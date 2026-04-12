@@ -30,8 +30,8 @@ type PlayerConfig struct {
 
 // DefaultPlayerConfig 默认玩家配置
 var DefaultPlayerConfig = PlayerConfig{
-	MaxHP:    10,
-	MaxLP:    5,
+	MaxHP:    6,
+	MaxLP:    10,
 	StartPos: 0,
 }
 

@@ -87,28 +87,28 @@ func TestEventTypeString(t *testing.T) {
 	}
 }
 
-func TestEventTypeGetAttribute(t *testing.T) {
+func TestEventTypeGetEventAttribute(t *testing.T) {
 	// 良性事件
 	goodEvents := []EventType{EventTypeHerb, EventTypeMilkTea, EventTypeRelic, EventTypeDivineBless}
 	for _, et := range goodEvents {
-		if et.GetAttribute() != AttributeGood {
-			t.Errorf("EventType(%d).GetAttribute() = %d, expected Good", et, et.GetAttribute())
+		if et.GetEventAttribute() != AttributeGood {
+			t.Errorf("EventType(%d).GetEventAttribute() = %d, expected Good", et, et.GetEventAttribute())
 		}
 	}
 
 	// 中性事件
 	neutralEvents := []EventType{EventTypeExchange, EventTypeHiddenBuff, EventTypeTasteTest}
 	for _, et := range neutralEvents {
-		if et.GetAttribute() != AttributeNeutral {
-			t.Errorf("EventType(%d).GetAttribute() = %d, expected Neutral", et, et.GetAttribute())
+		if et.GetEventAttribute() != AttributeNeutral {
+			t.Errorf("EventType(%d).GetEventAttribute() = %d, expected Neutral", et, et.GetEventAttribute())
 		}
 	}
 
 	// 恶性事件
 	badEvents := []EventType{EventTypeMosquito, EventTypeGhostHit, EventTypeDogPoop, EventTypeThief, EventTypeCurseBuddha, EventTypeLostWay, EventTypeThunder}
 	for _, et := range badEvents {
-		if et.GetAttribute() != AttributeBad {
-			t.Errorf("EventType(%d).GetAttribute() = %d, expected Bad", et, et.GetAttribute())
+		if et.GetEventAttribute() != AttributeBad {
+			t.Errorf("EventType(%d).GetEventAttribute() = %d, expected Bad", et, et.GetEventAttribute())
 		}
 	}
 }

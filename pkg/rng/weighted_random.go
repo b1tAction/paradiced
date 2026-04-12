@@ -106,7 +106,7 @@ func (p *WeightedPool) Draw() (*WeightedItem, error) {
 	r := p.rng.Intn(p.TotalWeight)
 
 	// 找到对应的项
- cumulative := 0
+ 	cumulative := 0
 	for _, item := range p.Items {
 	 cumulative += item.Weight
 		if r < cumulative {
@@ -134,7 +134,7 @@ func (p *WeightedPool) DrawWithType(itemType string) (*WeightedItem, error) {
 
 	// 在该类型范围内抽取
 	r := p.rng.Intn(totalWeight)
- cumulative := 0
+ 	cumulative := 0
 	for _, item := range items {
 	 cumulative += item.Weight
 		if r < cumulative {
