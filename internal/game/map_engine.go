@@ -118,7 +118,7 @@ type PathResult struct {
 	TargetIndex    int   `json:"target_index"`     // 目标位置（实际到达位置）
 	OriginalTarget int   `json:"original_target"`  // 原始目标位置（骰子步数计算）
 	Path           []int `json:"path"`             // 经过的格子索引列表
-	Interrupted    bool  `json:"interrupted"`      // 是否被中断（如掉落 fragile）
+	Interrupted    bool  `json:"interrupted"`      // 是否被中断 alias for FellDown, saved for other interrupt behavs
 	FellDown       bool  `json:"fell_down"`        // 是否掉落（最终落点为未碎fragile）
 	BrokenFragiles []int `json:"broken_fragiles"`  // 本次移动中碎裂的 Fragile 格子索引
 	ReachedEnd     bool  `json:"reached_end"`      // 是否到达终点
@@ -134,9 +134,9 @@ func (m *MapEngine) CalculatePath(start int, steps int) (*PathResult, error) {
 	if start < 0 || start >= m.Length {
 		return nil, errors.New("start index out of bounds")
 	}
-	if steps < 0 {
-		return nil, errors.New("steps cannot be negative")
-	}
+	// if steps < 0 {
+	// 	return nil, errors.New("steps cannot be negative")
+	// }
 
 	result := &PathResult{
 		StartIndex:     start,
