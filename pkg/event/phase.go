@@ -12,18 +12,23 @@ const (
 	PhasePreDamage               // 受伤前（隐匿、护盾）
 	PhaseAfterTurn               // 回合结束后（甘霖/腐化 HP±1，TickDuration）
 	PhaseAnyTime                 // 任何时候可用（道具主动使用）
+	// 事件驱动型 Phase - Buff 生命周期事件
+	PhaseOnBuffApplied           // 当任意 Buff 被挂载到玩家身上时触发
+	PhaseOnBuffRemoved           // 当任意 Buff 从玩家身上被移除/失效时触发
 )
 
 // String 返回Phase的字符串表示
 func (p Phase) String() string {
 	names := map[Phase]string{
-		PhaseBeforeTurn: "BeforeTurn",
-		PhaseOnMove:     "OnMove",
-		PhaseOnLand:     "OnLand",
-		PhasePreEvent:   "PreEvent",
-		PhasePreDamage:  "PreDamage",
-		PhaseAfterTurn:  "AfterTurn",
-		PhaseAnyTime:    "AnyTime",
+		PhaseBeforeTurn:     "BeforeTurn",
+		PhaseOnMove:         "OnMove",
+		PhaseOnLand:         "OnLand",
+		PhasePreEvent:       "PreEvent",
+		PhasePreDamage:      "PreDamage",
+		PhaseAfterTurn:      "AfterTurn",
+		PhaseAnyTime:        "AnyTime",
+		PhaseOnBuffApplied:  "OnBuffApplied",
+		PhaseOnBuffRemoved:  "OnBuffRemoved",
 	}
 	if name, ok := names[p]; ok {
 		return name
@@ -33,11 +38,12 @@ func (p Phase) String() string {
 
 // IsValid 检查Phase是否有效
 func (p Phase) IsValid() bool {
-	return p >= PhaseBeforeTurn && p <= PhaseAnyTime
+	return p >= PhaseBeforeTurn && p <= PhaseOnBuffRemoved
 }
 
 // NeedsSubscription 判断该Phase是否需要订阅EventBus
 // AnyTime类型不订阅，需要主动触发
+// PhaseOnBuffApplied 和 PhaseOnBuffRemoved 需要订阅以监听 Buff 生命周期事件
 func (p Phase) NeedsSubscription() bool {
 	return p != PhaseAnyTime
 }
