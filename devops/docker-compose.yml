@@ -6,7 +6,7 @@ services:
       - ..:/app # pass the whole proj to the claude
       - ~/.ssh:/root/.ssh:ro
       - ./run-claude.sh:/usr/local/bin/run-claude:rwx
-      - ./prepare.sh:/usr/local/bin/prepare:rwx
+      - ./prepare.sh:/usr/local/bin/prepare.sh:rwx
     command: bash /usr/local/bin/prepare.sh
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
