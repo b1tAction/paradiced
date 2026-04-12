@@ -2,6 +2,8 @@ package game
 
 import (
 	"testing"
+
+	"github.com/b1tAction/Fated/pkg/event"
 )
 
 // ========== Evaluation Tests ==========
@@ -433,6 +435,200 @@ func TestBuffRegistryGetAllBuffDefinitions(t *testing.T) {
 	for _, def := range defs {
 		if !def.Eval.IsValid() {
 			t.Errorf("BuffDefinition for %s has invalid Evaluation %d", def.Name, def.Eval)
+		}
+	}
+}
+
+// ========== BuffDefinition Phase Tests ==========
+
+func TestBuffDefinitionPhase(t *testing.T) {
+	// 测试诅咒 Buff 的 Phase
+	def := BuffTypeCurse.GetBuffDefinition()
+	if def.Phase != event.PhaseBeforeTurn {
+		t.Errorf("Curse Phase = %s, expected BeforeTurn", def.Phase.String())
+	}
+
+	// 测试神眷 Buff 的 Phase
+	def = BuffTypeDivine.GetBuffDefinition()
+	if def.Phase != event.PhaseBeforeTurn {
+		t.Errorf("Divine Phase = %s, expected BeforeTurn", def.Phase.String())
+	}
+
+	// 测试隐匿 Buff 的 Phase（受伤前免疫）
+	def = BuffTypeHidden.GetBuffDefinition()
+	if def.Phase != event.PhasePreDamage {
+		t.Errorf("Hidden Phase = %s, expected PreDamage", def.Phase.String())
+	}
+
+	// 测试迷途 Buff 的 Phase（移动时反向）
+	def = BuffTypeLost.GetBuffDefinition()
+	if def.Phase != event.PhaseOnMove {
+		t.Errorf("Lost Phase = %s, expected OnMove", def.Phase.String())
+	}
+
+	// 测试腐化 Buff 的 Phase（回合结束后）
+	def = BuffTypeCorrupt.GetBuffDefinition()
+	if def.Phase != event.PhaseAfterTurn {
+		t.Errorf("Corrupt Phase = %s, expected AfterTurn", def.Phase.String())
+	}
+
+	// 测试甘霖 Buff 的 Phase（回合结束后）
+	def = BuffTypeRain.GetBuffDefinition()
+	if def.Phase != event.PhaseAfterTurn {
+		t.Errorf("Rain Phase = %s, expected AfterTurn", def.Phase.String())
+	}
+
+	// 测试辟邪 Buff 的 Phase（事件触发前）
+	def = BuffTypeExorcism.GetBuffDefinition()
+	if def.Phase != event.PhasePreEvent {
+		t.Errorf("Exorcism Phase = %s, expected PreEvent", def.Phase.String())
+	}
+
+	// 测试毒瘴 Buff 的 Phase（回合开始前）
+	def = BuffTypePoison.GetBuffDefinition()
+	if def.Phase != event.PhaseBeforeTurn {
+		t.Errorf("Poison Phase = %s, expected BeforeTurn", def.Phase.String())
+	}
+
+	// 测试离火 Buff 的 Phase（永久被动）
+	def = BuffTypeFire.GetBuffDefinition()
+	if def.Phase != event.PhasePassive {
+		t.Errorf("Fire Phase = %s, expected Passive", def.Phase.String())
+	}
+}
+
+func TestBuffDefinitionPriority(t *testing.T) {
+	// 测试隐匿 Buff 的优先级（高优先级，免疫伤害）
+	def := BuffTypeHidden.GetBuffDefinition()
+	if def.Priority != 100 {
+		t.Errorf("Hidden Priority = %d, expected 100 (highest)", def.Priority)
+	}
+
+	// 测试迷途 Buff 的优先级（高优先级）
+	def = BuffTypeLost.GetBuffDefinition()
+	if def.Priority != 100 {
+		t.Errorf("Lost Priority = %d, expected 100", def.Priority)
+	}
+
+	// 测试辟邪 Buff 的优先级
+	def = BuffTypeExorcism.GetBuffDefinition()
+	if def.Priority != 80 {
+		t.Errorf("Exorcism Priority = %d, expected 80", def.Priority)
+	}
+
+	// 测试神眷/诅咒 Buff 的优先级（标准）
+	def = BuffTypeDivine.GetBuffDefinition()
+	if def.Priority != 50 {
+		t.Errorf("Divine Priority = %d, expected 50", def.Priority)
+	}
+
+	def = BuffTypeCurse.GetBuffDefinition()
+	if def.Priority != 50 {
+		t.Errorf("Curse Priority = %d, expected 50", def.Priority)
+	}
+
+	// 测试毒瘴 Buff 的优先级（低优先级）
+	def = BuffTypePoison.GetBuffDefinition()
+	if def.Priority != 30 {
+		t.Errorf("Poison Priority = %d, expected 30 (lowest)", def.Priority)
+	}
+}
+
+func TestBuffDefinitionNeedConfirm(t *testing.T) {
+	// 所有 Buff 默认不需要用户确认
+	registry := NewBuffRegistry()
+	for _, bt := range registry.AllBuffs {
+		def := bt.GetBuffDefinition()
+		if def == nil {
+			continue
+		}
+		// Buff 效果默认自动执行，不需要确认
+		if def.NeedConfirm {
+			t.Errorf("Buff %s should not need confirm by default", bt.String())
+		}
+	}
+}
+
+func TestBuffDefinitionPhaseNeedsSubscription(t *testing.T) {
+	// 测试 Phase 是否需要订阅 EventBus
+	tests := []struct {
+		bt           BuffType
+		needsSub     bool
+		reason       string
+	}{
+		{BuffTypeCurse, true, "BeforeTurn 需要订阅"},
+		{BuffTypeDivine, true, "BeforeTurn 需要订阅"},
+		{BuffTypeHidden, true, "PreDamage 需要订阅"},
+		{BuffTypeLost, true, "OnMove 需要订阅"},
+		{BuffTypeCorrupt, true, "AfterTurn 需要订阅"},
+		{BuffTypeRain, true, "AfterTurn 需要订阅"},
+		{BuffTypeExorcism, true, "PreEvent 需要订阅"},
+		{BuffTypePoison, true, "BeforeTurn 需要订阅"},
+		{BuffTypeFire, false, "Passive 不需要订阅（特殊处理）"},
+	}
+
+	for _, tt := range tests {
+		def := tt.bt.GetBuffDefinition()
+		if def == nil {
+			t.Errorf("BuffType(%s) has no definition", tt.bt.String())
+			continue
+		}
+		if def.Phase.NeedsSubscription() != tt.needsSub {
+			t.Errorf("%s: Phase.NeedsSubscription() = %v, expected %v (%s)",
+				tt.bt.String(), def.Phase.NeedsSubscription(), tt.needsSub, tt.reason)
+		}
+	}
+}
+
+func TestBuffDefinitionDurationAndPhaseConsistency(t *testing.T) {
+	// 验证 Duration 和 Phase 的合理性
+	registry := NewBuffRegistry()
+	for _, bt := range registry.AllBuffs {
+		def := bt.GetBuffDefinition()
+		if def == nil {
+			continue
+		}
+
+		// 永久 Buff（Duration=-1）应该是 Passive 或特殊处理
+		if def.Duration == -1 {
+			if bt == BuffTypeFire {
+				// 离火是永久被动，正确
+				if def.Phase != event.PhasePassive {
+					t.Errorf("Permanent buff %s should be Passive phase", bt.String())
+				}
+			}
+		}
+
+		// 有持续时间的 Buff 应该有有效的 Phase
+		if def.Duration > 0 {
+			if !def.Phase.IsValid() {
+				t.Errorf("Buff %s with duration %d has invalid Phase", bt.String(), def.Duration)
+			}
+		}
+	}
+}
+
+func TestBuffDefinitionSpecialEffects(t *testing.T) {
+	// 测试特殊效果标记
+	tests := []struct {
+		bt          BuffType
+		expected    string
+	}{
+		{BuffTypeHidden, "immune"},
+		{BuffTypeLost, "reverse"},
+		{BuffTypeExorcism, "immune_poison"},
+		{BuffTypePoison, "bad_event_per_turn"},
+		{BuffTypeFire, "zhuque_passive"},
+	}
+
+	for _, tt := range tests {
+		def := tt.bt.GetBuffDefinition()
+		if def == nil {
+			t.Errorf("BuffType(%s) has no definition", tt.bt.String())
+			continue
+		}
+		if def.Special != tt.expected {
+			t.Errorf("%s Special = %s, expected %s", tt.bt.String(), def.Special, tt.expected)
 		}
 	}
 }
