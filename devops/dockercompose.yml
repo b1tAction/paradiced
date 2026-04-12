@@ -1,0 +1,15 @@
+services:
+  claude-dev:
+    build: .
+    container_name: claude_backend_dev
+    volumes:
+      - ..:/app # pass the whole proj to the claude
+      - ~/.ssh:/root/.ssh:ro
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL}
+      - ANTHROPIC_BASE_MODEL=glm-5
+    stdin_open: true
+    tty: true
+    tmpfs:
+      - /go/pkg
