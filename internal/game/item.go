@@ -1,7 +1,7 @@
 package game
 
 import (
-	"github.com/fate-dice/game-server/pkg/event"
+	"github.com/b1tAction/Fated/pkg/event"
 )
 
 // ========== Item 类型定义 ==========

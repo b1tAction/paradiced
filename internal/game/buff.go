@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/fate-dice/game-server/pkg/event"
+	"github.com/b1tAction/Fated/pkg/event"
 )
 
 // ========== Evaluation 属性评分系统 ==========

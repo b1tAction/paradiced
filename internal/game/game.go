@@ -3,7 +3,7 @@ package game
 import (
 	"sync"
 
-	"github.com/fate-dice/game-server/pkg/event"
+	"github.com/b1tAction/Fated/pkg/event"
 )
 
 // Game 游戏实例，包含EventBus和所有玩家
