@@ -60,7 +60,7 @@ func (bt BuffType) GetEvaluation() Evaluation {
 		BuffTypeCorrupt:  EvaluationBad,      // 腐化：较恶
 		BuffTypePoison:   EvaluationVeryBad,  // 毒瘴：极恶
 		BuffTypeDivine:   EvaluationVeryGood, // 神眷：极良
-		BuffTypeHidden:   EvaluationExcellent, // 隐匿：最佳（免疫）
+		BuffTypeHidden:   EvaluationNeutral, // 隐匿： 中性
 		BuffTypeRain:     EvaluationGood,     // 甘霖：较良
 		BuffTypeExorcism: EvaluationMildGood, // 辟邪：轻良
 		BuffTypeFire:     EvaluationGood,     // 离火：较良
@@ -74,19 +74,20 @@ func (bt BuffType) GetEvaluation() Evaluation {
 // ========== Buff 实例 ==========
 
 type Buff struct {
-	Type           BuffType `json:"type"`
-	ID             string   `json:"id"`              // Buff实例ID
-	Duration       int      `json:"duration"`
-	Charge         int      `json:"charge"`
-	SubscriptionID string   `json:"subscription_id"` // EventBus订阅ID（由 engine 包管理）
+	Type            BuffType  `json:"type"`
+	ID              string    `json:"id"`               // Buff实例ID
+	Duration        int       `json:"duration"`
+	Charge          int       `json:"charge"`
+	SubscriptionIDs []string  `json:"subscription_ids"` // EventBus订阅ID列表（由 engine 包管理，支持多Phase订阅）
 }
 
 func NewBuff(buffType BuffType, duration int) *Buff {
 	return &Buff{
-		Type:     buffType,
-		ID:       fmt.Sprintf("buff-%d", time.Now().UnixNano()),
-		Duration: duration,
-		Charge:   0,
+		Type:            buffType,
+		ID:              fmt.Sprintf("buff-%d", time.Now().UnixNano()),
+		Duration:        duration,
+		Charge:          0,
+		SubscriptionIDs: make([]string, 0),
 	}
 }
 
@@ -104,17 +105,33 @@ func (b *Buff) TickDuration() bool {
 // ========== Buff 静态定义 ==========
 
 type BuffDefinition struct {
-	Type        BuffType    `json:"type"`
-	Eval        Evaluation  `json:"evaluation"`    // 评分
-	Name        string      `json:"name"`
-	Desc        string      `json:"desc"`
-	Duration    int         `json:"duration"`
-	HPPerTurn   int         `json:"hp_per_turn"`
-	LPPerTurn   int         `json:"lp_per_turn"`
-	Special     string      `json:"special"`
-	Phase       event.Phase `json:"phase"`         // 触发时机
-	Priority    int         `json:"priority"`      // 执行优先级
-	NeedConfirm bool        `json:"need_confirm"`  // 是否需要用户确认（默认false）
+	Type        BuffType      `json:"type"`
+	Eval        Evaluation    `json:"evaluation"`    // 评分
+	Name        string        `json:"name"`
+	Desc        string        `json:"desc"`
+	Duration    int           `json:"duration"`
+	HPPerTurn   int           `json:"hp_per_turn"`
+	LPPerTurn   int           `json:"lp_per_turn"`
+	Special     string        `json:"special"`
+	Phases      []event.Phase `json:"phases"`        // 触发时机列表（支持多Phase）
+	Priority    int           `json:"priority"`      // 执行优先级
+	NeedConfirm bool          `json:"need_confirm"`  // 是否需要用户确认（默认false）
+}
+
+// GetPhases 返回 Buff 的触发时机列表
+// 向后兼容：如果 Phases 为空，返回默认 Phase（不会发生，所有 Buff 都有定义）
+func (def *BuffDefinition) GetPhases() []event.Phase {
+	return def.Phases
+}
+
+// HasPhase 检查 Buff 是否在指定 Phase 触发
+func (def *BuffDefinition) HasPhase(phase event.Phase) bool {
+	for _, p := range def.Phases {
+		if p == phase {
+			return true
+		}
+	}
+	return false
 }
 
 func (bt BuffType) GetBuffDefinition() *BuffDefinition {
@@ -127,7 +144,7 @@ func (bt BuffType) GetBuffDefinition() *BuffDefinition {
 			Desc:      "接下来3回合LP-1",
 			Duration:  3,
 			LPPerTurn: -1,
-			Phase:     event.PhaseBeforeTurn,
+			Phases:    []event.Phase{event.PhaseBeforeTurn},
 			Priority:  50,
 		},
 		BuffTypeDivine: {
@@ -137,7 +154,7 @@ func (bt BuffType) GetBuffDefinition() *BuffDefinition {
 			Desc:      "接下来3回合LP+1",
 			Duration:  3,
 			LPPerTurn: 1,
-			Phase:     event.PhaseBeforeTurn,
+			Phases:    []event.Phase{event.PhaseBeforeTurn},
 			Priority:  50,
 		},
 		BuffTypeHidden: {
@@ -147,7 +164,7 @@ func (bt BuffType) GetBuffDefinition() *BuffDefinition {
 			Desc:      "接下来3回合免疫任意事件、BUFF或道具的影响",
 			Duration:  3,
 			Special:   "immune",
-			Phase:     event.PhasePreDamage,
+			Phases:    []event.Phase{event.PhasePreDamage},
 			Priority:  100,
 		},
 		BuffTypeLost: {
@@ -157,7 +174,7 @@ func (bt BuffType) GetBuffDefinition() *BuffDefinition {
 			Desc:      "下1回合朝反方向移动",
 			Duration:  1,
 			Special:   "reverse",
-			Phase:     event.PhaseOnMove,
+			Phases:    []event.Phase{event.PhaseOnMove},
 			Priority:  100,
 		},
 		BuffTypeCorrupt: {
@@ -167,7 +184,7 @@ func (bt BuffType) GetBuffDefinition() *BuffDefinition {
 			Desc:      "接下来4回合每2回合HP-1",
 			Duration:  4,
 			HPPerTurn: -1,
-			Phase:     event.PhaseAfterTurn,
+			Phases:    []event.Phase{event.PhaseAfterTurn},
 			Priority:  50,
 		},
 		BuffTypeRain: {
@@ -177,7 +194,7 @@ func (bt BuffType) GetBuffDefinition() *BuffDefinition {
 			Desc:      "接下来4回合每2回合HP+1",
 			Duration:  4,
 			HPPerTurn: 1,
-			Phase:     event.PhaseAfterTurn,
+			Phases:    []event.Phase{event.PhaseAfterTurn},
 			Priority:  50,
 		},
 		BuffTypeExorcism: {
@@ -187,7 +204,7 @@ func (bt BuffType) GetBuffDefinition() *BuffDefinition {
 			Desc:      "接下来5回合无视毒瘴buff",
 			Duration:  5,
 			Special:   "immune_poison",
-			Phase:     event.PhasePreEvent,
+			Phases:    []event.Phase{event.PhasePreEvent},
 			Priority:  80,
 		},
 		BuffTypePoison: {
@@ -197,7 +214,7 @@ func (bt BuffType) GetBuffDefinition() *BuffDefinition {
 			Desc:      "接下来3回合每回合受一次恶性随机事件影响",
 			Duration:  3,
 			Special:   "bad_event_per_turn",
-			Phase:     event.PhaseBeforeTurn,
+			Phases:    []event.Phase{event.PhaseBeforeTurn},
 			Priority:  30,
 		},
 		BuffTypeFire: {
@@ -207,7 +224,7 @@ func (bt BuffType) GetBuffDefinition() *BuffDefinition {
 			Desc:      "朱雀阵营增益，每4回合LP+1",
 			Duration:  -1,
 			Special:   "zhuque_passive",
-			Phase:     event.PhaseBeforeTurn,
+			Phases:    []event.Phase{event.PhaseBeforeTurn},
 			Priority:  10,
 		},
 	}

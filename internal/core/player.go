@@ -32,7 +32,7 @@ type PlayerConfig struct {
 // DefaultPlayerConfig 默认玩家配置
 var DefaultPlayerConfig = PlayerConfig{
 	MaxHP:    6,
-	MaxLP:    10,
+	MaxLP:    8, // 与 ModifyLP 的 LP 范围限制一致
 	StartPos: 0,
 }
 
