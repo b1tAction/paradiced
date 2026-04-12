@@ -3,7 +3,7 @@ package game
 import (
 	"sort"
 
-	"github.com/fate-dice/game-server/pkg/event"
+	"github.com/b1tAction/Fated/pkg/event"
 )
 
 // StateMachine 状态机，处理Phase触发和用户决策等待
@@ -27,13 +27,23 @@ func NewStateMachine(game *Game) *StateMachine {
 // 返回需要用户确认的Decision列表
 // 如果返回非空列表，状态机进入等待状态，流程暂停
 func (sm *StateMachine) TriggerPhase(phase event.Phase, player *Player) []*event.Decision {
-	// 创建上下文
-	ctx := event.NewContext(player).
-		WithState(&event.GameState{
-			Round:        sm.Game.State.Round,
-			Turn:         sm.Game.State.Turn,
-			CurrentPhase: phase,
-		})
+	return sm.TriggerPhaseWithCtx(phase, player, nil)
+}
+
+// TriggerPhaseWithCtx 触发某个Phase，可传入预设的Context
+func (sm *StateMachine) TriggerPhaseWithCtx(phase event.Phase, player *Player, presetCtx *event.Context) []*event.Decision {
+	// 创建或使用预设上下文
+	ctx := presetCtx
+	if ctx == nil {
+		ctx = event.NewContext(player)
+	}
+
+	// 设置游戏状态
+	ctx = ctx.WithState(&event.GameState{
+		Round:        sm.Game.State.Round,
+		Turn:         sm.Game.State.Turn,
+		CurrentPhase: phase,
+	})
 
 	sm.CurrentCtx = ctx
 
@@ -154,8 +164,7 @@ func (sm *StateMachine) ExecutePreEventPhase(player *Player) []*event.Decision {
 // ExecutePreDamagePhase 执行受伤前Phase
 func (sm *StateMachine) ExecutePreDamagePhase(player *Player, damage int) []*event.Decision {
 	ctx := event.NewContext(player).WithData(damage)
-	sm.CurrentCtx = ctx
-	return sm.TriggerPhase(event.PhasePreDamage, player)
+	return sm.TriggerPhaseWithCtx(event.PhasePreDamage, player, ctx)
 }
 
 // ExecuteAfterTurnPhase 执行回合结束后Phase
