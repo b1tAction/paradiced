@@ -60,7 +60,7 @@ func (bt BuffType) GetEvaluation() Evaluation {
 		BuffTypeCorrupt:  EvaluationBad,      // 腐化：较恶
 		BuffTypePoison:   EvaluationVeryBad,  // 毒瘴：极恶
 		BuffTypeDivine:   EvaluationVeryGood, // 神眷：极良
-		BuffTypeHidden:   EvaluationNeutral, // 隐匿：中性
+		BuffTypeHidden:   EvaluationExcellent, // 隐匿：最佳（免疫）
 		BuffTypeRain:     EvaluationGood,     // 甘霖：较良
 		BuffTypeExorcism: EvaluationMildGood, // 辟邪：轻良
 		BuffTypeFire:     EvaluationGood,     // 离火：较良

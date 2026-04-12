@@ -1,8 +1,9 @@
-package game
+package engine
 
 import (
 	"testing"
 
+	"github.com/b1tAction/Fated/internal/core"
 	"github.com/b1tAction/Fated/pkg/event"
 )
 
@@ -50,9 +51,9 @@ func TestGameBusCreation(t *testing.T) {
 
 func TestGameAddPlayer(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{
+	player := core.NewPlayer(core.PlayerConfig{
 		UserID:  "player-001",
-		Faction: FactionQingLong,
+		Faction: core.FactionQingLong,
 	})
 
 	game.AddPlayer(player)
@@ -69,9 +70,9 @@ func TestGameAddMultiplePlayers(t *testing.T) {
 	game := NewGame("game-001")
 
 	for i := 1; i <= 4; i++ {
-		player := NewPlayer(PlayerConfig{
+		player := core.NewPlayer(core.PlayerConfig{
 			UserID:  "player-" + string(rune('0'+i)),
-			Faction: Faction(i),
+			Faction: core.Faction(i),
 		})
 		game.AddPlayer(player)
 	}
@@ -83,8 +84,8 @@ func TestGameAddMultiplePlayers(t *testing.T) {
 
 func TestGameRemovePlayer(t *testing.T) {
 	game := NewGame("game-001")
-	player1 := NewPlayer(PlayerConfig{UserID: "player-001"})
-	player2 := NewPlayer(PlayerConfig{UserID: "player-002"})
+	player1 := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
+	player2 := core.NewPlayer(core.PlayerConfig{UserID: "player-002"})
 
 	game.AddPlayer(player1)
 	game.AddPlayer(player2)
@@ -101,10 +102,10 @@ func TestGameRemovePlayer(t *testing.T) {
 
 func TestGameRemovePlayerCancelsSubscriptions(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 
 	// 添加一个需要订阅的 Buff
-	buff := NewBuff(BuffTypeCurse, 3)
+	buff := core.NewBuff(core.BuffTypeCurse, 3)
 	player.AddBuff(buff)
 	game.AddPlayer(player)
 
@@ -124,8 +125,8 @@ func TestGameRemovePlayerCancelsSubscriptions(t *testing.T) {
 
 func TestGameGetPlayer(t *testing.T) {
 	game := NewGame("game-001")
-	player1 := NewPlayer(PlayerConfig{UserID: "player-001"})
-	player2 := NewPlayer(PlayerConfig{UserID: "player-002"})
+	player1 := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
+	player2 := core.NewPlayer(core.PlayerConfig{UserID: "player-002"})
 
 	game.AddPlayer(player1)
 	game.AddPlayer(player2)
@@ -146,8 +147,8 @@ func TestGameGetPlayer(t *testing.T) {
 
 func TestGameGetCurrentPlayer(t *testing.T) {
 	game := NewGame("game-001")
-	player1 := NewPlayer(PlayerConfig{UserID: "player-001"})
-	player2 := NewPlayer(PlayerConfig{UserID: "player-002"})
+	player1 := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
+	player2 := core.NewPlayer(core.PlayerConfig{UserID: "player-002"})
 
 	game.AddPlayer(player1)
 	game.AddPlayer(player2)
@@ -171,7 +172,7 @@ func TestGameGetCurrentPlayer(t *testing.T) {
 func TestGameNextTurn(t *testing.T) {
 	game := NewGame("game-001")
 	for i := 1; i <= 3; i++ {
-		player := NewPlayer(PlayerConfig{UserID: "player-00" + string(rune('0'+i))})
+		player := core.NewPlayer(core.PlayerConfig{UserID: "player-00" + string(rune('0'+i))})
 		game.AddPlayer(player)
 	}
 
@@ -204,15 +205,15 @@ func TestGameNextTurn(t *testing.T) {
 
 func TestGameSubscribeBuff(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
 	// 添加需要订阅的 Buff (诅咒)
-	buff := NewBuff(BuffTypeCurse, 3)
+	buff := core.NewBuff(core.BuffTypeCurse, 3)
 	game.SubscribeBuff(player, buff)
 
 	// 验证订阅已创建
-	def := BuffTypeCurse.GetBuffDefinition()
+	def := core.BuffTypeCurse.GetBuffDefinition()
 	if def.Phase.NeedsSubscription() {
 		if game.Bus.GetSubscriptionCount() != 1 {
 			t.Errorf("Subscription count = %d, expected 1", game.Bus.GetSubscriptionCount())
@@ -225,15 +226,15 @@ func TestGameSubscribeBuff(t *testing.T) {
 
 func TestGameSubscribePassiveBuff(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
 	// 添加永久 Buff (离火，现在使用 BeforeTurn)
-	buff := NewBuff(BuffTypeFire, -1)
+	buff := core.NewBuff(core.BuffTypeFire, -1)
 	game.SubscribeBuff(player, buff)
 
 	// 离火现在需要订阅 BeforeTurn（每4回合检查）
-	def := BuffTypeFire.GetBuffDefinition()
+	def := core.BuffTypeFire.GetBuffDefinition()
 	if def.Phase.NeedsSubscription() {
 		if buff.SubscriptionID == "" {
 			t.Error("Fire Buff should have SubscriptionID (BeforeTurn)")
@@ -243,11 +244,11 @@ func TestGameSubscribePassiveBuff(t *testing.T) {
 
 func TestGameUnsubscribeBuff(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
 	// 订阅 Buff
-	buff := NewBuff(BuffTypeCurse, 3)
+	buff := core.NewBuff(core.BuffTypeCurse, 3)
 	game.SubscribeBuff(player, buff)
 
 	initialCount := game.Bus.GetSubscriptionCount()
@@ -265,21 +266,21 @@ func TestGameUnsubscribeBuff(t *testing.T) {
 
 func TestGameSubscribeBuffByPlayerAdd(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{
+	player := core.NewPlayer(core.PlayerConfig{
 		UserID:  "player-001",
-		Faction: FactionZhuQue, // 朱雀初始携带离火 Buff
+		Faction: core.FactionZhuQue, // 朱雀初始携带离火 Buff
 	})
 
-	// 朱雀玩家初始有离火 Buff（永久被动，不需要订阅）
+	// 朱雀玩家初始有离火 Buff（永久被动）
 	game.AddPlayer(player)
 
 	// 验证玩家有离火 Buff
-	if !player.HasBuff(BuffTypeFire) {
+	if !player.HasBuff(core.BuffTypeFire) {
 		t.Error("ZhuQue player should have Fire buff")
 	}
 
 	// 离火现在使用 BeforeTurn，需要订阅
-	def := BuffTypeFire.GetBuffDefinition()
+	def := core.BuffTypeFire.GetBuffDefinition()
 	if def.Phase.NeedsSubscription() {
 		// BeforeTurn 需要订阅
 		if game.Bus.GetSubscriptionCount() != 1 {
@@ -292,15 +293,15 @@ func TestGameSubscribeBuffByPlayerAdd(t *testing.T) {
 
 func TestGameSubscribeItem(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
 	// 添加需要订阅的道具 (骰子升级卡)
-	item := NewItem(ItemTypeDiceUpgrade, "item-001")
+	item := core.NewItem(core.ItemTypeDiceUpgrade, "item-001")
 	game.SubscribeItem(player, item)
 
 	// 验证订阅已创建
-	def := ItemTypeDiceUpgrade.GetItemDefinition()
+	def := core.ItemTypeDiceUpgrade.GetItemDefinition()
 	if def.Phase.NeedsSubscription() {
 		if game.Bus.GetSubscriptionCount() != 1 {
 			t.Errorf("Subscription count = %d, expected 1", game.Bus.GetSubscriptionCount())
@@ -313,15 +314,15 @@ func TestGameSubscribeItem(t *testing.T) {
 
 func TestGameSubscribeAnyTimeItem(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
 	// 添加 AnyTime 道具 (反方向的钟)
-	item := NewItem(ItemTypeReverseClock, "item-001")
+	item := core.NewItem(core.ItemTypeReverseClock, "item-001")
 	game.SubscribeItem(player, item)
 
 	// AnyTime 道具不需要订阅（主动触发）
-	def := ItemTypeReverseClock.GetItemDefinition()
+	def := core.ItemTypeReverseClock.GetItemDefinition()
 	if def.Phase == event.PhaseAnyTime {
 		if item.SubscriptionID != "" {
 			t.Error("AnyTime Item should not have SubscriptionID")
@@ -331,11 +332,11 @@ func TestGameSubscribeAnyTimeItem(t *testing.T) {
 
 func TestGameUnsubscribeItem(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
 	// 订阅道具
-	item := NewItem(ItemTypeDiceUpgrade, "item-001")
+	item := core.NewItem(core.ItemTypeDiceUpgrade, "item-001")
 	game.SubscribeItem(player, item)
 
 	initialCount := game.Bus.GetSubscriptionCount()
@@ -355,13 +356,13 @@ func TestGameUnsubscribeItem(t *testing.T) {
 
 func TestGameMultipleBuffSubscriptions(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
 	// 添加多个 Buff
-	buff1 := NewBuff(BuffTypeCurse, 3)     // BeforeTurn
-	buff2 := NewBuff(BuffTypeDivine, 3)    // BeforeTurn
-	buff3 := NewBuff(BuffTypeHidden, 3)    // PreDamage
+	buff1 := core.NewBuff(core.BuffTypeCurse, 3)     // BeforeTurn
+	buff2 := core.NewBuff(core.BuffTypeDivine, 3)    // BeforeTurn
+	buff3 := core.NewBuff(core.BuffTypeHidden, 3)    // PreDamage
 
 	player.AddBuff(buff1)
 	player.AddBuff(buff2)
@@ -379,12 +380,12 @@ func TestGameMultipleBuffSubscriptions(t *testing.T) {
 
 func TestGameMixedSubscriptions(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
 	// 添加 Buff 和道具
-	buff := NewBuff(BuffTypeCurse, 3)
-	item := NewItem(ItemTypeDiceUpgrade, "item-001")
+	buff := core.NewBuff(core.BuffTypeCurse, 3)
+	item := core.NewItem(core.ItemTypeDiceUpgrade, "item-001")
 
 	player.AddBuff(buff)
 	player.AddItem(item)
@@ -402,8 +403,8 @@ func TestGameMixedSubscriptions(t *testing.T) {
 
 func TestGameCreateBuffDecision(t *testing.T) {
 	game := NewGame("game-001")
-	buff := NewBuff(BuffTypeCurse, 3)
-	def := BuffTypeCurse.GetBuffDefinition()
+	buff := core.NewBuff(core.BuffTypeCurse, 3)
+	def := core.BuffTypeCurse.GetBuffDefinition()
 
 	decision := game.createBuffDecision(buff, def)
 
@@ -421,8 +422,8 @@ func TestGameCreateBuffDecision(t *testing.T) {
 
 func TestGameCreateItemDecision(t *testing.T) {
 	game := NewGame("game-001")
-	item := NewItem(ItemTypeDiceUpgrade, "item-001")
-	def := ItemTypeDiceUpgrade.GetItemDefinition()
+	item := core.NewItem(core.ItemTypeDiceUpgrade, "item-001")
+	def := core.ItemTypeDiceUpgrade.GetItemDefinition()
 
 	decision := game.createItemDecision(item, def)
 

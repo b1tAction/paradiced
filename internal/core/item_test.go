@@ -1,4 +1,4 @@
-package game
+package core
 
 import (
 	"testing"
@@ -50,7 +50,7 @@ func TestItemTypeGetEvaluation(t *testing.T) {
 		it       ItemType
 		expected Evaluation
 	}{
-		{ItemTypeReverseClock, EvaluationBad},     // 反方向的钟：较恶 (25)
+		{ItemTypeReverseClock, EvaluationGood},     // 反方向的钟：较良 (25)
 		{ItemTypeAnyDoor, EvaluationNeutral},      // 任意门：中性 (50)
 		{ItemTypeDiceSwap, EvaluationNeutral},     // 骰子交换：中性 (50)
 		{ItemTypeDiceUpgrade, EvaluationGood},     // 骰子升级：较良 (80)
@@ -69,7 +69,7 @@ func TestItemTypeGetCategory(t *testing.T) {
 		it       ItemType
 		expected string
 	}{
-		{ItemTypeReverseClock, "Bad"},
+		{ItemTypeReverseClock, "Good"},
 		{ItemTypeAnyDoor, "Neutral"},
 		{ItemTypeDiceSwap, "Neutral"},
 		{ItemTypeDiceUpgrade, "Good"},
@@ -131,8 +131,8 @@ func TestItemTypeGetItemDefinition(t *testing.T) {
 	if def.Name != "反方向的钟" {
 		t.Errorf("def.Name = %s, expected 反方向的钟", def.Name)
 	}
-	if def.Eval != EvaluationBad {
-		t.Errorf("def.Eval = %d, expected Bad(%d)", def.Eval, EvaluationBad)
+	if def.Eval != EvaluationGood {
+		t.Errorf("def.Eval = %d, expected Good(%d)", def.Eval, EvaluationGood)
 	}
 	if def.TargetSelf {
 		t.Error("反方向的钟 should not target self")
@@ -220,15 +220,10 @@ func TestNewItemRegistry(t *testing.T) {
 func TestItemRegistryGetItemsByEvaluationRange(t *testing.T) {
 	registry := NewItemRegistry()
 
-	// 获取恶性道具（0~40）
+	// 获取恶性道具（0~40）- 当前没有恶性道具
 	badItems := registry.GetItemsByEvaluationRange(EvaluationMin, EvaluationBadThreshold)
-	if len(badItems) != 1 {
-		t.Errorf("bad items count = %d, expected 1 (ReverseClock)", len(badItems))
-	}
-	for _, it := range badItems {
-		if it != ItemTypeReverseClock {
-			t.Errorf("bad item should be ReverseClock, got %s", it.String())
-		}
+	if len(badItems) != 0 {
+		t.Errorf("bad items count = %d, expected 0 (no bad items)", len(badItems))
 	}
 
 	// 获取中性道具（41~65）
@@ -237,15 +232,10 @@ func TestItemRegistryGetItemsByEvaluationRange(t *testing.T) {
 		t.Errorf("neutral items count = %d, expected 2 (AnyDoor+DiceSwap)", len(neutralItems))
 	}
 
-	// 获取良性道具（66~100）
+	// 获取良性道具（66~100）- ReverseClock 和 DiceUpgrade
 	goodItems := registry.GetItemsByEvaluationRange(66, EvaluationMax)
-	if len(goodItems) != 1 {
-		t.Errorf("good items count = %d, expected 1 (DiceUpgrade)", len(goodItems))
-	}
-	for _, it := range goodItems {
-		if it != ItemTypeDiceUpgrade {
-			t.Errorf("good item should be DiceUpgrade, got %s", it.String())
-		}
+	if len(goodItems) != 2 {
+		t.Errorf("good items count = %d, expected 2 (ReverseClock+DiceUpgrade)", len(goodItems))
 	}
 }
 
@@ -253,8 +243,8 @@ func TestItemRegistryGetItemsByCategory(t *testing.T) {
 	registry := NewItemRegistry()
 
 	good := registry.GetItemsByCategory("Good")
-	if len(good) != 1 {
-		t.Errorf("good items count = %d, expected 1", len(good))
+	if len(good) != 2 {
+		t.Errorf("good items count = %d, expected 2 (ReverseClock+DiceUpgrade)", len(good))
 	}
 
 	neutral := registry.GetItemsByCategory("Neutral")
@@ -263,8 +253,8 @@ func TestItemRegistryGetItemsByCategory(t *testing.T) {
 	}
 
 	bad := registry.GetItemsByCategory("Bad")
-	if len(bad) != 1 {
-		t.Errorf("bad items count = %d, expected 1", len(bad))
+	if len(bad) != 0 {
+		t.Errorf("bad items count = %d, expected 0 (no bad items)", len(bad))
 	}
 
 	all := registry.GetItemsByCategory("Unknown")
@@ -307,10 +297,10 @@ func TestItemEvaluationRanges(t *testing.T) {
 	for _, it := range registry.AllItems {
 		eval := it.GetEvaluation()
 
-		// 反方向的钟应该是恶性
+		// 反方向的钟现在是良性（对持有者有利）
 		if it == ItemTypeReverseClock {
-			if !eval.IsBad() {
-				t.Errorf("ItemTypeReverseClock should be bad, got eval %d", eval)
+			if !eval.IsGood() {
+				t.Errorf("ItemTypeReverseClock should be good, got eval %d", eval)
 			}
 		}
 

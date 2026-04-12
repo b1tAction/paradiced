@@ -1,8 +1,20 @@
-# MapEngine (地图引擎) 实现文档
+# internal/gamemap - Map System
+
+地图系统包，管理游戏地图的生成和路径计算。
 
 ## 概述
 
 MapEngine 是《命运骰子》游戏的核心地图管理模块，负责线性地图的生成、格子状态管理和移动路径计算。
+
+## 文件结构
+
+```
+internal/gamemap/
+├── cell.go           # 格子类型定义
+├── engine.go         # 地图引擎实现
+├── engine_test.go    # 单元测试
+├── README.md         # 包文档
+```
 
 ## 数据结构
 
@@ -88,7 +100,7 @@ result, err := engine.CalculatePath(startPosition, diceSteps)
 type PathResult struct {
     StartIndex     int   // 起始位置
     TargetIndex    int   // 实际到达位置
-    OriginalTarget int   // 原始目标位置（骰子步数计算，可能超过终点）
+    OriginalTarget int   // 原始目标位置
     Path           []int // 经过的格子索引列表
     Interrupted    bool  // 是否被中断（掉落）
     FellDown       bool  // 是否掉落
@@ -96,35 +108,6 @@ type PathResult struct {
     ReachedEnd     bool  // 是否到达终点
 }
 ```
-
-**示例场景**：
-
-```
-地图：[0]-[1]-[2]-[3]-[4(F)]-[5]-[6]-[7]-[8(F)]-[9]-[10]
-      F = 未碎 Fragile
-
-场景1：玩家从位置0移动10步 → 经过位置4、最终落点位置10
-结果：位置4碎裂，玩家正常到达位置10（不中断）
-BrokenFragiles: [4]
-
-场景2：玩家从位置0移动8步 → 最终落点恰好是位置8（未碎Fragile）
-结果：位置8碎裂，玩家掉落（中断）
-BrokenFragiles: [4, 8]  （位置4经过时碎裂，位置8落点碎裂）
-
-场景3：后续玩家从位置0移动8步 → 最终落点是位置8（已碎Fragile）
-结果：玩家停在位置7（无法到达已碎Fragile）
-BrokenFragiles: [4]  （位置4经过时碎裂）
-```
-
-**其他特殊场景**：
-
-| 场景 | 处理方式 |
-|------|----------|
-| 从 Fragile 格子开始移动 | 不触发碎裂（已在上面） |
-| 步数为0 | 原地不动，不触发任何格子效果 |
-| 负数步数 | 允许反向移动（当前已启用） |
-| 移动超过终点 | 自动停在终点 |
-| 经过 Fog 格子 | 自动激活迷雾区域 |
 
 ### 3. 地图导入/导出
 
@@ -134,22 +117,6 @@ data, err := engine.Export()
 
 // 从 JSON 加载
 loaded, err := LoadMap(data)
-
-// 导入到现有引擎
-engine.Import(data)
-```
-
-JSON 格式示例：
-```json
-{
-  "cells": [
-    {"index": 0, "cell_type": 0, "is_broken": false, "event_id": "", "fog_active": false},
-    {"index": 10, "cell_type": 1, "is_broken": true, "event_id": "", "fog_active": false}
-  ],
-  "length": 50,
-  "start_index": 0,
-  "end_index": 49
-}
 ```
 
 ### 4. 辅助方法
@@ -166,29 +133,18 @@ JSON 格式示例：
 
 ## 测试覆盖
 
-测试文件：`internal/game/map_engine_test.go`
+测试文件：`internal/gamemap/engine_test.go`
 
 | 测试类 | 覆盖内容 |
 |--------|----------|
 | CellTypeTest | 类型字符串转换、有效性验证 |
 | MapCellTest | 格子创建、初始状态验证 |
 | MapEngineTest | 地图生成、长度边界、格子类型配置 |
-| CalculatePathTest | 正常移动、终点到达 |
-| FragileTest | **经过未碎Fragile、落点未碎Fragile、落点已碎Fragile、多个Fragile、从Fragile开始移动、步数为0** |
-| ExportImportTest | JSON序列化、数据一致性、异常处理 |
+| CalculatePathTest | 正常移动、终点到达、Fragile 逻辑 |
+| ExportImportTest | JSON序列化、数据一致性 |
 | HelperMethodTest | 类型筛选、检查点查找、克隆功能 |
 
-## 后续扩展
+## 与其他包的关系
 
-1. **捷径机制**：传送阵实现（先发玩家经过后生成）
-2. **地图编辑器**：可视化配置格子分布
-3. **动态事件**：格子关联事件ID的触发逻辑
-
-## 文件结构
-
-```
-internal/game/
-├── cell.go           # 格子类型定义 (~30行)
-├── map_engine.go     # 地图引擎实现 (~305行)
-└── map_engine_test.go # 单元测试（~825行，含详细Fragile测试）
-```
+- 无外部依赖（不依赖 pkg/event 或 internal/core）
+- 被 internal/engine 使用（回城逻辑）

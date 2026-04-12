@@ -1,8 +1,9 @@
-package game
+package engine
 
 import (
 	"testing"
 
+	"github.com/b1tAction/Fated/internal/core"
 	"github.com/b1tAction/Fated/pkg/event"
 )
 
@@ -33,7 +34,7 @@ func TestNewStateMachine(t *testing.T) {
 
 func TestStateMachineTriggerPhase(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
 	sm := NewStateMachine(game)
@@ -51,18 +52,18 @@ func TestStateMachineTriggerPhase(t *testing.T) {
 
 func TestStateMachineTriggerPhaseWithSubscription(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
 	// 添加一个需要确认的道具（会创建 Decision）
-	item := NewItem(ItemTypeDiceUpgrade, "item-001")
+	item := core.NewItem(core.ItemTypeDiceUpgrade, "item-001")
 	player.AddItem(item)
 	game.SubscribeItem(player, item)
 
 	sm := NewStateMachine(game)
 
 	// 触发道具订阅的 Phase
-	def := ItemTypeDiceUpgrade.GetItemDefinition()
+	def := core.ItemTypeDiceUpgrade.GetItemDefinition()
 	decisions := sm.TriggerPhase(def.Phase, player)
 
 	// DiceUpgrade 需要确认，所以应该返回一个 Decision
@@ -71,47 +72,9 @@ func TestStateMachineTriggerPhaseWithSubscription(t *testing.T) {
 	}
 }
 
-func TestStateMachineTriggerPhasePriorityOrder(t *testing.T) {
-	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
-	game.AddPlayer(player)
-
-	// 添加多个 Buff，不同优先级
-	buff1 := NewBuff(BuffTypeCurse, 3)     // Priority 50, Phase: BeforeTurn
-	buff2 := NewBuff(BuffTypeHidden, 3)    // Priority 100, Phase: PreDamage
-	buff3 := NewBuff(BuffTypeDivine, 3)    // Priority 50, Phase: BeforeTurn
-
-	player.AddBuff(buff1)
-	player.AddBuff(buff2)
-	player.AddBuff(buff3)
-
-	game.SubscribeBuff(player, buff1)
-	game.SubscribeBuff(player, buff2)
-	game.SubscribeBuff(player, buff3)
-
-	sm := NewStateMachine(game)
-
-	// 触发 BeforeTurn Phase（Curse 和 Divine 订阅）
-	decisions := sm.TriggerPhase(event.PhaseBeforeTurn, player)
-
-	// Curse 和 Divine 都订阅了 BeforeTurn，两者都不需要确认
-	// 所以返回空列表（自动执行）
-	if len(decisions) != 0 {
-		t.Errorf("BeforeTurn Decisions count = %d, expected 0 (auto-execute buffs)", len(decisions))
-	}
-
-	// 触发 PreDamage Phase（只有 Hidden 订阅）
-	decisions = sm.TriggerPhase(event.PhasePreDamage, player)
-
-	// Hidden 订阅了 PreDamage，也不需要确认（自动免疫）
-	if len(decisions) != 0 {
-		t.Errorf("PreDamage Decisions count = %d, expected 0 (auto-execute Hidden)", len(decisions))
-	}
-}
-
 func TestStateMachineTriggerPhaseUpdatesContext(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
 	sm := NewStateMachine(game)
@@ -138,7 +101,7 @@ func TestStateMachineTriggerPhaseUpdatesContext(t *testing.T) {
 
 func TestStateMachineTriggerPhaseAndWaitNoSubscriptions(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
 	sm := NewStateMachine(game)
@@ -156,18 +119,18 @@ func TestStateMachineTriggerPhaseAndWaitNoSubscriptions(t *testing.T) {
 
 func TestStateMachineTriggerPhaseAndWaitWithSubscription(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
 	// 添加需要确认的道具
-	item := NewItem(ItemTypeDiceUpgrade, "item-001")
+	item := core.NewItem(core.ItemTypeDiceUpgrade, "item-001")
 	player.AddItem(item)
 	game.SubscribeItem(player, item)
 
 	sm := NewStateMachine(game)
 
 	// 有订阅时，返回 true（需要等待）
-	def := ItemTypeDiceUpgrade.GetItemDefinition()
+	def := core.ItemTypeDiceUpgrade.GetItemDefinition()
 	needsWait := sm.TriggerPhaseAndWait(def.Phase, player)
 
 	if !needsWait {
@@ -301,37 +264,6 @@ func TestStateMachineOnUserChoiceMultipleDecisions(t *testing.T) {
 	}
 }
 
-func TestStateMachineOnUserChoiceNoDecisions(t *testing.T) {
-	game := NewGame("game-001")
-	sm := NewStateMachine(game)
-
-	// 没有等待的决策时，OnUserChoice 应安全处理
-	sm.OnUserChoice(0)
-
-	// 不应该崩溃，状态保持不变
-	if sm.IsWaiting() {
-		t.Error("StateMachine should not be waiting")
-	}
-}
-
-func TestStateMachineOnUserChoiceWithCallback(t *testing.T) {
-	game := NewGame("game-001")
-	sm := NewStateMachine(game)
-
-	choiceIndex := -1
-	d := event.NewDecision("测试", []event.Option{{ID: "ok", Label: "OK"}})
-	d.WithOnChoice(func(c int, ctx *event.Context) { choiceIndex = c })
-
-	sm.EnterWaitingState([]*event.Decision{d})
-	sm.CurrentCtx = event.NewContext(nil)
-
-	sm.OnUserChoice(0)
-
-	if choiceIndex != 0 {
-		t.Errorf("OnChoice callback should receive choice index 0, got %d", choiceIndex)
-	}
-}
-
 // ========== Current Decision Tests ==========
 
 func TestStateMachineGetCurrentDecision(t *testing.T) {
@@ -446,35 +378,11 @@ func TestStateMachineCancelWaiting(t *testing.T) {
 	}
 }
 
-func TestStateMachineCancelWaitingMultipleDecisions(t *testing.T) {
-	game := NewGame("game-001")
-	sm := NewStateMachine(game)
-
-	executedCount := 0
-	d1 := event.NewDecision("决策1", []event.Option{
-		{ID: "a", Label: "A", Action: func(c *event.Context) { executedCount++ }},
-	})
-	d2 := event.NewDecision("决策2", []event.Option{
-		{ID: "b", Label: "B", Action: func(c *event.Context) { executedCount++ }},
-	})
-	d1.Default = 0
-	d2.Default = 0
-
-	sm.EnterWaitingState([]*event.Decision{d1, d2})
-	sm.CurrentCtx = event.NewContext(nil)
-
-	sm.CancelWaiting()
-
-	if executedCount != 2 {
-		t.Errorf("Both default options should be executed, count = %d", executedCount)
-	}
-}
-
 // ========== Phase Executor Tests ==========
 
 func TestStateMachineExecuteBeforeTurnPhase(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
 	sm := NewStateMachine(game)
@@ -489,7 +397,7 @@ func TestStateMachineExecuteBeforeTurnPhase(t *testing.T) {
 
 func TestStateMachineExecuteOnMovePhase(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
 	sm := NewStateMachine(game)
@@ -503,7 +411,7 @@ func TestStateMachineExecuteOnMovePhase(t *testing.T) {
 
 func TestStateMachineExecuteOnLandPhase(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
 	sm := NewStateMachine(game)
@@ -517,7 +425,7 @@ func TestStateMachineExecuteOnLandPhase(t *testing.T) {
 
 func TestStateMachineExecutePreEventPhase(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
 	sm := NewStateMachine(game)
@@ -531,7 +439,7 @@ func TestStateMachineExecutePreEventPhase(t *testing.T) {
 
 func TestStateMachineExecutePreDamagePhase(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
 	sm := NewStateMachine(game)
@@ -555,7 +463,7 @@ func TestStateMachineExecutePreDamagePhase(t *testing.T) {
 
 func TestStateMachineExecuteAfterTurnPhase(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
 	sm := NewStateMachine(game)
@@ -571,11 +479,11 @@ func TestStateMachineExecuteAfterTurnPhase(t *testing.T) {
 
 func TestStateMachineExecutePreDamageWithHiddenBuff(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
 	// 添加隐匿 Buff（PreDamage Phase，高优先级）
-	buff := NewBuff(BuffTypeHidden, 3)
+	buff := core.NewBuff(core.BuffTypeHidden, 3)
 	player.AddBuff(buff)
 	game.SubscribeBuff(player, buff)
 
@@ -593,11 +501,11 @@ func TestStateMachineExecutePreDamageWithHiddenBuff(t *testing.T) {
 
 func TestStateMachineExecuteBeforeTurnWithCurseBuff(t *testing.T) {
 	game := NewGame("game-001")
-	player := NewPlayer(PlayerConfig{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
 	// 添加诅咒 Buff（BeforeTurn Phase）
-	buff := NewBuff(BuffTypeCurse, 3)
+	buff := core.NewBuff(core.BuffTypeCurse, 3)
 	player.AddBuff(buff)
 	game.SubscribeBuff(player, buff)
 

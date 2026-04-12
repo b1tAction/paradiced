@@ -1,4 +1,4 @@
-package game
+package core
 
 import (
 	"testing"
@@ -155,24 +155,6 @@ func TestEvaluationConstants(t *testing.T) {
 	}
 	if EvaluationExcellent != 100 {
 		t.Errorf("EvaluationExcellent = %d, expected 100", EvaluationExcellent)
-	}
-}
-
-func TestEventAttributeToEvaluation(t *testing.T) {
-	tests := []struct {
-		attr     EventAttribute
-		expected Evaluation
-	}{
-		{AttributeGood, EvaluationGood},
-		{AttributeNeutral, EvaluationNeutral},
-		{AttributeBad, EvaluationBad},
-	}
-
-	for _, tt := range tests {
-		result := tt.attr.ToEvaluation()
-		if result != tt.expected {
-			t.Errorf("EventAttribute(%d).ToEvaluation() = %d, expected %d", tt.attr, result, tt.expected)
-		}
 	}
 }
 

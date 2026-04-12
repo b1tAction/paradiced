@@ -1,4 +1,4 @@
-package game
+package core
 
 import (
 	"testing"
@@ -107,9 +107,6 @@ func TestNewPlayerDefaultConfig(t *testing.T) {
 // ========== HP/LP Tests ==========
 
 func TestApplyDamage(t *testing.T) {
-	engine := NewMapEngine(50)
-	engine.SetCellType(10, CellTypeCheckpoint)
-
 	player := NewPlayer(PlayerConfig{
 		UserID:  "player-001",
 		Faction: FactionQingLong,
@@ -118,25 +115,19 @@ func TestApplyDamage(t *testing.T) {
 	player.Position = 20
 
 	// 正常扣血
-	isDead, respawnPos, err := player.ApplyDamage(3, engine)
+	err := player.ApplyDamage(3)
 	if err != nil {
 		t.Fatalf("ApplyDamage failed: %v", err)
 	}
-	if isDead {
+	if player.IsDead {
 		t.Error("player should not be dead")
 	}
 	if player.HP != 7 {
 		t.Errorf("player.HP = %d, expected 7", player.HP)
 	}
-	if respawnPos != 20 {
-		t.Errorf("respawnPos = %d, expected 20", respawnPos)
-	}
 }
 
 func TestApplyDamageDeath(t *testing.T) {
-	engine := NewMapEngine(50)
-	engine.SetCellType(10, CellTypeCheckpoint)
-
 	player := NewPlayer(PlayerConfig{
 		UserID:  "player-001",
 		Faction: FactionQingLong,
@@ -145,48 +136,40 @@ func TestApplyDamageDeath(t *testing.T) {
 	player.Position = 25
 
 	// 扣血致死
-	isDead, respawnPos, err := player.ApplyDamage(15, engine)
+	err := player.ApplyDamage(15)
 	if err != nil {
 		t.Fatalf("ApplyDamage failed: %v", err)
 	}
-	if !isDead {
+	if !player.IsDead {
 		t.Error("player should be dead")
 	}
 	if player.HP != 0 {
 		t.Errorf("player.HP = %d, expected 0", player.HP)
 	}
-	if !player.IsDead {
-		t.Error("player.IsDead should be true")
-	}
-	// 应该回城到最近的检查点
-	if respawnPos != 10 {
-		t.Errorf("respawnPos = %d, expected 10 (checkpoint)", respawnPos)
-	}
+	// 注意：回城逻辑由 engine 包处理，player 只标记死亡状态
 }
 
 func TestApplyDamageNegative(t *testing.T) {
-	engine := NewMapEngine(10)
 	player := NewPlayer(DefaultPlayerConfig)
 
-	_, _, err := player.ApplyDamage(-1, engine)
+	err := player.ApplyDamage(-1)
 	if err == nil {
 		t.Error("ApplyDamage with negative amount should return error")
 	}
 }
 
 func TestApplyDamageHiddenImmune(t *testing.T) {
-	engine := NewMapEngine(10)
 	player := NewPlayer(PlayerConfig{UserID: "test"})
 	player.AddBuff(NewBuff(BuffTypeHidden, 3))
 
-	isDead, _, err := player.ApplyDamage(5, engine)
+	err := player.ApplyDamage(5)
 	if err != nil {
 		t.Fatalf("ApplyDamage failed: %v", err)
 	}
-	if isDead {
+	if player.IsDead {
 		t.Error("player with Hidden buff should be immune to damage")
 	}
-	// HP 应保持初始值（用户修改后的 DefaultPlayerConfig.MaxHP = 6）
+	// HP 应保持初始值
 	if player.HP != DefaultPlayerConfig.MaxHP {
 		t.Errorf("player.HP = %d, expected %d (immune)", player.HP, DefaultPlayerConfig.MaxHP)
 	}
@@ -482,29 +465,6 @@ func TestGetItem(t *testing.T) {
 
 // ========== Faction Skill Tests ==========
 
-func TestTriggerFactionSkillQingLong(t *testing.T) {
-	player := NewPlayer(PlayerConfig{
-		UserID:  "test",
-		Faction: FactionQingLong,
-	})
-	player.ChargeCount = 1
-
-	// 有充能时可以触发
-	result := player.TriggerFactionSkill(nil)
-	if !result {
-		t.Error("QingLong with charge should be able to trigger skill")
-	}
-	if player.ChargeCount != 0 {
-		t.Errorf("ChargeCount = %d, expected 0", player.ChargeCount)
-	}
-
-	// 无充能时不能触发
-	result = player.TriggerFactionSkill(nil)
-	if result {
-		t.Error("QingLong without charge should not be able to trigger skill")
-	}
-}
-
 func TestTriggerFactionSkillZhuQue(t *testing.T) {
 	player := NewPlayer(PlayerConfig{
 		UserID:  "test",
@@ -518,83 +478,8 @@ func TestTriggerFactionSkillZhuQue(t *testing.T) {
 	}
 }
 
-func TestTriggerFactionSkillBaiHu(t *testing.T) {
-	player := NewPlayer(PlayerConfig{
-		UserID:  "test",
-		Faction: FactionBaiHu,
-	})
-	target := NewPlayer(PlayerConfig{UserID: "target"})
-	target.AddBuff(NewBuff(BuffTypeCurse, 3))
-
-	event := &GameEvent{
-		Type:   EventOnOvertake,
-		Source: player,
-		Target: target,
-	}
-
-	// 白虎反超时偷取 Buff
-	result := player.TriggerFactionSkill(event)
-	if !result {
-		t.Error("BaiHu should be able to trigger skill on overtake")
-	}
-	if !player.HasBuff(BuffTypeCurse) {
-		t.Error("BaiHu should have stolen Curse buff")
-	}
-	if target.HasBuff(BuffTypeCurse) {
-		t.Error("target should not have Curse buff after steal")
-	}
-}
-
-func TestTriggerFactionSkillXuanWu(t *testing.T) {
-	player := NewPlayer(PlayerConfig{
-		UserID:  "test",
-		Faction: FactionXuanWu,
-	})
-	player.ChargeCount = 1
-
-	event := &GameEvent{
-		Type: EventPreBadEvent,
-	}
-
-	// 玄武有充能时可以抵消恶性事件
-	result := player.TriggerFactionSkill(event)
-	if !result {
-		t.Error("XuanWu with charge should be able to trigger skill")
-	}
-	if !event.IsCancel {
-		t.Error("event should be cancelled")
-	}
-	if player.ChargeCount != 0 {
-		t.Errorf("ChargeCount = %d, expected 0", player.ChargeCount)
-	}
-
-	// 无充能时不能抵消
-	event2 := &GameEvent{Type: EventPreBadEvent}
-	player.ChargeCount = 0
-	result = player.TriggerFactionSkill(event2)
-	if result {
-		t.Error("XuanWu without charge should not trigger")
-	}
-	if event2.IsCancel {
-		t.Error("event should not be cancelled without charge")
-	}
-}
-
-// ========== Event System Tests ==========
-
-func TestDispatchEventHidden(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test"})
-	player.AddBuff(NewBuff(BuffTypeHidden, 3))
-
-	event := &GameEvent{
-		Type: EventPreBadEvent,
-	}
-
-	player.DispatchEvent(event)
-	if !event.IsCancel {
-		t.Error("Hidden buff should cancel event")
-	}
-}
+// 注意：阵营被动技能的触发逻辑已迁移到 engine 包，
+// 通过 EventBus + Decision 系统处理。
 
 // ========== Helper Methods Tests ==========
 
