@@ -114,17 +114,22 @@ func (m *MapEngine) ActivateFog(index int) error {
 
 // PathResult 移动路径计算结果
 type PathResult struct {
-	StartIndex  int   `json:"start_index"`  // 起始位置
-	TargetIndex int   `json:"target_index"` // 目标位置（实际到达位置）
-	Path        []int `json:"path"`         // 经过的格子索引列表
-	Interrupted bool  `json:"interrupted"`  // 是否被中断（如掉落 fragile）
-	FellDown    bool  `json:"fell_down"`    // 是否掉落（踩碎 fragile）
-	ReachedEnd  bool  `json:"reached_end"`  // 是否到达终点
+	StartIndex     int   `json:"start_index"`      // 起始位置
+	TargetIndex    int   `json:"target_index"`     // 目标位置（实际到达位置）
+	OriginalTarget int   `json:"original_target"`  // 原始目标位置（骰子步数计算）
+	Path           []int `json:"path"`             // 经过的格子索引列表
+	Interrupted    bool  `json:"interrupted"`      // 是否被中断（如掉落 fragile）
+	FellDown       bool  `json:"fell_down"`        // 是否掉落（最终落点为未碎fragile）
+	BrokenFragiles []int `json:"broken_fragiles"`  // 本次移动中碎裂的 Fragile 格子索引
+	ReachedEnd     bool  `json:"reached_end"`      // 是否到达终点
 }
 
 // CalculatePath 计算移动路径
-// start: 起始位置，steps: 骰子步数
-// 返回实际移动路径，处理途经 Fragile 块掉落中止移动的逻辑
+// start: 走始位置，steps: 骰子步数
+// 返回实际移动路径，处理 Fragile 块的逻辑：
+// 1. 经过未碎 Fragile → Fragile 碎裂，玩家继续移动
+// 2. 最终落点恰好是未碎 Fragile → 碎裂 + 排落（中断）
+// 3. 最终落点恰好是已碎 Fragile → 无法到达，停在上一格
 func (m *MapEngine) CalculatePath(start int, steps int) (*PathResult, error) {
 	if start < 0 || start >= m.Length {
 		return nil, errors.New("start index out of bounds")
@@ -134,12 +139,14 @@ func (m *MapEngine) CalculatePath(start int, steps int) (*PathResult, error) {
 	}
 
 	result := &PathResult{
-		StartIndex:  start,
-		TargetIndex: start,
-		Path:        []int{start},
-		Interrupted: false,
-		FellDown:    false,
-		ReachedEnd:  false,
+		StartIndex:     start,
+		TargetIndex:    start,
+		OriginalTarget: start + steps, // 原始目标（骰子步数计算，可能超过终点）
+		Path:           []int{start},
+		Interrupted:    false,
+		FellDown:       false,
+		BrokenFragiles: []int{},
+		ReachedEnd:     false,
 	}
 
 	// 计算目标位置（不超过地图终点）
@@ -149,37 +156,81 @@ func (m *MapEngine) CalculatePath(start int, steps int) (*PathResult, error) {
 		result.ReachedEnd = true
 	}
 
-	// 逐格移动，检查 Fragile 块
+	// 逐格移动，记录路径并激活迷雾
 	for i := start + 1; i <= target; i++ {
 		cell, err := m.GetCell(i)
 		if err != nil {
 			break
 		}
 
-		result.Path = append(result.Path, i)
-		result.TargetIndex = i
-
-		// 检查 Fragile 块
-		if cell.CellType == CellTypeFragile {
-			if !cell.IsBroken {
-				// 未碎的 Fragile 块，踩上去会碎掉并掉落
-				cell.IsBroken = true
-				result.Interrupted = true
-				result.FellDown = true
-				break
-			}
-			// 已碎的 Fragile 块，跳过去（不影响移动）
-		}
-
-		// 检查迷雾区域
+		// 检查迷雾区域（经过时激活）
 		if cell.CellType == CellTypeFog {
 			cell.FogActive = true
 		}
 
-		// 到达终点
-		if i == m.Length-1 {
-			result.ReachedEnd = true
-			break
+		// 记录路径
+		result.Path = append(result.Path, i)
+	}
+
+	// 检查最终落点的 Fragile 状态
+	finalCell, err := m.GetCell(target)
+	if err != nil {
+		result.TargetIndex = start
+		return result, nil
+	}
+
+	// 处理最终落点的 Fragile 格子逻辑
+	if finalCell.CellType == CellTypeFragile {
+		if !finalCell.IsBroken {
+			// 最终落点是未碎的 Fragile → 碎裂 + 排落
+			finalCell.IsBroken = true
+			result.BrokenFragiles = append(result.BrokenFragiles, target)
+			result.TargetIndex = target
+			result.Interrupted = true
+			result.FellDown = true
+
+			// 检查路径中经过的其他 Fragile 格子（非最终落点），标记为碎裂
+			for i := start + 1; i < target; i++ {
+				cell, _ := m.GetCell(i)
+				if cell != nil && cell.CellType == CellTypeFragile && !cell.IsBroken {
+					cell.IsBroken = true
+					result.BrokenFragiles = append(result.BrokenFragiles, i)
+				}
+			}
+
+			return result, nil
+		} else {
+			// 最终落点是已碎的 Fragile → 无法到达，停在上一格
+			if target > start {
+				result.TargetIndex = target - 1
+				// 移除路径中的最后一个格子（无法到达）
+				result.Path = result.Path[:len(result.Path)-1]
+			} else {
+				result.TargetIndex = start
+			}
+
+			// 检查路径中经过的其他 Fragile 格子（非最终落点），标记为碎裂
+			for i := start + 1; i < target; i++ {
+				cell, _ := m.GetCell(i)
+				if cell != nil && cell.CellType == CellTypeFragile && !cell.IsBroken {
+					cell.IsBroken = true
+					result.BrokenFragiles = append(result.BrokenFragiles, i)
+				}
+			}
+
+			return result, nil
+		}
+	}
+
+	// 正常情况：最终落点不是 Fragile
+	result.TargetIndex = target
+
+	// 检查路径中经过的 Fragile 格子（非最终落点），标记为碎裂
+	for i := start + 1; i <= target; i++ {
+		cell, _ := m.GetCell(i)
+		if cell != nil && cell.CellType == CellTypeFragile && !cell.IsBroken {
+			cell.IsBroken = true
+			result.BrokenFragiles = append(result.BrokenFragiles, i)
 		}
 	}
 

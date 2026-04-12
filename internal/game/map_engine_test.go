@@ -256,6 +256,9 @@ func TestCalculatePathNormal(t *testing.T) {
 	if result.TargetIndex != 5 {
 		t.Errorf("TargetIndex = %d, expected 5", result.TargetIndex)
 	}
+	if result.OriginalTarget != 5 {
+		t.Errorf("OriginalTarget = %d, expected 5", result.OriginalTarget)
+	}
 	if len(result.Path) != 6 {
 		t.Errorf("Path length = %d, expected 6", len(result.Path))
 	}
@@ -267,6 +270,9 @@ func TestCalculatePathNormal(t *testing.T) {
 	}
 	if result.ReachedEnd {
 		t.Error("should not reach end")
+	}
+	if len(result.BrokenFragiles) != 0 {
+		t.Errorf("BrokenFragiles count = %d, expected 0", len(result.BrokenFragiles))
 	}
 
 	// 验证路径
@@ -290,55 +296,141 @@ func TestCalculatePathReachEnd(t *testing.T) {
 	if result.TargetIndex != 9 {
 		t.Errorf("TargetIndex = %d, expected 9 (end)", result.TargetIndex)
 	}
+	if result.OriginalTarget != 15 {
+		t.Errorf("OriginalTarget = %d, expected 15", result.OriginalTarget)
+	}
 	if !result.ReachedEnd {
 		t.Error("should reach end")
 	}
 }
 
-func TestCalculatePathFragileInterrupt(t *testing.T) {
-	engine := NewMapEngine(50)
-	engine.SetCellType(5, CellTypeFragile)
+// ========== Fragile Tests (New Logic) ==========
 
-	// 从位置 0 移动 10 步，经过位置 5 的 Fragile 块
+// 测试：经过未碎 Fragile，最终落点不是 Fragile（不中断，继续移动）
+func TestCalculatePathPassUnbrokenFragile(t *testing.T) {
+	engine := NewMapEngine(50)
+	engine.SetCellType(5, CellTypeFragile) // 位置5是未碎Fragile
+
+	// 从位置0移动10步，目标位置10，经过位置5的Fragile
 	result, err := engine.CalculatePath(0, 10)
 	if err != nil {
 		t.Fatalf("CalculatePath failed: %v", err)
 	}
 
-	// 应该在位置 5 中断并掉落
-	if result.TargetIndex != 5 {
-		t.Errorf("TargetIndex = %d, expected 5 (interrupted at fragile)", result.TargetIndex)
+	// 应该正常到达位置10（不中断）
+	if result.TargetIndex != 10 {
+		t.Errorf("TargetIndex = %d, expected 10", result.TargetIndex)
 	}
-	if !result.Interrupted {
-		t.Error("should be interrupted")
+	if result.Interrupted {
+		t.Error("should not be interrupted (passing fragile, not landing on it)")
 	}
-	if !result.FellDown {
-		t.Error("should fall down")
+	if result.FellDown {
+		t.Error("should not fall down (passing fragile, not landing on it)")
 	}
 
-	// Fragile 块应该被标记为 broken
+	// 经过路径中的 Fragile 应该碎裂
 	if !engine.Cells[5].IsBroken {
-		t.Error("fragile cell should be broken after falling")
+		t.Error("fragile cell at position 5 should be broken after passing")
+	}
+	if len(result.BrokenFragiles) != 1 {
+		t.Errorf("BrokenFragiles count = %d, expected 1", len(result.BrokenFragiles))
+	}
+	if result.BrokenFragiles[0] != 5 {
+		t.Errorf("BrokenFragiles[0] = %d, expected 5", result.BrokenFragiles[0])
 	}
 
-	// 验证路径长度
-	if len(result.Path) != 6 {
-		t.Errorf("Path length = %d, expected 6", len(result.Path))
+	// 验证路径长度（包含起点和终点）
+	if len(result.Path) != 11 {
+		t.Errorf("Path length = %d, expected 11", len(result.Path))
 	}
 }
 
-func TestCalculatePathBrokenFragilePass(t *testing.T) {
+// 测试：最终落点恰好是未碎 Fragile（碎裂+排落）
+func TestCalculatePathLandOnUnbrokenFragile(t *testing.T) {
 	engine := NewMapEngine(50)
-	engine.SetCellType(5, CellTypeFragile)
-	engine.Cells[5].IsBroken = true // 已碎
+	engine.SetCellType(10, CellTypeFragile) // 位置10是未碎Fragile
 
-	// 从位置 0 移动 10 步，经过已碎的 Fragile 块
+	// 从位置0移动10步，目标恰好是位置10的Fragile
 	result, err := engine.CalculatePath(0, 10)
 	if err != nil {
 		t.Fatalf("CalculatePath failed: %v", err)
 	}
 
-	// 应该正常通过，到达位置 10
+	// 应该在位置10中断并排落
+	if result.TargetIndex != 10 {
+		t.Errorf("TargetIndex = %d, expected 10", result.TargetIndex)
+	}
+	if !result.Interrupted {
+		t.Error("should be interrupted (landing on fragile)")
+	}
+	if !result.FellDown {
+		t.Error("should fall down (landing on fragile)")
+	}
+
+	// 落点的 Fragile 应该碎裂
+	if !engine.Cells[10].IsBroken {
+		t.Error("fragile cell should be broken after landing")
+	}
+	if len(result.BrokenFragiles) != 1 {
+		t.Errorf("BrokenFragiles count = %d, expected 1", len(result.BrokenFragiles))
+	}
+	if result.BrokenFragiles[0] != 10 {
+		t.Errorf("BrokenFragiles[0] = %d, expected 10", result.BrokenFragiles[0])
+	}
+
+	// 验证路径长度
+	if len(result.Path) != 11 {
+		t.Errorf("Path length = %d, expected 11", len(result.Path))
+	}
+}
+
+// 测试：最终落点恰好是已碎 Fragile（停在上一格）
+func TestCalculatePathLandOnBrokenFragile(t *testing.T) {
+	engine := NewMapEngine(50)
+	engine.SetCellType(10, CellTypeFragile)
+	engine.Cells[10].IsBroken = true // 位置10是已碎Fragile
+
+	// 从位置0移动10步，目标恰好是位置10的已碎Fragile
+	result, err := engine.CalculatePath(0, 10)
+	if err != nil {
+		t.Fatalf("CalculatePath failed: %v", err)
+	}
+
+	// 应该停在上一格（位置9）
+	if result.TargetIndex != 9 {
+		t.Errorf("TargetIndex = %d, expected 9 (stopped before broken fragile)", result.TargetIndex)
+	}
+	if result.Interrupted {
+		t.Error("should not be interrupted (just stopped, not fell)")
+	}
+	if result.FellDown {
+		t.Error("should not fall down (broken fragile)")
+	}
+
+	// 路径不包含无法到达的格子
+	if len(result.Path) != 10 {
+		t.Errorf("Path length = %d, expected 10 (without broken fragile)", len(result.Path))
+	}
+
+	// 验证最后一个格子是位置9
+	if result.Path[len(result.Path)-1] != 9 {
+		t.Errorf("last path position = %d, expected 9", result.Path[len(result.Path)-1])
+	}
+}
+
+// 测试：经过已碎 Fragile，最终落点不是 Fragile（正常移动）
+func TestCalculatePathPassBrokenFragile(t *testing.T) {
+	engine := NewMapEngine(50)
+	engine.SetCellType(5, CellTypeFragile)
+	engine.Cells[5].IsBroken = true // 位置5是已碎Fragile
+
+	// 从位置0移动10步，经过已碎的Fragile，到达位置10
+	result, err := engine.CalculatePath(0, 10)
+	if err != nil {
+		t.Fatalf("CalculatePath failed: %v", err)
+	}
+
+	// 应该正常到达位置10
 	if result.TargetIndex != 10 {
 		t.Errorf("TargetIndex = %d, expected 10", result.TargetIndex)
 	}
@@ -348,29 +440,166 @@ func TestCalculatePathBrokenFragilePass(t *testing.T) {
 	if result.FellDown {
 		t.Error("should not fall down (fragile already broken)")
 	}
+	if len(result.BrokenFragiles) != 0 {
+		t.Errorf("BrokenFragiles count = %d, expected 0 (already broken)", len(result.BrokenFragiles))
+	}
 }
 
+// 测试：路径中经过多个未碎 Fragile，最终落点是其中一个
+func TestCalculatePathMultipleFragiles(t *testing.T) {
+	engine := NewMapEngine(50)
+	engine.SetCellType(5, CellTypeFragile)
+	engine.SetCellType(10, CellTypeFragile) // 最终落点
+
+	// 从位置0移动10步，经过位置5，最终落在位置10
+	result, err := engine.CalculatePath(0, 10)
+	if err != nil {
+		t.Fatalf("CalculatePath failed: %v", err)
+	}
+
+	// 应该在位置10中断并排落
+	if result.TargetIndex != 10 {
+		t.Errorf("TargetIndex = %d, expected 10", result.TargetIndex)
+	}
+	if !result.Interrupted {
+		t.Error("should be interrupted")
+	}
+	if !result.FellDown {
+		t.Error("should fall down")
+	}
+
+	// 位置5的Fragile也应该碎裂（经过时）
+	if !engine.Cells[5].IsBroken {
+		t.Error("fragile cell at 5 should be broken (passed through)")
+	}
+	// 位置10的Fragile碎裂（落点）
+	if !engine.Cells[10].IsBroken {
+		t.Error("fragile cell at 10 should be broken (landing)")
+	}
+}
+
+// 测试：路径中经过多个未碎 Fragile，最终落点不是 Fragile
+func TestCalculatePathPassMultipleFragiles(t *testing.T) {
+	engine := NewMapEngine(50)
+	engine.SetCellType(5, CellTypeFragile)
+	engine.SetCellType(10, CellTypeFragile)
+
+	// 从位置0移动15步，经过位置5和10，最终落在位置15
+	result, err := engine.CalculatePath(0, 15)
+	if err != nil {
+		t.Fatalf("CalculatePath failed: %v", err)
+	}
+
+	// 应该正常到达位置15
+	if result.TargetIndex != 15 {
+		t.Errorf("TargetIndex = %d, expected 15", result.TargetIndex)
+	}
+	if result.Interrupted {
+		t.Error("should not be interrupted")
+	}
+	if result.FellDown {
+		t.Error("should not fall down")
+	}
+
+	// 两个 Fragile 都应该碎裂
+	if !engine.Cells[5].IsBroken {
+		t.Error("fragile cell at 5 should be broken")
+	}
+	if !engine.Cells[10].IsBroken {
+		t.Error("fragile cell at 10 should be broken")
+	}
+	if len(result.BrokenFragiles) != 2 {
+		t.Errorf("BrokenFragiles count = %d, expected 2", len(result.BrokenFragiles))
+	}
+}
+
+// 测试：从 Fragile 格子开始移动
 func TestCalculatePathStartOnFragile(t *testing.T) {
 	engine := NewMapEngine(50)
 	engine.SetCellType(5, CellTypeFragile)
 
-	// 从 Fragile 格子开始移动（不会掉落）
+	// 从位置5（Fragile）开始移动
 	result, err := engine.CalculatePath(5, 5)
 	if err != nil {
 		t.Fatalf("CalculatePath failed: %v", err)
 	}
 
-	// 正常移动到位置 10
+	// 正常移动到位置10
 	if result.TargetIndex != 10 {
 		t.Errorf("TargetIndex = %d, expected 10", result.TargetIndex)
 	}
 	if result.Interrupted {
 		t.Error("should not be interrupted (starting on fragile)")
 	}
+	if result.FellDown {
+		t.Error("should not fall down (starting on fragile)")
+	}
 
-	// 起始位置的 Fragile 块不应该被标记为 broken
+	// 起始位置的 Fragile 不应该碎裂（已经在上面，不是"经过"）
 	if engine.Cells[5].IsBroken {
 		t.Error("starting fragile cell should not be broken")
+	}
+}
+
+// 测试：从已碎 Fragile 格子开始移动
+func TestCalculatePathStartOnBrokenFragile(t *testing.T) {
+	engine := NewMapEngine(50)
+	engine.SetCellType(5, CellTypeFragile)
+	engine.Cells[5].IsBroken = true
+
+	// 从位置5（已碎Fragile）开始移动1步
+	result, err := engine.CalculatePath(5, 1)
+	if err != nil {
+		t.Fatalf("CalculatePath failed: %v", err)
+	}
+
+	// 应该正常移动到位置6
+	if result.TargetIndex != 6 {
+		t.Errorf("TargetIndex = %d, expected 6", result.TargetIndex)
+	}
+	if result.Interrupted {
+		t.Error("should not be interrupted")
+	}
+}
+
+// 测试：步数为0（原地不动）
+func TestCalculatePathZeroSteps(t *testing.T) {
+	engine := NewMapEngine(50)
+	engine.SetCellType(5, CellTypeFragile)
+
+	// 从位置0移动0步
+	result, err := engine.CalculatePath(0, 0)
+	if err != nil {
+		t.Fatalf("CalculatePath failed: %v", err)
+	}
+
+	// 应该停在位置0
+	if result.TargetIndex != 0 {
+		t.Errorf("TargetIndex = %d, expected 0", result.TargetIndex)
+	}
+	if len(result.Path) != 1 {
+		t.Errorf("Path length = %d, expected 1", len(result.Path))
+	}
+}
+
+// 测试：最终落点是已碎 Fragile，但起点就在前一格
+func TestCalculatePathLandOnBrokenFragileAdjacent(t *testing.T) {
+	engine := NewMapEngine(50)
+	engine.SetCellType(6, CellTypeFragile)
+	engine.Cells[6].IsBroken = true
+
+	// 从位置5移动1步，目标是已碎的位置6
+	result, err := engine.CalculatePath(5, 1)
+	if err != nil {
+		t.Fatalf("CalculatePath failed: %v", err)
+	}
+
+	// 应该停在位置5
+	if result.TargetIndex != 5 {
+		t.Errorf("TargetIndex = %d, expected 5", result.TargetIndex)
+	}
+	if len(result.Path) != 1 {
+		t.Errorf("Path length = %d, expected 1", len(result.Path))
 	}
 }
 
