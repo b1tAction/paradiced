@@ -23,9 +23,21 @@ pkg/event/
 
 internal/game/
 ├── buff.go           # BuffDefinition扩展（Phase字段）
+├── buff_test.go      # Buff测试（含Phase字段测试）
 ├── item.go           # ItemDefinition扩展（Phase字段）
+├── item_test.go      # Item测试（含Phase字段测试）
+├── event.go          # Event系统
+├── event_test.go     # Event测试
 ├── game.go           # Game实例（包含EventBus）
+├── game_test.go      # Game测试（订阅管理测试）
 ├── state_machine.go  # StateMachine（Phase触发、Decision等待）
+├── state_machine_test.go # StateMachine测试
+├── integration_test.go   # 联合测试
+├── player.go         # Player结构
+├── player_test.go    # Player测试
+├── faction.go        # 阵营定义
+├── map_engine.go     # 地图引擎
+├── map_engine_test.go # 地图测试
 ```
 
 ## Phase枚举
@@ -211,12 +223,70 @@ func (sm *StateMachine) ProcessTurn(player *Player) {
 
 ## 测试覆盖
 
-| 测试类 | 覆盖内容 |
-|--------|----------|
-| PhaseTest | String转换、IsValid、NeedsSubscription |
-| DecisionTest | 创建、优先级、超时、条件判断、执行、克隆 |
-| EventBusTest | Subscribe、Unsubscribe、Publish、Priority排序 |
-| ContextTest | 创建、WithEvent、WithData |
+### pkg/event 包测试
+| 测试文件 | 测试类 | 覆盖内容 |
+|---------|--------|----------|
+| bus_test.go | PhaseTest | String转换、IsValid、NeedsSubscription |
+| bus_test.go | DecisionTest | 创建、优先级、超时、条件判断、执行、克隆、Builder |
+| bus_test.go | EventBusTest | Subscribe、Unsubscribe、UnsubscribeBySource、UnsubscribeByOwner、Publish、Priority排序、Clear |
+| bus_test.go | ContextTest | 创建、WithEvent、WithData、WithState |
+
+### internal/game 包测试
+| 测试文件 | 测试类 | 覆盖内容 |
+|---------|--------|----------|
+| buff_test.go | EvaluationTest | 有效性、类别判断、比较方法、常量验证 |
+| buff_test.go | BuffTypeTest | String转换、IsPositive、GetEvaluation |
+| buff_test.go | BuffInstanceTest | NewBuff、IsActive、TickDuration |
+| buff_test.go | BuffDefinitionTest | GetBuffDefinition、Evaluation一致性 |
+| buff_test.go | BuffRegistryTest | 创建、按评分/类别筛选 |
+| buff_test.go | BuffDefinitionPhaseTest | Phase字段验证（9种Buff） |
+| buff_test.go | BuffDefinitionPriorityTest | Priority字段验证 |
+| buff_test.go | BuffDefinitionNeedConfirmTest | NeedConfirm字段验证（默认false） |
+| buff_test.go | BuffDefinitionPhaseNeedsSubscriptionTest | 各Buff订阅需求验证 |
+| buff_test.go | BuffDefinitionSpecialEffectsTest | Special字段验证 |
+| item_test.go | ItemTypeTest | String转换、IsValid、GetEvaluation、GetCategory |
+| item_test.go | ItemInstanceTest | NewItem、字段验证 |
+| item_test.go | ItemDefinitionTest | GetItemDefinition、Evaluation一致性 |
+| item_test.go | ItemRegistryTest | 创建、按评分/类别筛选 |
+| item_test.go | ItemDefinitionPhaseTest | Phase字段验证（4种道具） |
+| item_test.go | ItemDefinitionPriorityTest | Priority字段验证 |
+| item_test.go | ItemDefinitionNeedConfirmTest | NeedConfirm字段验证（默认true） |
+| item_test.go | ItemDefinitionPhaseNeedsSubscriptionTest | 各道具订阅需求验证 |
+| item_test.go | ItemDefinitionTargetTypesTest | TargetSelf/TargetOther验证 |
+| item_test.go | ItemDefinitionRangeTest | Range字段验证（任意门30格） |
+| item_test.go | ItemDefinitionBuffTypeTest | BuffType字段验证 |
+| game_test.go | GameCreationTest | NewGame、Bus初始化、State初始化 |
+| game_test.go | PlayerManagementTest | AddPlayer、RemovePlayer、GetPlayer、GetCurrentPlayer、NextTurn |
+| game_test.go | BuffSubscriptionTest | SubscribeBuff、UnsubscribeBuff、PassiveBuff不订阅 |
+| game_test.go | ItemSubscriptionTest | SubscribeItem、UnsubscribeItem、AnyTime道具不订阅 |
+| game_test.go | MultipleSubscriptionsTest | 多Buff/道具订阅、混合订阅 |
+| game_test.go | DecisionCreationTest | createBuffDecision、createItemDecision |
+| state_machine_test.go | StateMachineCreationTest | NewStateMachine |
+| state_machine_test.go | TriggerPhaseTest | TriggerPhase、TriggerPhaseWithCtx、Context更新 |
+| state_machine_test.go | TriggerPhaseAndWaitTest | 返回值、等待状态 |
+| state_machine_test.go | WaitingStateTest | EnterWaitingState、ExitWaitingState |
+| state_machine_test.go | UserChoiceTest | OnUserChoice、多Decision处理、回调执行 |
+| state_machine_test.go | FlowControlTest | ContinueFlow、CancelWaiting |
+| state_machine_test.go | PhaseExecutorTest | ExecuteBeforeTurn/OnMove/OnLand/PreEvent/PreDamage/AfterTurn |
+| state_machine_test.go | BuffPhaseExecutorTest | Hidden免疫、诅咒自动执行 |
+| integration_test.go | FullTurnFlowTest | 完整回合流程：BeforeTurn→OnMove→OnLand→PreEvent→AfterTurn |
+| integration_test.go | BuffAutoExecutionTest | Buff自动执行验证 |
+| integration_test.go | ItemNeedConfirmTest | 道具用户确认流程 |
+| integration_test.go | MultipleBuffsPriorityTest | 多Buff优先级排序 |
+| integration_test.go | HiddenBuffImmunityTest | 隐匿免疫效果 |
+| integration_test.go | BuffRemovalUnsubscribeTest | Buff移除时取消订阅 |
+| integration_test.go | PlayerRemovalCleansSubscriptionsTest | 玩家移除时清理所有订阅 |
+| integration_test.go | ZhuQueFactionPassiveTest | 朱雀离火永久被动 |
+| integration_test.go | AnyTimeItemTest | AnyTime道具不订阅EventBus |
+| integration_test.go | FullGameScenarioTest | 4玩家多回合完整游戏流程 |
+| integration_test.go | DecisionWithActionTest | Decision Action执行验证 |
+| integration_test.go | ContextDataPassingTest | Context数据传递验证（伤害值） |
+
+### 测试覆盖率统计
+```
+pkg/event:       91.9% statements
+internal/game:   88.6% statements
+```
 
 ## 后续扩展
 
