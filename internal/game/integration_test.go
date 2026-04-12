@@ -286,20 +286,20 @@ func TestIntegrationZhuQueFactionPassive(t *testing.T) {
 	})
 	game.AddPlayer(player)
 
-	// 朱雀玩家初始有离火 Buff（永久被动）
+	// 朱雀玩家初始有离火 Buff（永久，每4回合LP+1）
 	if !player.HasBuff(BuffTypeFire) {
 		t.Error("ZhuQue player should have Fire buff")
 	}
 
-	// 离火是 Passive，不需要订阅 EventBus
+	// 离火现在使用 BeforeTurn，需要订阅 EventBus
 	fireBuff := player.GetBuff(BuffTypeFire)
-	if fireBuff.SubscriptionID != "" {
-		t.Error("Fire buff (Passive) should not have subscription ID")
+	def := BuffTypeFire.GetBuffDefinition()
+	if def.Phase.NeedsSubscription() && fireBuff.SubscriptionID == "" {
+		t.Error("Fire buff (BeforeTurn) should have subscription ID")
 	}
 
-	// Passive Buff 需要特殊处理（每4回合 LP+1）
-	// 这里只验证 Buff 存在，实际触发逻辑需要单独实现
-	t.Logf("ZhuQue player has Fire buff: duration=%d", fireBuff.Duration)
+	// 离火 Buff 在 BeforeTurn 时检查是否是第4回合
+	t.Logf("ZhuQue player has Fire buff: duration=%d, phase=%s", fireBuff.Duration, def.Phase.String())
 }
 
 // TestIntegrationAnyTimeItem 测试 AnyTime 道具（主动触发）

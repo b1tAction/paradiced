@@ -317,8 +317,8 @@ func (bt BuffType) GetBuffDefinition() *BuffDefinition {
 			Desc:      "朱雀阵营增益，每4回合LP+1",
 			Duration:  -1,
 			Special:   "zhuque_passive",
-			Phase:     event.PhasePassive,  // 永久被动，需要特殊处理
-			Priority:  0,
+			Phase:     event.PhaseBeforeTurn,  // 回合开始前检查，内部判断是否生效
+			Priority:  10,  // 最低优先级，在其他效果之后
 		},
 	}
 	if def, ok := definitions[bt]; ok {

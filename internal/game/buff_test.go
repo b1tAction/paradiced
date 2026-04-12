@@ -490,10 +490,10 @@ func TestBuffDefinitionPhase(t *testing.T) {
 		t.Errorf("Poison Phase = %s, expected BeforeTurn", def.Phase.String())
 	}
 
-	// 测试离火 Buff 的 Phase（永久被动）
+	// 测试离火 Buff 的 Phase（回合开始前检查）
 	def = BuffTypeFire.GetBuffDefinition()
-	if def.Phase != event.PhasePassive {
-		t.Errorf("Fire Phase = %s, expected Passive", def.Phase.String())
+	if def.Phase != event.PhaseBeforeTurn {
+		t.Errorf("Fire Phase = %s, expected BeforeTurn", def.Phase.String())
 	}
 }
 
@@ -551,6 +551,7 @@ func TestBuffDefinitionNeedConfirm(t *testing.T) {
 
 func TestBuffDefinitionPhaseNeedsSubscription(t *testing.T) {
 	// 测试 Phase 是否需要订阅 EventBus
+	// 所有 Buff（除 AnyTime道具）都需要订阅
 	tests := []struct {
 		bt           BuffType
 		needsSub     bool
@@ -564,7 +565,7 @@ func TestBuffDefinitionPhaseNeedsSubscription(t *testing.T) {
 		{BuffTypeRain, true, "AfterTurn 需要订阅"},
 		{BuffTypeExorcism, true, "PreEvent 需要订阅"},
 		{BuffTypePoison, true, "BeforeTurn 需要订阅"},
-		{BuffTypeFire, false, "Passive 不需要订阅（特殊处理）"},
+		{BuffTypeFire, true, "BeforeTurn 需要订阅（每4回合检查）"},
 	}
 
 	for _, tt := range tests {
@@ -589,12 +590,12 @@ func TestBuffDefinitionDurationAndPhaseConsistency(t *testing.T) {
 			continue
 		}
 
-		// 永久 Buff（Duration=-1）应该是 Passive 或特殊处理
+		// 永久 Buff（Duration=-1）现在也使用 BeforeTurn
+		// 离火在 BeforeTurn 时检查是否是第4回合
 		if def.Duration == -1 {
 			if bt == BuffTypeFire {
-				// 离火是永久被动，正确
-				if def.Phase != event.PhasePassive {
-					t.Errorf("Permanent buff %s should be Passive phase", bt.String())
+				if def.Phase != event.PhaseBeforeTurn {
+					t.Errorf("Permanent buff %s should use BeforeTurn phase", bt.String())
 				}
 			}
 		}

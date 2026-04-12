@@ -228,15 +228,15 @@ func TestGameSubscribePassiveBuff(t *testing.T) {
 	player := NewPlayer(PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
-	// 添加永久被动 Buff (离火)
+	// 添加永久 Buff (离火，现在使用 BeforeTurn)
 	buff := NewBuff(BuffTypeFire, -1)
 	game.SubscribeBuff(player, buff)
 
-	// Passive Buff 不需要订阅
+	// 离火现在需要订阅 BeforeTurn（每4回合检查）
 	def := BuffTypeFire.GetBuffDefinition()
-	if def.Phase == event.PhasePassive {
-		if buff.SubscriptionID != "" {
-			t.Error("Passive Buff should not have SubscriptionID")
+	if def.Phase.NeedsSubscription() {
+		if buff.SubscriptionID == "" {
+			t.Error("Fire Buff should have SubscriptionID (BeforeTurn)")
 		}
 	}
 }
@@ -278,12 +278,12 @@ func TestGameSubscribeBuffByPlayerAdd(t *testing.T) {
 		t.Error("ZhuQue player should have Fire buff")
 	}
 
-	// 离火是 Passive，不需要订阅
+	// 离火现在使用 BeforeTurn，需要订阅
 	def := BuffTypeFire.GetBuffDefinition()
-	if def.Phase == event.PhasePassive {
-		// Passive 不订阅，所以订阅数应该为 0
-		if game.Bus.GetSubscriptionCount() != 0 {
-			t.Errorf("Passive Buff should not subscribe, count = %d", game.Bus.GetSubscriptionCount())
+	if def.Phase.NeedsSubscription() {
+		// BeforeTurn 需要订阅
+		if game.Bus.GetSubscriptionCount() != 1 {
+			t.Errorf("Fire Buff should subscribe to BeforeTurn, count = %d", game.Bus.GetSubscriptionCount())
 		}
 	}
 }
