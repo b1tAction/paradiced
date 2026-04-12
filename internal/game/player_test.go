@@ -309,8 +309,9 @@ func TestApplyDamageHiddenImmune(t *testing.T) {
 	if isDead {
 		t.Error("player with Hidden buff should be immune to damage")
 	}
-	if player.HP != 10 {
-		t.Errorf("player.HP = %d, expected 10 (immune)", player.HP)
+	// HP 应保持初始值（用户修改后的 DefaultPlayerConfig.MaxHP = 6）
+	if player.HP != DefaultPlayerConfig.MaxHP {
+		t.Errorf("player.HP = %d, expected %d (immune)", player.HP, DefaultPlayerConfig.MaxHP)
 	}
 }
 

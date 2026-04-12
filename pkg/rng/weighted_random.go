@@ -562,3 +562,185 @@ func (ip *ItemPool) DrawItem(luck int, rng *rand.Rand) (*WeightedItem, string, e
 
 	return nil, "", errors.New("unknown rarity type")
 }
+// ========== 属性分类抽卡池 ==========
+
+// AttributeType 属性类型（用于抽卡池分类）
+type AttributeType string
+
+const (
+	AttributeGood    AttributeType = "good"    // 良性
+	AttributeNeutral AttributeType = "neutral" // 中性
+	AttributeBad     AttributeType = "bad"     // 恶性
+)
+
+// AttributeBasedPool 基于属性的抽卡池
+// 支持按属性分类存储和抽取
+type AttributeBasedPool struct {
+	GoodPool    *WeightedPool `json:"good_pool"`    // 良性池
+	NeutralPool *WeightedPool `json:"neutral_pool"` // 中性池
+	BadPool     *WeightedPool `json:"bad_pool"`     // 恶性池
+	rng         *rand.Rand    `json:"-"`            // 随机数生成器
+}
+
+// NewAttributeBasedPool 创建属性分类抽卡池
+func NewAttributeBasedPool() *AttributeBasedPool {
+	return &AttributeBasedPool{
+		GoodPool:    NewWeightedPool(),
+		NeutralPool: NewWeightedPool(),
+		BadPool:     NewWeightedPool(),
+		rng:         rand.New(rand.NewSource(time.Now().UnixNano())),
+	}
+}
+
+// NewAttributeBasedPoolWithSeed 创建带指定种子的属性分类抽卡池（用于测试）
+func NewAttributeBasedPoolWithSeed(seed int64) *AttributeBasedPool {
+	return &AttributeBasedPool{
+		GoodPool:    NewWeightedPoolWithSeed(seed),
+		NeutralPool: NewWeightedPoolWithSeed(seed + 1),
+		BadPool:     NewWeightedPoolWithSeed(seed + 2),
+		rng:         rand.New(rand.NewSource(seed)),
+	}
+}
+
+// AddItem 添加项到指定属性池
+func (abp *AttributeBasedPool) AddItem(id string, attr AttributeType, weight int, data interface{}) error {
+	switch attr {
+	case AttributeGood:
+		return abp.GoodPool.AddItem(id, string(attr), weight, data)
+	case AttributeNeutral:
+		return abp.NeutralPool.AddItem(id, string(attr), weight, data)
+	case AttributeBad:
+		return abp.BadPool.AddItem(id, string(attr), weight, data)
+	}
+	return errors.New("unknown attribute type")
+}
+
+// AddGoodItem 添加良性项
+func (abp *AttributeBasedPool) AddGoodItem(id string, weight int, data interface{}) error {
+	return abp.AddItem(id, AttributeGood, weight, data)
+}
+
+// AddNeutralItem 添加中性项
+func (abp *AttributeBasedPool) AddNeutralItem(id string, weight int, data interface{}) error {
+	return abp.AddItem(id, AttributeNeutral, weight, data)
+}
+
+// AddBadItem 添加恶性项
+func (abp *AttributeBasedPool) AddBadItem(id string, weight int, data interface{}) error {
+	return abp.AddItem(id, AttributeBad, weight, data)
+}
+
+// GetPoolByAttribute 获取指定属性的池
+func (abp *AttributeBasedPool) GetPoolByAttribute(attr AttributeType) *WeightedPool {
+	switch attr {
+	case AttributeGood:
+		return abp.GoodPool
+	case AttributeNeutral:
+		return abp.NeutralPool
+	case AttributeBad:
+		return abp.BadPool
+	}
+	return nil
+}
+
+// DrawFromAttribute 从指定属性池抽取
+func (abp *AttributeBasedPool) DrawFromAttribute(attr AttributeType) (*WeightedItem, error) {
+	pool := abp.GetPoolByAttribute(attr)
+	if pool == nil {
+		return nil, errors.New("unknown attribute type")
+	}
+	return pool.Draw()
+}
+
+// DrawWithLuck 根据幸运值抽取
+// luck: 幸运值，影响好/坏属性的概率分布
+// 基础概率：好30%，坏30%，中性40%
+// 幸运值每点增加好事件5%，减少坏事件5%
+func (abp *AttributeBasedPool) DrawWithLuck(luck int) (*WeightedItem, AttributeType, error) {
+	// 计算属性选择概率
+	goodProb := 30 + luck*5
+	badProb := 30 - luck*5
+	neutralProb := 40
+
+	// 限制概率范围
+	if goodProb > 70 {
+		goodProb = 70
+	}
+	if badProb < 10 {
+		badProb = 10
+	}
+
+	// 创建属性选择池
+	attrPool := NewWeightedPoolWithSeed(abp.rng.Int63())
+	attrPool.AddItem("good", "attr", goodProb, nil)
+	attrPool.AddItem("bad", "attr", badProb, nil)
+	attrPool.AddItem("neutral", "attr", neutralProb, nil)
+
+	// 选择属性
+	attrItem, err := attrPool.Draw()
+	if err != nil {
+		return nil, "", err
+	}
+
+	attr := AttributeType(attrItem.ID)
+	item, err := abp.DrawFromAttribute(attr)
+	return item, attr, err
+}
+
+// DrawWithLuckAndSeed 根据幸运值和指定种子抽取（用于测试）
+func (abp *AttributeBasedPool) DrawWithLuckAndSeed(luck int, seed int64) (*WeightedItem, AttributeType, error) {
+	// 计算属性选择概率
+	goodProb := 30 + luck*5
+	badProb := 30 - luck*5
+	neutralProb := 40
+
+	// 限制概率范围
+	if goodProb > 70 {
+		goodProb = 70
+	}
+	if badProb < 10 {
+		badProb = 10
+	}
+
+	// 创建属性选择池
+	attrPool := NewWeightedPoolWithSeed(seed)
+	attrPool.AddItem("good", "attr", goodProb, nil)
+	attrPool.AddItem("bad", "attr", badProb, nil)
+	attrPool.AddItem("neutral", "attr", neutralProb, nil)
+
+	// 选择属性
+	attrItem, err := attrPool.Draw()
+	if err != nil {
+		return nil, "", err
+	}
+
+	attr := AttributeType(attrItem.ID)
+	pool := abp.GetPoolByAttribute(attr)
+	if pool == nil {
+		return nil, "", errors.New("pool not found for attribute")
+	}
+
+	item, err := pool.Draw()
+	return item, attr, err
+}
+
+// GetTotalWeight 获取所有池的总权重
+func (abp *AttributeBasedPool) GetTotalWeight() int {
+	return abp.GoodPool.TotalWeight + abp.NeutralPool.TotalWeight + abp.BadPool.TotalWeight
+}
+
+// GetAttributeWeights 获取各属性池的权重
+func (abp *AttributeBasedPool) GetAttributeWeights() map[AttributeType]int {
+	return map[AttributeType]int{
+		AttributeGood:    abp.GoodPool.TotalWeight,
+		AttributeNeutral: abp.NeutralPool.TotalWeight,
+		AttributeBad:     abp.BadPool.TotalWeight,
+	}
+}
+
+// Clear 清空所有池
+func (abp *AttributeBasedPool) Clear() {
+	abp.GoodPool = NewWeightedPool()
+	abp.NeutralPool = NewWeightedPool()
+	abp.BadPool = NewWeightedPool()
+}

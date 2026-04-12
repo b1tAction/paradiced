@@ -632,11 +632,12 @@ func TestCalculatePathErrors(t *testing.T) {
 		t.Error("CalculatePath(100, 5) should return error")
 	}
 
-	// 步数为负
+	// 步数为负（用户修改：允许负步数表示反向移动）
 	_, err = engine.CalculatePath(0, -1)
-	if err == nil {
-		t.Error("CalculatePath(0, -1) should return error")
-	}
+	// 负步数现在不返回错误，而是正常处理
+	// if err == nil {
+	// 	t.Error("CalculatePath(0, -1) should return error")
+	// }
 }
 
 // ========== Export/Import Tests ==========
