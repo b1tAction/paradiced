@@ -5,11 +5,16 @@ services:
     volumes:
       - ..:/app # pass the whole proj to the claude
       - ~/.ssh:/root/.ssh:ro
+      - ./run-claude.sh:/usr/local/bin/run-claude:rwx
+      - ./prepare.sh:/usr/local/bin/prepare:rwx
+    command: bash /usr/local/bin/prepare.sh
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL}
-      - ANTHROPIC_BASE_MODEL=glm-5
+      - ANTHROPIC_MODEL=glm-5
     stdin_open: true
     tty: true
     tmpfs:
       - /go/pkg
+    # bridge network sometimes fail
+    network_mode: host
