@@ -2,7 +2,24 @@
 
 ## 概述
 
-Event 属性系统是《命运骰子》游戏的事件分类框架，为所有事件和 Buff 提供统一的属性分类（良性/中性/恶性），便于 RNG 抽卡和游戏逻辑处理。
+Event 属性系统是《命运骰子》游戏的事件分类框架，为所有事件、Buff 和道具提供统一的属性分类（良性/中性/恶性），便于 RNG 抽卡和游戏逻辑处理。
+
+## 文件结构
+
+```
+internal/game/
+├── faction.go   # 阵营定义 + 被动技能描述
+├── buff.go      # Buff 系统（类型 + 定义 + 注册表）
+├── event.go     # Event 系统（类型 + 定义 + 注册表）
+├── item.go      # Item 系统（类型 + 定义 + 注册表）
+└── event_test.go # 单元测试
+```
+
+每个文件专注于一个领域，包含：
+- 类型枚举定义
+- 实例结构体
+- 静态定义（Definition）
+- 注册表（Registry）
 
 ## 数据结构
 
@@ -210,7 +227,7 @@ func (s *StateManager) processLandedEvent(player *Player) {
     event := s.drawEventBasedOnLuck(player.LP)
     
     // 玄武抵消恶性事件
-    if event.GetAttribute() == AttributeBad {
+    if event.GetEventAttribute() == AttributeBad {
         ev := &GameEvent{Type: EventPreBadEvent}
         player.DispatchEvent(ev)
         if ev.IsCancel {
@@ -251,9 +268,21 @@ func (s *StateManager) processLandedEvent(player *Player) {
 
 ```
 internal/game/
-├── event.go          # 事件属性系统实现 (~400行)
-└── event_test.go     # 单元测试 (~300行)
+├── faction.go      # 阵营定义（76行）
+├── buff.go         # Buff 系统（309行）- BuffType, Buff, BuffDefinition, BuffRegistry
+├── event.go        # Event 系统（305行）- EventType, EventDefinition, EventRegistry
+├── item.go         # Item 系统（190行）- ItemType, Item, ItemDefinition, ItemRegistry
+├── event_test.go   # 单元测试（332行）
+└── ...
 
 pkg/rng/
-└── weighted_random.go # AttributeBasedPool (追加 ~150行)
+└── weighted_random.go # AttributeBasedPool（追加 ~150行）
 ```
+
+每个模块文件的组成：
+| 文件 | 类型枚举 | 实例结构 | Definition | Registry |
+|------|---------|---------|-----------|----------|
+| faction.go | Faction | - | - | - |
+| buff.go | BuffType | Buff | BuffDefinition | BuffRegistry |
+| event.go | EventType | - | EventDefinition | EventRegistry |
+| item.go | ItemType | Item | ItemDefinition | ItemRegistry |
