@@ -1,65 +1,135 @@
 package game
 
-// ========== Buff 属性分类 ==========
+import "fmt"
 
-// EventAttribute 事件/BUFF的属性分类
+// ========== Evaluation 属性评分系统 ==========
+
+// Evaluation 属性评分（0~100）
+// 越低越坏，越高越好
+// 0~40: 恶性（Bad）
+// 41~65: 中性（Neutral）
+// 66~100: 良性（Good）
+type Evaluation int
+
+const (
+	// Evaluation 范围常量
+	EvaluationMin    Evaluation = 0   // 最低评分
+	EvaluationMax    Evaluation = 100 // 最高评分
+
+	// 分类边界
+	EvaluationBadThreshold     Evaluation = 40  // 恶性上限（≤40）
+	EvaluationNeutralThreshold Evaluation = 65  // 中性上限（≤65）
+	// Evaluation > 65 为良性
+)
+
+// 预定义的 Evaluation 常量（常用评分）
+const (
+	// 恶性评分（0~40）
+	EvaluationVeryBad   Evaluation = 10  // 极恶（如雷劫）
+	EvaluationBad       Evaluation = 25  // 较恶（如诅咒）
+	EvaluationMildBad   Evaluation = 35  // 轻恶（如蚊虫叮咬）
+
+	// 中性评分（41~65）
+	EvaluationNeutral   Evaluation = 50  // 标准中性（如交换）
+	EvaluationMixed     Evaluation = 55  // 混合效果（如尝一口）
+
+	// 良性评分（66~100）
+	EvaluationMildGood  Evaluation = 70  // 轻良（如草药）
+	EvaluationGood      Evaluation = 80  // 较良（如奶茶）
+	EvaluationVeryGood  Evaluation = 90  // 极良（如神眷）
+	EvaluationExcellent Evaluation = 100 // 最佳
+)
+
+// IsValid 检查评分是否在有效范围内
+func (e Evaluation) IsValid() bool {
+	return e >= EvaluationMin && e <= EvaluationMax
+}
+
+// GetCategory 获取评分类别
+func (e Evaluation) GetCategory() string {
+	if e <= EvaluationBadThreshold {
+		return "Bad"
+	} else if e <= EvaluationNeutralThreshold {
+		return "Neutral"
+	}
+	return "Good"
+}
+
+// IsGood 判断是否为良性
+func (e Evaluation) IsGood() bool {
+	return e > EvaluationNeutralThreshold
+}
+
+// IsNeutral 判断是否为中性
+func (e Evaluation) IsNeutral() bool {
+	return e > EvaluationBadThreshold && e <= EvaluationNeutralThreshold
+}
+
+// IsBad 判断是否为恶性
+func (e Evaluation) IsBad() bool {
+	return e <= EvaluationBadThreshold
+}
+
+// String 返回评分描述
+func (e Evaluation) String() string {
+	return fmt.Sprintf("Evaluation(%d): %s", e, e.GetCategory())
+}
+
+// Compare 比较两个评分
+// 返回 1 表示当前评分更好，-1 表示更差，0 表示相同
+func (e Evaluation) Compare(other Evaluation) int {
+	if e > other {
+		return 1
+	} else if e < other {
+		return -1
+	}
+	return 0
+}
+
+// ========== 旧版兼容（EventAttribute） ==========
+
+// EventAttribute 旧版属性分类（已废弃，建议使用 Evaluation）
+// 保留用于向后兼容
 type EventAttribute int
 
 const (
-	AttributeGood     EventAttribute = iota // 良性（正面效果）
-	AttributeNeutral                        // 中性（混合/随机效果）
-	AttributeBad                            // 恶性（负面效果）
+	AttributeGood     EventAttribute = iota // 良性
+	AttributeNeutral                        // 中性
+	AttributeBad                            // 恶性
 )
 
-// String 返回属性名称
-func (ea EventAttribute) String() string {
-	names := map[EventAttribute]string{
-		AttributeGood:     "Good",
-		AttributeNeutral:  "Neutral",
-		AttributeBad:      "Bad",
+// ToEvaluation 将旧版 EventAttribute 转换为 Evaluation
+func (ea EventAttribute) ToEvaluation() Evaluation {
+	switch ea {
+	case AttributeGood:
+		return EvaluationGood
+	case AttributeNeutral:
+		return EvaluationNeutral
+	case AttributeBad:
+		return EvaluationBad
 	}
-	if name, ok := names[ea]; ok {
-		return name
-	}
-	return "Unknown"
-}
-
-// IsValid 检查属性是否有效
-func (ea EventAttribute) IsValid() bool {
-	return ea >= AttributeGood && ea <= AttributeBad
-}
-
-// IsPositive 判断是否为正面属性
-func (ea EventAttribute) IsPositive() bool {
-	return ea == AttributeGood
-}
-
-// IsNegative 判断是否为负面属性
-func (ea EventAttribute) IsNegative() bool {
-	return ea == AttributeBad
+	return EvaluationNeutral
 }
 
 // ========== Buff 类型定义 ==========
 
-// BuffType Buff 类型
 type BuffType int
 
 const (
 	BuffTypeNone BuffType = iota
 	// 负性 Buff
-	BuffTypeCurse    // 诅咒：接下来3回合LP-1
-	BuffTypeLost     // 迷途：下1回合朝反方向移动
-	BuffTypeCorrupt  // 腐化：接下来4回合每2回合HP-1
-	BuffTypePoison   // 毒瘴：接下来3回合每回合受一次恶性随机事件
+	BuffTypeCurse    // 诅咒
+	BuffTypeLost     // 迷途
+	BuffTypeCorrupt  // 腐化
+	BuffTypePoison   // 毒瘴
 	// 正性 Buff
-	BuffTypeDivine   // 神眷：接下来3回合LP+1
-	BuffTypeHidden   // 隐匿：接下来3回合免疫任意事件、BUFF或道具
-	BuffTypeRain     // 甘霖：接下来4回合每2回合HP+1
-	BuffTypeExorcism // 辟邪：接下来5回合无视毒瘴buff
-	BuffTypeFire     // 离火：朱雀阵营初始增益，每4回合LP+1
+	BuffTypeDivine   // 神眷
+	BuffTypeHidden   // 隐匿
+	BuffTypeRain     // 甘霖
+	BuffTypeExorcism // 辟邪
+	BuffTypeFire     // 离火
 )
 
-// String 返回 Buff 类型名称
 func (bt BuffType) String() string {
 	names := map[BuffType]string{
 		BuffTypeNone:     "None",
@@ -85,38 +155,33 @@ func (bt BuffType) IsPositive() bool {
 		bt == BuffTypeRain || bt == BuffTypeExorcism || bt == BuffTypeFire
 }
 
-// GetBuffAttribute 获取 Buff 的属性分类
-func (bt BuffType) GetBuffAttribute() EventAttribute {
-	positiveBuffs := []BuffType{
-		BuffTypeDivine, BuffTypeHidden, BuffTypeRain, BuffTypeExorcism, BuffTypeFire,
+// GetEvaluation 获取 Buff 的评分
+func (bt BuffType) GetEvaluation() Evaluation {
+	evalMap := map[BuffType]Evaluation{
+		BuffTypeCurse:    EvaluationBad,    // 诅咒：较恶
+		BuffTypeLost:     EvaluationMildBad, // 迷途：轻恶
+		BuffTypeCorrupt:  EvaluationBad,    // 腐化：较恶
+		BuffTypePoison:   EvaluationVeryBad, // 毒瘴：极恶
+		BuffTypeDivine:   EvaluationVeryGood, // 神眷：极良
+		BuffTypeHidden:   EvaluationExcellent, // 隐匿：最佳（免疫）
+		BuffTypeRain:     EvaluationGood,    // 甘霖：较良
+		BuffTypeExorcism: EvaluationMildGood, // 辟邪：轻良
+		BuffTypeFire:     EvaluationGood,    // 离火：较良
 	}
-	negativeBuffs := []BuffType{
-		BuffTypeCurse, BuffTypeLost, BuffTypeCorrupt, BuffTypePoison,
+	if eval, ok := evalMap[bt]; ok {
+		return eval
 	}
-
-	for _, b := range positiveBuffs {
-		if bt == b {
-			return AttributeGood
-		}
-	}
-	for _, b := range negativeBuffs {
-		if bt == b {
-			return AttributeBad
-		}
-	}
-	return AttributeNeutral
+	return EvaluationNeutral
 }
 
 // ========== Buff 实例 ==========
 
-// Buff 持续状态实例
 type Buff struct {
-	Type     BuffType `json:"type"`     // Buff类型
-	Duration int      `json:"duration"` // 持续回合数
-	Charge   int      `json:"charge"`   // 充能次数（用于青龙/玄武被动）
+	Type     BuffType `json:"type"`
+	Duration int      `json:"duration"`
+	Charge   int      `json:"charge"`
 }
 
-// NewBuff 创建新的 Buff 实例
 func NewBuff(buffType BuffType, duration int) *Buff {
 	return &Buff{
 		Type:     buffType,
@@ -125,14 +190,10 @@ func NewBuff(buffType BuffType, duration int) *Buff {
 	}
 }
 
-// IsActive 检查 Buff 是否仍然生效
-// Duration == -1 表示永久生效
 func (b *Buff) IsActive() bool {
 	return b.Duration > 0 || b.Duration == -1 || b.Charge > 0
 }
 
-// TickDuration 减少持续时间
-// 永久 Buff (Duration == -1) 不会减少
 func (b *Buff) TickDuration() bool {
 	if b.Duration > 0 {
 		b.Duration--
@@ -142,24 +203,23 @@ func (b *Buff) TickDuration() bool {
 
 // ========== Buff 静态定义 ==========
 
-// BuffDefinition Buff定义（静态配置）
 type BuffDefinition struct {
-	Type      BuffType       `json:"type"`       // Buff类型
-	Attribute EventAttribute `json:"attribute"`  // Buff属性（良性/恶性）
-	Name      string         `json:"name"`       // Buff名称（中文）
-	Desc      string         `json:"desc"`       // Buff描述
-	Duration  int            `json:"duration"`   // 持续回合数（-1表示永久）
-	HPPerTurn int            `json:"hp_per_turn"` // 每回合HP变化
-	LPPerTurn int            `json:"lp_per_turn"` // 每回合LP变化
-	Special   string         `json:"special"`    // 特殊效果描述
+	Type      BuffType   `json:"type"`
+	Eval      Evaluation `json:"evaluation"`    // 评分（替代旧版 Attribute）
+	Name      string     `json:"name"`
+	Desc      string     `json:"desc"`
+	Duration  int        `json:"duration"`
+	HPPerTurn int        `json:"hp_per_turn"`
+	LPPerTurn int        `json:"lp_per_turn"`
+	Special   string     `json:"special"`
 }
 
-// GetBuffDefinition 获取 Buff 的完整定义
 func (bt BuffType) GetBuffDefinition() *BuffDefinition {
+	eval := bt.GetEvaluation()
 	definitions := map[BuffType]*BuffDefinition{
 		BuffTypeCurse: {
 			Type:      BuffTypeCurse,
-			Attribute: AttributeBad,
+			Eval:      eval,
 			Name:      "诅咒",
 			Desc:      "接下来3回合LP-1",
 			Duration:  3,
@@ -167,7 +227,7 @@ func (bt BuffType) GetBuffDefinition() *BuffDefinition {
 		},
 		BuffTypeDivine: {
 			Type:      BuffTypeDivine,
-			Attribute: AttributeGood,
+			Eval:      eval,
 			Name:      "神眷",
 			Desc:      "接下来3回合LP+1",
 			Duration:  3,
@@ -175,7 +235,7 @@ func (bt BuffType) GetBuffDefinition() *BuffDefinition {
 		},
 		BuffTypeHidden: {
 			Type:      BuffTypeHidden,
-			Attribute: AttributeGood,
+			Eval:      eval,
 			Name:      "隐匿",
 			Desc:      "接下来3回合免疫任意事件、BUFF或道具的影响",
 			Duration:  3,
@@ -183,7 +243,7 @@ func (bt BuffType) GetBuffDefinition() *BuffDefinition {
 		},
 		BuffTypeLost: {
 			Type:      BuffTypeLost,
-			Attribute: AttributeBad,
+			Eval:      eval,
 			Name:      "迷途",
 			Desc:      "下1回合朝反方向移动",
 			Duration:  1,
@@ -191,23 +251,23 @@ func (bt BuffType) GetBuffDefinition() *BuffDefinition {
 		},
 		BuffTypeCorrupt: {
 			Type:      BuffTypeCorrupt,
-			Attribute: AttributeBad,
+			Eval:      eval,
 			Name:      "腐化",
 			Desc:      "接下来4回合每2回合HP-1",
 			Duration:  4,
-			HPPerTurn: -1, // 实际是每2回合生效
+			HPPerTurn: -1,
 		},
 		BuffTypeRain: {
 			Type:      BuffTypeRain,
-			Attribute: AttributeGood,
+			Eval:      eval,
 			Name:      "甘霖",
 			Desc:      "接下来4回合每2回合HP+1",
 			Duration:  4,
-			HPPerTurn: 1, // 实际是每2回合生效
+			HPPerTurn: 1,
 		},
 		BuffTypeExorcism: {
 			Type:      BuffTypeExorcism,
-			Attribute: AttributeGood,
+			Eval:      eval,
 			Name:      "辟邪",
 			Desc:      "接下来5回合无视毒瘴buff",
 			Duration:  5,
@@ -215,7 +275,7 @@ func (bt BuffType) GetBuffDefinition() *BuffDefinition {
 		},
 		BuffTypePoison: {
 			Type:      BuffTypePoison,
-			Attribute: AttributeBad,
+			Eval:      eval,
 			Name:      "毒瘴",
 			Desc:      "接下来3回合每回合受一次恶性随机事件影响",
 			Duration:  3,
@@ -223,14 +283,13 @@ func (bt BuffType) GetBuffDefinition() *BuffDefinition {
 		},
 		BuffTypeFire: {
 			Type:      BuffTypeFire,
-			Attribute: AttributeGood,
+			Eval:      eval,
 			Name:      "离火",
 			Desc:      "朱雀阵营增益，每4回合LP+1",
-			Duration:  -1, // 永久
+			Duration:  -1,
 			Special:   "zhuque_passive",
 		},
 	}
-
 	if def, ok := definitions[bt]; ok {
 		return def
 	}
@@ -239,14 +298,12 @@ func (bt BuffType) GetBuffDefinition() *BuffDefinition {
 
 // ========== Buff 注册表 ==========
 
-// BuffRegistry Buff注册表
 type BuffRegistry struct {
-	AllBuffs  []BuffType `json:"all_buffs"`  // 所有Buff
-	GoodBuffs []BuffType `json:"good_buffs"` // 良性Buff
-	BadBuffs  []BuffType `json:"bad_buffs"`  // 恶性Buff
+	AllBuffs  []BuffType `json:"all_buffs"`
+	GoodBuffs []BuffType `json:"good_buffs"`
+	BadBuffs  []BuffType `json:"bad_buffs"`
 }
 
-// NewBuffRegistry 创建Buff注册表
 func NewBuffRegistry() *BuffRegistry {
 	return &BuffRegistry{
 		AllBuffs: []BuffType{
@@ -262,45 +319,33 @@ func NewBuffRegistry() *BuffRegistry {
 	}
 }
 
-// GetBuffsByAttribute 按属性获取Buff列表
-func (br *BuffRegistry) GetBuffsByAttribute(attr EventAttribute) []BuffType {
-	switch attr {
-	case AttributeGood:
+// GetBuffsByEvaluationRange 按 Evaluation 范围获取 Buff 列表
+func (br *BuffRegistry) GetBuffsByEvaluationRange(minEval, maxEval Evaluation) []BuffType {
+	var result []BuffType
+	for _, bt := range br.AllBuffs {
+		eval := bt.GetEvaluation()
+		if eval >= minEval && eval <= maxEval {
+			result = append(result, bt)
+		}
+	}
+	return result
+}
+
+// GetBuffsByCategory 按类别获取 Buff 列表（兼容旧版）
+func (br *BuffRegistry) GetBuffsByCategory(category string) []BuffType {
+	switch category {
+	case "Good":
 		return br.GoodBuffs
-	case AttributeBad:
+	case "Bad":
 		return br.BadBuffs
 	}
 	return br.AllBuffs
 }
 
-// GetAllBuffDefinitions 获取所有Buff定义
+// GetAllBuffDefinitions 获取所有 Buff 定义
 func (br *BuffRegistry) GetAllBuffDefinitions() []*BuffDefinition {
 	defs := make([]*BuffDefinition, 0, len(br.AllBuffs))
 	for _, bt := range br.AllBuffs {
-		def := bt.GetBuffDefinition()
-		if def != nil {
-			defs = append(defs, def)
-		}
-	}
-	return defs
-}
-
-// GetGoodBuffDefinitions 获取良性Buff定义
-func (br *BuffRegistry) GetGoodBuffDefinitions() []*BuffDefinition {
-	defs := make([]*BuffDefinition, 0, len(br.GoodBuffs))
-	for _, bt := range br.GoodBuffs {
-		def := bt.GetBuffDefinition()
-		if def != nil {
-			defs = append(defs, def)
-		}
-	}
-	return defs
-}
-
-// GetBadBuffDefinitions 获取恶性Buff定义
-func (br *BuffRegistry) GetBadBuffDefinitions() []*BuffDefinition {
-	defs := make([]*BuffDefinition, 0, len(br.BadBuffs))
-	for _, bt := range br.BadBuffs {
 		def := bt.GetBuffDefinition()
 		if def != nil {
 			defs = append(defs, def)
