@@ -214,12 +214,14 @@ func TestGameSubscribeBuff(t *testing.T) {
 
 	// 验证订阅已创建
 	def := core.BuffTypeCurse.GetBuffDefinition()
-	if def.Phase.NeedsSubscription() {
-		if game.Bus.GetSubscriptionCount() != 1 {
-			t.Errorf("Subscription count = %d, expected 1", game.Bus.GetSubscriptionCount())
-		}
-		if buff.SubscriptionID == "" {
-			t.Error("Buff should have SubscriptionID")
+	for _, phase := range def.GetPhases() {
+		if phase.NeedsSubscription() {
+			if game.Bus.GetSubscriptionCount() != 1 {
+				t.Errorf("Subscription count = %d, expected 1", game.Bus.GetSubscriptionCount())
+			}
+			if len(buff.SubscriptionIDs) != 1 {
+				t.Error("Buff should have SubscriptionIDs")
+			}
 		}
 	}
 }
@@ -235,9 +237,11 @@ func TestGameSubscribePassiveBuff(t *testing.T) {
 
 	// 离火现在需要订阅 BeforeTurn（每4回合检查）
 	def := core.BuffTypeFire.GetBuffDefinition()
-	if def.Phase.NeedsSubscription() {
-		if buff.SubscriptionID == "" {
-			t.Error("Fire Buff should have SubscriptionID (BeforeTurn)")
+	for _, phase := range def.GetPhases() {
+		if phase.NeedsSubscription() {
+			if len(buff.SubscriptionIDs) == 0 {
+				t.Error("Fire Buff should have SubscriptionIDs (BeforeTurn)")
+			}
 		}
 	}
 }
@@ -259,8 +263,8 @@ func TestGameUnsubscribeBuff(t *testing.T) {
 	if game.Bus.GetSubscriptionCount() != initialCount-1 {
 		t.Errorf("Subscription count should decrease after unsubscribe")
 	}
-	if buff.SubscriptionID != "" {
-		t.Error("Buff SubscriptionID should be cleared after unsubscribe")
+	if len(buff.SubscriptionIDs) != 0 {
+		t.Error("Buff SubscriptionIDs should be empty after unsubscribe")
 	}
 }
 
@@ -281,10 +285,12 @@ func TestGameSubscribeBuffByPlayerAdd(t *testing.T) {
 
 	// 离火现在使用 BeforeTurn，需要订阅
 	def := core.BuffTypeFire.GetBuffDefinition()
-	if def.Phase.NeedsSubscription() {
-		// BeforeTurn 需要订阅
-		if game.Bus.GetSubscriptionCount() != 1 {
-			t.Errorf("Fire Buff should subscribe to BeforeTurn, count = %d", game.Bus.GetSubscriptionCount())
+	for _, phase := range def.GetPhases() {
+		if phase.NeedsSubscription() {
+			// BeforeTurn 需要订阅
+			if game.Bus.GetSubscriptionCount() != 1 {
+				t.Errorf("Fire Buff should subscribe to BeforeTurn, count = %d", game.Bus.GetSubscriptionCount())
+			}
 		}
 	}
 }
@@ -439,5 +445,182 @@ func TestGameCreateItemDecision(t *testing.T) {
 	}
 	if len(decision.Options) != 2 {
 		t.Errorf("Item Decision should have 2 options (use/skip), got %d", len(decision.Options))
+	}
+}
+
+// ========== Buff Lifecycle Tests ==========
+
+func TestGameApplyBuffToPlayer(t *testing.T) {
+	game := NewGame("game-001")
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
+	game.AddPlayer(player)
+
+	// 使用 ApplyBuffToPlayer 添加 Buff
+	buff := core.NewBuff(core.BuffTypeCurse, 3)
+	err := game.ApplyBuffToPlayer(player, buff)
+
+	if err != nil {
+		t.Errorf("ApplyBuffToPlayer should not return error: %v", err)
+	}
+
+	// 验证 Buff 已添加
+	if !player.HasBuff(core.BuffTypeCurse) {
+		t.Error("Player should have Curse buff")
+	}
+
+	// 验证订阅已创建
+	if game.Bus.GetSubscriptionCount() == 0 {
+		t.Error("Should have subscriptions after ApplyBuffToPlayer")
+	}
+
+	// 验证 SubscriptionIDs 已填充
+	if len(buff.SubscriptionIDs) == 0 {
+		t.Error("Buff should have SubscriptionIDs")
+	}
+}
+
+func TestGameRemoveBuffFromPlayer(t *testing.T) {
+	game := NewGame("game-001")
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
+	game.AddPlayer(player)
+
+	// 先添加 Buff
+	buff := core.NewBuff(core.BuffTypeCurse, 3)
+	game.ApplyBuffToPlayer(player, buff)
+
+	// 验证初始状态
+	initialSubCount := game.Bus.GetSubscriptionCount()
+	if initialSubCount == 0 {
+		t.Fatal("Should have subscriptions before removal")
+	}
+
+	// 移除 Buff
+	result := game.RemoveBuffFromPlayer(player, buff)
+
+	if !result {
+		t.Error("RemoveBuffFromPlayer should return true")
+	}
+
+	// 验证 Buff 已移除
+	if player.HasBuff(core.BuffTypeCurse) {
+		t.Error("Player should not have Curse buff after removal")
+	}
+
+	// 验证订阅已取消
+	if game.Bus.GetSubscriptionCount() != initialSubCount-1 {
+		t.Errorf("Subscription count should decrease after removal")
+	}
+}
+
+func TestGameBroadcastBuffApplied(t *testing.T) {
+	game := NewGame("game-001")
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
+	game.AddPlayer(player)
+
+	// 订阅 PhaseOnBuffApplied（用于测试接收）
+	received := false
+	buffTypeCheck := core.BuffTypeNone
+	d := event.NewAutoDecision("测试", []event.Option{
+		{ID: "ok", Label: "OK", Action: func(ctx *event.Context) {
+			received = true
+			// 验证 Context.Data 包含 Buff
+			buff, ok := ctx.Data.(*core.Buff)
+			if !ok {
+				t.Error("Context.Data should be Buff")
+				return
+			}
+			buffTypeCheck = buff.Type
+		}},
+	})
+	game.Bus.Subscribe(event.PhaseOnBuffApplied, player.UserID, "test-listener", "test", d)
+
+	// 广播 Applied 事件
+	buff := core.NewBuff(core.BuffTypeCurse, 3)
+	game.BroadcastBuffApplied(player, buff)
+
+	// 验证事件已触发
+	if !received {
+		t.Error("PhaseOnBuffApplied should be triggered")
+	}
+	if buffTypeCheck != core.BuffTypeCurse {
+		t.Errorf("Buff.Type = %v, expected Curse", buffTypeCheck)
+	}
+}
+
+func TestGameBroadcastBuffRemoved(t *testing.T) {
+	game := NewGame("game-001")
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
+	game.AddPlayer(player)
+
+	// 订阅 PhaseOnBuffRemoved（用于测试接收）
+	received := false
+	buffTypeCheck := core.BuffTypeNone
+	d := event.NewAutoDecision("测试", []event.Option{
+		{ID: "ok", Label: "OK", Action: func(ctx *event.Context) {
+			received = true
+			// 验证 Context.Data 包含 Buff
+			buff, ok := ctx.Data.(*core.Buff)
+			if !ok {
+				t.Error("Context.Data should be Buff")
+				return
+			}
+			buffTypeCheck = buff.Type
+		}},
+	})
+	game.Bus.Subscribe(event.PhaseOnBuffRemoved, player.UserID, "test-listener", "test", d)
+
+	// 广播 Removed 事件
+	buff := core.NewBuff(core.BuffTypeDivine, 3)
+	game.BroadcastBuffRemoved(player, buff)
+
+	// 验证事件已触发
+	if !received {
+		t.Error("PhaseOnBuffRemoved should be triggered")
+	}
+	if buffTypeCheck != core.BuffTypeDivine {
+		t.Errorf("Buff.Type = %v, expected Divine", buffTypeCheck)
+	}
+}
+
+func TestGameGetActiveBuffCount(t *testing.T) {
+	game := NewGame("game-001")
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
+	game.AddPlayer(player)
+
+	// 初始 Buff 数量
+	if game.GetActiveBuffCount("player-001") != 0 {
+		t.Error("Initial buff count should be 0")
+	}
+
+	// 添加 Buff
+	buff1 := core.NewBuff(core.BuffTypeCurse, 3)
+	buff2 := core.NewBuff(core.BuffTypeDivine, 3)
+	game.ApplyBuffToPlayer(player, buff1)
+	game.ApplyBuffToPlayer(player, buff2)
+
+	// 验证 Buff 数量
+	if game.GetActiveBuffCount("player-001") != 2 {
+		t.Errorf("Buff count = %d, expected 2", game.GetActiveBuffCount("player-001"))
+	}
+
+	// 不存在的玩家
+	if game.GetActiveBuffCount("unknown") != 0 {
+		t.Error("Unknown player buff count should be 0")
+	}
+}
+
+func TestGameGetBuffSubscriptionCount(t *testing.T) {
+	game := NewGame("game-001")
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
+	game.AddPlayer(player)
+
+	// 添加 Buff
+	buff := core.NewBuff(core.BuffTypeCurse, 3)
+	game.SubscribeBuff(player, buff)
+
+	// 验证订阅数量
+	count := game.GetBuffSubscriptionCount(buff)
+	if count != 1 {
+		t.Errorf("Subscription count = %d, expected 1", count)
 	}
 }

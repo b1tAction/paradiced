@@ -154,7 +154,7 @@ func TestEvaluationConstants(t *testing.T) {
 		t.Errorf("EvaluationVeryGood = %d, expected 90", EvaluationVeryGood)
 	}
 	if EvaluationExcellent != 100 {
-		t.Errorf("EvaluationExcellent = %d, expected 100", EvaluationExcellent)
+		t.Errorf("EvaluationExcellent = %d, expected 100", EvaluationNeutral)
 	}
 }
 
@@ -206,7 +206,7 @@ func TestBuffTypeGetEvaluation(t *testing.T) {
 		{BuffTypeCorrupt, EvaluationBad},    // 腐化：较恶 (25)
 		{BuffTypePoison, EvaluationVeryBad}, // 毒瘴：极恶 (10)
 		{BuffTypeDivine, EvaluationVeryGood}, // 神眷：极良 (90)
-		{BuffTypeHidden, EvaluationExcellent}, // 隐匿：最佳 (100)
+		{BuffTypeHidden, EvaluationNeutral}, // 隐匿： 中性 (50)
 		{BuffTypeRain, EvaluationGood},      // 甘霖：较良 (80)
 		{BuffTypeExorcism, EvaluationMildGood}, // 辟邪：轻良 (70)
 		{BuffTypeFire, EvaluationGood},      // 离火：较良 (80)
@@ -324,13 +324,13 @@ func TestBuffTypeGetBuffDefinition(t *testing.T) {
 		t.Errorf("def.LPPerTurn = %d, expected 1", def.LPPerTurn)
 	}
 
-	// 测试隐匿 Buff（最佳评分）
+	// 测试隐匿 Buff（中性评分）
 	def = BuffTypeHidden.GetBuffDefinition()
 	if def == nil {
 		t.Fatal("BuffTypeHidden should have definition")
 	}
-	if def.Eval != EvaluationExcellent {
-		t.Errorf("def.Eval = %d, expected Excellent(%d)", def.Eval, EvaluationExcellent)
+	if def.Eval != EvaluationNeutral {
+		t.Errorf("def.Eval = %d, expected Excellent(%d)", def.Eval, EvaluationNeutral)
 	}
 	if def.Special != "immune" {
 		t.Errorf("def.Special = %s, expected immune", def.Special)
@@ -375,14 +375,14 @@ func TestBuffRegistryGetBuffsByEvaluationRange(t *testing.T) {
 
 	// 获取良性 Buff（66~100）
 	goodBuffs := registry.GetBuffsByEvaluationRange(66, EvaluationMax)
-	if len(goodBuffs) != 5 {
-		t.Errorf("good buffs count = %d, expected 5", len(goodBuffs))
+	if len(goodBuffs) != 4 {
+		t.Errorf("good buffs count = %d, expected 4", len(goodBuffs))
 	}
 
 	// 获取极良 Buff（90~100）
 	excellentBuffs := registry.GetBuffsByEvaluationRange(90, 100)
-	if len(excellentBuffs) != 2 {
-		t.Errorf("excellent buffs count = %d, expected 2 (Divine+Hidden)", len(excellentBuffs))
+	if len(excellentBuffs) != 1 {
+		t.Errorf("excellent buffs count = %d, expected 1 (Divine)", len(excellentBuffs))
 	}
 }
 
@@ -424,58 +424,61 @@ func TestBuffRegistryGetAllBuffDefinitions(t *testing.T) {
 // ========== BuffDefinition Phase Tests ==========
 
 func TestBuffDefinitionPhase(t *testing.T) {
-	// 测试诅咒 Buff 的 Phase
+	// 测试诅咒 Buff 的 Phases
 	def := BuffTypeCurse.GetBuffDefinition()
-	if def.Phase != event.PhaseBeforeTurn {
-		t.Errorf("Curse Phase = %s, expected BeforeTurn", def.Phase.String())
+	if !def.HasPhase(event.PhaseBeforeTurn) {
+		t.Errorf("Curse should have BeforeTurn phase")
+	}
+	if len(def.Phases) != 1 {
+		t.Errorf("Curse Phases count = %d, expected 1", len(def.Phases))
 	}
 
-	// 测试神眷 Buff 的 Phase
+	// 测试神眷 Buff 的 Phases
 	def = BuffTypeDivine.GetBuffDefinition()
-	if def.Phase != event.PhaseBeforeTurn {
-		t.Errorf("Divine Phase = %s, expected BeforeTurn", def.Phase.String())
+	if !def.HasPhase(event.PhaseBeforeTurn) {
+		t.Errorf("Divine should have BeforeTurn phase")
 	}
 
-	// 测试隐匿 Buff 的 Phase（受伤前免疫）
+	// 测试隐匿 Buff 的 Phases（受伤前免疫）
 	def = BuffTypeHidden.GetBuffDefinition()
-	if def.Phase != event.PhasePreDamage {
-		t.Errorf("Hidden Phase = %s, expected PreDamage", def.Phase.String())
+	if !def.HasPhase(event.PhasePreDamage) {
+		t.Errorf("Hidden should have PreDamage phase")
 	}
 
-	// 测试迷途 Buff 的 Phase（移动时反向）
+	// 测试迷途 Buff 的 Phases（移动时反向）
 	def = BuffTypeLost.GetBuffDefinition()
-	if def.Phase != event.PhaseOnMove {
-		t.Errorf("Lost Phase = %s, expected OnMove", def.Phase.String())
+	if !def.HasPhase(event.PhaseOnMove) {
+		t.Errorf("Lost should have OnMove phase")
 	}
 
-	// 测试腐化 Buff 的 Phase（回合结束后）
+	// 测试腐化 Buff 的 Phases（回合结束后）
 	def = BuffTypeCorrupt.GetBuffDefinition()
-	if def.Phase != event.PhaseAfterTurn {
-		t.Errorf("Corrupt Phase = %s, expected AfterTurn", def.Phase.String())
+	if !def.HasPhase(event.PhaseAfterTurn) {
+		t.Errorf("Corrupt should have AfterTurn phase")
 	}
 
-	// 测试甘霖 Buff 的 Phase（回合结束后）
+	// 测试甘霖 Buff 的 Phases（回合结束后）
 	def = BuffTypeRain.GetBuffDefinition()
-	if def.Phase != event.PhaseAfterTurn {
-		t.Errorf("Rain Phase = %s, expected AfterTurn", def.Phase.String())
+	if !def.HasPhase(event.PhaseAfterTurn) {
+		t.Errorf("Rain should have AfterTurn phase")
 	}
 
-	// 测试辟邪 Buff 的 Phase（事件触发前）
+	// 测试辟邪 Buff 的 Phases（事件触发前）
 	def = BuffTypeExorcism.GetBuffDefinition()
-	if def.Phase != event.PhasePreEvent {
-		t.Errorf("Exorcism Phase = %s, expected PreEvent", def.Phase.String())
+	if !def.HasPhase(event.PhasePreEvent) {
+		t.Errorf("Exorcism should have PreEvent phase")
 	}
 
-	// 测试毒瘴 Buff 的 Phase（回合开始前）
+	// 测试毒瘴 Buff 的 Phases（回合开始前）
 	def = BuffTypePoison.GetBuffDefinition()
-	if def.Phase != event.PhaseBeforeTurn {
-		t.Errorf("Poison Phase = %s, expected BeforeTurn", def.Phase.String())
+	if !def.HasPhase(event.PhaseBeforeTurn) {
+		t.Errorf("Poison should have BeforeTurn phase")
 	}
 
-	// 测试离火 Buff 的 Phase（回合开始前检查）
+	// 测试离火 Buff 的 Phases（回合开始前检查）
 	def = BuffTypeFire.GetBuffDefinition()
-	if def.Phase != event.PhaseBeforeTurn {
-		t.Errorf("Fire Phase = %s, expected BeforeTurn", def.Phase.String())
+	if !def.HasPhase(event.PhaseBeforeTurn) {
+		t.Errorf("Fire should have BeforeTurn phase")
 	}
 }
 
@@ -532,7 +535,7 @@ func TestBuffDefinitionNeedConfirm(t *testing.T) {
 }
 
 func TestBuffDefinitionPhaseNeedsSubscription(t *testing.T) {
-	// 测试 Phase 是否需要订阅 EventBus
+	// 测试 Phases 是否需要订阅 EventBus
 	// 所有 Buff（除 AnyTime道具）都需要订阅
 	tests := []struct {
 		bt           BuffType
@@ -556,15 +559,18 @@ func TestBuffDefinitionPhaseNeedsSubscription(t *testing.T) {
 			t.Errorf("BuffType(%s) has no definition", tt.bt.String())
 			continue
 		}
-		if def.Phase.NeedsSubscription() != tt.needsSub {
-			t.Errorf("%s: Phase.NeedsSubscription() = %v, expected %v (%s)",
-				tt.bt.String(), def.Phase.NeedsSubscription(), tt.needsSub, tt.reason)
+		// 检查所有 Phases 的订阅需求
+		for _, phase := range def.GetPhases() {
+			if phase.NeedsSubscription() != tt.needsSub {
+				t.Errorf("%s: Phase.NeedsSubscription() = %v, expected %v (%s)",
+					tt.bt.String(), phase.NeedsSubscription(), tt.needsSub, tt.reason)
+			}
 		}
 	}
 }
 
 func TestBuffDefinitionDurationAndPhaseConsistency(t *testing.T) {
-	// 验证 Duration 和 Phase 的合理性
+	// 验证 Duration 和 Phases 的合理性
 	registry := NewBuffRegistry()
 	for _, bt := range registry.AllBuffs {
 		def := bt.GetBuffDefinition()
@@ -576,16 +582,18 @@ func TestBuffDefinitionDurationAndPhaseConsistency(t *testing.T) {
 		// 离火在 BeforeTurn 时检查是否是第4回合
 		if def.Duration == -1 {
 			if bt == BuffTypeFire {
-				if def.Phase != event.PhaseBeforeTurn {
-					t.Errorf("Permanent buff %s should use BeforeTurn phase", bt.String())
+				if !def.HasPhase(event.PhaseBeforeTurn) {
+					t.Errorf("Permanent buff %s should have BeforeTurn phase", bt.String())
 				}
 			}
 		}
 
-		// 有持续时间的 Buff 应该有有效的 Phase
+		// 有持续时间的 Buff 应该有有效的 Phases
 		if def.Duration > 0 {
-			if !def.Phase.IsValid() {
-				t.Errorf("Buff %s with duration %d has invalid Phase", bt.String(), def.Duration)
+			for _, phase := range def.GetPhases() {
+				if !phase.IsValid() {
+					t.Errorf("Buff %s with duration %d has invalid Phase %s", bt.String(), def.Duration, phase.String())
+				}
 			}
 		}
 	}
@@ -612,6 +620,83 @@ func TestBuffDefinitionSpecialEffects(t *testing.T) {
 		}
 		if def.Special != tt.expected {
 			t.Errorf("%s Special = %s, expected %s", tt.bt.String(), def.Special, tt.expected)
+		}
+	}
+}
+
+// ========== 多 Phase 支持 Tests ==========
+
+func TestBuffDefinitionGetPhases(t *testing.T) {
+	// 测试 GetPhases 方法返回正确的 Phase 列表
+	def := BuffTypeCurse.GetBuffDefinition()
+	phases := def.GetPhases()
+	if len(phases) != 1 {
+		t.Errorf("Curse GetPhases count = %d, expected 1", len(phases))
+	}
+	if phases[0] != event.PhaseBeforeTurn {
+		t.Errorf("Curse GetPhases[0] = %s, expected BeforeTurn", phases[0].String())
+	}
+}
+
+func TestBuffDefinitionHasPhase(t *testing.T) {
+	// 测试 HasPhase 方法
+	tests := []struct {
+		bt       BuffType
+		phase    event.Phase
+		expected bool
+	}{
+		{BuffTypeCurse, event.PhaseBeforeTurn, true},
+		{BuffTypeCurse, event.PhaseAfterTurn, false},
+		{BuffTypeHidden, event.PhasePreDamage, true},
+		{BuffTypeHidden, event.PhaseBeforeTurn, false},
+		{BuffTypeLost, event.PhaseOnMove, true},
+		{BuffTypeLost, event.PhaseOnLand, false},
+	}
+
+	for _, tt := range tests {
+		def := tt.bt.GetBuffDefinition()
+		if def == nil {
+			t.Errorf("BuffType(%s) has no definition", tt.bt.String())
+			continue
+		}
+		result := def.HasPhase(tt.phase)
+		if result != tt.expected {
+			t.Errorf("%s.HasPhase(%s) = %v, expected %v",
+				tt.bt.String(), tt.phase.String(), result, tt.expected)
+		}
+	}
+}
+
+func TestBuffInstanceSubscriptionIDs(t *testing.T) {
+	// 测试 Buff 实例的 SubscriptionIDs 切片
+	buff := NewBuff(BuffTypeCurse, 3)
+
+	// 初始应该是空切片
+	if buff.SubscriptionIDs == nil {
+		buff.SubscriptionIDs = make([]string, 0)
+	}
+	if len(buff.SubscriptionIDs) != 0 {
+		t.Errorf("New Buff SubscriptionIDs count = %d, expected 0", len(buff.SubscriptionIDs))
+	}
+
+	// 可以添加多个订阅 ID
+	buff.SubscriptionIDs = append(buff.SubscriptionIDs, "sub-001", "sub-002")
+	if len(buff.SubscriptionIDs) != 2 {
+		t.Errorf("Buff SubscriptionIDs count = %d, expected 2", len(buff.SubscriptionIDs))
+	}
+}
+
+func TestBuffDefinitionPhasesSlice(t *testing.T) {
+	// 测试 Phases 是切片类型
+	registry := NewBuffRegistry()
+	for _, bt := range registry.AllBuffs {
+		def := bt.GetBuffDefinition()
+		if def == nil {
+			continue
+		}
+		// Phases 应该是切片，至少有一个元素
+		if len(def.Phases) == 0 {
+			t.Errorf("Buff %s should have at least one Phase", bt.String())
 		}
 	}
 }

@@ -24,6 +24,8 @@ func TestPhaseString(t *testing.T) {
 		{PhasePreDamage, "PreDamage"},
 		{PhaseAfterTurn, "AfterTurn"},
 		{PhaseAnyTime, "AnyTime"},
+		{PhaseOnBuffApplied, "OnBuffApplied"},
+		{PhaseOnBuffRemoved, "OnBuffRemoved"},
 		{Phase(999), "Unknown"},
 	}
 
@@ -39,6 +41,7 @@ func TestPhaseIsValid(t *testing.T) {
 	validPhases := []Phase{
 		PhaseBeforeTurn, PhaseOnMove, PhaseOnLand, PhasePreEvent,
 		PhasePreDamage, PhaseAfterTurn, PhaseAnyTime,
+		PhaseOnBuffApplied, PhaseOnBuffRemoved,
 	}
 	for _, p := range validPhases {
 		if !p.IsValid() {
@@ -60,10 +63,11 @@ func TestPhaseNeedsSubscription(t *testing.T) {
 		t.Error("PhaseAnyTime should not need subscription")
 	}
 
-	// 其他 Phase 需要订阅
+	// 其他 Phase 需要订阅（包括新的生命周期事件）
 	needsSub := []Phase{
 		PhaseBeforeTurn, PhaseOnMove, PhaseOnLand, PhasePreEvent,
 		PhasePreDamage, PhaseAfterTurn,
+		PhaseOnBuffApplied, PhaseOnBuffRemoved,
 	}
 	for _, p := range needsSub {
 		if !p.NeedsSubscription() {
