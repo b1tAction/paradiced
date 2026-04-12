@@ -1,5 +1,9 @@
 package game
 
+import (
+	"github.com/fate-dice/game-server/pkg/event"
+)
+
 // ========== Item 类型定义 ==========
 
 type ItemType int
@@ -52,10 +56,11 @@ func (it ItemType) GetCategory() string {
 // ========== Item 实例 ==========
 
 type Item struct {
-	Type     ItemType `json:"type"`
-	ID       string   `json:"id"`
-	Usable   bool     `json:"usable"`
-	TargetID string   `json:"target_id"`
+	Type           ItemType `json:"type"`
+	ID             string   `json:"id"`
+	Usable         bool     `json:"usable"`
+	TargetID       string   `json:"target_id"`
+	SubscriptionID string   `json:"subscription_id"` // EventBus订阅ID
 }
 
 func NewItem(itemType ItemType, id string) *Item {
@@ -69,14 +74,19 @@ func NewItem(itemType ItemType, id string) *Item {
 // ========== Item 静态定义 ==========
 
 type ItemDefinition struct {
-	Type        ItemType   `json:"type"`
-	Eval        Evaluation `json:"evaluation"`
-	Name        string     `json:"name"`
-	Desc        string     `json:"desc"`
-	TargetSelf  bool       `json:"target_self"`
-	TargetOther bool       `json:"target_other"`
-	BuffType    BuffType   `json:"buff_type"`
-	Range       int        `json:"range"`
+	Type        ItemType     `json:"type"`
+	Eval        Evaluation   `json:"evaluation"`
+	Name        string       `json:"name"`
+	Desc        string       `json:"desc"`
+	TargetSelf  bool         `json:"target_self"`
+	TargetOther bool         `json:"target_other"`
+	BuffType    BuffType     `json:"buff_type"`
+	Range       int          `json:"range"`
+
+	// Phase系统字段
+	Phase       event.Phase `json:"phase"`        // 可使用时机
+	Priority    int         `json:"priority"`     // 执行优先级
+	NeedConfirm bool        `json:"need_confirm"` // 是否需要用户确认（默认true）
 }
 
 func (it ItemType) GetItemDefinition() *ItemDefinition {
@@ -90,6 +100,9 @@ func (it ItemType) GetItemDefinition() *ItemDefinition {
 			TargetSelf:  false,
 			TargetOther: true,
 			BuffType:    BuffTypeLost,
+			Phase:       event.PhaseAnyTime,     // 任何时候可用
+			Priority:    50,
+			NeedConfirm: true,  // 需要确认目标
 		},
 		ItemTypeAnyDoor: {
 			Type:        ItemTypeAnyDoor,
@@ -99,6 +112,9 @@ func (it ItemType) GetItemDefinition() *ItemDefinition {
 			TargetSelf:  false,
 			TargetOther: true,
 			Range:       30,
+			Phase:       event.PhaseOnLand,      // 落地后可用
+			Priority:    60,
+			NeedConfirm: true,  // 需要确认目标
 		},
 		ItemTypeDiceSwap: {
 			Type:        ItemTypeDiceSwap,
@@ -107,6 +123,9 @@ func (it ItemType) GetItemDefinition() *ItemDefinition {
 			Desc:        "与指定玩家交换骰子等级",
 			TargetSelf:  false,
 			TargetOther: true,
+			Phase:       event.PhaseAnyTime,     // 任何时候可用
+			Priority:    40,
+			NeedConfirm: true,  // 需要确认目标
 		},
 		ItemTypeDiceUpgrade: {
 			Type:        ItemTypeDiceUpgrade,
@@ -115,6 +134,9 @@ func (it ItemType) GetItemDefinition() *ItemDefinition {
 			Desc:        "将当前骰子升级为更高等级",
 			TargetSelf:  true,
 			TargetOther: false,
+			Phase:       event.PhaseBeforeTurn,  // 回合开始前可用
+			Priority:    70,
+			NeedConfirm: true,  // 需要确认使用
 		},
 	}
 	if def, ok := definitions[it]; ok {
