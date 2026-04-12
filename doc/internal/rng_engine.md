@@ -209,6 +209,6 @@ item, eventType, _ := eventPool.DrawEvent(player.LP, rng)
 
 ```
 pkg/rng/
-├── weighted_random.go      # 核心实现 (380行)
-└── weighted_random_test.go # 单元测试 (530行)
+├── weighted_random.go      # 核心实现 (~750行)
+└── weighted_random_test.go # 单元测试 (~700行)
 ```

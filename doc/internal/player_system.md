@@ -4,6 +4,27 @@
 
 PlayerSystem 是《命运骰子》游戏的玩家管理模块，负责玩家数据结构、阵营系统、Buff/道具管理和数值逻辑。
 
+## 文件结构
+
+```
+internal/game/
+├── faction.go        # 阵营定义（~100行）
+├── buff.go           # Evaluation 系统 + Buff 系统（~360行）
+├── event.go          # Event 系统（~290行）
+├── item.go           # Item 系统（~200行）
+├── player.go         # 玩家实现（~480行）
+├── buff_test.go      # Buff 和 Evaluation 单元测试
+├── item_test.go      # Item 单元测试
+├── event_test.go     # Event 单元测试
+└── player_test.go    # Player 单元测试（~600行）
+```
+
+类型定义已分散到各自领域文件中：
+- `buff.go`: Evaluation, BuffType, Buff, BuffDefinition, BuffRegistry
+- `event.go`: EventType, EventDefinition, EventRegistry
+- `item.go`: ItemType, Item, ItemDefinition, ItemRegistry
+- `faction.go`: Faction
+
 ## 数据结构
 
 ### Faction (阵营枚举)
@@ -19,45 +40,45 @@ const (
 )
 ```
 
-### BuffType (Buff类型枚举)
+### PlayerConfig (玩家配置)
 
-| 类型 | 属性 | 效果 | 持续回合 |
-|------|------|------|----------|
-| Curse | 负面 | 每回合 LP-1 | 3 |
-| Lost | 负面 | 反方向移动 | 1 |
-| Corrupt | 负面 | 每2回合 HP-1 | 4 |
-| Poison | 负面 | 每回合受恶性随机事件 | 3 |
-| Divine | 正面 | 每回合 LP+1 | 3 |
-| Hidden | 正面 | 免疫任意事件/BUFF/道具 | 3 |
-| Rain | 正面 | 每2回合 HP+1 | 4 |
-| Exorcism | 正面 | 无视毒瘴buff | 5 |
-| Fire | 正面 | 朱雀阵营增益，每4回合 LP+1 | 永久 |
+```go
+type PlayerConfig struct {
+    UserID   string  // 玩家UUID
+    Faction  Faction // 阵营
+    MaxHP    int     // 最大血量
+    MaxLP    int     // 最大幸运值
+    StartPos int     // 起始位置
+}
 
-### ItemType (道具类型枚举)
-
-| 类型 | 效果 |
-|------|------|
-| ReverseClock | 给予指定玩家迷途buff |
-| AnyDoor | 去到30格内指定玩家身边 |
-| DiceSwap | 骰子交换 |
-| DiceUpgrade | 骰子升级卡 |
+// 默认配置
+var DefaultPlayerConfig = PlayerConfig{
+    MaxHP:    6,   // 默认血量
+    MaxLP:    10,  // 默认幸运值上限
+    StartPos: 0,   // 起点位置
+}
+```
 
 ### Player (玩家结构体)
 
 ```go
 type Player struct {
-    UserID      string   // 玩家UUID
-    Faction     Faction  // 阵营
-    Position    int      // 当前位置
-    HP          int      // 血量
-    LP          int      // 幸运值（影响随机事件）
-    Inventory   []*Item  // 道具栏
-    ActiveBuffs []*Buff  // 持续状态
-    IsDead      bool     // 是否死亡
-    SkipTurn    bool     // 是否跳过回合
-    ChargeCount int      // 充能计数（青龙/玄武）
+    UserID      string   `json:"user_id"`      // 玩家UUID
+    Faction     Faction  `json:"faction"`      // 阵营
+    Position    int      `json:"position"`     // 当前位置
+    HP          int      `json:"hp"`           // 血量
+    LP          int      `json:"lp"`           // 幸运值（影响随机事件）
+    Inventory   []*Item  `json:"inventory"`    // 道具栏
+    ActiveBuffs []*Buff  `json:"active_buffs"` // 持续状态
+    IsDead      bool     `json:"is_dead"`      // 是否死亡
+    SkipTurn    bool     `json:"skip_turn"`    // 是否跳过回合（冰冻/晕眩）
+    ChargeCount int      `json:"charge_count"` // 充能计数（青龙/玄武）
 }
 ```
+
+### BuffType / ItemType
+
+Buff 和 Item 的详细定义参见 `doc/internal/event_system.md`。
 
 ## 核心功能
 
@@ -69,16 +90,19 @@ isDead, respawnPos, err := player.ApplyDamage(amount, engine)
 ```
 
 **逻辑流程**：
-1. 检查隐匿状态（Hidden Buff 免疫伤害）
-2. 扣减 HP
-3. HP ≤ 0 时触发死亡，回城到最近检查点
-4. 返回死亡状态和回城位置
+1. 检查伤害值有效性（不能为负数）
+2. 检查隐匿状态（Hidden Buff 免疫伤害）
+3. 扣减 HP
+4. HP ≤ 0 时触发死亡，回城到最近检查点
+5. 返回死亡状态和回城位置
 
 #### Heal / ModifyLP
 ```go
 player.Heal(amount)      // 回血
 player.ModifyLP(amount)  // 修改幸运值（范围限制 0~8）
 ```
+
+**幸运值范围**：LP 限制在 `[0, 8]` 区间内。
 
 ### 2. 移动逻辑
 
@@ -88,7 +112,7 @@ player.Respawn(respawnPos)           // 复活回城
 ```
 
 **复活回城**：
-- 重置 HP 到初始值
+- 重置 HP 到默认值（DefaultPlayerConfig.MaxHP = 6）
 - 移动到检查点位置
 - 清除 IsDead 和 SkipTurn 状态
 
@@ -105,7 +129,8 @@ player.ClearNegativeBuffs()       // 清除所有负面 Buff
 
 **特殊规则**：
 - `Duration == -1` 表示永久 Buff（如朱雀离火）
-- 隐匿状态下免疫负面 Buff
+- 隐匿状态下免疫负面 Buff（AddBuff 时判断，正面 Buff 可以添加）
+- 隐匿状态下免疫伤害（ApplyDamage 时判断）
 - TickBuffs 在回合结束时调用
 
 ### 4. 道具管理
@@ -128,8 +153,13 @@ player.HasItem(itemType)          // 检查是否有指定类型道具
 
 ```go
 player.TriggerFactionSkill(event)  // 触发阵营被动
-player.UpdateCharge()              // 更新充能计数
+player.UpdateCharge()              // 更新充能计数（回合结束时调用）
 ```
+
+**充能机制**：
+- 青龙/玄武：每回合 `UpdateCharge()` 增加 ChargeCount，满5触发充能获得
+- 朱雀：创建时自动获得离火 Buff（Duration = -1）
+- 白虎：反超事件时自动触发 Buff 偷取
 
 ### 6. 游戏事件系统
 
@@ -144,11 +174,11 @@ const (
 )
 
 type GameEvent struct {
-    Type     EventPhase
-    Source   *Player
-    Target   *Player
-    Payload  interface{}
-    IsCancel bool  // 是否被取消/拦截
+    Type     EventPhase  `json:"type"`      // 事件类型
+    Source   *Player     `json:"source"`    // 触发事件的玩家
+    Target   *Player     `json:"target"`    // 目标玩家
+    Payload  interface{} `json:"payload"`   // 事件数据
+    IsCancel bool        `json:"is_cancel"` // 是否被取消/拦截
 }
 ```
 
@@ -160,6 +190,22 @@ player.DispatchEvent(event)  // 分发事件到玩家的 Hooks
 1. 检查隐匿状态 → 取消事件
 2. 触发阵营被动技能（玄武抵消恶性事件）
 3. 触发道具 Hook（待扩展）
+
+## FactionSkill 接口
+
+```go
+type FactionSkill interface {
+    CanActivate(player *Player) bool
+    Activate(player *Player, event *GameEvent) bool
+    GetCharge() int
+}
+
+// 具体实现
+type QingLongPassive struct { Charge int }
+type ZhuQuePassive struct{}
+type BaiHuPassive struct{}
+type XuanWuPassive struct { Charge int }
+```
 
 ## 与 MapEngine 协作
 
@@ -179,6 +225,15 @@ if isDead {
 }
 ```
 
+## 辅助方法
+
+```go
+player.Clone()        // 克隆玩家（用于测试）
+player.String()       // 返回玩家信息字符串
+player.IsAlive()      // 检查玩家是否存活（HP>0 && !IsDead）
+player.CanAct()       // 检查玩家是否可以行动（IsAlive && !SkipTurn）
+```
+
 ## 测试覆盖
 
 测试文件：`internal/game/player_test.go`
@@ -186,9 +241,6 @@ if isDead {
 | 测试类 | 覆盖内容 |
 |--------|----------|
 | FactionTest | 阵营名称转换、有效性验证 |
-| BuffTypeTest | Buff名称、正面/负面分类 |
-| BuffTest | 创建、激活状态、持续时间更新 |
-| ItemTest | 道具创建、类型名称 |
 | PlayerTest | 创建玩家、默认配置、朱雀初始Buff |
 | HP/LPTest | 扣血/回血/死亡/回城、隐匿免疫、LP范围限制 |
 | MovementTest | 移动位置、终点限制、复活回城 |
@@ -198,17 +250,13 @@ if isDead {
 | EventSystemTest | 隐匿取消事件 |
 | HelperTest | 克隆、字符串表示、存活状态、行动状态 |
 
+**分离的测试文件**：
+- `buff_test.go`: Evaluation 和 Buff 相关测试
+- `item_test.go`: Item 相关测试
+- `event_test.go`: Event 相关测试
+
 ## 后续扩展
 
 1. **道具 Hook 系统**：护盾类道具监听 PreDamage 事件
 2. **回合状态机集成**：State_Turn_Upkeep 调用 CanAct()，State_Turn_End 调用 TickBuffs()
 3. **Buff 效果结算**：回合结束时根据 Buff 类型修改 HP/LP
-
-## 文件结构
-
-```
-internal/game/
-├── types.go          # 类型定义 (Faction, BuffType, ItemType) (150行)
-├── player.go         # 玩家实现 (330行)
-└── player_test.go    # 单元测试 (480行)
-```

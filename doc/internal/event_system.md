@@ -320,8 +320,8 @@ weights := map[EventType]int{
 player := NewPlayer(PlayerConfig{UserID: "test"})
 
 // 检查 Buff 评分决定是否免疫
-if buff.GetEvaluation().IsBad() && player.HasBuff(BuffTypeHidden) {
-    // 隐匿状态下免疫负面 Buff
+if player.HasBuff(BuffTypeHidden) {
+    // 隐匿状态下免疫所有Buff
 }
 
 // 检查事件评分触发阵营被动

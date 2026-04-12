@@ -74,6 +74,11 @@ func (p *Player) ApplyDamage(amount int, engine *MapEngine) (isDead bool, respaw
 		return false, p.Position, errors.New("damage amount cannot be negative")
 	}
 
+	// 隐匿状态下免疫伤害
+	if p.HasBuff(BuffTypeHidden) {
+		return false, p.Position, nil
+	}
+
 	p.HP -= amount
 
 	if p.HP <= 0 {
@@ -143,8 +148,8 @@ func (p *Player) AddBuff(buff *Buff) error {
 	if buff == nil {
 		return errors.New("buff cannot be nil")
 	}
-	// 隐匿状态下免疫 Buff
-	if p.HasBuff(BuffTypeHidden) {
+	// 隐匿状态下免疫负面 Buff，正面 Buff 可以添加
+	if p.HasBuff(BuffTypeHidden) && !buff.Type.IsPositive() {
 		return nil
 	}
 	p.ActiveBuffs = append(p.ActiveBuffs, buff)
