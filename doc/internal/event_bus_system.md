@@ -15,29 +15,37 @@ EventBus + Decision 系统是《命运骰子》游戏的统一触发机制框架
 
 ```
 pkg/event/
-├── phase.go          # Phase枚举定义
+├── phase.go          # Phase枚举定义（6种触发时机）
 ├── bus.go            # EventBus结构和方法
 ├── decision.go       # Decision和Option结构
 ├── context.go        # Context结构
-└── bus_test.go       # 单元测试
+├── bus_test.go       # 单元测试
+├── README.md         # 包文档
 
-internal/game/
-├── buff.go           # BuffDefinition扩展（Phase字段）
-├── buff_test.go      # Buff测试（含Phase字段测试）
-├── item.go           # ItemDefinition扩展（Phase字段）
-├── item_test.go      # Item测试（含Phase字段测试）
-├── event.go          # Event系统
-├── event_test.go     # Event测试
-├── game.go           # Game实例（包含EventBus）
-├── game_test.go      # Game测试（订阅管理测试）
-├── state_machine.go  # StateMachine（Phase触发、Decision等待）
-├── state_machine_test.go # StateMachine测试
-├── integration_test.go   # 联合测试
-├── player.go         # Player结构
-├── player_test.go    # Player测试
-├── faction.go        # 阵营定义
-├── map_engine.go     # 地图引擎
-├── map_engine_test.go # 地图测试
+internal/core/
+├── evaluation.go     # 评分系统（0-100）
+├── faction.go        # 阵营定义（四神兽）
+├── buff.go           # Buff系统（类型/定义/注册表）
+├── item.go           # Item系统（类型/定义/注册表）
+├── event.go          # Event系统（类型/定义/注册表）
+├── player.go         # Player结构（HP/LP/Buffs/Items）
+├── README.md         # 包文档
+
+internal/engine/
+├── game.go           # Game实例（EventBus/玩家管理/订阅）
+├── state_machine.go  # StateMachine（Phase触发/决策等待）
+├── README.md         # 包文档
+
+internal/gamemap/
+├── cell.go           # Cell类型定义
+├── engine.go         # MapEngine（地图生成/路径计算）
+├── README.md         # 包文档
+```
+
+**包依赖关系**：
+```
+pkg/event ← internal/core ← internal/engine
+                        ← internal/gamemap
 ```
 
 ## Phase枚举
