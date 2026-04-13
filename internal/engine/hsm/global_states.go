@@ -44,7 +44,7 @@ func (s *MatchInitState) Enter(ctx *StateContext) {
 	// 4. Initialize EventBus subscriptions
 
 	ctx.Success = true
-	ctx.SetMetadata("initialized", true)
+	ctx.SetBool("initialized", true)
 }
 
 func (s *MatchInitState) Update(ctx *StateContext) StateID {
@@ -54,7 +54,7 @@ func (s *MatchInitState) Update(ctx *StateContext) StateID {
 
 func (s *MatchInitState) Exit(ctx *StateContext) {
 	// Cleanup initialization resources
-	ctx.Metadata = nil
+	ctx.Delete("initialized")
 }
 
 // RoundMiniGameState - Mini-Game Phase State
@@ -78,11 +78,11 @@ func NewRoundMiniGameState() *RoundMiniGameState {
 func (s *RoundMiniGameState) Enter(ctx *StateContext) {
 	// Start mini-game phase
 	// Broadcast MiniGameStart to all clients
-	s.totalPlayers = len(ctx.Game.Players) // Direct access to Game.Players
+	s.totalPlayers = len(ctx.Game.Players)
 	s.resultsReceived = 0
 
-	ctx.SetMetadata("mini_game_started", true)
-	ctx.SetMetadata("waiting_for_results", true)
+	ctx.SetBool("mini_game_started", true)
+	ctx.SetBool("waiting_for_results", true)
 }
 
 func (s *RoundMiniGameState) Update(ctx *StateContext) StateID {
@@ -95,14 +95,14 @@ func (s *RoundMiniGameState) Update(ctx *StateContext) StateID {
 }
 
 func (s *RoundMiniGameState) Exit(ctx *StateContext) {
-	ctx.SetMetadata("mini_game_started", false)
-	ctx.SetMetadata("waiting_for_results", false)
+	ctx.SetBool("mini_game_started", false)
+	ctx.SetBool("waiting_for_results", false)
 }
 
 // OnMiniGameResult handles mini-game result submission.
 func (s *RoundMiniGameState) OnMiniGameResult(ctx *StateContext, playerID string, rank int) {
 	s.resultsReceived++
-	ctx.SetMetadata("result_"+playerID, rank)
+	ctx.SetMiniGameRank(playerID, rank)
 }
 
 // RoundPrepState - Round Preparation State
@@ -128,19 +128,20 @@ func (s *RoundPrepState) Enter(ctx *StateContext) {
 	// Rank 3 -> Copper dice (1-5)
 	// Rank 4 -> Wood dice (1-3)
 
-	players := ctx.Game.Players // Direct access
+	players := ctx.Game.Players
 	for _, player := range players {
 		// Default assignment based on position (will be updated by mini-game results)
 		rank := len(players) // Default to lowest rank
-		if r, ok := ctx.GetMetadata("result_"+player.UserID).(int); ok {
-			rank = r
+		playerRank := ctx.GetMiniGameRank(player.UserID)
+		if playerRank > 0 {
+			rank = playerRank
 		}
 		s.diceAssignments[player.UserID] = rank
-		ctx.SetMetadata("dice_"+player.UserID, getDiceType(rank))
+		ctx.SetDiceType(player.UserID, getDiceType(rank))
 	}
 
 	// Increment round counter
-	ctx.Game.State.Round++ // Direct access
+	ctx.Game.State.Round++
 
 	ctx.Success = true
 }
@@ -191,12 +192,12 @@ func NewTurnLoopState() *TurnLoopState {
 func (s *TurnLoopState) Enter(ctx *StateContext) {
 	// Initialize turn queue
 	// First player starts their turn
-	players := ctx.Game.Players // Direct access
+	players := ctx.Game.Players
 	if len(players) > 0 {
-		ctx.Game.State.Turn = 0 // Direct access
+		ctx.Game.State.Turn = 0
 	}
 
-	ctx.SetMetadata("turn_loop_active", true)
+	ctx.SetBool("turn_loop_active", true)
 }
 
 func (s *TurnLoopState) Update(ctx *StateContext) StateID {
@@ -216,14 +217,14 @@ func (s *TurnLoopState) Update(ctx *StateContext) StateID {
 }
 
 func (s *TurnLoopState) Exit(ctx *StateContext) {
-	ctx.SetMetadata("turn_loop_active", false)
+	ctx.SetBool("turn_loop_active", false)
 	s.turnsCompleted = 0
 	s.currentPlayerIndex = 0
 }
 
 // StartPlayerTurn initiates a player's turn (called by external controller).
 func (s *TurnLoopState) StartPlayerTurn(ctx *StateContext) StateID {
-	players := ctx.Game.Players // Direct access
+	players := ctx.Game.Players
 	if s.currentPlayerIndex >= len(players) {
 		// All players completed, next round
 		s.currentPlayerIndex = 0
@@ -232,7 +233,7 @@ func (s *TurnLoopState) StartPlayerTurn(ctx *StateContext) StateID {
 	}
 
 	// Set current player
-	ctx.Game.State.Turn = s.currentPlayerIndex // Direct access
+	ctx.Game.State.Turn = s.currentPlayerIndex
 
 	// Transition to TurnUpkeep (first turn state)
 	return StateTurnUpkeep
@@ -244,7 +245,7 @@ func (s *TurnLoopState) OnTurnComplete(ctx *StateContext) {
 	s.currentPlayerIndex++
 
 	// Check if player reached end
-	if reachedEnd, ok := ctx.GetMetadata("reached_end").(bool); ok && reachedEnd {
+	if ctx.HasReachedEnd() {
 		s.reachedEnd = true
 	}
 }
@@ -270,7 +271,7 @@ func (s *TurnLoopState) CanTransitionTo(target StateID) bool {
 
 type BossBattleState struct {
 	BaseGlobalState
-	triggerPlayer *core.Player // Direct type
+	triggerPlayer *core.Player
 	bossDefeated  bool
 }
 
@@ -285,11 +286,12 @@ func NewBossBattleState() *BossBattleState {
 func (s *BossBattleState) Enter(ctx *StateContext) {
 	// Get the player who triggered boss battle
 	// This would be set by TurnLoop before transitioning
-	if playerID, ok := ctx.GetMetadata("boss_trigger_player").(string); ok {
-		s.triggerPlayer = ctx.Game.GetPlayer(playerID) // Returns *core.Player directly
+	triggerID := ctx.GetStringOrDefault(KeyBossTrigger, "")
+	if triggerID != "" {
+		s.triggerPlayer = ctx.Game.GetPlayer(triggerID)
 	}
 
-	ctx.SetMetadata("boss_battle_active", true)
+	ctx.SetBool("boss_battle_active", true)
 }
 
 func (s *BossBattleState) Update(ctx *StateContext) StateID {
@@ -304,7 +306,7 @@ func (s *BossBattleState) Update(ctx *StateContext) StateID {
 }
 
 func (s *BossBattleState) Exit(ctx *StateContext) {
-	ctx.SetMetadata("boss_battle_active", false)
+	ctx.SetBool("boss_battle_active", false)
 	s.triggerPlayer = nil
 }
 
@@ -318,7 +320,7 @@ func (s *BossBattleState) OnBossDefeated() {
 
 type GameOverState struct {
 	BaseGlobalState
-	winner *core.Player // Direct type
+	winner *core.Player
 }
 
 // NewGameOverState creates a new GameOver state.
@@ -333,12 +335,13 @@ func (s *GameOverState) Enter(ctx *StateContext) {
 	// Perform final data settlement
 	// Cleanup resources
 
-	if winnerID, ok := ctx.GetMetadata("winner_id").(string); ok {
-		s.winner = ctx.Game.GetPlayer(winnerID) // Returns *core.Player directly
+	winnerID := ctx.GetStringOrDefault(KeyWinner, "")
+	if winnerID != "" {
+		s.winner = ctx.Game.GetPlayer(winnerID)
 	}
 
 	ctx.Success = true
-	ctx.SetMetadata("game_over", true)
+	ctx.SetBool("game_over", true)
 }
 
 func (s *GameOverState) Update(ctx *StateContext) StateID {

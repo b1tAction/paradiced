@@ -6,6 +6,22 @@ import (
 	"github.com/b1tAction/Fated/internal/core"
 	"github.com/b1tAction/Fated/internal/engine"
 	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/Fated/pkg/util"
+)
+
+// Context key constants for commonly used state markers.
+// These keys are stored in the embedded Metadata for type-safe access.
+const (
+	KeySkipTurn    = "skip_turn"     // Mark to skip remaining turn
+	KeyFellDown    = "fell_down"     // Mark for Fragile cell fall
+	KeyReachedEnd  = "reached_end"   // Mark for reaching Boss cell
+	KeyDiceSteps   = "dice_steps"    // Dice roll result for movement
+	KeyTargetPos   = "target_pos"    // Target position after movement
+	KeyDamage      = "damage"        // Damage amount
+	KeyMiniGameRank = "mini_game_rank" // Mini-game ranking result
+	KeyDiceType    = "dice_type"     // Dice type (gold/silver/copper/wood)
+	KeyBossTrigger = "boss_trigger_player" // Player who triggered boss battle
+	KeyWinner      = "winner_id"     // Winner player ID
 )
 
 // State defines the interface for all states in the HSM.
@@ -33,7 +49,11 @@ type State interface {
 
 // StateContext provides context data passed to state methods.
 // Contains game reference, player data, phase info, and interrupt stack.
+// Embeds util.Metadata for extensible type-safe key-value storage.
 type StateContext struct {
+	// Embedded Metadata for extensible storage
+	*util.Metadata
+
 	// Core references - direct types for domain objects
 	Game      *engine.Game       // Game instance (direct access)
 	Player    *core.Player       // Current player (direct access, used in Layer 2 states)
@@ -46,10 +66,6 @@ type StateContext struct {
 	Phase     event.Phase        // Current phase to trigger
 	PhaseData interface{}        // Additional phase data (e.g., damage amount, dice steps)
 
-	// Movement data
-	DiceSteps int                // Dice roll result for movement calculation
-	TargetPos int                // Target position after movement
-
 	// Decision handling
 	Decision  *event.Decision    // Pending decision requiring user input
 	Decisions []*event.Decision  // List of pending decisions
@@ -61,25 +77,21 @@ type StateContext struct {
 	// Stack reference (Layer 3)
 	Stack     *StateStack        // Reference to interrupt stack
 
-	// State result markers
+	// Execution result
 	Success   bool               // Whether state execution succeeded
 	Error     error              // Error if state execution failed
-	SkipTurn  bool               // Mark to skip remaining turn
-	FellDown  bool               // Mark for Fragile fall
-	ReachedEnd bool              // Mark for reaching Boss cell
-
-	// Additional metadata
-	Metadata  map[string]interface{} // Extensible data container
 }
 
 // NewStateContext creates a new StateContext with default values.
 func NewStateContext() *StateContext {
 	return &StateContext{
-		Metadata:  make(map[string]interface{}),
+		Metadata:  util.NewMetadata(),
 		Decisions: make([]*event.Decision, 0),
 		Success:   true,
 	}
 }
+
+// ========== Game/Player Setup ==========
 
 // WithGame sets the game instance and creates EventBus wrapper.
 func (ctx *StateContext) WithGame(game *engine.Game) *StateContext {
@@ -108,6 +120,8 @@ func (ctx *StateContext) WithMapEngine(engine MapEngineAdapter) *StateContext {
 	return ctx
 }
 
+// ========== Phase Setup ==========
+
 // WithPhase sets the phase and optional data.
 func (ctx *StateContext) WithPhase(phase event.Phase, data interface{}) *StateContext {
 	ctx.Phase = phase
@@ -115,11 +129,31 @@ func (ctx *StateContext) WithPhase(phase event.Phase, data interface{}) *StateCo
 	return ctx
 }
 
-// WithDiceSteps sets dice steps for movement.
+// ========== Movement Data ==========
+
+// WithDiceSteps sets dice steps for movement (stored in Metadata).
 func (ctx *StateContext) WithDiceSteps(steps int) *StateContext {
-	ctx.DiceSteps = steps
+	ctx.SetInt(KeyDiceSteps, steps)
 	return ctx
 }
+
+// GetDiceSteps retrieves dice steps from Metadata.
+func (ctx *StateContext) GetDiceSteps() int {
+	return ctx.GetIntOrDefault(KeyDiceSteps, 0)
+}
+
+// WithTargetPos sets target position after movement (stored in Metadata).
+func (ctx *StateContext) WithTargetPos(pos int) *StateContext {
+	ctx.SetInt(KeyTargetPos, pos)
+	return ctx
+}
+
+// GetTargetPos retrieves target position from Metadata.
+func (ctx *StateContext) GetTargetPos() int {
+	return ctx.GetIntOrDefault(KeyTargetPos, 0)
+}
+
+// ========== Decision Setup ==========
 
 // WithDecision sets a pending decision.
 func (ctx *StateContext) WithDecision(decision *event.Decision) *StateContext {
@@ -133,11 +167,15 @@ func (ctx *StateContext) WithDecisions(decisions []*event.Decision) *StateContex
 	return ctx
 }
 
+// ========== Timing Setup ==========
+
 // WithTimeout sets timeout duration.
 func (ctx *StateContext) WithTimeout(timeout time.Duration) *StateContext {
 	ctx.Timeout = timeout
 	return ctx
 }
+
+// ========== Stack Setup ==========
 
 // WithStack sets the state stack reference.
 func (ctx *StateContext) WithStack(stack *StateStack) *StateContext {
@@ -145,35 +183,70 @@ func (ctx *StateContext) WithStack(stack *StateStack) *StateContext {
 	return ctx
 }
 
-// SetMetadata sets a metadata key-value pair.
-func (ctx *StateContext) SetMetadata(key string, value interface{}) {
-	if ctx.Metadata == nil {
-		ctx.Metadata = make(map[string]interface{})
-	}
-	ctx.Metadata[key] = value
+// ========== State Markers (stored in Metadata) ==========
+
+// IsSkipTurn checks if turn should be skipped.
+func (ctx *StateContext) IsSkipTurn() bool {
+	return ctx.GetBoolOrDefault(KeySkipTurn, false)
 }
 
-// GetMetadata retrieves a metadata value by key.
-func (ctx *StateContext) GetMetadata(key string) interface{} {
-	if ctx.Metadata == nil {
-		return nil
-	}
-	return ctx.Metadata[key]
+// SetSkipTurn sets the skip turn marker.
+func (ctx *StateContext) SetSkipTurn(skip bool) {
+	ctx.SetBool(KeySkipTurn, skip)
 }
+
+// IsFellDown checks if player fell from Fragile cell.
+func (ctx *StateContext) IsFellDown() bool {
+	return ctx.GetBoolOrDefault(KeyFellDown, false)
+}
+
+// SetFellDown sets the fell down marker.
+func (ctx *StateContext) SetFellDown(fell bool) {
+	ctx.SetBool(KeyFellDown, fell)
+}
+
+// HasReachedEnd checks if player reached Boss cell.
+func (ctx *StateContext) HasReachedEnd() bool {
+	return ctx.GetBoolOrDefault(KeyReachedEnd, false)
+}
+
+// SetReachedEnd sets the reached end marker.
+func (ctx *StateContext) SetReachedEnd(reached bool) {
+	ctx.SetBool(KeyReachedEnd, reached)
+}
+
+// ========== Mini-Game Results ==========
+
+// SetMiniGameRank sets player's mini-game ranking.
+func (ctx *StateContext) SetMiniGameRank(playerID string, rank int) {
+	ctx.SetInt("result_"+playerID, rank)
+}
+
+// GetMiniGameRank retrieves player's mini-game ranking.
+func (ctx *StateContext) GetMiniGameRank(playerID string) int {
+	return ctx.GetIntOrDefault("result_"+playerID, 0)
+}
+
+// SetDiceType sets player's dice type based on ranking.
+func (ctx *StateContext) SetDiceType(playerID string, diceType string) {
+	ctx.SetString("dice_"+playerID, diceType)
+}
+
+// GetDiceType retrieves player's dice type.
+func (ctx *StateContext) GetDiceType(playerID string) string {
+	return ctx.GetStringOrDefault("dice_"+playerID, "wood")
+}
+
+// ========== Lifecycle ==========
 
 // Clear resets the context to default values.
 func (ctx *StateContext) Clear() {
 	ctx.Phase = event.Phase(0)
 	ctx.PhaseData = nil
-	ctx.DiceSteps = 0
-	ctx.TargetPos = 0
 	ctx.Decision = nil
 	ctx.Decisions = make([]*event.Decision, 0)
 	ctx.Timeout = 0
 	ctx.Success = true
 	ctx.Error = nil
-	ctx.SkipTurn = false
-	ctx.FellDown = false
-	ctx.ReachedEnd = false
-	ctx.Metadata = make(map[string]interface{})
+	ctx.Metadata.Clear()
 }

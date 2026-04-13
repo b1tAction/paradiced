@@ -20,7 +20,7 @@ func TestStateMatchInit(t *testing.T) {
 	if !ctx.Success {
 		t.Error("Enter should set Success = true")
 	}
-	if ctx.GetMetadata("initialized") != true {
+	if !ctx.GetBoolOrDefault("initialized", false) {
 		t.Error("Enter should set initialized metadata")
 	}
 
@@ -42,7 +42,6 @@ func TestStateRoundMiniGame(t *testing.T) {
 	}
 
 	game := engine.NewGame("game-1", 0)
-	// Add players using core.NewPlayer
 	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p1"}))
 	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p2"}))
 	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p3"}))
@@ -53,7 +52,7 @@ func TestStateRoundMiniGame(t *testing.T) {
 	if state.totalPlayers != 3 {
 		t.Errorf("totalPlayers should be 3, got %d", state.totalPlayers)
 	}
-	if ctx.GetMetadata("mini_game_started") != true {
+	if !ctx.GetBoolOrDefault("mini_game_started", false) {
 		t.Error("mini_game_started should be true")
 	}
 
@@ -76,7 +75,7 @@ func TestStateRoundMiniGame(t *testing.T) {
 	}
 
 	state.Exit(ctx)
-	if ctx.GetMetadata("mini_game_started") != false {
+	if ctx.GetBoolOrDefault("mini_game_started", true) {
 		t.Error("mini_game_started should be false after exit")
 	}
 }
@@ -95,10 +94,10 @@ func TestStateRoundPrep(t *testing.T) {
 	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p4"}))
 
 	ctx := NewStateContext().WithGame(game)
-	ctx.SetMetadata("result_p1", 1)
-	ctx.SetMetadata("result_p2", 2)
-	ctx.SetMetadata("result_p3", 3)
-	ctx.SetMetadata("result_p4", 4)
+	ctx.SetMiniGameRank("p1", 1)
+	ctx.SetMiniGameRank("p2", 2)
+	ctx.SetMiniGameRank("p3", 3)
+	ctx.SetMiniGameRank("p4", 4)
 
 	state.Enter(ctx)
 
@@ -117,6 +116,14 @@ func TestStateRoundPrep(t *testing.T) {
 
 	if game.State.Round != 2 {
 		t.Errorf("Round should be incremented to 2 (started at 1), got %d", game.State.Round)
+	}
+
+	// Verify dice types set correctly
+	if ctx.GetDiceType("p1") != "gold" {
+		t.Error("p1 should have gold dice")
+	}
+	if ctx.GetDiceType("p2") != "silver" {
+		t.Error("p2 should have silver dice")
 	}
 
 	nextID := state.Update(ctx)
@@ -140,7 +147,7 @@ func TestStateTurnLoop(t *testing.T) {
 
 	state.Enter(ctx)
 
-	if ctx.GetMetadata("turn_loop_active") != true {
+	if !ctx.GetBoolOrDefault("turn_loop_active", false) {
 		t.Error("turn_loop_active should be true")
 	}
 	if state.currentPlayerIndex != 0 {
@@ -166,9 +173,11 @@ func TestStateTurnLoop(t *testing.T) {
 		t.Errorf("currentPlayerIndex should be 1, got %d", state.currentPlayerIndex)
 	}
 
-	state.OnPlayerReachedEnd()
+	// Test reached end marker via Metadata
+	ctx.SetReachedEnd(true)
+	state.OnTurnComplete(ctx)
 	if !state.reachedEnd {
-		t.Error("reachedEnd should be true")
+		t.Error("reachedEnd should be true when ctx.HasReachedEnd()")
 	}
 
 	nextID = state.Update(ctx)
@@ -203,14 +212,14 @@ func TestStateBossBattle(t *testing.T) {
 	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p1"}))
 
 	ctx := NewStateContext().WithGame(game)
-	ctx.SetMetadata("boss_trigger_player", "p1")
+	ctx.SetString(KeyBossTrigger, "p1")
 
 	state.Enter(ctx)
 
 	if state.triggerPlayer == nil {
 		t.Error("triggerPlayer should be set")
 	}
-	if ctx.GetMetadata("boss_battle_active") != true {
+	if !ctx.GetBoolOrDefault("boss_battle_active", false) {
 		t.Error("boss_battle_active should be true")
 	}
 
@@ -246,7 +255,7 @@ func TestStateGameOver(t *testing.T) {
 	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "winner"}))
 
 	ctx := NewStateContext().WithGame(game)
-	ctx.SetMetadata("winner_id", "winner")
+	ctx.SetString(KeyWinner, "winner")
 
 	state.Enter(ctx)
 
@@ -256,7 +265,7 @@ func TestStateGameOver(t *testing.T) {
 	if !ctx.Success {
 		t.Error("Success should be true")
 	}
-	if ctx.GetMetadata("game_over") != true {
+	if !ctx.GetBoolOrDefault("game_over", false) {
 		t.Error("game_over should be true")
 	}
 
@@ -344,17 +353,6 @@ func TestHSMGlobalStateFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Start failed: %v", err)
 	}
-
-	// MatchInit auto-transitions to RoundMiniGame, but we need to check
-	// what actually happens after Enter and Update
-	// The auto-transition happens in transitionGlobal after Enter calls Update
-	// which returns RoundMiniGame, triggering another transition
-
-	// After auto-transition chain, state depends on how HSM handles it
-	// Since MatchInit.Update returns RoundMiniGame, and RoundMiniGame.Update returns StateNone (waiting),
-	// the final state should be RoundMiniGame
-
-	// But let's test what we have - may need adjustment based on actual HSM behavior
 
 	// Stop HSM with proper context
 	hsm.Stop(NewStateContext().WithGame(game))

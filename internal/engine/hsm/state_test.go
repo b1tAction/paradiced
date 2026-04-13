@@ -50,10 +50,16 @@ func TestStateContextWithMethods(t *testing.T) {
 		t.Error("PhaseData not set correctly")
 	}
 
-	// Test WithDiceSteps
+	// Test WithDiceSteps (stored in Metadata)
 	ctx = ctx.WithDiceSteps(6)
-	if ctx.DiceSteps != 6 {
+	if ctx.GetDiceSteps() != 6 {
 		t.Error("DiceSteps not set correctly")
+	}
+
+	// Test WithTargetPos (stored in Metadata)
+	ctx = ctx.WithTargetPos(20)
+	if ctx.GetTargetPos() != 20 {
+		t.Error("TargetPos not set correctly")
 	}
 
 	// Test WithTimeout
@@ -70,39 +76,110 @@ func TestStateContextWithMethods(t *testing.T) {
 	}
 }
 
-func TestStateContextMetadata(t *testing.T) {
+func TestStateContextMetadataMethods(t *testing.T) {
 	ctx := NewStateContext()
 
-	// Test SetMetadata
-	ctx.SetMetadata("key1", "value1")
-	ctx.SetMetadata("key2", 123)
+	// Test Set/Get
+	ctx.Set("key1", "value1")
+	ctx.SetInt("key2", 123)
+	ctx.SetBool("key3", true)
 
-	// Test GetMetadata
-	if ctx.GetMetadata("key1") != "value1" {
-		t.Error("Metadata key1 not retrieved correctly")
+	// Test Get with default
+	if ctx.GetStringOrDefault("key1", "") != "value1" {
+		t.Error("key1 not retrieved correctly")
 	}
-	if ctx.GetMetadata("key2") != 123 {
-		t.Error("Metadata key2 not retrieved correctly")
+	if ctx.GetIntOrDefault("key2", 0) != 123 {
+		t.Error("key2 not retrieved correctly")
 	}
-	if ctx.GetMetadata("nonexistent") != nil {
-		t.Error("Nonexistent key should return nil")
+	if !ctx.GetBoolOrDefault("key3", false) {
+		t.Error("key3 not retrieved correctly")
+	}
+}
+
+func TestStateContextStateMarkers(t *testing.T) {
+	ctx := NewStateContext()
+
+	// Test SkipTurn
+	if ctx.IsSkipTurn() {
+		t.Error("IsSkipTurn should be false by default")
+	}
+	ctx.SetSkipTurn(true)
+	if !ctx.IsSkipTurn() {
+		t.Error("IsSkipTurn should be true after SetSkipTurn(true)")
+	}
+
+	// Test FellDown
+	if ctx.IsFellDown() {
+		t.Error("IsFellDown should be false by default")
+	}
+	ctx.SetFellDown(true)
+	if !ctx.IsFellDown() {
+		t.Error("IsFellDown should be true after SetFellDown(true)")
+	}
+
+	// Test ReachedEnd
+	if ctx.HasReachedEnd() {
+		t.Error("HasReachedEnd should be false by default")
+	}
+	ctx.SetReachedEnd(true)
+	if !ctx.HasReachedEnd() {
+		t.Error("HasReachedEnd should be true after SetReachedEnd(true)")
+	}
+}
+
+func TestStateContextMiniGameMethods(t *testing.T) {
+	ctx := NewStateContext()
+
+	// Test mini-game rank
+	ctx.SetMiniGameRank("p1", 1)
+	ctx.SetMiniGameRank("p2", 2)
+	ctx.SetMiniGameRank("p3", 3)
+
+	if ctx.GetMiniGameRank("p1") != 1 {
+		t.Error("p1 rank should be 1")
+	}
+	if ctx.GetMiniGameRank("p2") != 2 {
+		t.Error("p2 rank should be 2")
+	}
+	if ctx.GetMiniGameRank("p3") != 3 {
+		t.Error("p3 rank should be 3")
+	}
+	if ctx.GetMiniGameRank("unknown") != 0 {
+		t.Error("unknown player rank should default to 0")
+	}
+
+	// Test dice type
+	ctx.SetDiceType("p1", "gold")
+	ctx.SetDiceType("p2", "silver")
+
+	if ctx.GetDiceType("p1") != "gold" {
+		t.Error("p1 dice should be gold")
+	}
+	if ctx.GetDiceType("p2") != "silver" {
+		t.Error("p2 dice should be silver")
+	}
+	if ctx.GetDiceType("unknown") != "wood" {
+		t.Error("unknown player dice should default to wood")
 	}
 }
 
 func TestStateContextClear(t *testing.T) {
 	ctx := NewStateContext()
-	ctx.SetMetadata("test", "value")
-	ctx.DiceSteps = 10
+	ctx.SetInt(KeyDiceSteps, 10)
+	ctx.SetBool(KeySkipTurn, true)
+	ctx.SetBool(KeyFellDown, true)
 	ctx.Success = false
-	ctx.Error = nil // would be an error if set
 
 	ctx.Clear()
 
-	if ctx.Metadata["test"] != nil {
-		t.Error("Metadata should be cleared")
-	}
-	if ctx.DiceSteps != 0 {
+	if ctx.GetDiceSteps() != 0 {
 		t.Error("DiceSteps should be reset to 0")
+	}
+	if ctx.IsSkipTurn() {
+		t.Error("SkipTurn should be reset to false")
+	}
+	if ctx.IsFellDown() {
+		t.Error("FellDown should be reset to false")
 	}
 	if !ctx.Success {
 		t.Error("Success should be reset to true")
@@ -112,7 +189,7 @@ func TestStateContextClear(t *testing.T) {
 func TestStateContextWithBus(t *testing.T) {
 	game := engine.NewGame("test", 0)
 
-	// Test WithBus creates adapter
+	// Test WithGame creates adapter
 	ctx := NewStateContext().WithGame(game)
 	if ctx.Bus == nil {
 		t.Error("WithGame should create Bus adapter")
