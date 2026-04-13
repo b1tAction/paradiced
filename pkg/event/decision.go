@@ -119,6 +119,25 @@ func (d *Decision) Execute(choice int, ctx *Context) {
 	}
 }
 
+// ExecuteTimeout executes the default choice when timeout occurs.
+// Returns true if timeout was handled, false if no timeout set.
+func (d *Decision) ExecuteTimeout(ctx *Context) bool {
+	if d.Timeout <= 0 {
+		return false
+	}
+	d.Execute(d.Default, ctx)
+	return true
+}
+
+// IsTimedOut checks if the decision has exceeded its timeout.
+// Requires external time tracking (startTime should be when decision was presented).
+func (d *Decision) IsTimedOut(startTime time.Time) bool {
+	if d.Timeout <= 0 {
+		return false
+	}
+	return time.Since(startTime) >= d.Timeout
+}
+
 // Clone clones the decision (used for templates).
 func (d *Decision) Clone() *Decision {
 	return &Decision{
