@@ -7,24 +7,24 @@ import (
 	"github.com/b1tAction/Fated/pkg/event"
 )
 
-// ========== Buff 类型定义 ==========
+// ========== Buff Type Definitions ==========
 
 type BuffType int
 
 const (
 	BuffTypeNone BuffType = iota
-	// 负性 Buff
-	BuffTypeCurse    // 诅咒
-	BuffTypeLost     // 迷途
-	BuffTypeCorrupt  // 腐化
-	BuffTypePoison   // 毒瘴
-	// 中性 Buff
-	BuffTypeHidden   // 隐匿
-	// 正性 Buff
-	BuffTypeDivine   // 神眷
-	BuffTypeRain     // 甘霖
-	BuffTypeExorcism // 辟邪
-	BuffTypeFire     // 离火
+	// Negative Buffs
+	BuffTypeCurse    // Curse诅咒
+	BuffTypeLost     // Lost迷途
+	BuffTypeCorrupt  // Corrupt腐化
+	BuffTypePoison   // Poison毒瘴
+	// Neutral Buff
+	BuffTypeHidden   // Hidden隐匿
+	// Positive Buffs
+	BuffTypeDivine   // Divine神眷
+	BuffTypeRain     // Rain甘霖
+	BuffTypeExorcism // Exorcism辟邪
+	BuffTypeFire     // Fire离火
 )
 
 func (bt BuffType) String() string {
@@ -46,24 +46,24 @@ func (bt BuffType) String() string {
 	return "Unknown"
 }
 
-// IsPositive 判断是否为正面 Buff
+// IsPositive checks if the Buff is positive.
 func (bt BuffType) IsPositive() bool {
 	return bt == BuffTypeDivine || bt == BuffTypeHidden ||
 		bt == BuffTypeRain || bt == BuffTypeExorcism || bt == BuffTypeFire
 }
 
-// GetEvaluation 获取 Buff 的评分
+// GetEvaluation returns the Buff's evaluation score.
 func (bt BuffType) GetEvaluation() Evaluation {
 	evalMap := map[BuffType]Evaluation{
-		BuffTypeCurse:    EvaluationBad,      // 诅咒：较恶
-		BuffTypeLost:     EvaluationMildBad,  // 迷途：轻恶
-		BuffTypeCorrupt:  EvaluationBad,      // 腐化：较恶
-		BuffTypePoison:   EvaluationVeryBad,  // 毒瘴：极恶
-		BuffTypeDivine:   EvaluationVeryGood, // 神眷：极良
-		BuffTypeHidden:   EvaluationNeutral, // 隐匿： 中性
-		BuffTypeRain:     EvaluationGood,     // 甘霖：较良
-		BuffTypeExorcism: EvaluationMildGood, // 辟邪：轻良
-		BuffTypeFire:     EvaluationGood,     // 离火：较良
+		BuffTypeCurse:    EvaluationBad,      // Curse: bad
+		BuffTypeLost:     EvaluationMildBad,  // Lost: mild bad
+		BuffTypeCorrupt:  EvaluationBad,      // Corrupt: bad
+		BuffTypePoison:   EvaluationVeryBad,  // Poison: very bad
+		BuffTypeDivine:   EvaluationVeryGood, // Divine: very good
+		BuffTypeHidden:   EvaluationNeutral,  // Hidden: neutral
+		BuffTypeRain:     EvaluationGood,     // Rain: good
+		BuffTypeExorcism: EvaluationMildGood, // Exorcism: mild good
+		BuffTypeFire:     EvaluationGood,     // Fire: good
 	}
 	if eval, ok := evalMap[bt]; ok {
 		return eval
@@ -71,14 +71,14 @@ func (bt BuffType) GetEvaluation() Evaluation {
 	return EvaluationNeutral
 }
 
-// ========== Buff 实例 ==========
+// ========== Buff Instance ==========
 
 type Buff struct {
 	Type            BuffType  `json:"type"`
-	ID              string    `json:"id"`               // Buff实例ID
+	ID              string    `json:"id"`               // Buff instance ID
 	Duration        int       `json:"duration"`
 	Charge          int       `json:"charge"`
-	SubscriptionIDs []string  `json:"subscription_ids"` // EventBus订阅ID列表（由 engine 包管理，支持多Phase订阅）
+	SubscriptionIDs []string  `json:"subscription_ids"` // EventBus subscription IDs (managed by engine package, supports multi-phase subscriptions)
 }
 
 func NewBuff(buffType BuffType, duration int) *Buff {
@@ -102,29 +102,29 @@ func (b *Buff) TickDuration() bool {
 	return b.IsActive()
 }
 
-// ========== Buff 静态定义 ==========
+// ========== Buff Definition ==========
 
 type BuffDefinition struct {
 	Type        BuffType      `json:"type"`
-	Eval        Evaluation    `json:"evaluation"`    // 评分
+	Eval        Evaluation    `json:"evaluation"`    // Evaluation score
 	Name        string        `json:"name"`
 	Desc        string        `json:"desc"`
 	Duration    int           `json:"duration"`
 	HPPerTurn   int           `json:"hp_per_turn"`
 	LPPerTurn   int           `json:"lp_per_turn"`
 	Special     string        `json:"special"`
-	Phases      []event.Phase `json:"phases"`        // 触发时机列表（支持多Phase）
-	Priority    int           `json:"priority"`      // 执行优先级
-	NeedConfirm bool          `json:"need_confirm"`  // 是否需要用户确认（默认false）
+	Phases      []event.Phase `json:"phases"`        // Trigger phases list (supports multi-phase)
+	Priority    int           `json:"priority"`      // Execution priority
+	NeedConfirm bool          `json:"need_confirm"`  // Whether user confirmation is needed (default false)
 }
 
-// GetPhases 返回 Buff 的触发时机列表
-// 向后兼容：如果 Phases 为空，返回默认 Phase（不会发生，所有 Buff 都有定义）
+// GetPhases returns the Buff's trigger phase list.
+// Backward compatible: if Phases is empty, returns default Phase (won't happen, all Buffs have definitions).
 func (def *BuffDefinition) GetPhases() []event.Phase {
 	return def.Phases
 }
 
-// HasPhase 检查 Buff 是否在指定 Phase 触发
+// HasPhase checks if the Buff triggers at the specified Phase.
 func (def *BuffDefinition) HasPhase(phase event.Phase) bool {
 	for _, p := range def.Phases {
 		if p == phase {
@@ -234,7 +234,7 @@ func (bt BuffType) GetBuffDefinition() *BuffDefinition {
 	return nil
 }
 
-// ========== Buff 注册表 ==========
+// ========== Buff Registry ==========
 
 type BuffRegistry struct {
 	AllBuffs  []BuffType `json:"all_buffs"`
@@ -257,7 +257,7 @@ func NewBuffRegistry() *BuffRegistry {
 	}
 }
 
-// GetBuffsByEvaluationRange 按 Evaluation 范围获取 Buff 列表
+// GetBuffsByEvaluationRange returns Buffs within the specified Evaluation range.
 func (br *BuffRegistry) GetBuffsByEvaluationRange(minEval, maxEval Evaluation) []BuffType {
 	var result []BuffType
 	for _, bt := range br.AllBuffs {
@@ -269,7 +269,7 @@ func (br *BuffRegistry) GetBuffsByEvaluationRange(minEval, maxEval Evaluation) [
 	return result
 }
 
-// GetBuffsByCategory 按类别获取 Buff 列表
+// GetBuffsByCategory returns Buffs by category.
 func (br *BuffRegistry) GetBuffsByCategory(category string) []BuffType {
 	switch category {
 	case "Good":
@@ -280,7 +280,7 @@ func (br *BuffRegistry) GetBuffsByCategory(category string) []BuffType {
 	return br.AllBuffs
 }
 
-// GetAllBuffDefinitions 获取所有 Buff 定义
+// GetAllBuffDefinitions returns all Buff definitions.
 func (br *BuffRegistry) GetAllBuffDefinitions() []*BuffDefinition {
 	defs := make([]*BuffDefinition, 0, len(br.AllBuffs))
 	for _, bt := range br.AllBuffs {

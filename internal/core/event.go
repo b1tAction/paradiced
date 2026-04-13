@@ -1,31 +1,31 @@
 package core
 
-// ========== Event 类型定义 ==========
+// ========== Event Type Definitions ==========
 
 type EventType int
 
 const (
 	EventTypeNone EventType = iota
 
-	// 良性事件 (Evaluation > 65)
-	EventTypeHerb         // 采集到草药：HP+1
-	EventTypeMilkTea      // 捡到奶茶：LP+1
-	EventTypeRelic        // 捡到勇士的圣遗物：道具抽奖
-	EventTypeDivineBless  // 受到天使眷顾：获得神眷Buff
+	// Good events (Evaluation > 65)
+	EventTypeHerb         // Herb: HP+1
+	EventTypeMilkTea      // MilkTea: LP+1
+	EventTypeRelic        // Relic: item draw
+	EventTypeDivineBless  // DivineBless: Divine buff
 
-	// 中性事件 (Evaluation 41~65)
-	EventTypeExchange     // 交换：与随机玩家交换位置
-	EventTypeHiddenBuff   // 麻了：获得隐匿Buff
-	EventTypeTasteTest    // 这是什么？尝一口：获得腐化/甘霖Buff
+	// Neutral events (Evaluation 41~65)
+	EventTypeExchange     // Exchange: swap position with random player
+	EventTypeHiddenBuff   // HiddenBuff: Hidden buff
+	EventTypeTasteTest    // TasteTest: random buff (Corrupt/Rain)
 
-	// 恶性事件 (Evaluation ≤ 40)
-	EventTypeMosquito     // 被蚊虫叮咬：HP-1
-	EventTypeGhostHit     // 偶遇孤魂野鬼：HP-1
-	EventTypeDogPoop      // 踩到了狗屎：LP-1
-	EventTypeThief        // 啊？！贼：随机丢失道具
-	EventTypeCurseBuddha  // 虔诚拜三拜：获得诅咒Buff
-	EventTypeLostWay      // 迷途：获得迷途Buff
-	EventTypeThunder      // 雷劫：HP归零
+	// Bad events (Evaluation ≤ 40)
+	EventTypeMosquito     // Mosquito: HP-1
+	EventTypeGhostHit     // GhostHit: HP-1
+	EventTypeDogPoop      // DogPoop: LP-1
+	EventTypeThief        // Thief: random item loss
+	EventTypeCurseBuddha  // CurseBuddha: Curse buff
+	EventTypeLostWay      // LostWay: Lost buff
+	EventTypeThunder      // Thunder: HP to 0
 )
 
 func (et EventType) String() string {
@@ -56,28 +56,28 @@ func (et EventType) IsValid() bool {
 	return et > EventTypeNone && et <= EventTypeThunder
 }
 
-// GetEvaluation 获取事件的评分
+// GetEvaluation returns the event's evaluation score.
 func (et EventType) GetEvaluation() Evaluation {
 	evalMap := map[EventType]Evaluation{
-		// 良性事件
-		EventTypeHerb:         EvaluationMildGood,  // 草药：轻良
-		EventTypeMilkTea:      EvaluationGood,      // 奶茶：较良
-		EventTypeRelic:        EvaluationVeryGood,  // 圣遗物：极良
-		EventTypeDivineBless:  EvaluationExcellent, // 神眷：最佳
+		// Good events
+		EventTypeHerb:         EvaluationMildGood,  // Herb: mild good
+		EventTypeMilkTea:      EvaluationGood,      // MilkTea: good
+		EventTypeRelic:        EvaluationVeryGood,  // Relic: very good
+		EventTypeDivineBless:  EvaluationExcellent, // DivineBless: excellent
 
-		// 中性事件
-		EventTypeExchange:     EvaluationNeutral, // 交换：标准中性
-		EventTypeHiddenBuff:   EvaluationGood,    // 隐匿：较良
-		EventTypeTasteTest:    EvaluationMixed,   // 品尝：混合效果
+		// Neutral events
+		EventTypeExchange:     EvaluationNeutral,  // Exchange: neutral
+		EventTypeHiddenBuff:   EvaluationGood,     // HiddenBuff: good
+		EventTypeTasteTest:    EvaluationMixed,    // TasteTest: mixed
 
-		// 恶性事件
-		EventTypeMosquito:     EvaluationMildBad, // 蚊虫：轻恶
-		EventTypeGhostHit:     EvaluationMildBad, // 野鬼：轻恶
-		EventTypeDogPoop:      EvaluationMildBad, // 狗屎：轻恶
-		EventTypeThief:        EvaluationBad,     // 盗贼：较恶
-		EventTypeCurseBuddha:  EvaluationBad,     // 野佛：较恶
-		EventTypeLostWay:      EvaluationMildBad, // 迷途：轻恶
-		EventTypeThunder:      EvaluationVeryBad, // 雷劫：极恶
+		// Bad events
+		EventTypeMosquito:     EvaluationMildBad,  // Mosquito: mild bad
+		EventTypeGhostHit:     EvaluationMildBad,  // GhostHit: mild bad
+		EventTypeDogPoop:      EvaluationMildBad,  // DogPoop: mild bad
+		EventTypeThief:        EvaluationBad,      // Thief: bad
+		EventTypeCurseBuddha:  EvaluationBad,      // CurseBuddha: bad
+		EventTypeLostWay:      EvaluationMildBad,  // LostWay: mild bad
+		EventTypeThunder:      EvaluationVeryBad,  // Thunder: very bad
 	}
 	if eval, ok := evalMap[et]; ok {
 		return eval
@@ -85,12 +85,12 @@ func (et EventType) GetEvaluation() Evaluation {
 	return EvaluationNeutral
 }
 
-// GetCategory 获取事件的类别（基于 Evaluation）
+// GetCategory returns the event's category (based on Evaluation).
 func (et EventType) GetCategory() string {
 	return et.GetEvaluation().GetCategory()
 }
 
-// ========== Event 静态定义 ==========
+// ========== Event Definition ==========
 
 type EventDefinition struct {
 	Type       EventType  `json:"type"`
@@ -209,7 +209,7 @@ func (et EventType) GetEventDefinition() *EventDefinition {
 	return nil
 }
 
-// ========== Event 注册表 ==========
+// ========== Event Registry ==========
 
 type EventRegistry struct {
 	AllEvents     []EventType `json:"all_events"`
@@ -246,7 +246,7 @@ func NewEventRegistry() *EventRegistry {
 	}
 }
 
-// GetEventsByEvaluationRange 按 Evaluation 范围获取事件列表
+// GetEventsByEvaluationRange returns Events within the specified Evaluation range.
 func (er *EventRegistry) GetEventsByEvaluationRange(minEval, maxEval Evaluation) []EventType {
 	var result []EventType
 	for _, et := range er.AllEvents {
@@ -258,7 +258,7 @@ func (er *EventRegistry) GetEventsByEvaluationRange(minEval, maxEval Evaluation)
 	return result
 }
 
-// GetEventsByCategory 按类别获取事件列表
+// GetEventsByCategory returns Events by category.
 func (er *EventRegistry) GetEventsByCategory(category string) []EventType {
 	switch category {
 	case "Good":
@@ -271,7 +271,7 @@ func (er *EventRegistry) GetEventsByCategory(category string) []EventType {
 	return er.AllEvents
 }
 
-// GetAllEventDefinitions 获取所有事件定义
+// GetAllEventDefinitions returns all Event definitions.
 func (er *EventRegistry) GetAllEventDefinitions() []*EventDefinition {
 	defs := make([]*EventDefinition, 0, len(er.AllEvents))
 	for _, et := range er.AllEvents {

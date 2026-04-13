@@ -7,16 +7,16 @@ import (
 	"github.com/b1tAction/Fated/pkg/event"
 )
 
-// ========== Item 类型定义 ==========
+// ========== Item Type Definitions ==========
 
 type ItemType int
 
 const (
 	ItemTypeNone ItemType = iota
-	ItemTypeReverseClock // 反方向的钟
-	ItemTypeAnyDoor      // 任意门
-	ItemTypeDiceSwap     // 骰子交换
-	ItemTypeDiceUpgrade  // 骰子升级卡
+	ItemTypeReverseClock // ReverseClock反方向的钟
+	ItemTypeAnyDoor      // AnyDoor任意门
+	ItemTypeDiceSwap     // DiceSwap骰子交换
+	ItemTypeDiceUpgrade  // DiceUpgrade骰子升级卡
 )
 
 func (it ItemType) String() string {
@@ -37,13 +37,13 @@ func (it ItemType) IsValid() bool {
 	return it > ItemTypeNone && it <= ItemTypeDiceUpgrade
 }
 
-// GetEvaluation 获取道具的评分
+// GetEvaluation returns the item's evaluation score.
 func (it ItemType) GetEvaluation() Evaluation {
 	evalMap := map[ItemType]Evaluation{
-		ItemTypeReverseClock: EvaluationGood,     // 反方向的钟：较良（对他人负面）
-		ItemTypeAnyDoor:      EvaluationNeutral, // 任意门：中性
-		ItemTypeDiceSwap:     EvaluationNeutral, // 骰子交换：中性
-		ItemTypeDiceUpgrade:  EvaluationGood,    // 骰子升级：较良
+		ItemTypeReverseClock: EvaluationGood,     // ReverseClock: good (negative for others)
+		ItemTypeAnyDoor:      EvaluationNeutral,  // AnyDoor: neutral
+		ItemTypeDiceSwap:     EvaluationNeutral,  // DiceSwap: neutral
+		ItemTypeDiceUpgrade:  EvaluationGood,     // DiceUpgrade: good
 	}
 	if eval, ok := evalMap[it]; ok {
 		return eval
@@ -51,19 +51,19 @@ func (it ItemType) GetEvaluation() Evaluation {
 	return EvaluationNeutral
 }
 
-// GetCategory 获取道具的类别（基于 Evaluation）
+// GetCategory returns the item's category (based on Evaluation).
 func (it ItemType) GetCategory() string {
 	return it.GetEvaluation().GetCategory()
 }
 
-// ========== Item 实例 ==========
+// ========== Item Instance ==========
 
 type Item struct {
 	Type           ItemType `json:"type"`
 	ID             string   `json:"id"`
 	Usable         bool     `json:"usable"`
 	TargetID       string   `json:"target_id"`
-	SubscriptionID string   `json:"subscription_id"` // EventBus订阅ID（由 engine 包管理）
+	SubscriptionID string   `json:"subscription_id"` // EventBus subscription ID (managed by engine package)
 }
 
 func NewItem(itemType ItemType, id string) *Item {
@@ -74,7 +74,7 @@ func NewItem(itemType ItemType, id string) *Item {
 	}
 }
 
-// ========== Item 静态定义 ==========
+// ========== Item Definition ==========
 
 type ItemDefinition struct {
 	Type        ItemType    `json:"type"`
@@ -85,9 +85,9 @@ type ItemDefinition struct {
 	TargetOther bool        `json:"target_other"`
 	BuffType    BuffType    `json:"buff_type"`
 	Range       int         `json:"range"`
-	Phase       event.Phase `json:"phase"`        // 可使用时机
-	Priority    int         `json:"priority"`     // 执行优先级
-	NeedConfirm bool        `json:"need_confirm"` // 是否需要用户确认（默认true）
+	Phase       event.Phase `json:"phase"`        // Usable phase
+	Priority    int         `json:"priority"`     // Execution priority
+	NeedConfirm bool        `json:"need_confirm"` // Whether user confirmation is needed (default true)
 }
 
 func (it ItemType) GetItemDefinition() *ItemDefinition {
@@ -146,7 +146,7 @@ func (it ItemType) GetItemDefinition() *ItemDefinition {
 	return nil
 }
 
-// ========== Item 注册表 ==========
+// ========== Item Registry ==========
 
 type ItemRegistry struct {
 	AllItems     []ItemType `json:"all_items"`
@@ -180,7 +180,7 @@ func NewItemRegistry() *ItemRegistry {
 	}
 }
 
-// GetItemsByEvaluationRange 按 Evaluation 范围获取道具列表
+// GetItemsByEvaluationRange returns Items within the specified Evaluation range.
 func (ir *ItemRegistry) GetItemsByEvaluationRange(minEval, maxEval Evaluation) []ItemType {
 	var result []ItemType
 	for _, it := range ir.AllItems {
@@ -192,7 +192,7 @@ func (ir *ItemRegistry) GetItemsByEvaluationRange(minEval, maxEval Evaluation) [
 	return result
 }
 
-// GetItemsByCategory 按类别获取道具列表
+// GetItemsByCategory returns Items by category.
 func (ir *ItemRegistry) GetItemsByCategory(category string) []ItemType {
 	switch category {
 	case "Good":
@@ -205,7 +205,7 @@ func (ir *ItemRegistry) GetItemsByCategory(category string) []ItemType {
 	return ir.AllItems
 }
 
-// GetAllItemDefinitions 获取所有道具定义
+// GetAllItemDefinitions returns all Item definitions.
 func (ir *ItemRegistry) GetAllItemDefinitions() []*ItemDefinition {
 	defs := make([]*ItemDefinition, 0, len(ir.AllItems))
 	for _, it := range ir.AllItems {
@@ -217,7 +217,7 @@ func (ir *ItemRegistry) GetAllItemDefinitions() []*ItemDefinition {
 	return defs
 }
 
-// GenerateItemID 生成道具ID（供 engine 包使用）
+// GenerateItemID generates an Item ID (for engine package use).
 func GenerateItemID() string {
 	return fmt.Sprintf("item-%d", time.Now().UnixNano())
 }
