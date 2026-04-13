@@ -20,7 +20,7 @@ func TestStateMatchInit(t *testing.T) {
 	if !ctx.Success {
 		t.Error("Enter should set Success = true")
 	}
-	if !ctx.GetBoolOrDefault("initialized", false) {
+	if !ctx.GetBoolOrDefault(KeyInitialized, false) {
 		t.Error("Enter should set initialized metadata")
 	}
 
@@ -52,7 +52,7 @@ func TestStateRoundMiniGame(t *testing.T) {
 	if state.totalPlayers != 3 {
 		t.Errorf("totalPlayers should be 3, got %d", state.totalPlayers)
 	}
-	if !ctx.GetBoolOrDefault("mini_game_started", false) {
+	if !ctx.GetBoolOrDefault(KeyMiniGameStarted, false) {
 		t.Error("mini_game_started should be true")
 	}
 
@@ -75,7 +75,7 @@ func TestStateRoundMiniGame(t *testing.T) {
 	}
 
 	state.Exit(ctx)
-	if ctx.GetBoolOrDefault("mini_game_started", true) {
+	if ctx.GetBoolOrDefault(KeyMiniGameStarted, true) {
 		t.Error("mini_game_started should be false after exit")
 	}
 }
@@ -101,16 +101,16 @@ func TestStateRoundPrep(t *testing.T) {
 
 	state.Enter(ctx)
 
-	if getDiceType(1) != "gold" {
+	if diceTypeFromRank(1) != "gold" {
 		t.Error("Rank 1 should get gold dice")
 	}
-	if getDiceType(2) != "silver" {
+	if diceTypeFromRank(2) != "silver" {
 		t.Error("Rank 2 should get silver dice")
 	}
-	if getDiceType(3) != "copper" {
+	if diceTypeFromRank(3) != "copper" {
 		t.Error("Rank 3 should get copper dice")
 	}
-	if getDiceType(4) != "wood" {
+	if diceTypeFromRank(4) != "wood" {
 		t.Error("Rank 4 should get wood dice")
 	}
 
@@ -147,7 +147,7 @@ func TestStateTurnLoop(t *testing.T) {
 
 	state.Enter(ctx)
 
-	if !ctx.GetBoolOrDefault("turn_loop_active", false) {
+	if !ctx.GetBoolOrDefault(KeyTurnLoopActive, false) {
 		t.Error("turn_loop_active should be true")
 	}
 	if state.currentPlayerIndex != 0 {
@@ -219,7 +219,7 @@ func TestStateBossBattle(t *testing.T) {
 	if state.triggerPlayer == nil {
 		t.Error("triggerPlayer should be set")
 	}
-	if !ctx.GetBoolOrDefault("boss_battle_active", false) {
+	if !ctx.GetBoolOrDefault(KeyBossBattleActive, false) {
 		t.Error("boss_battle_active should be true")
 	}
 
@@ -265,7 +265,7 @@ func TestStateGameOver(t *testing.T) {
 	if !ctx.Success {
 		t.Error("Success should be true")
 	}
-	if !ctx.GetBoolOrDefault("game_over", false) {
+	if !ctx.GetBoolOrDefault(KeyGameOver, false) {
 		t.Error("game_over should be true")
 	}
 
@@ -319,7 +319,7 @@ func TestRegisterGlobalStates(t *testing.T) {
 	}
 }
 
-func TestGetDiceType(t *testing.T) {
+func TestDiceTypeFromRank(t *testing.T) {
 	tests := []struct {
 		rank     int
 		expected string
@@ -332,9 +332,9 @@ func TestGetDiceType(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := getDiceType(tt.rank)
+		result := diceTypeFromRank(tt.rank)
 		if result != tt.expected {
-			t.Errorf("getDiceType(%d) = %s, want %s", tt.rank, result, tt.expected)
+			t.Errorf("diceTypeFromRank(%d) = %s, want %s", tt.rank, result, tt.expected)
 		}
 	}
 }

@@ -44,7 +44,7 @@ func (s *MatchInitState) Enter(ctx *StateContext) {
 	// 4. Initialize EventBus subscriptions
 
 	ctx.Success = true
-	ctx.SetBool("initialized", true)
+	ctx.SetBool(KeyInitialized, true)
 }
 
 func (s *MatchInitState) Update(ctx *StateContext) StateID {
@@ -81,8 +81,8 @@ func (s *RoundMiniGameState) Enter(ctx *StateContext) {
 	s.totalPlayers = len(ctx.Game.Players)
 	s.resultsReceived = 0
 
-	ctx.SetBool("mini_game_started", true)
-	ctx.SetBool("waiting_for_results", true)
+	ctx.SetBool(KeyMiniGameStarted, true)
+	ctx.SetBool(KeyWaitingForResults, true)
 }
 
 func (s *RoundMiniGameState) Update(ctx *StateContext) StateID {
@@ -95,8 +95,8 @@ func (s *RoundMiniGameState) Update(ctx *StateContext) StateID {
 }
 
 func (s *RoundMiniGameState) Exit(ctx *StateContext) {
-	ctx.SetBool("mini_game_started", false)
-	ctx.SetBool("waiting_for_results", false)
+	ctx.SetBool(KeyMiniGameStarted, false)
+	ctx.SetBool(KeyWaitingForResults, false)
 }
 
 // OnMiniGameResult handles mini-game result submission.
@@ -123,10 +123,10 @@ func NewRoundPrepState() *RoundPrepState {
 
 func (s *RoundPrepState) Enter(ctx *StateContext) {
 	// Assign dice based on mini-game rankings
-	// Rank 1 -> Gold dice (1-10)
-	// Rank 2 -> Silver dice (1-7)
-	// Rank 3 -> Copper dice (1-5)
-	// Rank 4 -> Wood dice (1-3)
+	// Rank 1 -> Gold dice (weighted toward high numbers)
+	// Rank 2 -> Silver dice
+	// Rank 3 -> Copper dice
+	// Rank 4 -> Wood dice (uniform distribution)
 
 	players := ctx.Game.Players
 	for _, player := range players {
@@ -137,7 +137,8 @@ func (s *RoundPrepState) Enter(ctx *StateContext) {
 			rank = playerRank
 		}
 		s.diceAssignments[player.UserID] = rank
-		ctx.SetDiceType(player.UserID, getDiceType(rank))
+		// Store dice type as string for context (used by DiceManager later)
+		ctx.SetDiceType(player.UserID, diceTypeFromRank(rank))
 	}
 
 	// Increment round counter
@@ -155,17 +156,17 @@ func (s *RoundPrepState) Exit(ctx *StateContext) {
 	s.diceAssignments = make(map[string]int)
 }
 
-// getDiceType returns dice type based on rank.
-func getDiceType(rank int) string {
+// diceTypeFromRank returns dice type name based on rank.
+func diceTypeFromRank(rank int) string {
 	switch rank {
 	case 1:
-		return "gold" // 1-10
+		return "gold"
 	case 2:
-		return "silver" // 1-7
+		return "silver"
 	case 3:
-		return "copper" // 1-5
+		return "copper"
 	default:
-		return "wood" // 1-3
+		return "wood"
 	}
 }
 
@@ -197,7 +198,7 @@ func (s *TurnLoopState) Enter(ctx *StateContext) {
 		ctx.Game.State.Turn = 0
 	}
 
-	ctx.SetBool("turn_loop_active", true)
+	ctx.SetBool(KeyTurnLoopActive, true)
 }
 
 func (s *TurnLoopState) Update(ctx *StateContext) StateID {
@@ -217,7 +218,7 @@ func (s *TurnLoopState) Update(ctx *StateContext) StateID {
 }
 
 func (s *TurnLoopState) Exit(ctx *StateContext) {
-	ctx.SetBool("turn_loop_active", false)
+	ctx.SetBool(KeyTurnLoopActive, false)
 	s.turnsCompleted = 0
 	s.currentPlayerIndex = 0
 }
@@ -291,7 +292,7 @@ func (s *BossBattleState) Enter(ctx *StateContext) {
 		s.triggerPlayer = ctx.Game.GetPlayer(triggerID)
 	}
 
-	ctx.SetBool("boss_battle_active", true)
+	ctx.SetBool(KeyBossBattleActive, true)
 }
 
 func (s *BossBattleState) Update(ctx *StateContext) StateID {
@@ -306,7 +307,7 @@ func (s *BossBattleState) Update(ctx *StateContext) StateID {
 }
 
 func (s *BossBattleState) Exit(ctx *StateContext) {
-	ctx.SetBool("boss_battle_active", false)
+	ctx.SetBool(KeyBossBattleActive, false)
 	s.triggerPlayer = nil
 }
 
@@ -341,7 +342,7 @@ func (s *GameOverState) Enter(ctx *StateContext) {
 	}
 
 	ctx.Success = true
-	ctx.SetBool("game_over", true)
+	ctx.SetBool(KeyGameOver, true)
 }
 
 func (s *GameOverState) Update(ctx *StateContext) StateID {
