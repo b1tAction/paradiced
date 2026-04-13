@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/b1tAction/Fated/internal/core"
+	"github.com/b1tAction/Fated/internal/engine"
 	"github.com/b1tAction/Fated/pkg/event"
 )
 
@@ -18,19 +20,20 @@ type HSM struct {
 	// ========== Layer 2: Turn State ==========
 	turnState     State
 	turnStateID   StateID
-	turnPlayer    PlayerAdapter // Current player in turn
+	turnPlayer    *core.Player // Current player in turn (direct type)
 
 	// ========== Layer 3: Interrupt Stack ==========
 	stack         *StateStack
-	waitingState  State         // Current WaitDecision state (if active)
-	decision      *event.Decision // Current pending decision
+	waitingState  State            // Current WaitDecision state (if active)
+	decision      *event.Decision  // Current pending decision
 
 	// ========== State Registry ==========
 	states       map[StateID]State // All registered states
 	factory      StateFactory      // State factory for creating instances
 
-	// ========== Game Reference ==========
-	game         GameAdapter       // Game adapter for state operations
+	// ========== Game Reference - direct type ==========
+	game         *engine.Game      // Game instance (direct access)
+	bus          EventBusAdapter   // EventBus adapter
 
 	// ========== Timing ==========
 	lastUpdate   time.Time         // Last update timestamp
@@ -42,13 +45,18 @@ type HSM struct {
 }
 
 // NewHSM creates a new HSM instance.
-func NewHSM(game GameAdapter) *HSM {
+func NewHSM(game *engine.Game) *HSM {
+	var busAdapter EventBusAdapter
+	if game != nil && game.Bus != nil {
+		busAdapter = NewEventBusWrapper(game.Bus)
+	}
 	return &HSM{
 		globalStateID: StateNone,
 		turnStateID:   StateNone,
 		stack:         NewStateStack(),
 		states:        make(map[StateID]State),
 		game:          game,
+		bus:           busAdapter,
 		running:       false,
 		paused:        false,
 	}
@@ -121,9 +129,19 @@ func (hsm *HSM) GetTurnState() State {
 	return hsm.turnState
 }
 
-// GetTurnPlayer returns current player in turn.
-func (hsm *HSM) GetTurnPlayer() PlayerAdapter {
+// GetTurnPlayer returns current player in turn (direct type).
+func (hsm *HSM) GetTurnPlayer() *core.Player {
 	return hsm.turnPlayer
+}
+
+// GetGame returns the game instance (direct type).
+func (hsm *HSM) GetGame() *engine.Game {
+	return hsm.game
+}
+
+// GetBus returns the EventBus adapter.
+func (hsm *HSM) GetBus() EventBusAdapter {
+	return hsm.bus
 }
 
 // GetStack returns the interrupt state stack.
@@ -420,13 +438,13 @@ func (hsm *HSM) OnUserChoice(choice int, ctx *StateContext) error {
 
 // ========== Turn Player Management ==========
 
-// SetTurnPlayer sets the current player for turn state.
-func (hsm *HSM) SetTurnPlayer(player PlayerAdapter) {
+// SetTurnPlayer sets the current player for turn state (direct type).
+func (hsm *HSM) SetTurnPlayer(player *core.Player) {
 	hsm.turnPlayer = player
 }
 
 // NextTurnPlayer advances to the next player in turn queue.
-func (hsm *HSM) NextTurnPlayer() PlayerAdapter {
+func (hsm *HSM) NextTurnPlayer() *core.Player {
 	hsm.game.NextTurn()
 	hsm.turnPlayer = hsm.game.GetCurrentPlayer()
 	return hsm.turnPlayer
@@ -518,11 +536,11 @@ func (hsm *HSM) RestoreFromSnapshot(snapshot *HSMSnapshot) error {
 
 // ========== Helper Functions ==========
 
-func getPlayerID(player PlayerAdapter) string {
+func getPlayerID(player *core.Player) string {
 	if player == nil {
 		return ""
 	}
-	return player.GetUserID()
+	return player.UserID
 }
 
 func snapshotDecision(decision *event.Decision) *DecisionSnapshot {

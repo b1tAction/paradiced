@@ -3,6 +3,8 @@ package hsm
 import (
 	"time"
 
+	"github.com/b1tAction/Fated/internal/core"
+	"github.com/b1tAction/Fated/internal/engine"
 	"github.com/b1tAction/Fated/pkg/event"
 )
 
@@ -32,9 +34,13 @@ type State interface {
 // StateContext provides context data passed to state methods.
 // Contains game reference, player data, phase info, and interrupt stack.
 type StateContext struct {
-	// Core references
-	Game      GameAdapter       // Game adapter for accessing game state and EventBus
-	Player    PlayerAdapter     // Current player (used in Layer 2 states)
+	// Core references - direct types for domain objects
+	Game      *engine.Game       // Game instance (direct access)
+	Player    *core.Player       // Current player (direct access, used in Layer 2 states)
+
+	// Adapter interfaces - for cross-package isolation
+	Bus       EventBusAdapter    // EventBus adapter (isolates pkg/event)
+	MapEngine MapEngineAdapter   // MapEngine adapter (isolates internal/gamemap)
 
 	// Phase triggering
 	Phase     event.Phase        // Current phase to trigger
@@ -75,15 +81,30 @@ func NewStateContext() *StateContext {
 	}
 }
 
-// WithGame sets the game adapter.
-func (ctx *StateContext) WithGame(game GameAdapter) *StateContext {
+// WithGame sets the game instance and creates EventBus wrapper.
+func (ctx *StateContext) WithGame(game *engine.Game) *StateContext {
 	ctx.Game = game
+	if game != nil && game.Bus != nil {
+		ctx.Bus = NewEventBusWrapper(game.Bus)
+	}
 	return ctx
 }
 
-// WithPlayer sets the player adapter.
-func (ctx *StateContext) WithPlayer(player PlayerAdapter) *StateContext {
+// WithPlayer sets the player (direct type).
+func (ctx *StateContext) WithPlayer(player *core.Player) *StateContext {
 	ctx.Player = player
+	return ctx
+}
+
+// WithBus sets the EventBus adapter directly.
+func (ctx *StateContext) WithBus(bus EventBusAdapter) *StateContext {
+	ctx.Bus = bus
+	return ctx
+}
+
+// WithMapEngine sets the MapEngine adapter.
+func (ctx *StateContext) WithMapEngine(engine MapEngineAdapter) *StateContext {
+	ctx.MapEngine = engine
 	return ctx
 }
 
