@@ -20,28 +20,28 @@
 | StateID | state_id.go | ✅ | 三层枚举定义 |
 | State接口 | state.go | ✅ | Enter/Update/Exit生命周期 |
 | StateContext | state.go | ✅ | 状态上下文数据传递 |
-| Adapter接口 | adapter.go | ✅ | Game/Player/Buff/Item/Map适配器 |
+| Adapter接口 | adapter.go | ✅ | EventBus/MapEngine/Game适配器 |
 | StateStack | state_stack.go | ✅ | 中断入栈/出栈机制 |
 | HSM主结构 | hsm.go | ✅ | 状态注册、转移、生命周期管理 |
 | 全局状态 | global_states.go | ✅ | 6个Layer 1状态实现 |
 | 单元测试 | *_test.go | ✅ | 55+测试用例 |
 
-### Phase 2: 回合层状态 🚧 (进行中)
+### Phase 2: 回合层状态 ✅ (已完成)
 
 | 组件 | 文件 | 状态 | 说明 |
 |------|------|------|------|
-| TurnUpkeepState | turn_states.go | ⏳ | PhaseBeforeTurn触发 |
-| MainActionState | turn_states.go | ⏳ | 等待道具/骰子选择 |
-| TurnMovingState | turn_states.go | ⏳ | 路径计算、Fragile/Fog |
-| TurnLandedState | turn_states.go | ⏳ | PhaseOnLand触发 |
-| TurnEventState | turn_states.go | ⏳ | PhasePreEvent/PreDamage |
-| TurnEndState | turn_states.go | ⏳ | PhaseAfterTurn、TickBuffs |
+| TurnUpkeepState | turn_states.go | ✅ | PhaseBeforeTurn触发、SkipTurn/IsDead检查 |
+| MainActionState | turn_states.go | ✅ | 等待道具/骰子选择、超时处理 |
+| TurnMovingState | turn_states.go | ✅ | 路径计算、Fragile/Fog处理 |
+| TurnLandedState | turn_states.go | ✅ | PhaseOnLand触发、CellType检查 |
+| TurnEventState | turn_states.go | ✅ | PhasePreEvent触发、事件抽取 |
+| TurnEndState | turn_states.go | ✅ | PhaseAfterTurn触发、TickBuffs、阵营充能 |
 
-### Phase 3: 中断层状态 ⏳ (待开始)
+### Phase 3: 中断层状态 ✅ (已完成)
 
 | 组件 | 文件 | 状态 | 说明 |
 |------|------|------|------|
-| WaitDecisionState | interrupt_states.go | ⏳ | 决策等待、超时处理 |
+| WaitDecisionState | interrupt_states.go | ✅ | 决策等待、超时处理、用户选择执行 |
 
 ## 文件结构
 
@@ -49,13 +49,20 @@
 internal/engine/hsm/
 ├── state.go           # State接口和StateContext定义
 ├── state_id.go        # StateID三层枚举
-├── adapter.go         # 适配器接口定义
-├── hsm.go             # HSM主结构和HSMSnapshot
+├── adapter.go         # EventBusAdapter、MapEngineAdapter、GameWrapper
+├── hsm.go             # HSM主结构、OnRollDice/OnUseItem处理、HSMSnapshot
 ├── state_stack.go     # StateStack入栈出栈
-├── global_states.go   # Layer 1全局状态实现
-├── turn_states.go     # Layer 2回合状态实现 (Phase 2)
-├── interrupt_states.go # Layer 3中断状态实现 (Phase 3)
-└── *_test.go          # 各组件单元测试
+├── global_states.go   # Layer 1全局状态实现 (已完成)
+├── turn_states.go     # Layer 2回合状态实现 (已完成)
+├── interrupt_states.go # Layer 3中断状态实现 (已完成)
+├── README.md          # HSM包文档
+├── global_states_test.go # Layer 1测试
+├── turn_states_test.go   # Layer 2测试 (已完成)
+├── interrupt_states_test.go # Layer 3测试 (已完成)
+├── hsm_test.go        # HSM主结构测试
+├── state_id_test.go   # StateID测试
+├── state_stack_test.go # StateStack测试
+└── state_test.go      # StateContext测试
 ```
 
 ### 🌐 第一层：全局对局层 (GlobalGameState)
