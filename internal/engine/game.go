@@ -2,19 +2,24 @@
 package engine
 
 import (
+	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/b1tAction/Fated/internal/core"
 	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/Fated/pkg/rng"
 )
 
 // Game is the game instance, containing EventBus and all players.
 type Game struct {
-	ID        string          `json:"id"`
-	Bus       *event.EventBus `json:"bus"`
-	Players   []*core.Player  `json:"players"`
-	State     *GameState      `json:"state"`
-	mutex     sync.RWMutex
+	ID      string          `json:"id"`
+	Bus     *event.EventBus `json:"bus"`
+	Players []*core.Player  `json:"players"`
+	State   *GameState      `json:"state"`
+	RNG     *rand.Rand      `json:"-"` // Game unique random source
+	Draw    *rng.DrawEngine `json:"-"` // Draw engine for random draws
+	mutex   sync.RWMutex
 }
 
 // GameState represents game state.
@@ -26,12 +31,21 @@ type GameState struct {
 }
 
 // NewGame creates a new game instance.
-func NewGame(gameID string) *Game {
+// seed: random seed (0 for auto-generated from current time)
+func NewGame(gameID string, seed int64) *Game {
+	rngSource := seed
+	if rngSource == 0 {
+		rngSource = time.Now().UnixNano()
+	}
+	rngInst := rand.New(rand.NewSource(rngSource))
+
 	return &Game{
-		ID:      gameID,
-		Bus:     event.NewEventBus(gameID),
+		ID:    gameID,
+		Bus:   event.NewEventBus(gameID),
 		Players: make([]*core.Player, 0),
-		State:   &GameState{Round: 1, Turn: 0, CurrentPhase: "init", Waiting: false},
+		State: &GameState{Round: 1, Turn: 0, CurrentPhase: "init", Waiting: false},
+		RNG:   rngInst,
+		Draw:  rng.NewDrawEngine(rngInst),
 	}
 }
 

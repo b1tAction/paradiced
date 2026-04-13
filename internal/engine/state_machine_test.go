@@ -10,7 +10,7 @@ import (
 // ========== StateMachine Creation Tests ==========
 
 func TestNewStateMachine(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	sm := NewStateMachine(game)
 
 	if sm == nil {
@@ -33,7 +33,7 @@ func TestNewStateMachine(t *testing.T) {
 // ========== TriggerPhase Tests ==========
 
 func TestStateMachineTriggerPhase(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
@@ -51,7 +51,7 @@ func TestStateMachineTriggerPhase(t *testing.T) {
 }
 
 func TestStateMachineTriggerPhaseWithSubscription(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
@@ -73,7 +73,7 @@ func TestStateMachineTriggerPhaseWithSubscription(t *testing.T) {
 }
 
 func TestStateMachineTriggerPhaseUpdatesContext(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
@@ -100,7 +100,7 @@ func TestStateMachineTriggerPhaseUpdatesContext(t *testing.T) {
 // ========== TriggerPhaseAndWait Tests ==========
 
 func TestStateMachineTriggerPhaseAndWaitNoSubscriptions(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
@@ -118,7 +118,7 @@ func TestStateMachineTriggerPhaseAndWaitNoSubscriptions(t *testing.T) {
 }
 
 func TestStateMachineTriggerPhaseAndWaitWithSubscription(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
@@ -147,7 +147,7 @@ func TestStateMachineTriggerPhaseAndWaitWithSubscription(t *testing.T) {
 // ========== Waiting State Tests ==========
 
 func TestStateMachineEnterWaitingState(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	sm := NewStateMachine(game)
 
 	// 创建 Decision 列表
@@ -169,7 +169,7 @@ func TestStateMachineEnterWaitingState(t *testing.T) {
 }
 
 func TestStateMachineExitWaitingState(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	sm := NewStateMachine(game)
 
 	// 先进入等待状态
@@ -193,7 +193,7 @@ func TestStateMachineExitWaitingState(t *testing.T) {
 // ========== User Choice Tests ==========
 
 func TestStateMachineOnUserChoice(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	sm := NewStateMachine(game)
 
 	executed := false
@@ -221,7 +221,7 @@ func TestStateMachineOnUserChoice(t *testing.T) {
 }
 
 func TestStateMachineOnUserChoiceMultipleDecisions(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	sm := NewStateMachine(game)
 
 	choice1 := false
@@ -267,7 +267,7 @@ func TestStateMachineOnUserChoiceMultipleDecisions(t *testing.T) {
 // ========== Current Decision Tests ==========
 
 func TestStateMachineGetCurrentDecision(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	sm := NewStateMachine(game)
 
 	// 没有决策时返回 nil
@@ -290,7 +290,7 @@ func TestStateMachineGetCurrentDecision(t *testing.T) {
 }
 
 func TestStateMachineIsWaiting(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	sm := NewStateMachine(game)
 
 	// 初始不等待
@@ -315,7 +315,7 @@ func TestStateMachineIsWaiting(t *testing.T) {
 }
 
 func TestStateMachineGetWaitingCount(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	sm := NewStateMachine(game)
 
 	if sm.GetWaitingCount() != 0 {
@@ -335,7 +335,7 @@ func TestStateMachineGetWaitingCount(t *testing.T) {
 // ========== Flow Control Tests ==========
 
 func TestStateMachineContinueFlow(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	sm := NewStateMachine(game)
 
 	// 进入等待状态
@@ -354,7 +354,7 @@ func TestStateMachineContinueFlow(t *testing.T) {
 }
 
 func TestStateMachineCancelWaiting(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	sm := NewStateMachine(game)
 
 	executed := false
@@ -381,7 +381,7 @@ func TestStateMachineCancelWaiting(t *testing.T) {
 // ========== Phase Executor Tests ==========
 
 func TestStateMachineExecuteBeforeTurnPhase(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
@@ -396,7 +396,7 @@ func TestStateMachineExecuteBeforeTurnPhase(t *testing.T) {
 }
 
 func TestStateMachineExecuteOnMovePhase(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
@@ -410,7 +410,7 @@ func TestStateMachineExecuteOnMovePhase(t *testing.T) {
 }
 
 func TestStateMachineExecuteOnLandPhase(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
@@ -424,7 +424,7 @@ func TestStateMachineExecuteOnLandPhase(t *testing.T) {
 }
 
 func TestStateMachineExecutePreEventPhase(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
@@ -438,7 +438,7 @@ func TestStateMachineExecutePreEventPhase(t *testing.T) {
 }
 
 func TestStateMachineExecutePreDamagePhase(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
@@ -462,7 +462,7 @@ func TestStateMachineExecutePreDamagePhase(t *testing.T) {
 }
 
 func TestStateMachineExecuteAfterTurnPhase(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
@@ -478,7 +478,7 @@ func TestStateMachineExecuteAfterTurnPhase(t *testing.T) {
 // ========== Phase Executor with Buff Tests ==========
 
 func TestStateMachineExecutePreDamageWithHiddenBuff(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
@@ -500,7 +500,7 @@ func TestStateMachineExecutePreDamageWithHiddenBuff(t *testing.T) {
 }
 
 func TestStateMachineExecuteBeforeTurnWithCurseBuff(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 

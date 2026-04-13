@@ -12,7 +12,7 @@ import (
 // TestIntegrationFullTurnFlow 测试完整的回合流程
 func TestIntegrationFullTurnFlow(t *testing.T) {
 	// 1. 创建游戏和玩家
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{
 		UserID:  "player-001",
 		Faction: core.FactionQingLong,
@@ -75,7 +75,7 @@ func TestIntegrationFullTurnFlow(t *testing.T) {
 
 // TestIntegrationItemNeedConfirm 测试道具需要用户确认
 func TestIntegrationItemNeedConfirm(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
@@ -118,7 +118,7 @@ func TestIntegrationItemNeedConfirm(t *testing.T) {
 
 // TestIntegrationHiddenBuffImmunity 测试隐匿 Buff 免疫效果
 func TestIntegrationHiddenBuffImmunity(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{
 		UserID: "player-001",
 		MaxHP:  6,
@@ -149,7 +149,7 @@ func TestIntegrationHiddenBuffImmunity(t *testing.T) {
 
 // TestIntegrationBuffRemovalUnsubscribe 测试 Buff 移除时取消订阅
 func TestIntegrationBuffRemovalUnsubscribe(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
@@ -175,7 +175,7 @@ func TestIntegrationBuffRemovalUnsubscribe(t *testing.T) {
 
 // TestIntegrationPlayerRemovalCleansSubscriptions 测试玩家移除时清理订阅
 func TestIntegrationPlayerRemovalCleansSubscriptions(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
@@ -208,7 +208,7 @@ func TestIntegrationPlayerRemovalCleansSubscriptions(t *testing.T) {
 
 // TestIntegrationZhuQueFactionPassive 测试朱雀阵营永久被动
 func TestIntegrationZhuQueFactionPassive(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{
 		UserID:  "player-001",
 		Faction: core.FactionZhuQue,
@@ -235,7 +235,7 @@ func TestIntegrationZhuQueFactionPassive(t *testing.T) {
 
 // TestIntegrationAnyTimeItem 测试 AnyTime 道具（主动触发）
 func TestIntegrationAnyTimeItem(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
@@ -261,7 +261,7 @@ func TestIntegrationAnyTimeItem(t *testing.T) {
 
 // TestIntegrationFullGameScenario 测试完整游戏场景
 func TestIntegrationFullGameScenario(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 
 	// 创建 4 个玩家，不同阵营
 	factions := []core.Faction{core.FactionQingLong, core.FactionZhuQue, core.FactionBaiHu, core.FactionXuanWu}
@@ -319,7 +319,7 @@ func TestIntegrationFullGameScenario(t *testing.T) {
 
 // TestIntegrationContextDataPassing 测试 Context 数据传递
 func TestIntegrationContextDataPassing(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
@@ -350,7 +350,7 @@ func TestIntegrationContextDataPassing(t *testing.T) {
 
 // TestIntegrationMultiPhaseBuffSubscription 测试多 Phase Buff 的订阅和触发
 func TestIntegrationMultiPhaseBuffSubscription(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
@@ -382,7 +382,7 @@ func TestIntegrationMultiPhaseBuffSubscription(t *testing.T) {
 
 // TestIntegrationBuffLifecycleWithAppliedEvent 测试 Buff Applied 事件的完整流程
 func TestIntegrationBuffLifecycleWithAppliedEvent(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
@@ -420,7 +420,7 @@ func TestIntegrationBuffLifecycleWithAppliedEvent(t *testing.T) {
 
 // TestIntegrationBuffLifecycleWithRemovedEvent 测试 Buff Removed 事件的完整流程
 func TestIntegrationBuffLifecycleWithRemovedEvent(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
@@ -461,7 +461,7 @@ func TestIntegrationBuffLifecycleWithRemovedEvent(t *testing.T) {
 
 // TestIntegrationZhuQueFireHandler 测试朱雀离火的定制处理器
 func TestIntegrationZhuQueFireHandler(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{
 		UserID:  "player-001",
 		Faction: core.FactionZhuQue,
@@ -496,7 +496,7 @@ func TestIntegrationZhuQueFireHandler(t *testing.T) {
 
 // TestIntegrationEventHandlerStrategy 测试 EventHandler 策略执行
 func TestIntegrationEventHandlerStrategy(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{
 		UserID: "player-001",
 		MaxLP:  5,
@@ -538,7 +538,7 @@ func TestIntegrationEventHandlerStrategy(t *testing.T) {
 
 // TestIntegrationBuffHearsOwnLifecycleEvent 测试 Buff 能听到自己的 Applied/Removed 事件
 func TestIntegrationBuffHearsOwnLifecycleEvent(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{UserID: "player-001"})
 	game.AddPlayer(player)
 
@@ -588,7 +588,7 @@ func TestIntegrationBuffHearsOwnLifecycleEvent(t *testing.T) {
 
 // TestIntegrationMultipleBuffsMultiplePhases 测试多个 Buff 多个 Phase 的完整流程
 func TestIntegrationMultipleBuffsMultiplePhases(t *testing.T) {
-	game := NewGame("game-001")
+	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{
 		UserID: "player-001",
 		MaxHP:  6,

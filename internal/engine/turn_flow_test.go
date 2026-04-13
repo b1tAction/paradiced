@@ -9,7 +9,7 @@ import (
 )
 
 func TestNewTurnFlow(t *testing.T) {
-	game := NewGame("test-game")
+	game := NewGame("test-game", 0)
 	player := core.NewPlayer(core.PlayerConfig{
 		UserID:  "player-1",
 		Faction: core.FactionZhuQue,
@@ -61,7 +61,7 @@ func TestTurnStepString(t *testing.T) {
 }
 
 func TestExecuteUpcheck(t *testing.T) {
-	game := NewGame("test-game")
+	game := NewGame("test-game", 0)
 	player := core.NewPlayer(core.PlayerConfig{
 		UserID:  "player-1",
 		Faction: core.FactionQingLong,
@@ -82,7 +82,7 @@ func TestExecuteUpcheck(t *testing.T) {
 }
 
 func TestExecuteUpcheckSkipTurn(t *testing.T) {
-	game := NewGame("test-game")
+	game := NewGame("test-game", 0)
 	player := core.NewPlayer(core.PlayerConfig{
 		UserID:  "player-1",
 		Faction: core.FactionQingLong,
@@ -108,7 +108,7 @@ func TestExecuteUpcheckSkipTurn(t *testing.T) {
 }
 
 func TestExecuteUpcheckDeadPlayer(t *testing.T) {
-	game := NewGame("test-game")
+	game := NewGame("test-game", 0)
 	player := core.NewPlayer(core.PlayerConfig{
 		UserID:  "player-1",
 		Faction: core.FactionQingLong,
@@ -140,7 +140,7 @@ func TestExecuteUpcheckDeadPlayer(t *testing.T) {
 }
 
 func TestExecuteBeforeTurn(t *testing.T) {
-	game := NewGame("test-game")
+	game := NewGame("test-game", 0)
 	player := core.NewPlayer(core.PlayerConfig{
 		UserID:  "player-1",
 		Faction: core.FactionZhuQue, // ZhuQue starts with Fire buff
@@ -160,7 +160,7 @@ func TestExecuteBeforeTurn(t *testing.T) {
 }
 
 func TestExecuteBeforeTurnWithDecision(t *testing.T) {
-	game := NewGame("test-game")
+	game := NewGame("test-game", 0)
 	player := core.NewPlayer(core.PlayerConfig{
 		UserID:  "player-1",
 		Faction: core.FactionQingLong,
@@ -183,7 +183,7 @@ func TestExecuteBeforeTurnWithDecision(t *testing.T) {
 }
 
 func TestExecuteOnMove(t *testing.T) {
-	game := NewGame("test-game")
+	game := NewGame("test-game", 0)
 	player := core.NewPlayer(core.PlayerConfig{
 		UserID:  "player-1",
 		Faction: core.FactionQingLong,
@@ -212,7 +212,7 @@ func TestExecuteOnMove(t *testing.T) {
 }
 
 func TestExecuteOnMoveWithLostBuff(t *testing.T) {
-	game := NewGame("test-game")
+	game := NewGame("test-game", 0)
 	player := core.NewPlayer(core.PlayerConfig{
 		UserID:  "player-1",
 		Faction: core.FactionQingLong,
@@ -241,7 +241,7 @@ func TestExecuteOnMoveWithLostBuff(t *testing.T) {
 }
 
 func TestExecuteAfterTurn(t *testing.T) {
-	game := NewGame("test-game")
+	game := NewGame("test-game", 0)
 	player := core.NewPlayer(core.PlayerConfig{
 		UserID:  "player-1",
 		Faction: core.FactionQingLong,
@@ -270,7 +270,7 @@ func TestExecuteAfterTurn(t *testing.T) {
 }
 
 func TestOnUserChoice(t *testing.T) {
-	game := NewGame("test-game")
+	game := NewGame("test-game", 0)
 	player := core.NewPlayer(core.PlayerConfig{
 		UserID:  "player-1",
 		Faction: core.FactionQingLong,
@@ -303,7 +303,7 @@ func TestOnUserChoice(t *testing.T) {
 }
 
 func TestCreateSnapshot(t *testing.T) {
-	game := NewGame("test-game")
+	game := NewGame("test-game", 0)
 	player := core.NewPlayer(core.PlayerConfig{
 		UserID:  "player-1",
 		Faction: core.FactionQingLong,
@@ -339,7 +339,7 @@ func TestCreateSnapshot(t *testing.T) {
 }
 
 func TestInterruptAndResume(t *testing.T) {
-	game := NewGame("test-game")
+	game := NewGame("test-game", 0)
 	player := core.NewPlayer(core.PlayerConfig{
 		UserID:  "player-1",
 		Faction: core.FactionQingLong,
@@ -379,7 +379,7 @@ func TestInterruptAndResume(t *testing.T) {
 }
 
 func TestIsWaiting(t *testing.T) {
-	game := NewGame("test-game")
+	game := NewGame("test-game", 0)
 	mapEngine := gamemap.NewMapEngine(50)
 	tf := NewTurnFlow(game, mapEngine)
 
@@ -398,7 +398,7 @@ func TestIsWaiting(t *testing.T) {
 }
 
 func TestSetDiceSteps(t *testing.T) {
-	game := NewGame("test-game")
+	game := NewGame("test-game", 0)
 	mapEngine := gamemap.NewMapEngine(50)
 	tf := NewTurnFlow(game, mapEngine)
 
