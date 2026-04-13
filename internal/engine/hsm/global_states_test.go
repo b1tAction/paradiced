@@ -3,57 +3,9 @@ package hsm
 import (
 	"testing"
 
-	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/Fated/internal/core"
+	"github.com/b1tAction/Fated/internal/engine"
 )
-
-// ========== Mock Game Adapter for Global States ==========
-
-type mockGameAdapterForGlobal struct {
-	id      string
-	round   int
-	turn    int
-	players []PlayerAdapter
-}
-
-func (m *mockGameAdapterForGlobal) GetID() string            { return m.id }
-func (m *mockGameAdapterForGlobal) GetRound() int            { return m.round }
-func (m *mockGameAdapterForGlobal) GetTurn() int             { return m.turn }
-func (m *mockGameAdapterForGlobal) GetCurrentPhase() string  { return "" }
-func (m *mockGameAdapterForGlobal) SetRound(r int)           { m.round = r }
-func (m *mockGameAdapterForGlobal) SetTurn(t int)            { m.turn = t }
-func (m *mockGameAdapterForGlobal) SetWaiting(w bool)        {}
-func (m *mockGameAdapterForGlobal) GetPlayer(id string) PlayerAdapter {
-	for _, p := range m.players {
-		if p.GetUserID() == id {
-			return p
-		}
-	}
-	return nil
-}
-func (m *mockGameAdapterForGlobal) GetCurrentPlayer() PlayerAdapter {
-	if len(m.players) > 0 && m.turn < len(m.players) {
-		return m.players[m.turn]
-	}
-	return nil
-}
-func (m *mockGameAdapterForGlobal) GetAllPlayers() []PlayerAdapter { return m.players }
-func (m *mockGameAdapterForGlobal) NextTurn() {
-	m.turn++
-	if m.turn >= len(m.players) {
-		m.turn = 0
-	}
-}
-func (m *mockGameAdapterForGlobal) GetBus() EventBusAdapter         { return nil }
-func (m *mockGameAdapterForGlobal) PublishPhase(p event.Phase, pid string, ctx *StateContext) []*event.Decision { return nil }
-func (m *mockGameAdapterForGlobal) SubscribeBuff(p PlayerAdapter, b BuffAdapter)     {}
-func (m *mockGameAdapterForGlobal) UnsubscribeBuff(b BuffAdapter)                     {}
-func (m *mockGameAdapterForGlobal) ApplyBuffToPlayer(p PlayerAdapter, b BuffAdapter) {}
-func (m *mockGameAdapterForGlobal) RemoveBuffFromPlayer(p PlayerAdapter, b BuffAdapter) {}
-func (m *mockGameAdapterForGlobal) SubscribeItem(p PlayerAdapter, i ItemAdapter)     {}
-func (m *mockGameAdapterForGlobal) UnsubscribeItem(i ItemAdapter)                     {}
-func (m *mockGameAdapterForGlobal) DrawEvent(lp int) EventAdapter                     { return nil }
-func (m *mockGameAdapterForGlobal) DrawItem(lp int) ItemAdapter                       { return nil }
-func (m *mockGameAdapterForGlobal) GetMapEngine() MapEngineAdapter                    { return nil }
 
 func TestStateMatchInit(t *testing.T) {
 	state := NewMatchInitState()
@@ -62,7 +14,8 @@ func TestStateMatchInit(t *testing.T) {
 		t.Errorf("MatchInitState.ID() = %s, want StateMatchInit", state.ID().String())
 	}
 
-	ctx := NewStateContext().WithGame(&mockGameAdapterForGlobal{id: "game-1"})
+	game := engine.NewGame("game-1", 0)
+	ctx := NewStateContext().WithGame(game)
 	state.Enter(ctx)
 	if !ctx.Success {
 		t.Error("Enter should set Success = true")
@@ -88,10 +41,12 @@ func TestStateRoundMiniGame(t *testing.T) {
 		t.Errorf("RoundMiniGameState.ID() = %s, want StateRoundMiniGame", state.ID().String())
 	}
 
-	game := &mockGameAdapterForGlobal{
-		id:      "game-1",
-		players: []PlayerAdapter{&mockPlayerAdapter{id: "p1"}, &mockPlayerAdapter{id: "p2"}, &mockPlayerAdapter{id: "p3"}},
-	}
+	game := engine.NewGame("game-1", 0)
+	// Add players using core.NewPlayer
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p1"}))
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p2"}))
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p3"}))
+
 	ctx := NewStateContext().WithGame(game)
 	state.Enter(ctx)
 
@@ -133,11 +88,12 @@ func TestStateRoundPrep(t *testing.T) {
 		t.Errorf("RoundPrepState.ID() = %s, want StateRoundPrep", state.ID().String())
 	}
 
-	game := &mockGameAdapterForGlobal{
-		id:      "game-1",
-		round:   0,
-		players: []PlayerAdapter{&mockPlayerAdapter{id: "p1"}, &mockPlayerAdapter{id: "p2"}, &mockPlayerAdapter{id: "p3"}, &mockPlayerAdapter{id: "p4"}},
-	}
+	game := engine.NewGame("game-1", 0)
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p1"}))
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p2"}))
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p3"}))
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p4"}))
+
 	ctx := NewStateContext().WithGame(game)
 	ctx.SetMetadata("result_p1", 1)
 	ctx.SetMetadata("result_p2", 2)
@@ -159,8 +115,8 @@ func TestStateRoundPrep(t *testing.T) {
 		t.Error("Rank 4 should get wood dice")
 	}
 
-	if game.round != 1 {
-		t.Errorf("Round should be incremented to 1, got %d", game.round)
+	if game.State.Round != 2 {
+		t.Errorf("Round should be incremented to 2 (started at 1), got %d", game.State.Round)
 	}
 
 	nextID := state.Update(ctx)
@@ -176,10 +132,10 @@ func TestStateTurnLoop(t *testing.T) {
 		t.Errorf("TurnLoopState.ID() = %s, want StateTurnLoop", state.ID().String())
 	}
 
-	game := &mockGameAdapterForGlobal{
-		id:      "game-1",
-		players: []PlayerAdapter{&mockPlayerAdapter{id: "p1"}, &mockPlayerAdapter{id: "p2"}},
-	}
+	game := engine.NewGame("game-1", 0)
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p1"}))
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p2"}))
+
 	ctx := NewStateContext().WithGame(game)
 
 	state.Enter(ctx)
@@ -243,7 +199,9 @@ func TestStateBossBattle(t *testing.T) {
 		t.Errorf("BossBattleState.ID() = %s, want StateBossBattle", state.ID().String())
 	}
 
-	game := &mockGameAdapterForGlobal{id: "game-1", players: []PlayerAdapter{&mockPlayerAdapter{id: "p1"}}}
+	game := engine.NewGame("game-1", 0)
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p1"}))
+
 	ctx := NewStateContext().WithGame(game)
 	ctx.SetMetadata("boss_trigger_player", "p1")
 
@@ -284,7 +242,9 @@ func TestStateGameOver(t *testing.T) {
 		t.Errorf("GameOverState.ID() = %s, want StateGameOver", state.ID().String())
 	}
 
-	game := &mockGameAdapterForGlobal{id: "game-1", players: []PlayerAdapter{&mockPlayerAdapter{id: "winner"}}}
+	game := engine.NewGame("game-1", 0)
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "winner"}))
+
 	ctx := NewStateContext().WithGame(game)
 	ctx.SetMetadata("winner_id", "winner")
 
@@ -335,7 +295,7 @@ func TestGlobalStateFactory(t *testing.T) {
 }
 
 func TestRegisterGlobalStates(t *testing.T) {
-	game := &mockGameAdapterForGlobal{id: "game-1"}
+	game := engine.NewGame("game-1", 0)
 	hsm := NewHSM(game)
 
 	err := RegisterGlobalStates(hsm)
@@ -371,11 +331,10 @@ func TestGetDiceType(t *testing.T) {
 }
 
 func TestHSMGlobalStateFlow(t *testing.T) {
-	game := &mockGameAdapterForGlobal{
-		id:      "game-1",
-		round:   0,
-		players: []PlayerAdapter{&mockPlayerAdapter{id: "p1"}, &mockPlayerAdapter{id: "p2"}},
-	}
+	game := engine.NewGame("game-1", 0)
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p1"}))
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p2"}))
+
 	hsm := NewHSM(game)
 
 	RegisterGlobalStates(hsm)
@@ -406,10 +365,10 @@ func TestHSMGlobalStateFlow(t *testing.T) {
 
 func TestTurnLoopAllPlayersComplete(t *testing.T) {
 	state := NewTurnLoopState()
-	game := &mockGameAdapterForGlobal{
-		id:      "game-1",
-		players: []PlayerAdapter{&mockPlayerAdapter{id: "p1"}, &mockPlayerAdapter{id: "p2"}},
-	}
+	game := engine.NewGame("game-1", 0)
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p1"}))
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p2"}))
+
 	ctx := NewStateContext().WithGame(game)
 
 	state.Enter(ctx)

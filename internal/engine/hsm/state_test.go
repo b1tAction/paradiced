@@ -4,6 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/b1tAction/Fated/internal/core"
+	"github.com/b1tAction/Fated/internal/engine"
+	"github.com/b1tAction/Fated/internal/gamemap"
 	"github.com/b1tAction/Fated/pkg/event"
 )
 
@@ -22,15 +25,17 @@ func TestNewStateContext(t *testing.T) {
 }
 
 func TestStateContextWithMethods(t *testing.T) {
-	// Test WithGame
-	game := &mockGameAdapter{}
+	game := engine.NewGame("test", 0)
 	ctx := NewStateContext().WithGame(game)
 	if ctx.Game != game {
 		t.Error("Game not set correctly")
 	}
+	if ctx.Bus == nil {
+		t.Error("Bus adapter should be created from game")
+	}
 
 	// Test WithPlayer
-	player := &mockPlayerAdapter{id: "player-1"}
+	player := core.NewPlayer(core.PlayerConfig{UserID: "player-1"})
 	ctx = ctx.WithPlayer(player)
 	if ctx.Player != player {
 		t.Error("Player not set correctly")
@@ -104,95 +109,60 @@ func TestStateContextClear(t *testing.T) {
 	}
 }
 
-// ========== Mock Types for Testing ==========
+func TestStateContextWithBus(t *testing.T) {
+	game := engine.NewGame("test", 0)
 
-type mockGameAdapter struct {
-	id      string
-	round   int
-	turn    int
-	players []*mockPlayerAdapter
-}
-
-func (m *mockGameAdapter) GetID() string            { return m.id }
-func (m *mockGameAdapter) GetRound() int            { return m.round }
-func (m *mockGameAdapter) GetTurn() int             { return m.turn }
-func (m *mockGameAdapter) GetCurrentPhase() string  { return "" }
-func (m *mockGameAdapter) SetRound(r int)           { m.round = r }
-func (m *mockGameAdapter) SetTurn(t int)            { m.turn = t }
-func (m *mockGameAdapter) SetWaiting(w bool)        {}
-func (m *mockGameAdapter) GetPlayer(id string) PlayerAdapter {
-	for _, p := range m.players {
-		if p.id == id {
-			return p
-		}
+	// Test WithBus creates adapter
+	ctx := NewStateContext().WithGame(game)
+	if ctx.Bus == nil {
+		t.Error("WithGame should create Bus adapter")
 	}
-	return nil
-}
-func (m *mockGameAdapter) GetCurrentPlayer() PlayerAdapter {
-	if len(m.players) > 0 {
-		return m.players[0]
+
+	// Test WithBus can override
+	mockBus := &mockEventBusAdapter{}
+	ctx = NewStateContext().WithBus(mockBus)
+	if ctx.Bus != mockBus {
+		t.Error("WithBus should set adapter directly")
 	}
-	return nil
-}
-func (m *mockGameAdapter) GetAllPlayers() []PlayerAdapter { return nil }
-func (m *mockGameAdapter) NextTurn()                       {}
-func (m *mockGameAdapter) GetBus() EventBusAdapter         { return nil }
-func (m *mockGameAdapter) PublishPhase(p event.Phase, pid string, ctx *StateContext) []*event.Decision {
-	return nil
-}
-func (m *mockGameAdapter) SubscribeBuff(p PlayerAdapter, b BuffAdapter)     {}
-func (m *mockGameAdapter) UnsubscribeBuff(b BuffAdapter)                     {}
-func (m *mockGameAdapter) ApplyBuffToPlayer(p PlayerAdapter, b BuffAdapter) {}
-func (m *mockGameAdapter) RemoveBuffFromPlayer(p PlayerAdapter, b BuffAdapter) {}
-func (m *mockGameAdapter) SubscribeItem(p PlayerAdapter, i ItemAdapter)     {}
-func (m *mockGameAdapter) UnsubscribeItem(i ItemAdapter)                     {}
-func (m *mockGameAdapter) DrawEvent(lp int) EventAdapter                     { return nil }
-func (m *mockGameAdapter) DrawItem(lp int) ItemAdapter                       { return nil }
-func (m *mockGameAdapter) GetMapEngine() MapEngineAdapter                    { return nil }
-
-type mockPlayerAdapter struct {
-	id       string
-	position int
-	hp       int
-	lp       int
-	dead     bool
-	skipTurn bool
 }
 
-func (m *mockPlayerAdapter) GetUserID() string     { return m.id }
-func (m *mockPlayerAdapter) GetFaction() FactionAdapter { return nil }
-func (m *mockPlayerAdapter) GetPosition() int      { return m.position }
-func (m *mockPlayerAdapter) GetHP() int            { return m.hp }
-func (m *mockPlayerAdapter) GetLP() int            { return m.lp }
-func (m *mockPlayerAdapter) IsDead() bool          { return m.dead }
-func (m *mockPlayerAdapter) CanAct() bool          { return !m.dead && !m.skipTurn }
-func (m *mockPlayerAdapter) GetSkipTurn() bool     { return m.skipTurn }
-func (m *mockPlayerAdapter) SetPosition(p int)     { m.position = p }
-func (m *mockPlayerAdapter) SetHP(h int)           { m.hp = h }
-func (m *mockPlayerAdapter) SetLP(l int)           { m.lp = l }
-func (m *mockPlayerAdapter) SetSkipTurn(s bool)    { m.skipTurn = s }
-func (m *mockPlayerAdapter) SetDead(d bool)        { m.dead = d }
-func (m *mockPlayerAdapter) Move(p int, max int)   { m.position = p }
-func (m *mockPlayerAdapter) ApplyDamage(a int)     { m.hp -= a }
-func (m *mockPlayerAdapter) Heal(a int)            { m.hp += a }
-func (m *mockPlayerAdapter) ModifyLP(a int)        { m.lp += a }
-func (m *mockPlayerAdapter) AddBuff(b BuffAdapter) {}
-func (m *mockPlayerAdapter) RemoveBuff(t BuffTypeAdapter) {}
-func (m *mockPlayerAdapter) HasBuff(t BuffTypeAdapter) bool { return false }
-func (m *mockPlayerAdapter) GetBuff(t BuffTypeAdapter) BuffAdapter { return nil }
-func (m *mockPlayerAdapter) GetAllBuffs() []BuffAdapter { return nil }
-func (m *mockPlayerAdapter) TickBuffs() []BuffAdapter { return nil }
-func (m *mockPlayerAdapter) ClearNegativeBuffs() int { return 0 }
-func (m *mockPlayerAdapter) AddItem(i ItemAdapter) {}
-func (m *mockPlayerAdapter) RemoveItem(id string) ItemAdapter { return nil }
-func (m *mockPlayerAdapter) GetItem(id string) ItemAdapter { return nil }
-func (m *mockPlayerAdapter) HasItem(t ItemTypeAdapter) bool { return false }
-func (m *mockPlayerAdapter) GetAllItems() []ItemAdapter { return nil }
-func (m *mockPlayerAdapter) GetChargeCount() int { return 0 }
-func (m *mockPlayerAdapter) SetChargeCount(c int) {}
-func (m *mockPlayerAdapter) IncrementChargeCount() int { return 0 }
-func (m *mockPlayerAdapter) GetFireCounter() int { return 0 }
-func (m *mockPlayerAdapter) SetFireCounter(c int) {}
-func (m *mockPlayerAdapter) IncrementFireCounter() int { return 0 }
-func (m *mockPlayerAdapter) Respawn(p int) { m.position = p; m.dead = false }
-func (m *mockPlayerAdapter) Clone() PlayerAdapter { return m }
+func TestStateContextWithMapEngine(t *testing.T) {
+	ctx := NewStateContext()
+
+	// Test WithMapEngine
+	mockEngine := &mockMapEngineAdapter{length: 100}
+	ctx = ctx.WithMapEngine(mockEngine)
+	if ctx.MapEngine != mockEngine {
+		t.Error("WithMapEngine should set adapter")
+	}
+}
+
+// ========== Mock Adapters for Testing ==========
+
+type mockEventBusAdapter struct{}
+
+func (m *mockEventBusAdapter) Publish(phase event.Phase, playerID string, ctx *event.Context) []*event.Decision {
+	return nil
+}
+func (m *mockEventBusAdapter) Subscribe(phase event.Phase, ownerID, sourceID, sourceType string, decision *event.Decision) string {
+	return ""
+}
+func (m *mockEventBusAdapter) Unsubscribe(subID string) bool { return false }
+func (m *mockEventBusAdapter) UnsubscribeBySource(sourceID string) int { return 0 }
+func (m *mockEventBusAdapter) UnsubscribeByOwner(ownerID string) int { return 0 }
+func (m *mockEventBusAdapter) GetSubscriptionCount() int { return 0 }
+func (m *mockEventBusAdapter) Clear() {}
+
+type mockMapEngineAdapter struct {
+	length int
+}
+
+func (m *mockMapEngineAdapter) GetLength() int { return m.length }
+func (m *mockMapEngineAdapter) GetCell(pos int) (*gamemap.MapCell, error) { return nil, nil }
+func (m *mockMapEngineAdapter) CalculatePath(startPos int, steps int) (*gamemap.PathResult, error) {
+	return nil, nil
+}
+func (m *mockMapEngineAdapter) GetLastCheckpoint(pos int) int { return 0 }
+func (m *mockMapEngineAdapter) SetCellType(pos int, cellType gamemap.CellType) error { return nil }
+func (m *mockMapEngineAdapter) ActivateFog(pos int) error { return nil }
+func (m *mockMapEngineAdapter) IsFogActivated(pos int) bool { return false }

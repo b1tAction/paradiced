@@ -282,21 +282,3 @@ func TestStateStackGetEntry(t *testing.T) {
 		t.Error("Large index should return nil")
 	}
 }
-
-// ========== Mock State for Testing ==========
-
-type mockState struct {
-	id       StateID
-	enterCalled  bool
-	updateCalled bool
-	exitCalled   bool
-}
-
-func (m *mockState) ID() StateID { return m.id }
-func (m *mockState) Enter(ctx *StateContext) { m.enterCalled = true }
-func (m *mockState) Update(ctx *StateContext) StateID {
-	m.updateCalled = true
-	return StateNone // Stay in current state
-}
-func (m *mockState) Exit(ctx *StateContext) { m.exitCalled = true }
-func (m *mockState) CanTransitionTo(target StateID) bool { return true }
