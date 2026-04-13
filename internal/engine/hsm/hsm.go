@@ -472,6 +472,74 @@ func (hsm *HSM) IsInTurn() bool {
 	return hsm.globalStateID == StateTurnLoop && hsm.turnStateID != StateNone
 }
 
+// ========== Turn State Input Handling ==========
+
+// OnRollDice handles dice roll input during MainActionState.
+func (hsm *HSM) OnRollDice(steps int, ctx *StateContext) error {
+	// Must be in MainAction state
+	if hsm.turnStateID != StateMainAction {
+		return errors.New("OnRollDice requires MainAction state")
+	}
+
+	// Create context if not provided
+	if ctx == nil {
+		ctx = NewStateContext().WithGame(hsm.game).WithPlayer(hsm.turnPlayer)
+	}
+
+	// Call OnRollDice on the turn state if it implements RollDiceHandler
+	if handler, ok := hsm.turnState.(RollDiceHandler); ok {
+		handler.OnRollDice(ctx, steps)
+	} else {
+		return errors.New("current turn state does not handle RollDice")
+	}
+
+	// Trigger update to check for state transition
+	nextID := hsm.turnState.Update(ctx)
+	if nextID != StateNone && nextID != hsm.turnStateID {
+		return hsm.TransitionTo(nextID, ctx)
+	}
+
+	return nil
+}
+
+// OnUseItem handles item usage input during MainActionState.
+func (hsm *HSM) OnUseItem(itemID string, ctx *StateContext) error {
+	// Must be in MainAction state
+	if hsm.turnStateID != StateMainAction {
+		return errors.New("OnUseItem requires MainAction state")
+	}
+
+	// Create context if not provided
+	if ctx == nil {
+		ctx = NewStateContext().WithGame(hsm.game).WithPlayer(hsm.turnPlayer)
+	}
+
+	// Call OnUseItem on the turn state if it implements UseItemHandler
+	if handler, ok := hsm.turnState.(UseItemHandler); ok {
+		handler.OnUseItem(ctx, itemID)
+	} else {
+		return errors.New("current turn state does not handle UseItem")
+	}
+
+	// Trigger update to check for state transition
+	nextID := hsm.turnState.Update(ctx)
+	if nextID != StateNone && nextID != hsm.turnStateID {
+		return hsm.TransitionTo(nextID, ctx)
+	}
+
+	return nil
+}
+
+// RollDiceHandler is an interface for states that handle dice roll input.
+type RollDiceHandler interface {
+	OnRollDice(ctx *StateContext, steps int)
+}
+
+// UseItemHandler is an interface for states that handle item usage input.
+type UseItemHandler interface {
+	OnUseItem(ctx *StateContext, itemID string)
+}
+
 // ========== Snapshot ==========
 
 // CreateSnapshot creates a snapshot of current HSM state.

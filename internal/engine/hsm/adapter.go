@@ -1,9 +1,13 @@
 package hsm
 
 import (
+	"github.com/b1tAction/Fated/internal/engine"
 	"github.com/b1tAction/Fated/internal/gamemap"
 	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/Fated/pkg/protocol"
 )
+
+// ========== EventBus Adapter ==========
 
 // EventBusAdapter isolates HSM from pkg/event package details.
 // This interface allows HSM to interact with EventBus without direct coupling
@@ -75,6 +79,41 @@ func (w *EventBusWrapper) GetSubscriptionCount() int {
 func (w *EventBusWrapper) Clear() {
 	w.bus.Clear()
 }
+
+// ========== Game Adapter (protocol.Game) ==========
+
+// GameWrapper wraps engine.Game to implement protocol.Game interface.
+// Used by ActionContext to access game state.
+type GameWrapper struct {
+	game *engine.Game
+}
+
+// NewGameWrapper creates a new GameWrapper.
+func NewGameWrapper(game *engine.Game) protocol.Game {
+	return &GameWrapper{game: game}
+}
+
+// GetCurrentPlayer returns the current player as interface{}.
+func (w *GameWrapper) GetCurrentPlayer() interface{} {
+	return w.game.GetCurrentPlayer()
+}
+
+// GetPlayer returns a player by ID as interface{}.
+func (w *GameWrapper) GetPlayer(id string) interface{} {
+	return w.game.GetPlayer(id)
+}
+
+// GetPlayers returns all players as []interface{}.
+func (w *GameWrapper) GetPlayers() []interface{} {
+	players := w.game.GetPlayers()
+	result := make([]interface{}, len(players))
+	for i, p := range players {
+		result[i] = p
+	}
+	return result
+}
+
+// ========== MapEngine Adapter ==========
 
 // MapEngineAdapter isolates HSM from internal/gamemap package.
 // This interface allows HSM to interact with MapEngine without direct coupling,
@@ -150,4 +189,41 @@ func (w *MapEngineWrapper) IsFogActivated(pos int) bool {
 		return false
 	}
 	return cell.CellType == gamemap.CellTypeFog && cell.FogActive
+}
+
+// ========== Protocol MapEngine Adapter ==========
+
+// ProtocolMapEngineWrapper wraps MapEngineAdapter to implement protocol.MapEngine.
+// Used by ActionContext which expects protocol.MapEngine interface.
+type ProtocolMapEngineWrapper struct {
+	adapter MapEngineAdapter
+}
+
+// NewProtocolMapEngineWrapper creates a wrapper that implements protocol.MapEngine.
+func NewProtocolMapEngineWrapper(adapter MapEngineAdapter) protocol.MapEngine {
+	return &ProtocolMapEngineWrapper{adapter: adapter}
+}
+
+// CalculatePath returns protocol.PathResult interface.
+func (w *ProtocolMapEngineWrapper) CalculatePath(startPos int, steps int) (protocol.PathResult, error) {
+	result, err := w.adapter.CalculatePath(startPos, steps)
+	if err != nil {
+		return nil, err
+	}
+	return &PathResultWrapper{result: result}, nil
+}
+
+// PathResultWrapper wraps gamemap.PathResult to implement protocol.PathResult.
+type PathResultWrapper struct {
+	result *gamemap.PathResult
+}
+
+// GetTargetIndex returns the target position.
+func (w *PathResultWrapper) GetTargetIndex() int {
+	return w.result.TargetIndex
+}
+
+// GetPath returns the path of visited cells.
+func (w *PathResultWrapper) GetPath() []int {
+	return w.result.Path
 }
