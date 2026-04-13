@@ -139,7 +139,7 @@ func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
 		return
 	}
 
-	def := buff.Type.GetBuffDefinition()
+	def := core.GetBuffDefinition(buff.Type)
 	if def == nil {
 		return
 	}
@@ -147,18 +147,14 @@ func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
 	// Initialize SubscriptionIDs list
 	buff.SubscriptionIDs = make([]string, 0)
 
-	// Get custom handler
-	handler := GetHandler(buff.Type)
-	hasCustomHandler := handler != nil
-
 	// Create subscription for each Phase
 	for _, phase := range def.GetPhases() {
 		if !phase.NeedsSubscription() {
 			continue
 		}
 
-		// Create closure Action
-		action := g.createBuffAction(buff, def, phase, player, hasCustomHandler, handler)
+		// Create closure Action (using handlers.go createBuffAction)
+		action := createBuffAction(buff, def, phase, player)
 
 		// Create Decision
 		decision := g.createBuffDecisionWithAction(buff, def, action)
@@ -166,25 +162,6 @@ func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
 		// Register with EventBus
 		subID := g.Bus.Subscribe(phase, player.UserID, buff.ID, "buff", decision)
 		buff.SubscriptionIDs = append(buff.SubscriptionIDs, subID)
-	}
-}
-
-// createBuffAction creates an Action closure when Buff triggers.
-func (g *Game) createBuffAction(buff *core.Buff, def *core.BuffDefinition, phase event.Phase, player *core.Player, hasCustomHandler bool, handler EventHandler) func(ctx *event.Context) {
-	return func(ctx *event.Context) {
-		// Get Player from Context (ensure correct type)
-		p, ok := ctx.Player.(*core.Player)
-		if !ok {
-			return
-		}
-
-		if hasCustomHandler {
-			// Call custom handler
-			handler(phase, ctx)
-		} else {
-			// Execute default value effect
-			executeDefaultBuffAction(def, p)
-		}
 	}
 }
 
@@ -213,7 +190,10 @@ func (g *Game) UnsubscribeBuff(buff *core.Buff) {
 
 // SubscribeItem subscribes when player gets a new Item.
 func (g *Game) SubscribeItem(player *core.Player, item *core.Item) {
-	def := item.Type.GetItemDefinition()
+	def := core.GetItemDefinition(item.Type)
+	if def == nil {
+		return
+	}
 	if def.Phase.NeedsSubscription() {
 		decision := g.createItemDecision(item, def)
 		subID := g.Bus.Subscribe(def.Phase, player.UserID, item.ID, "item", decision)

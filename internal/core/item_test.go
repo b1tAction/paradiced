@@ -13,7 +13,7 @@ func TestItemTypeString(t *testing.T) {
 		it       ItemType
 		expected string
 	}{
-		{ItemTypeNone, "None"},
+		{ItemTypeNone, "Unknown"}, // None is not registered, returns Unknown
 		{ItemTypeReverseClock, "ReverseClock"},
 		{ItemTypeAnyDoor, "AnyDoor"},
 		{ItemTypeDiceSwap, "DiceSwap"},
@@ -50,35 +50,16 @@ func TestItemTypeGetEvaluation(t *testing.T) {
 		it       ItemType
 		expected Evaluation
 	}{
-		{ItemTypeReverseClock, EvaluationGood},     // 反方向的钟：较良 (25)
-		{ItemTypeAnyDoor, EvaluationNeutral},      // 任意门：中性 (50)
-		{ItemTypeDiceSwap, EvaluationNeutral},     // 骰子交换：中性 (50)
-		{ItemTypeDiceUpgrade, EvaluationGood},     // 骰子升级：较良 (80)
+		{ItemTypeReverseClock, EvaluationGood},
+		{ItemTypeAnyDoor, EvaluationNeutral},
+		{ItemTypeDiceSwap, EvaluationNeutral},
+		{ItemTypeDiceUpgrade, EvaluationGood},
 	}
 
 	for _, tt := range tests {
-		result := tt.it.GetEvaluation()
+		result := GetItemEvaluation(tt.it)
 		if result != tt.expected {
-			t.Errorf("ItemType(%s).GetEvaluation() = %d, expected %d", tt.it.String(), result, tt.expected)
-		}
-	}
-}
-
-func TestItemTypeGetCategory(t *testing.T) {
-	tests := []struct {
-		it       ItemType
-		expected string
-	}{
-		{ItemTypeReverseClock, "Good"},
-		{ItemTypeAnyDoor, "Neutral"},
-		{ItemTypeDiceSwap, "Neutral"},
-		{ItemTypeDiceUpgrade, "Good"},
-	}
-
-	for _, tt := range tests {
-		result := tt.it.GetCategory()
-		if result != tt.expected {
-			t.Errorf("ItemType(%s).GetCategory() = %s, expected %s", tt.it.String(), result, tt.expected)
+			t.Errorf("GetItemEvaluation(%s) = %d, expected %d", tt.it.String(), result, tt.expected)
 		}
 	}
 }
@@ -113,7 +94,7 @@ func TestItemFields(t *testing.T) {
 		t.Errorf("item.TargetID = %s, expected player-123", item.TargetID)
 	}
 
-	// 设置不可用
+	// Set unusable
 	item.Usable = false
 	if item.Usable {
 		t.Error("item should be unusable after setting")
@@ -123,8 +104,8 @@ func TestItemFields(t *testing.T) {
 // ========== ItemDefinition Tests ==========
 
 func TestItemTypeGetItemDefinition(t *testing.T) {
-	// 测试反方向的钟
-	def := ItemTypeReverseClock.GetItemDefinition()
+	// Test ReverseClock
+	def := GetItemDefinition(ItemTypeReverseClock)
 	if def == nil {
 		t.Fatal("ItemTypeReverseClock should have definition")
 	}
@@ -135,17 +116,17 @@ func TestItemTypeGetItemDefinition(t *testing.T) {
 		t.Errorf("def.Eval = %d, expected Good(%d)", def.Eval, EvaluationGood)
 	}
 	if def.TargetSelf {
-		t.Error("反方向的钟 should not target self")
+		t.Error("ReverseClock should not target self")
 	}
 	if !def.TargetOther {
-		t.Error("反方向的钟 should target other")
+		t.Error("ReverseClock should target other")
 	}
 	if def.BuffType != BuffTypeLost {
 		t.Errorf("def.BuffType = %d, expected Lost", def.BuffType)
 	}
 
-	// 测试任意门
-	def = ItemTypeAnyDoor.GetItemDefinition()
+	// Test AnyDoor
+	def = GetItemDefinition(ItemTypeAnyDoor)
 	if def == nil {
 		t.Fatal("ItemTypeAnyDoor should have definition")
 	}
@@ -159,8 +140,8 @@ func TestItemTypeGetItemDefinition(t *testing.T) {
 		t.Errorf("def.Range = %d, expected 30", def.Range)
 	}
 
-	// 测试骰子升级卡
-	def = ItemTypeDiceUpgrade.GetItemDefinition()
+	// Test DiceUpgrade
+	def = GetItemDefinition(ItemTypeDiceUpgrade)
 	if def == nil {
 		t.Fatal("ItemTypeDiceUpgrade should have definition")
 	}
@@ -171,24 +152,23 @@ func TestItemTypeGetItemDefinition(t *testing.T) {
 		t.Errorf("def.Eval = %d, expected Good(%d)", def.Eval, EvaluationGood)
 	}
 	if !def.TargetSelf {
-		t.Error("骰子升级卡 should target self")
+		t.Error("DiceUpgrade should target self")
 	}
 	if def.TargetOther {
-		t.Error("骰子升级卡 should not target other")
+		t.Error("DiceUpgrade should not target other")
 	}
 
-	// 测试未知道具
-	def = ItemType(999).GetItemDefinition()
+	// Test unknown item
+	def = GetItemDefinition(ItemType(999))
 	if def != nil {
 		t.Error("unknown ItemType should return nil definition")
 	}
 }
 
 func TestItemDefinitionEvaluation(t *testing.T) {
-	// 验证所有道具定义都有有效的 Evaluation
-	registry := NewItemRegistry()
-	for _, it := range registry.AllItems {
-		def := it.GetItemDefinition()
+	// Verify all item definitions have valid Evaluation
+	for _, it := range GetAllItemTypes() {
+		def := GetItemDefinition(it)
 		if def == nil {
 			t.Errorf("ItemType(%s) has no definition", it.String())
 			continue
@@ -197,81 +177,73 @@ func TestItemDefinitionEvaluation(t *testing.T) {
 			t.Errorf("ItemType(%s) has invalid Evaluation %d", it.String(), def.Eval)
 		}
 
-		// 验证 GetEvaluation 和定义中的 Eval 一致
-		eval := it.GetEvaluation()
+		// Verify GetItemEvaluation matches definition Eval
+		eval := GetItemEvaluation(it)
 		if def.Eval != eval {
-			t.Errorf("ItemType(%s) definition.Eval(%d) != GetEvaluation(%d)", it.String(), def.Eval, eval)
+			t.Errorf("ItemType(%s) definition.Eval(%d) != GetItemEvaluation(%d)", it.String(), def.Eval, eval)
 		}
 	}
 }
 
-// ========== ItemRegistry Tests ==========
+// ========== Registry Tests ==========
 
-func TestNewItemRegistry(t *testing.T) {
-	registry := NewItemRegistry()
-	if registry == nil {
-		t.Fatal("NewItemRegistry should not return nil")
-	}
-	if len(registry.AllItems) != 4 {
-		t.Errorf("AllItems count = %d, expected 4", len(registry.AllItems))
+func TestGlobalRegistryItemTypes(t *testing.T) {
+	allItems := GetAllItemTypes()
+	if len(allItems) != 4 {
+		t.Errorf("AllItemTypes count = %d, expected 4", len(allItems))
 	}
 }
 
-func TestItemRegistryGetItemsByEvaluationRange(t *testing.T) {
-	registry := NewItemRegistry()
-
-	// 获取恶性道具（0~40）- 当前没有恶性道具
-	badItems := registry.GetItemsByEvaluationRange(EvaluationMin, EvaluationBadThreshold)
+func TestGetItemTypesByEvaluationRange(t *testing.T) {
+	// Get bad items (0~40) - currently no bad items
+	badItems := GlobalRegistry.GetItemTypesByEvaluationRange(EvaluationMin, EvaluationBadThreshold)
 	if len(badItems) != 0 {
 		t.Errorf("bad items count = %d, expected 0 (no bad items)", len(badItems))
 	}
 
-	// 获取中性道具（41~65）
-	neutralItems := registry.GetItemsByEvaluationRange(41, 65)
+	// Get neutral items (41~65)
+	neutralItems := GlobalRegistry.GetItemTypesByEvaluationRange(41, 65)
 	if len(neutralItems) != 2 {
 		t.Errorf("neutral items count = %d, expected 2 (AnyDoor+DiceSwap)", len(neutralItems))
 	}
 
-	// 获取良性道具（66~100）- ReverseClock 和 DiceUpgrade
-	goodItems := registry.GetItemsByEvaluationRange(66, EvaluationMax)
+	// Get good items (66~100) - ReverseClock and DiceUpgrade
+	goodItems := GlobalRegistry.GetItemTypesByEvaluationRange(66, EvaluationMax)
 	if len(goodItems) != 2 {
 		t.Errorf("good items count = %d, expected 2 (ReverseClock+DiceUpgrade)", len(goodItems))
 	}
 }
 
-func TestItemRegistryGetItemsByCategory(t *testing.T) {
-	registry := NewItemRegistry()
-
-	good := registry.GetItemsByCategory("Good")
+func TestGetItemTypesByCategory(t *testing.T) {
+	good := GetItemTypesByCategory("Good")
 	if len(good) != 2 {
 		t.Errorf("good items count = %d, expected 2 (ReverseClock+DiceUpgrade)", len(good))
 	}
 
-	neutral := registry.GetItemsByCategory("Neutral")
+	neutral := GetItemTypesByCategory("Neutral")
 	if len(neutral) != 2 {
 		t.Errorf("neutral items count = %d, expected 2", len(neutral))
 	}
 
-	bad := registry.GetItemsByCategory("Bad")
+	bad := GetItemTypesByCategory("Bad")
 	if len(bad) != 0 {
 		t.Errorf("bad items count = %d, expected 0 (no bad items)", len(bad))
 	}
 
-	all := registry.GetItemsByCategory("Unknown")
+	all := GetItemTypesByCategory("Unknown")
 	if len(all) != 4 {
 		t.Errorf("unknown category should return all items, got %d", len(all))
 	}
 }
 
-func TestItemRegistryGetAllItemDefinitions(t *testing.T) {
-	registry := NewItemRegistry()
-	defs := registry.GetAllItemDefinitions()
+func TestGetAllItemDefinitions(t *testing.T) {
+	defs := GetAllItemDefinitions()
 
 	if len(defs) != 4 {
 		t.Errorf("definitions count = %d, expected 4", len(defs))
 	}
 
-	// 验证每个定义
+	// Verify each definition
 	defMap := make(map[ItemType]bool)
 	for _, def := range defs {
 		defMap[def.Type] = true
@@ -280,8 +252,8 @@ func TestItemRegistryGetAllItemDefinitions(t *testing.T) {
 		}
 	}
 
-	// 验证所有道具都有定义
-	for _, it := range registry.AllItems {
+	// Verify all items have definitions
+	for _, it := range GetAllItemTypes() {
 		if !defMap[it] {
 			t.Errorf("ItemType(%s) missing in definitions", it.String())
 		}
@@ -291,27 +263,25 @@ func TestItemRegistryGetAllItemDefinitions(t *testing.T) {
 // ========== Evaluation Range Tests ==========
 
 func TestItemEvaluationRanges(t *testing.T) {
-	// 验证道具评分在合理范围内
-	registry := NewItemRegistry()
+	// Verify item evaluations are in reasonable ranges
+	for _, it := range GetAllItemTypes() {
+		eval := GetItemEvaluation(it)
 
-	for _, it := range registry.AllItems {
-		eval := it.GetEvaluation()
-
-		// 反方向的钟现在是良性（对持有者有利）
+		// ReverseClock is now good (beneficial to holder)
 		if it == ItemTypeReverseClock {
 			if !eval.IsGood() {
 				t.Errorf("ItemTypeReverseClock should be good, got eval %d", eval)
 			}
 		}
 
-		// 任意门和骰子交换应该是中性
+		// AnyDoor and DiceSwap should be neutral
 		if it == ItemTypeAnyDoor || it == ItemTypeDiceSwap {
 			if !eval.IsNeutral() {
 				t.Errorf("%s should be neutral, got eval %d", it.String(), eval)
 			}
 		}
 
-		// 骰子升级应该是良性
+		// DiceUpgrade should be good
 		if it == ItemTypeDiceUpgrade {
 			if !eval.IsGood() {
 				t.Errorf("ItemTypeDiceUpgrade should be good, got eval %d", eval)
@@ -323,8 +293,8 @@ func TestItemEvaluationRanges(t *testing.T) {
 // ========== ItemDefinition Phase Tests ==========
 
 func TestItemDefinitionPhase(t *testing.T) {
-	// 测试反方向的钟的 Phase（任何时候可用）
-	def := ItemTypeReverseClock.GetItemDefinition()
+	// Test ReverseClock Phase (AnyTime)
+	def := GetItemDefinition(ItemTypeReverseClock)
 	if def == nil {
 		t.Fatal("ItemTypeReverseClock should have definition")
 	}
@@ -332,8 +302,8 @@ func TestItemDefinitionPhase(t *testing.T) {
 		t.Errorf("ReverseClock Phase = %s, expected AnyTime", def.Phase.String())
 	}
 
-	// 测试任意门的 Phase（落地后可用）
-	def = ItemTypeAnyDoor.GetItemDefinition()
+	// Test AnyDoor Phase (OnLand)
+	def = GetItemDefinition(ItemTypeAnyDoor)
 	if def == nil {
 		t.Fatal("ItemTypeAnyDoor should have definition")
 	}
@@ -341,8 +311,8 @@ func TestItemDefinitionPhase(t *testing.T) {
 		t.Errorf("AnyDoor Phase = %s, expected OnLand", def.Phase.String())
 	}
 
-	// 测试骰子交换的 Phase（任何时候可用）
-	def = ItemTypeDiceSwap.GetItemDefinition()
+	// Test DiceSwap Phase (AnyTime)
+	def = GetItemDefinition(ItemTypeDiceSwap)
 	if def == nil {
 		t.Fatal("ItemTypeDiceSwap should have definition")
 	}
@@ -350,8 +320,8 @@ func TestItemDefinitionPhase(t *testing.T) {
 		t.Errorf("DiceSwap Phase = %s, expected AnyTime", def.Phase.String())
 	}
 
-	// 测试骰子升级卡的 Phase（回合开始前可用）
-	def = ItemTypeDiceUpgrade.GetItemDefinition()
+	// Test DiceUpgrade Phase (BeforeTurn)
+	def = GetItemDefinition(ItemTypeDiceUpgrade)
 	if def == nil {
 		t.Fatal("ItemTypeDiceUpgrade should have definition")
 	}
@@ -361,8 +331,8 @@ func TestItemDefinitionPhase(t *testing.T) {
 }
 
 func TestItemDefinitionPriority(t *testing.T) {
-	// 测试骰子升级卡的优先级（较高）
-	def := ItemTypeDiceUpgrade.GetItemDefinition()
+	// Test DiceUpgrade priority (high)
+	def := GetItemDefinition(ItemTypeDiceUpgrade)
 	if def == nil {
 		t.Fatal("ItemTypeDiceUpgrade should have definition")
 	}
@@ -370,8 +340,8 @@ func TestItemDefinitionPriority(t *testing.T) {
 		t.Errorf("DiceUpgrade Priority = %d, expected 70", def.Priority)
 	}
 
-	// 测试任意门的优先级
-	def = ItemTypeAnyDoor.GetItemDefinition()
+	// Test AnyDoor priority
+	def = GetItemDefinition(ItemTypeAnyDoor)
 	if def == nil {
 		t.Fatal("ItemTypeAnyDoor should have definition")
 	}
@@ -379,8 +349,8 @@ func TestItemDefinitionPriority(t *testing.T) {
 		t.Errorf("AnyDoor Priority = %d, expected 60", def.Priority)
 	}
 
-	// 测试反方向的钟的优先级（标准）
-	def = ItemTypeReverseClock.GetItemDefinition()
+	// Test ReverseClock priority (standard)
+	def = GetItemDefinition(ItemTypeReverseClock)
 	if def == nil {
 		t.Fatal("ItemTypeReverseClock should have definition")
 	}
@@ -388,8 +358,8 @@ func TestItemDefinitionPriority(t *testing.T) {
 		t.Errorf("ReverseClock Priority = %d, expected 50", def.Priority)
 	}
 
-	// 测试骰子交换的优先级（较低）
-	def = ItemTypeDiceSwap.GetItemDefinition()
+	// Test DiceSwap priority (low)
+	def = GetItemDefinition(ItemTypeDiceSwap)
 	if def == nil {
 		t.Fatal("ItemTypeDiceSwap should have definition")
 	}
@@ -399,14 +369,13 @@ func TestItemDefinitionPriority(t *testing.T) {
 }
 
 func TestItemDefinitionNeedConfirm(t *testing.T) {
-	// 所有道具默认需要用户确认
-	registry := NewItemRegistry()
-	for _, it := range registry.AllItems {
-		def := it.GetItemDefinition()
+	// All items default to needing user confirmation
+	for _, it := range GetAllItemTypes() {
+		def := GetItemDefinition(it)
 		if def == nil {
 			continue
 		}
-		// 道具使用需要用户确认目标
+		// Item usage needs user confirmation for target
 		if !def.NeedConfirm {
 			t.Errorf("Item %s should need confirm by default", it.String())
 		}
@@ -414,20 +383,20 @@ func TestItemDefinitionNeedConfirm(t *testing.T) {
 }
 
 func TestItemDefinitionPhaseNeedsSubscription(t *testing.T) {
-	// 测试 Phase 是否需要订阅 EventBus
+	// Test Phase needs EventBus subscription
 	tests := []struct {
-		it          ItemType
-		needsSub    bool
-		reason      string
+		it       ItemType
+		needsSub bool
+		reason   string
 	}{
-		{ItemTypeReverseClock, false, "AnyTime 不需要订阅（主动触发）"},
-		{ItemTypeAnyDoor, true, "OnLand 需要订阅"},
-		{ItemTypeDiceSwap, false, "AnyTime 不需要订阅（主动触发）"},
-		{ItemTypeDiceUpgrade, true, "BeforeTurn 需要订阅"},
+		{ItemTypeReverseClock, false, "AnyTime doesn't need subscription (manual trigger)"},
+		{ItemTypeAnyDoor, true, "OnLand needs subscription"},
+		{ItemTypeDiceSwap, false, "AnyTime doesn't need subscription (manual trigger)"},
+		{ItemTypeDiceUpgrade, true, "BeforeTurn needs subscription"},
 	}
 
 	for _, tt := range tests {
-		def := tt.it.GetItemDefinition()
+		def := GetItemDefinition(tt.it)
 		if def == nil {
 			t.Errorf("ItemType(%s) has no definition", tt.it.String())
 			continue
@@ -440,20 +409,20 @@ func TestItemDefinitionPhaseNeedsSubscription(t *testing.T) {
 }
 
 func TestItemDefinitionTargetTypes(t *testing.T) {
-	// 测试道具的目标类型
+	// Test item target types
 	tests := []struct {
-		it           ItemType
-		targetSelf   bool
-		targetOther  bool
+		it          ItemType
+		targetSelf  bool
+		targetOther bool
 	}{
-		{ItemTypeReverseClock, false, true},  // 对他人使用
-		{ItemTypeAnyDoor, false, true},        // 对他人使用
-		{ItemTypeDiceSwap, false, true},       // 对他人使用
-		{ItemTypeDiceUpgrade, true, false},    // 对自己使用
+		{ItemTypeReverseClock, false, true},
+		{ItemTypeAnyDoor, false, true},
+		{ItemTypeDiceSwap, false, true},
+		{ItemTypeDiceUpgrade, true, false},
 	}
 
 	for _, tt := range tests {
-		def := tt.it.GetItemDefinition()
+		def := GetItemDefinition(tt.it)
 		if def == nil {
 			t.Errorf("ItemType(%s) has no definition", tt.it.String())
 			continue
@@ -468,8 +437,8 @@ func TestItemDefinitionTargetTypes(t *testing.T) {
 }
 
 func TestItemDefinitionRange(t *testing.T) {
-	// 测试任意门的有效范围
-	def := ItemTypeAnyDoor.GetItemDefinition()
+	// Test AnyDoor effective range
+	def := GetItemDefinition(ItemTypeAnyDoor)
 	if def == nil {
 		t.Fatal("ItemTypeAnyDoor should have definition")
 	}
@@ -477,8 +446,8 @@ func TestItemDefinitionRange(t *testing.T) {
 		t.Errorf("AnyDoor Range = %d, expected 30", def.Range)
 	}
 
-	// 其他道具默认 Range 为 0
-	def = ItemTypeReverseClock.GetItemDefinition()
+	// Other items default Range is 0
+	def = GetItemDefinition(ItemTypeReverseClock)
 	if def == nil {
 		t.Fatal("ItemTypeReverseClock should have definition")
 	}
@@ -488,8 +457,8 @@ func TestItemDefinitionRange(t *testing.T) {
 }
 
 func TestItemDefinitionBuffType(t *testing.T) {
-	// 测试反方向的钟赋予的 Buff 类型
-	def := ItemTypeReverseClock.GetItemDefinition()
+	// Test BuffType granted by ReverseClock
+	def := GetItemDefinition(ItemTypeReverseClock)
 	if def == nil {
 		t.Fatal("ItemTypeReverseClock should have definition")
 	}
@@ -497,12 +466,36 @@ func TestItemDefinitionBuffType(t *testing.T) {
 		t.Errorf("ReverseClock BuffType = %d, expected Lost", def.BuffType)
 	}
 
-	// 其他道具默认不赋予 Buff
-	def = ItemTypeAnyDoor.GetItemDefinition()
+	// Other items don't grant Buff by default
+	def = GetItemDefinition(ItemTypeAnyDoor)
 	if def == nil {
 		t.Fatal("ItemTypeAnyDoor should have definition")
 	}
 	if def.BuffType != BuffTypeNone {
 		t.Errorf("AnyDoor BuffType = %d, expected None", def.BuffType)
+	}
+}
+
+func TestItemDefinitionSpecialEffects(t *testing.T) {
+	// Test special effects for items
+	tests := []struct {
+		it       ItemType
+		expected SpecialEffect
+	}{
+		{ItemTypeReverseClock, SpecialGiveLost},
+		{ItemTypeAnyDoor, SpecialTeleport},
+		{ItemTypeDiceSwap, SpecialDiceSwap},
+		{ItemTypeDiceUpgrade, SpecialDiceUpgrade},
+	}
+
+	for _, tt := range tests {
+		def := GetItemDefinition(tt.it)
+		if def == nil {
+			t.Errorf("ItemType(%s) has no definition", tt.it.String())
+			continue
+		}
+		if def.SpecialEffect != tt.expected {
+			t.Errorf("%s SpecialEffect = %d, expected %d", tt.it.String(), def.SpecialEffect, tt.expected)
+		}
 	}
 }

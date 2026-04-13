@@ -27,58 +27,24 @@ const (
 	BuffTypeFire     // Fire离火
 )
 
+// IsValid checks if the Buff type is valid.
+func (bt BuffType) IsValid() bool {
+	return bt > BuffTypeNone && bt <= BuffTypeFire
+}
+
+// String returns the Buff type name from GlobalRegistry.
 func (bt BuffType) String() string {
-	names := map[BuffType]string{
-		BuffTypeNone:     "None",
-		BuffTypeCurse:    "Curse",
-		BuffTypeLost:     "Lost",
-		BuffTypeCorrupt:  "Corrupt",
-		BuffTypePoison:   "Poison",
-		BuffTypeDivine:   "Divine",
-		BuffTypeHidden:   "Hidden",
-		BuffTypeRain:     "Rain",
-		BuffTypeExorcism: "Exorcism",
-		BuffTypeFire:     "Fire",
-	}
-	if name, ok := names[bt]; ok {
-		return name
-	}
-	return "Unknown"
-}
-
-// IsPositive checks if the Buff is positive.
-func (bt BuffType) IsPositive() bool {
-	return bt == BuffTypeDivine || bt == BuffTypeHidden ||
-		bt == BuffTypeRain || bt == BuffTypeExorcism || bt == BuffTypeFire
-}
-
-// GetEvaluation returns the Buff's evaluation score.
-func (bt BuffType) GetEvaluation() Evaluation {
-	evalMap := map[BuffType]Evaluation{
-		BuffTypeCurse:    EvaluationBad,      // Curse: bad
-		BuffTypeLost:     EvaluationMildBad,  // Lost: mild bad
-		BuffTypeCorrupt:  EvaluationBad,      // Corrupt: bad
-		BuffTypePoison:   EvaluationVeryBad,  // Poison: very bad
-		BuffTypeDivine:   EvaluationVeryGood, // Divine: very good
-		BuffTypeHidden:   EvaluationNeutral,  // Hidden: neutral
-		BuffTypeRain:     EvaluationGood,     // Rain: good
-		BuffTypeExorcism: EvaluationMildGood, // Exorcism: mild good
-		BuffTypeFire:     EvaluationGood,     // Fire: good
-	}
-	if eval, ok := evalMap[bt]; ok {
-		return eval
-	}
-	return EvaluationNeutral
+	return GlobalRegistry.GetBuffString(bt)
 }
 
 // ========== Buff Instance ==========
 
 type Buff struct {
-	Type            BuffType  `json:"type"`
-	ID              string    `json:"id"`               // Buff instance ID
-	Duration        int       `json:"duration"`
-	Charge          int       `json:"charge"`
-	SubscriptionIDs []string  `json:"subscription_ids"` // EventBus subscription IDs (managed by engine package, supports multi-phase subscriptions)
+	Type            BuffType `json:"type"`
+	ID              string   `json:"id"`               // Buff instance ID
+	Duration        int      `json:"duration"`
+	Charge          int      `json:"charge"`
+	SubscriptionIDs []string `json:"subscription_ids"` // EventBus subscription IDs (managed by engine package, supports multi-phase subscriptions)
 }
 
 func NewBuff(buffType BuffType, duration int) *Buff {
@@ -105,21 +71,21 @@ func (b *Buff) TickDuration() bool {
 // ========== Buff Definition ==========
 
 type BuffDefinition struct {
-	Type        BuffType      `json:"type"`
-	Eval        Evaluation    `json:"evaluation"`    // Evaluation score
-	Name        string        `json:"name"`
-	Desc        string        `json:"desc"`
-	Duration    int           `json:"duration"`
-	HPPerTurn   int           `json:"hp_per_turn"`
-	LPPerTurn   int           `json:"lp_per_turn"`
-	Special     string        `json:"special"`
-	Phases      []event.Phase `json:"phases"`        // Trigger phases list (supports multi-phase)
-	Priority    int           `json:"priority"`      // Execution priority
-	NeedConfirm bool          `json:"need_confirm"`  // Whether user confirmation is needed (default false)
+	Type          BuffType      `json:"type"`
+	Eval          Evaluation    `json:"evaluation"`     // Evaluation score
+	EnglishName   string        `json:"english_name"`   // English identifier (for String())
+	Name          string        `json:"name"`           // Chinese display name
+	Desc          string        `json:"desc"`
+	Duration      int           `json:"duration"`
+	HPPerTurn     int           `json:"hp_per_turn"`
+	LPPerTurn     int           `json:"lp_per_turn"`
+	SpecialEffect SpecialEffect `json:"special_effect"` // Special effect type (enum, not string)
+	Phases        []event.Phase `json:"phases"`         // Trigger phases list (supports multi-phase)
+	Priority      int           `json:"priority"`       // Execution priority
+	NeedConfirm   bool          `json:"need_confirm"`   // Whether user confirmation is needed (default false)
 }
 
 // GetPhases returns the Buff's trigger phase list.
-// Backward compatible: if Phases is empty, returns default Phase (won't happen, all Buffs have definitions).
 func (def *BuffDefinition) GetPhases() []event.Phase {
 	return def.Phases
 }
@@ -134,160 +100,58 @@ func (def *BuffDefinition) HasPhase(phase event.Phase) bool {
 	return false
 }
 
-func (bt BuffType) GetBuffDefinition() *BuffDefinition {
-	eval := bt.GetEvaluation()
-	definitions := map[BuffType]*BuffDefinition{
-		BuffTypeCurse: {
-			Type:      BuffTypeCurse,
-			Eval:      eval,
-			Name:      "诅咒",
-			Desc:      "接下来3回合LP-1",
-			Duration:  3,
-			LPPerTurn: -1,
-			Phases:    []event.Phase{event.PhaseBeforeTurn},
-			Priority:  50,
-		},
-		BuffTypeDivine: {
-			Type:      BuffTypeDivine,
-			Eval:      eval,
-			Name:      "神眷",
-			Desc:      "接下来3回合LP+1",
-			Duration:  3,
-			LPPerTurn: 1,
-			Phases:    []event.Phase{event.PhaseBeforeTurn},
-			Priority:  50,
-		},
-		BuffTypeHidden: {
-			Type:      BuffTypeHidden,
-			Eval:      eval,
-			Name:      "隐匿",
-			Desc:      "接下来3回合免疫任意事件、BUFF或道具的影响",
-			Duration:  3,
-			Special:   "immune",
-			Phases:    []event.Phase{event.PhasePreDamage},
-			Priority:  100,
-		},
-		BuffTypeLost: {
-			Type:      BuffTypeLost,
-			Eval:      eval,
-			Name:      "迷途",
-			Desc:      "下1回合朝反方向移动",
-			Duration:  1,
-			Special:   "reverse",
-			Phases:    []event.Phase{event.PhaseOnMove},
-			Priority:  100,
-		},
-		BuffTypeCorrupt: {
-			Type:      BuffTypeCorrupt,
-			Eval:      eval,
-			Name:      "腐化",
-			Desc:      "接下来4回合每2回合HP-1",
-			Duration:  4,
-			HPPerTurn: -1,
-			Phases:    []event.Phase{event.PhaseAfterTurn},
-			Priority:  50,
-		},
-		BuffTypeRain: {
-			Type:      BuffTypeRain,
-			Eval:      eval,
-			Name:      "甘霖",
-			Desc:      "接下来4回合每2回合HP+1",
-			Duration:  4,
-			HPPerTurn: 1,
-			Phases:    []event.Phase{event.PhaseAfterTurn},
-			Priority:  50,
-		},
-		BuffTypeExorcism: {
-			Type:      BuffTypeExorcism,
-			Eval:      eval,
-			Name:      "辟邪",
-			Desc:      "接下来5回合无视毒瘴buff",
-			Duration:  5,
-			Special:   "immune_poison",
-			Phases:    []event.Phase{event.PhasePreEvent},
-			Priority:  80,
-		},
-		BuffTypePoison: {
-			Type:      BuffTypePoison,
-			Eval:      eval,
-			Name:      "毒瘴",
-			Desc:      "接下来3回合每回合受一次恶性随机事件影响",
-			Duration:  3,
-			Special:   "bad_event_per_turn",
-			Phases:    []event.Phase{event.PhaseBeforeTurn},
-			Priority:  30,
-		},
-		BuffTypeFire: {
-			Type:      BuffTypeFire,
-			Eval:      eval,
-			Name:      "离火",
-			Desc:      "朱雀阵营增益，每4回合LP+1",
-			Duration:  -1,
-			Special:   "zhuque_passive",
-			Phases:    []event.Phase{event.PhaseBeforeTurn},
-			Priority:  10,
-		},
-	}
-	if def, ok := definitions[bt]; ok {
-		return def
-	}
-	return nil
+// ========== Global Registry Access Functions ==========
+
+// GetBuffDefinition returns the Buff definition from GlobalRegistry.
+func GetBuffDefinition(bt BuffType) *BuffDefinition {
+	return GlobalRegistry.GetBuffDefinition(bt)
 }
 
-// ========== Buff Registry ==========
-
-type BuffRegistry struct {
-	AllBuffs  []BuffType `json:"all_buffs"`
-	GoodBuffs []BuffType `json:"good_buffs"`
-	BadBuffs  []BuffType `json:"bad_buffs"`
+// GetBuffString returns the Buff name string from GlobalRegistry.
+func GetBuffString(bt BuffType) string {
+	return GlobalRegistry.GetBuffString(bt)
 }
 
-func NewBuffRegistry() *BuffRegistry {
-	return &BuffRegistry{
-		AllBuffs: []BuffType{
-			BuffTypeCurse, BuffTypeDivine, BuffTypeHidden, BuffTypeLost,
-			BuffTypeCorrupt, BuffTypeRain, BuffTypeExorcism, BuffTypePoison, BuffTypeFire,
-		},
-		GoodBuffs: []BuffType{
-			BuffTypeDivine, BuffTypeHidden, BuffTypeRain, BuffTypeExorcism, BuffTypeFire,
-		},
-		BadBuffs: []BuffType{
-			BuffTypeCurse, BuffTypeLost, BuffTypeCorrupt, BuffTypePoison,
-		},
-	}
+// GetBuffEvaluation returns the Buff evaluation score from GlobalRegistry.
+func GetBuffEvaluation(bt BuffType) Evaluation {
+	return GlobalRegistry.GetBuffEvaluation(bt)
 }
 
-// GetBuffsByEvaluationRange returns Buffs within the specified Evaluation range.
-func (br *BuffRegistry) GetBuffsByEvaluationRange(minEval, maxEval Evaluation) []BuffType {
-	var result []BuffType
-	for _, bt := range br.AllBuffs {
-		eval := bt.GetEvaluation()
-		if eval >= minEval && eval <= maxEval {
-			result = append(result, bt)
-		}
-	}
-	return result
+// GetBuffHandler returns the Buff's custom handler from GlobalRegistry.
+func GetBuffHandler(bt BuffType) EventHandler {
+	return GlobalRegistry.GetBuffHandler(bt)
 }
 
-// GetBuffsByCategory returns Buffs by category.
-func (br *BuffRegistry) GetBuffsByCategory(category string) []BuffType {
-	switch category {
-	case "Good":
-		return br.GoodBuffs
-	case "Bad":
-		return br.BadBuffs
-	}
-	return br.AllBuffs
+// HasBuffHandler checks if Buff has a custom handler.
+func HasBuffHandler(bt BuffType) bool {
+	return GlobalRegistry.HasBuffHandler(bt)
+}
+
+// GetAllBuffTypes returns all registered Buff types.
+func GetAllBuffTypes() []BuffType {
+	return GlobalRegistry.GetAllBuffTypes()
+}
+
+// GetBuffTypesByCategory returns Buff types by category.
+func GetBuffTypesByCategory(category string) []BuffType {
+	return GlobalRegistry.GetBuffTypesByCategory(category)
 }
 
 // GetAllBuffDefinitions returns all Buff definitions.
-func (br *BuffRegistry) GetAllBuffDefinitions() []*BuffDefinition {
-	defs := make([]*BuffDefinition, 0, len(br.AllBuffs))
-	for _, bt := range br.AllBuffs {
-		def := bt.GetBuffDefinition()
-		if def != nil {
-			defs = append(defs, def)
+func GetAllBuffDefinitions() []*BuffDefinition {
+	return GlobalRegistry.GetAllBuffDefinitions()
+}
+
+// IsPositive checks if the Buff is positive (based on effect, not evaluation).
+// Hidden is neutral evaluation but positive effect (immunity).
+func (bt BuffType) IsPositive() bool {
+	// Positive buffs: Divine, Hidden, Rain, Exorcism, Fire
+	// Hidden is neutral eval but positive effect
+	positiveBuffs := []BuffType{BuffTypeDivine, BuffTypeHidden, BuffTypeRain, BuffTypeExorcism, BuffTypeFire}
+	for _, pos := range positiveBuffs {
+		if bt == pos {
+			return true
 		}
 	}
-	return defs
+	return false
 }

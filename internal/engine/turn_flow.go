@@ -207,7 +207,7 @@ func (tf *TurnFlow) executeMainAction(player *core.Player) *StepResult {
 		{ID: "roll", Label: "Roll Dice"},
 	}
 	for _, item := range usableItems {
-		def := item.Type.GetItemDefinition()
+		def := core.GetItemDefinition(item.Type)
 		options = append(options, event.Option{
 			ID:     item.ID,
 			Label:  def.Name,
@@ -226,7 +226,7 @@ func (tf *TurnFlow) executeMainAction(player *core.Player) *StepResult {
 func (tf *TurnFlow) getUsableItems(player *core.Player) []*core.Item {
 	var usable []*core.Item
 	for _, item := range player.Inventory {
-		def := item.Type.GetItemDefinition()
+		def := core.GetItemDefinition(item.Type)
 		// Items usable in BeforeTurn or AnyTime
 		if def.Phase == event.PhaseBeforeTurn || def.Phase == event.PhaseAnyTime {
 			usable = append(usable, item)

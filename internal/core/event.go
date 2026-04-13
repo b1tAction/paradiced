@@ -28,257 +28,58 @@ const (
 	EventTypeThunder      // Thunder: HP to 0
 )
 
-func (et EventType) String() string {
-	names := map[EventType]string{
-		EventTypeNone:        "None",
-		EventTypeHerb:        "Herb",
-		EventTypeMilkTea:     "MilkTea",
-		EventTypeRelic:       "Relic",
-		EventTypeDivineBless: "DivineBless",
-		EventTypeExchange:    "Exchange",
-		EventTypeHiddenBuff:  "HiddenBuff",
-		EventTypeTasteTest:   "TasteTest",
-		EventTypeMosquito:    "Mosquito",
-		EventTypeGhostHit:    "GhostHit",
-		EventTypeDogPoop:     "DogPoop",
-		EventTypeThief:       "Thief",
-		EventTypeCurseBuddha: "CurseBuddha",
-		EventTypeLostWay:     "LostWay",
-		EventTypeThunder:     "Thunder",
-	}
-	if name, ok := names[et]; ok {
-		return name
-	}
-	return "Unknown"
-}
-
+// IsValid checks if the Event type is valid.
 func (et EventType) IsValid() bool {
 	return et > EventTypeNone && et <= EventTypeThunder
 }
 
-// GetEvaluation returns the event's evaluation score.
-func (et EventType) GetEvaluation() Evaluation {
-	evalMap := map[EventType]Evaluation{
-		// Good events
-		EventTypeHerb:         EvaluationMildGood,  // Herb: mild good
-		EventTypeMilkTea:      EvaluationGood,      // MilkTea: good
-		EventTypeRelic:        EvaluationVeryGood,  // Relic: very good
-		EventTypeDivineBless:  EvaluationExcellent, // DivineBless: excellent
-
-		// Neutral events
-		EventTypeExchange:     EvaluationNeutral,  // Exchange: neutral
-		EventTypeHiddenBuff:   EvaluationGood,     // HiddenBuff: good
-		EventTypeTasteTest:    EvaluationMixed,    // TasteTest: mixed
-
-		// Bad events
-		EventTypeMosquito:     EvaluationMildBad,  // Mosquito: mild bad
-		EventTypeGhostHit:     EvaluationMildBad,  // GhostHit: mild bad
-		EventTypeDogPoop:      EvaluationMildBad,  // DogPoop: mild bad
-		EventTypeThief:        EvaluationBad,      // Thief: bad
-		EventTypeCurseBuddha:  EvaluationBad,      // CurseBuddha: bad
-		EventTypeLostWay:      EvaluationMildBad,  // LostWay: mild bad
-		EventTypeThunder:      EvaluationVeryBad,  // Thunder: very bad
-	}
-	if eval, ok := evalMap[et]; ok {
-		return eval
-	}
-	return EvaluationNeutral
-}
-
-// GetCategory returns the event's category (based on Evaluation).
-func (et EventType) GetCategory() string {
-	return et.GetEvaluation().GetCategory()
+// String returns the Event type name from GlobalRegistry.
+func (et EventType) String() string {
+	return GlobalRegistry.GetEventString(et)
 }
 
 // ========== Event Definition ==========
 
 type EventDefinition struct {
-	Type       EventType  `json:"type"`
-	Eval       Evaluation `json:"evaluation"`
-	Name       string     `json:"name"`
-	Desc       string     `json:"desc"`
-	HPChange   int        `json:"hp_change"`
-	LPChange   int        `json:"lp_change"`
-	BuffType   BuffType   `json:"buff_type"`
-	ItemAction string     `json:"item_action"`
+	Type          EventType     `json:"type"`
+	Eval          Evaluation    `json:"evaluation"`
+	EnglishName   string        `json:"english_name"` // English identifier (for String())
+	Name          string        `json:"name"`         // Chinese display name
+	Desc          string        `json:"desc"`
+	HPChange      int           `json:"hp_change"`
+	LPChange      int           `json:"lp_change"`
+	BuffType      BuffType      `json:"buff_type"`
+	SpecialEffect SpecialEffect `json:"special_effect"` // Special effect type
 }
 
-func (et EventType) GetEventDefinition() *EventDefinition {
-	eval := et.GetEvaluation()
-	definitions := map[EventType]*EventDefinition{
-		EventTypeHerb: {
-			Type:     EventTypeHerb,
-			Eval:     eval,
-			Name:     "采集到草药",
-			Desc:     "在路边发现了草药，恢复了体力",
-			HPChange: 1,
-		},
-		EventTypeMilkTea: {
-			Type:     EventTypeMilkTea,
-			Eval:     eval,
-			Name:     "捡到奶茶",
-			Desc:     "捡到了一杯奶茶，一口就吃到了猪猪欸",
-			LPChange: 1,
-		},
-		EventTypeRelic: {
-			Type:       EventTypeRelic,
-			Eval:       eval,
-			Name:       "捡到勇士的圣遗物",
-			Desc:       "发现了古老圣遗物，获得一次道具抽奖机会",
-			ItemAction: "draw",
-		},
-		EventTypeDivineBless: {
-			Type:     EventTypeDivineBless,
-			Eval:     eval,
-			Name:     "受到天使眷顾",
-			Desc:     "天使的祝福降临，获得神眷Buff",
-			BuffType: BuffTypeDivine,
-		},
-		EventTypeExchange: {
-			Type:  EventTypeExchange,
-			Eval:  eval,
-			Name:  "交换",
-			Desc:  "命运之手将你与另一位玩家交换位置",
-		},
-		EventTypeHiddenBuff: {
-			Type:     EventTypeHiddenBuff,
-			Eval:     eval,
-			Name:     "麻了",
-			Desc:     "身体麻木，获得隐匿Buff",
-			BuffType: BuffTypeHidden,
-		},
-		EventTypeTasteTest: {
-			Type:  EventTypeTasteTest,
-			Eval:  eval,
-			Name:  "这是什么？尝一口",
-			Desc:  "发现神秘物质，尝试后获得随机效果",
-		},
-		EventTypeMosquito: {
-			Type:     EventTypeMosquito,
-			Eval:     eval,
-			Name:     "被蚊虫叮咬",
-			Desc:     "丛林中的蚊虫叮咬了你",
-			HPChange: -1,
-		},
-		EventTypeGhostHit: {
-			Type:     EventTypeGhostHit,
-			Eval:     eval,
-			Name:     "偶遇孤魂野鬼",
-			Desc:     "被野鬼打了一闷棍",
-			HPChange: -1,
-		},
-		EventTypeDogPoop: {
-			Type:     EventTypeDogPoop,
-			Eval:     eval,
-			Name:     "踩到了狗屎",
-			Desc:     "运气糟糕的一天",
-			LPChange: -1,
-		},
-		EventTypeThief: {
-			Type:       EventTypeThief,
-			Eval:       eval,
-			Name:       "啊？！贼",
-			Desc:       "遭遇盗贼，随机丢失一个道具",
-			ItemAction: "lose",
-		},
-		EventTypeCurseBuddha: {
-			Type:     EventTypeCurseBuddha,
-			Eval:     eval,
-			Name:     "虔诚拜三拜",
-			Desc:     "拜路边的野佛，获得诅咒Buff",
-			BuffType: BuffTypeCurse,
-		},
-		EventTypeLostWay: {
-			Type:     EventTypeLostWay,
-			Eval:     eval,
-			Name:     "迷途",
-			Desc:     "迷失方向，获得迷途Buff",
-			BuffType: BuffTypeLost,
-		},
-		EventTypeThunder: {
-			Type:     EventTypeThunder,
-			Eval:     eval,
-			Name:     "雷劫",
-			Desc:     "天雷降临，HP归零",
-			HPChange: -999,
-		},
-	}
-	if def, ok := definitions[et]; ok {
-		return def
-	}
-	return nil
+// ========== Global Registry Access Functions ==========
+
+// GetEventDefinition returns the Event definition from GlobalRegistry.
+func GetEventDefinition(et EventType) *EventDefinition {
+	return GlobalRegistry.GetEventDefinition(et)
 }
 
-// ========== Event Registry ==========
-
-type EventRegistry struct {
-	AllEvents     []EventType `json:"all_events"`
-	GoodEvents    []EventType `json:"good_events"`
-	NeutralEvents []EventType `json:"neutral_events"`
-	BadEvents     []EventType `json:"bad_events"`
+// GetEventString returns the Event name string from GlobalRegistry.
+func GetEventString(et EventType) string {
+	return GlobalRegistry.GetEventString(et)
 }
 
-func NewEventRegistry() *EventRegistry {
-	all := []EventType{
-		EventTypeHerb, EventTypeMilkTea, EventTypeRelic, EventTypeDivineBless,
-		EventTypeExchange, EventTypeHiddenBuff, EventTypeTasteTest,
-		EventTypeMosquito, EventTypeGhostHit, EventTypeDogPoop,
-		EventTypeThief, EventTypeCurseBuddha, EventTypeLostWay, EventTypeThunder,
-	}
-
-	var good, neutral, bad []EventType
-	for _, et := range all {
-		eval := et.GetEvaluation()
-		if eval.IsGood() {
-			good = append(good, et)
-		} else if eval.IsNeutral() {
-			neutral = append(neutral, et)
-		} else {
-			bad = append(bad, et)
-		}
-	}
-
-	return &EventRegistry{
-		AllEvents:     all,
-		GoodEvents:    good,
-		NeutralEvents: neutral,
-		BadEvents:     bad,
-	}
+// GetEventEvaluation returns the Event evaluation score from GlobalRegistry.
+func GetEventEvaluation(et EventType) Evaluation {
+	return GlobalRegistry.GetEventEvaluation(et)
 }
 
-// GetEventsByEvaluationRange returns Events within the specified Evaluation range.
-func (er *EventRegistry) GetEventsByEvaluationRange(minEval, maxEval Evaluation) []EventType {
-	var result []EventType
-	for _, et := range er.AllEvents {
-		eval := et.GetEvaluation()
-		if eval >= minEval && eval <= maxEval {
-			result = append(result, et)
-		}
-	}
-	return result
+// GetAllEventTypes returns all registered Event types.
+func GetAllEventTypes() []EventType {
+	return GlobalRegistry.GetAllEventTypes()
 }
 
-// GetEventsByCategory returns Events by category.
-func (er *EventRegistry) GetEventsByCategory(category string) []EventType {
-	switch category {
-	case "Good":
-		return er.GoodEvents
-	case "Neutral":
-		return er.NeutralEvents
-	case "Bad":
-		return er.BadEvents
-	}
-	return er.AllEvents
+// GetEventTypesByCategory returns Event types by category.
+func GetEventTypesByCategory(category string) []EventType {
+	return GlobalRegistry.GetEventTypesByCategory(category)
 }
 
 // GetAllEventDefinitions returns all Event definitions.
-func (er *EventRegistry) GetAllEventDefinitions() []*EventDefinition {
-	defs := make([]*EventDefinition, 0, len(er.AllEvents))
-	for _, et := range er.AllEvents {
-		def := et.GetEventDefinition()
-		if def != nil {
-			defs = append(defs, def)
-		}
-	}
-	return defs
+func GetAllEventDefinitions() []*EventDefinition {
+	return GlobalRegistry.GetAllEventDefinitions()
 }

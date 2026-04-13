@@ -102,9 +102,9 @@ func TestIntegrationItemNeedConfirm(t *testing.T) {
 	if current == nil {
 		t.Fatal("Should have a current decision")
 	}
-	if current.Prompt != core.ItemTypeDiceUpgrade.GetItemDefinition().Desc {
+	if current.Prompt != core.GetItemDefinition(core.ItemTypeDiceUpgrade).Desc {
 		t.Errorf("Decision prompt = %s, expected %s",
-			current.Prompt, core.ItemTypeDiceUpgrade.GetItemDefinition().Desc)
+			current.Prompt, core.GetItemDefinition(core.ItemTypeDiceUpgrade).Desc)
 	}
 
 	// 用户选择使用
@@ -223,7 +223,7 @@ func TestIntegrationZhuQueFactionPassive(t *testing.T) {
 
 	// 离火现在使用 BeforeTurn，需要订阅 EventBus
 	fireBuff := player.GetBuff(core.BuffTypeFire)
-	def := core.BuffTypeFire.GetBuffDefinition()
+	def := core.GetBuffDefinition(core.BuffTypeFire)
 	for _, phase := range def.GetPhases() {
 		if phase.NeedsSubscription() && len(fireBuff.SubscriptionIDs) == 0 {
 			t.Error("Fire buff (BeforeTurn) should have subscription IDs")
@@ -245,7 +245,7 @@ func TestIntegrationAnyTimeItem(t *testing.T) {
 	game.SubscribeItem(player, item)
 
 	// AnyTime 道具不订阅 EventBus
-	def := core.ItemTypeReverseClock.GetItemDefinition()
+	def := core.GetItemDefinition(core.ItemTypeReverseClock)
 	if def.Phase.NeedsSubscription() {
 		t.Error("ReverseClock (AnyTime) should not need subscription")
 	}
@@ -359,7 +359,7 @@ func TestIntegrationMultiPhaseBuffSubscription(t *testing.T) {
 	game.ApplyBuffToPlayer(player, buff)
 
 	// 验证订阅数量
-	def := core.BuffTypeCurse.GetBuffDefinition()
+	def := core.GetBuffDefinition(core.BuffTypeCurse)
 	expectedSubs := 0
 	for _, phase := range def.GetPhases() {
 		if phase.NeedsSubscription() {

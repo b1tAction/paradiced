@@ -48,59 +48,59 @@ func TestEventTypeIsValid(t *testing.T) {
 }
 
 func TestEventTypeGetEvaluation(t *testing.T) {
-	// 良性事件
+	// Good events
 	goodTests := []struct {
 		et       EventType
 		expected Evaluation
 	}{
-		{EventTypeHerb, EvaluationMildGood},    // 70
-		{EventTypeMilkTea, EvaluationGood},     // 80
-		{EventTypeRelic, EvaluationVeryGood},  // 90
-		{EventTypeDivineBless, EvaluationExcellent}, // 100
+		{EventTypeHerb, EvaluationMildGood},
+		{EventTypeMilkTea, EvaluationGood},
+		{EventTypeRelic, EvaluationVeryGood},
+		{EventTypeDivineBless, EvaluationExcellent},
 	}
 	for _, tt := range goodTests {
-		result := tt.et.GetEvaluation()
+		result := GetEventEvaluation(tt.et)
 		if result != tt.expected {
-			t.Errorf("EventType(%s).GetEvaluation() = %d, expected %d", tt.et.String(), result, tt.expected)
+			t.Errorf("GetEventEvaluation(%s) = %d, expected %d", tt.et.String(), result, tt.expected)
 		}
 		if !result.IsGood() {
 			t.Errorf("EventType(%s) evaluation should be Good", tt.et.String())
 		}
 	}
 
-	// 中性事件
+	// Neutral events
 	neutralTests := []struct {
 		et       EventType
 		expected Evaluation
 	}{
-		{EventTypeExchange, EvaluationNeutral}, // 50
-		{EventTypeHiddenBuff, EvaluationGood},   // 80 (虽然是中性分类，但效果正面)
-		{EventTypeTasteTest, EvaluationMixed},  // 55
+		{EventTypeExchange, EvaluationNeutral},
+		{EventTypeHiddenBuff, EvaluationGood},
+		{EventTypeTasteTest, EvaluationMixed},
 	}
 	for _, tt := range neutralTests {
-		result := tt.et.GetEvaluation()
+		result := GetEventEvaluation(tt.et)
 		if result != tt.expected {
-			t.Errorf("EventType(%s).GetEvaluation() = %d, expected %d", tt.et.String(), result, tt.expected)
+			t.Errorf("GetEventEvaluation(%s) = %d, expected %d", tt.et.String(), result, tt.expected)
 		}
 	}
 
-	// 恶性事件
+	// Bad events
 	badTests := []struct {
 		et       EventType
 		expected Evaluation
 	}{
-		{EventTypeMosquito, EvaluationMildBad},    // 35
-		{EventTypeGhostHit, EvaluationMildBad},    // 35
-		{EventTypeDogPoop, EvaluationMildBad},     // 35
-		{EventTypeThief, EvaluationBad},           // 25
-		{EventTypeCurseBuddha, EvaluationBad},     // 25
-		{EventTypeLostWay, EvaluationMildBad},     // 35
-		{EventTypeThunder, EvaluationVeryBad},     // 10
+		{EventTypeMosquito, EvaluationMildBad},
+		{EventTypeGhostHit, EvaluationMildBad},
+		{EventTypeDogPoop, EvaluationMildBad},
+		{EventTypeThief, EvaluationBad},
+		{EventTypeCurseBuddha, EvaluationBad},
+		{EventTypeLostWay, EvaluationMildBad},
+		{EventTypeThunder, EvaluationVeryBad},
 	}
 	for _, tt := range badTests {
-		result := tt.et.GetEvaluation()
+		result := GetEventEvaluation(tt.et)
 		if result != tt.expected {
-			t.Errorf("EventType(%s).GetEvaluation() = %d, expected %d", tt.et.String(), result, tt.expected)
+			t.Errorf("GetEventEvaluation(%s) = %d, expected %d", tt.et.String(), result, tt.expected)
 		}
 		if !result.IsBad() {
 			t.Errorf("EventType(%s) evaluation should be Bad", tt.et.String())
@@ -108,29 +108,9 @@ func TestEventTypeGetEvaluation(t *testing.T) {
 	}
 }
 
-func TestEventTypeGetCategory(t *testing.T) {
-	tests := []struct {
-		et       EventType
-		expected string
-	}{
-		{EventTypeHerb, "Good"},
-		{EventTypeMilkTea, "Good"},
-		{EventTypeExchange, "Neutral"},
-		{EventTypeMosquito, "Bad"},
-		{EventTypeThunder, "Bad"},
-	}
-
-	for _, tt := range tests {
-		result := tt.et.GetCategory()
-		if result != tt.expected {
-			t.Errorf("EventType(%s).GetCategory() = %s, expected %s", tt.et.String(), result, tt.expected)
-		}
-	}
-}
-
 func TestEventTypeGetEventDefinition(t *testing.T) {
-	// 测试良性事件定义
-	def := EventTypeHerb.GetEventDefinition()
+	// Test good event definition
+	def := GetEventDefinition(EventTypeHerb)
 	if def == nil {
 		t.Fatal("EventTypeHerb should have definition")
 	}
@@ -144,8 +124,8 @@ func TestEventTypeGetEventDefinition(t *testing.T) {
 		t.Errorf("def.HPChange = %d, expected 1", def.HPChange)
 	}
 
-	// 测试恶性事件定义
-	def = EventTypeThunder.GetEventDefinition()
+	// Test bad event definition
+	def = GetEventDefinition(EventTypeThunder)
 	if def == nil {
 		t.Fatal("EventTypeThunder should have definition")
 	}
@@ -159,8 +139,8 @@ func TestEventTypeGetEventDefinition(t *testing.T) {
 		t.Errorf("def.HPChange = %d, expected -999 (HP归零)", def.HPChange)
 	}
 
-	// 测试Buff类事件
-	def = EventTypeDivineBless.GetEventDefinition()
+	// Test Buff-giving event
+	def = GetEventDefinition(EventTypeDivineBless)
 	if def == nil {
 		t.Fatal("EventTypeDivineBless should have definition")
 	}
@@ -168,131 +148,103 @@ func TestEventTypeGetEventDefinition(t *testing.T) {
 		t.Errorf("def.BuffType = %d, expected Divine", def.BuffType)
 	}
 
-	// 测试道具类事件
-	def = EventTypeRelic.GetEventDefinition()
+	// Test item-giving event
+	def = GetEventDefinition(EventTypeRelic)
 	if def == nil {
 		t.Fatal("EventTypeRelic should have definition")
 	}
-	if def.ItemAction != "draw" {
-		t.Errorf("def.ItemAction = %s, expected draw", def.ItemAction)
+	if def.SpecialEffect != SpecialDrawItem {
+		t.Errorf("def.SpecialEffect = %d, expected SpecialDrawItem", def.SpecialEffect)
 	}
 
-	// 测试未知事件
-	def = EventType(999).GetEventDefinition()
+	// Test unknown event
+	def = GetEventDefinition(EventType(999))
 	if def != nil {
 		t.Error("unknown EventType should return nil definition")
 	}
 }
 
 func TestEventDefinitionEvaluationConsistency(t *testing.T) {
-	// 验证所有事件定义的 Eval 与 GetEvaluation 一致
-	registry := NewEventRegistry()
-	for _, et := range registry.AllEvents {
-		def := et.GetEventDefinition()
+	// Verify all event definitions have consistent Evaluation
+	for _, et := range GetAllEventTypes() {
+		def := GetEventDefinition(et)
 		if def == nil {
 			t.Errorf("EventType(%s) has no definition", et.String())
 			continue
 		}
-		eval := et.GetEvaluation()
+		eval := GetEventEvaluation(et)
 		if def.Eval != eval {
-			t.Errorf("EventType(%s) definition.Eval(%d) != GetEvaluation(%d)", et.String(), def.Eval, eval)
+			t.Errorf("EventType(%s) definition.Eval(%d) != GetEventEvaluation(%d)", et.String(), def.Eval, eval)
 		}
 	}
 }
 
-// ========== EventRegistry Tests ==========
+// ========== Registry Tests ==========
 
-func TestNewEventRegistry(t *testing.T) {
-	registry := NewEventRegistry()
-	if registry == nil {
-		t.Fatal("NewEventRegistry should not return nil")
-	}
-	if len(registry.AllEvents) != 14 {
-		t.Errorf("AllEvents count = %d, expected 14", len(registry.AllEvents))
-	}
-
-	// 验证按 Evaluation 分类后的数量
-	goodCount := len(registry.GoodEvents)
-	neutralCount := len(registry.NeutralEvents)
-	badCount := len(registry.BadEvents)
-
-	if goodCount+neutralCount+badCount != 14 {
-		t.Errorf("category sum = %d, expected 14", goodCount+neutralCount+badCount)
-	}
-
-	// 验证良性事件数量（5个：Herb, MilkTea, Relic, DivineBless, HiddenBuff）
-	if goodCount != 5 {
-		t.Errorf("GoodEvents count = %d, expected 5", goodCount)
-	}
-
-	// 验证恶性事件数量（7个）
-	if badCount != 7 {
-		t.Errorf("BadEvents count = %d, expected 7", badCount)
+func TestGlobalRegistryEventTypes(t *testing.T) {
+	allEvents := GetAllEventTypes()
+	if len(allEvents) != 14 {
+		t.Errorf("AllEventTypes count = %d, expected 14", len(allEvents))
 	}
 }
 
-func TestEventRegistryGetEventsByEvaluationRange(t *testing.T) {
-	registry := NewEventRegistry()
-
-	// 获取极良事件（90~100）
-	excellentEvents := registry.GetEventsByEvaluationRange(90, 100)
+func TestGetEventTypesByEvaluationRange(t *testing.T) {
+	// Get excellent events (90~100)
+	excellentEvents := GlobalRegistry.GetEventTypesByEvaluationRange(90, 100)
 	if len(excellentEvents) != 2 {
 		t.Errorf("excellent events count = %d, expected 2 (Relic+DivineBless)", len(excellentEvents))
 	}
 
-	// 获取良性事件（66~100，包含 HiddenBuff）
-	goodEvents := registry.GetEventsByEvaluationRange(66, 100)
+	// Get good events (66~100, includes HiddenBuff)
+	goodEvents := GlobalRegistry.GetEventTypesByEvaluationRange(66, 100)
 	if len(goodEvents) != 5 {
 		t.Errorf("good events count = %d, expected 5 (Herb+MilkTea+Relic+DivineBless+HiddenBuff)", len(goodEvents))
 	}
 
-	// 获取轻恶事件（30~40）
-	mildBadEvents := registry.GetEventsByEvaluationRange(30, 40)
+	// Get mild bad events (30~40)
+	mildBadEvents := GlobalRegistry.GetEventTypesByEvaluationRange(30, 40)
 	if len(mildBadEvents) != 4 {
 		t.Errorf("mild bad events count = %d, expected 4 (Mosquito+GhostHit+DogPoop+LostWay)", len(mildBadEvents))
 	}
 
-	// 获取极恶事件（0~15）
-	veryBadEvents := registry.GetEventsByEvaluationRange(0, 15)
+	// Get very bad events (0~15)
+	veryBadEvents := GlobalRegistry.GetEventTypesByEvaluationRange(0, 15)
 	if len(veryBadEvents) != 1 {
 		t.Errorf("very bad events count = %d, expected 1 (Thunder)", len(veryBadEvents))
 	}
 }
 
-func TestEventRegistryGetEventsByCategory(t *testing.T) {
-	registry := NewEventRegistry()
-
-	good := registry.GetEventsByCategory("Good")
+func TestGetEventTypesByCategory(t *testing.T) {
+	good := GetEventTypesByCategory("Good")
 	if len(good) != 5 {
 		t.Errorf("Good events count = %d, expected 5", len(good))
 	}
 
-	neutral := registry.GetEventsByCategory("Neutral")
-	// 只有 Exchange(50) 和 TasteTest(55) 是 Neutral
+	neutral := GetEventTypesByCategory("Neutral")
+	// Only Exchange(50) and TasteTest(55) are Neutral
 	if len(neutral) != 2 {
 		t.Errorf("Neutral events count = %d, expected 2", len(neutral))
 	}
 
-	bad := registry.GetEventsByCategory("Bad")
+	bad := GetEventTypesByCategory("Bad")
 	if len(bad) != 7 {
 		t.Errorf("Bad events count = %d, expected 7", len(bad))
 	}
 
-	all := registry.GetEventsByCategory("Unknown")
+	all := GetEventTypesByCategory("Unknown")
 	if len(all) != 14 {
 		t.Errorf("unknown category should return all events, got %d", len(all))
 	}
 }
 
-func TestEventRegistryGetAllEventDefinitions(t *testing.T) {
-	registry := NewEventRegistry()
-	defs := registry.GetAllEventDefinitions()
+func TestGetAllEventDefinitions(t *testing.T) {
+	defs := GetAllEventDefinitions()
 
 	if len(defs) != 14 {
 		t.Errorf("definitions count = %d, expected 14", len(defs))
 	}
 
-	// 验证每个定义都有有效的 Evaluation
+	// Verify each definition has valid Evaluation
 	for _, def := range defs {
 		if !def.Eval.IsValid() {
 			t.Errorf("EventDefinition for %s has invalid Evaluation %d", def.Name, def.Eval)
@@ -301,12 +253,10 @@ func TestEventRegistryGetAllEventDefinitions(t *testing.T) {
 }
 
 func TestEventRegistryEvaluationDistribution(t *testing.T) {
-	registry := NewEventRegistry()
-
-	// 统计各评分范围的事件数量
+	// Count events by evaluation range
 	var bad, neutral, good int
-	for _, et := range registry.AllEvents {
-		eval := et.GetEvaluation()
+	for _, et := range GetAllEventTypes() {
+		eval := GetEventEvaluation(et)
 		if eval <= EvaluationBadThreshold {
 			bad++
 		} else if eval <= EvaluationNeutralThreshold {
@@ -316,18 +266,19 @@ func TestEventRegistryEvaluationDistribution(t *testing.T) {
 		}
 	}
 
-	// 验证分布
-	// 良性：Herb(70), MilkTea(80), Relic(90), DivineBless(100) + HiddenBuff(80) = 5
-	// 中性：Exchange(50), TasteTest(55) = 2
-	// 恶性：7个
+	// Verify distribution
+	// Good: Herb(70), MilkTea(80), Relic(90), DivineBless(100), HiddenBuff(80) = 5
+	// Neutral: Exchange(50), TasteTest(55) = 2
+	// Bad: 7
 	t.Logf("Distribution: Bad=%d, Neutral=%d, Good=%d", bad, neutral, good)
 
-	// 由于 HiddenBuff 被分类为 Good，所以 Registry 分类可能不同
-	// 这里验证 Registry 的自动分类是正确的
-	if len(registry.BadEvents) != bad {
-		t.Errorf("BadEvents count mismatch: registry=%d, calculated=%d", len(registry.BadEvents), bad)
+	// Verify Registry auto-classification is correct
+	badEvents := GetEventTypesByCategory("Bad")
+	if len(badEvents) != bad {
+		t.Errorf("BadEvents count mismatch: registry=%d, calculated=%d", len(badEvents), bad)
 	}
-	if len(registry.GoodEvents) != good {
-		t.Errorf("GoodEvents count mismatch: registry=%d, calculated=%d", len(registry.GoodEvents), good)
+	goodEvents := GetEventTypesByCategory("Good")
+	if len(goodEvents) != good {
+		t.Errorf("GoodEvents count mismatch: registry=%d, calculated=%d", len(goodEvents), good)
 	}
 }

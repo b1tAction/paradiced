@@ -63,7 +63,7 @@ func TestStateMachineTriggerPhaseWithSubscription(t *testing.T) {
 	sm := NewStateMachine(game)
 
 	// 触发道具订阅的 Phase
-	def := core.ItemTypeDiceUpgrade.GetItemDefinition()
+	def := core.GetItemDefinition(core.ItemTypeDiceUpgrade)
 	decisions := sm.TriggerPhase(def.Phase, player)
 
 	// DiceUpgrade 需要确认，所以应该返回一个 Decision
@@ -130,7 +130,7 @@ func TestStateMachineTriggerPhaseAndWaitWithSubscription(t *testing.T) {
 	sm := NewStateMachine(game)
 
 	// 有订阅时，返回 true（需要等待）
-	def := core.ItemTypeDiceUpgrade.GetItemDefinition()
+	def := core.GetItemDefinition(core.ItemTypeDiceUpgrade)
 	needsWait := sm.TriggerPhaseAndWait(def.Phase, player)
 
 	if !needsWait {

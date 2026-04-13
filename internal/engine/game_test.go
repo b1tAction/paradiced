@@ -213,7 +213,7 @@ func TestGameSubscribeBuff(t *testing.T) {
 	game.SubscribeBuff(player, buff)
 
 	// 验证订阅已创建
-	def := core.BuffTypeCurse.GetBuffDefinition()
+	def := core.GetBuffDefinition(core.BuffTypeCurse)
 	for _, phase := range def.GetPhases() {
 		if phase.NeedsSubscription() {
 			if game.Bus.GetSubscriptionCount() != 1 {
@@ -236,7 +236,7 @@ func TestGameSubscribePassiveBuff(t *testing.T) {
 	game.SubscribeBuff(player, buff)
 
 	// 离火现在需要订阅 BeforeTurn（每4回合检查）
-	def := core.BuffTypeFire.GetBuffDefinition()
+	def := core.GetBuffDefinition(core.BuffTypeFire)
 	for _, phase := range def.GetPhases() {
 		if phase.NeedsSubscription() {
 			if len(buff.SubscriptionIDs) == 0 {
@@ -284,7 +284,7 @@ func TestGameSubscribeBuffByPlayerAdd(t *testing.T) {
 	}
 
 	// 离火现在使用 BeforeTurn，需要订阅
-	def := core.BuffTypeFire.GetBuffDefinition()
+	def := core.GetBuffDefinition(core.BuffTypeFire)
 	for _, phase := range def.GetPhases() {
 		if phase.NeedsSubscription() {
 			// BeforeTurn 需要订阅
@@ -307,7 +307,7 @@ func TestGameSubscribeItem(t *testing.T) {
 	game.SubscribeItem(player, item)
 
 	// 验证订阅已创建
-	def := core.ItemTypeDiceUpgrade.GetItemDefinition()
+	def := core.GetItemDefinition(core.ItemTypeDiceUpgrade)
 	if def.Phase.NeedsSubscription() {
 		if game.Bus.GetSubscriptionCount() != 1 {
 			t.Errorf("Subscription count = %d, expected 1", game.Bus.GetSubscriptionCount())
@@ -328,7 +328,7 @@ func TestGameSubscribeAnyTimeItem(t *testing.T) {
 	game.SubscribeItem(player, item)
 
 	// AnyTime 道具不需要订阅（主动触发）
-	def := core.ItemTypeReverseClock.GetItemDefinition()
+	def := core.GetItemDefinition(core.ItemTypeReverseClock)
 	if def.Phase == event.PhaseAnyTime {
 		if item.SubscriptionID != "" {
 			t.Error("AnyTime Item should not have SubscriptionID")
@@ -410,7 +410,7 @@ func TestGameMixedSubscriptions(t *testing.T) {
 func TestGameCreateBuffDecision(t *testing.T) {
 	game := NewGame("game-001")
 	buff := core.NewBuff(core.BuffTypeCurse, 3)
-	def := core.BuffTypeCurse.GetBuffDefinition()
+	def := core.GetBuffDefinition(core.BuffTypeCurse)
 
 	decision := game.createBuffDecision(buff, def)
 
@@ -429,7 +429,7 @@ func TestGameCreateBuffDecision(t *testing.T) {
 func TestGameCreateItemDecision(t *testing.T) {
 	game := NewGame("game-001")
 	item := core.NewItem(core.ItemTypeDiceUpgrade, "item-001")
-	def := core.ItemTypeDiceUpgrade.GetItemDefinition()
+	def := core.GetItemDefinition(core.ItemTypeDiceUpgrade)
 
 	decision := game.createItemDecision(item, def)
 
