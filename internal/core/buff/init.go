@@ -2,6 +2,7 @@ package buff
 
 import (
 	"github.com/b1tAction/Fated/internal/core/types"
+	"github.com/b1tAction/Fated/pkg/action"
 	"github.com/b1tAction/Fated/pkg/event"
 )
 
@@ -136,16 +137,17 @@ func registerAllBuffs() {
 
 // handleZhuQueFire is the custom handler for ZhuQue Fire buff.
 // Effect: LP+1 every 4 turns.
-func handleZhuQueFire(phase event.Phase, ctx *event.Context) {
+// Returns nil (no Action) - modifies LP directly via Player interface.
+func handleZhuQueFire(phase event.Phase, ctx *event.Context) action.Action {
 	// Get Player interface from Context
 	player, ok := ctx.Player.(Player)
 	if !ok {
-		return
+		return nil
 	}
 
 	// Only execute in BeforeTurn Phase
 	if phase != event.PhaseBeforeTurn {
-		return
+		return nil
 	}
 
 	// Increment Fire counter (using Metadata method)
@@ -156,6 +158,8 @@ func handleZhuQueFire(phase event.Phase, ctx *event.Context) {
 		player.ModifyLP(1)
 		player.SetFireCounter(0)
 	}
+
+	return nil // No Action returned - uses direct modification
 }
 
 // Player interface defines the methods needed for Buff handlers.

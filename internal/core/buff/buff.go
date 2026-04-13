@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/b1tAction/Fated/internal/core/types"
+	"github.com/b1tAction/Fated/pkg/action"
 	"github.com/b1tAction/Fated/pkg/event"
 )
 
@@ -118,13 +119,15 @@ func (def *BuffDefinition) HasPhase(phase event.Phase) bool {
 
 // ========== Buff Registry ==========
 
-// BuffHandler is a highly customized Buff effect handler function.
-type BuffHandler func(phase event.Phase, ctx *event.Context)
+// EffectHandler is a handler function for Buff/Item/Event/Faction effects.
+// Returns an Action to execute, or nil if only modifying current action.
+// Unified signature for all effect sources.
+type EffectHandler func(phase event.Phase, ctx *event.Context) action.Action
 
 // BuffRegistry is the registry for Buff definitions.
 type BuffRegistry struct {
 	defs     map[BuffType]*BuffDefinition
-	handlers map[BuffType]BuffHandler
+	handlers map[BuffType]EffectHandler
 	strings  map[BuffType]string // English identifier
 	names    map[BuffType]string // Chinese name
 	evals    map[BuffType]types.Evaluation
@@ -139,7 +142,7 @@ type BuffRegistry struct {
 func NewBuffRegistry() *BuffRegistry {
 	return &BuffRegistry{
 		defs:         make(map[BuffType]*BuffDefinition),
-		handlers:     make(map[BuffType]BuffHandler),
+		handlers:     make(map[BuffType]EffectHandler),
 		strings:      make(map[BuffType]string),
 		names:        make(map[BuffType]string),
 		evals:        make(map[BuffType]types.Evaluation),
@@ -150,7 +153,7 @@ func NewBuffRegistry() *BuffRegistry {
 }
 
 // RegisterBuff registers a Buff definition with optional handler.
-func (r *BuffRegistry) RegisterBuff(def *BuffDefinition, handler BuffHandler) {
+func (r *BuffRegistry) RegisterBuff(def *BuffDefinition, handler EffectHandler) {
 	if def == nil || def.Type == BuffTypeNone {
 		return
 	}
@@ -207,7 +210,7 @@ func (r *BuffRegistry) GetBuffEvaluation(bt BuffType) types.Evaluation {
 }
 
 // GetBuffHandler returns the Buff's custom handler (nil if none).
-func (r *BuffRegistry) GetBuffHandler(bt BuffType) BuffHandler {
+func (r *BuffRegistry) GetBuffHandler(bt BuffType) EffectHandler {
 	if handler, ok := r.handlers[bt]; ok {
 		return handler
 	}
@@ -280,7 +283,7 @@ func GetBuffEvaluation(bt BuffType) types.Evaluation {
 }
 
 // GetBuffHandler returns the Buff's custom handler from GlobalBuffRegistry.
-func GetBuffHandler(bt BuffType) BuffHandler {
+func GetBuffHandler(bt BuffType) EffectHandler {
 	return GlobalBuffRegistry.GetBuffHandler(bt)
 }
 

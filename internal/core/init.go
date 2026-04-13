@@ -80,8 +80,8 @@ var NewBuff = buff.NewBuff
 // BuffDefinition from buff package
 type BuffDefinition = buff.BuffDefinition
 
-// BuffHandler from buff package
-type BuffHandler = buff.BuffHandler
+// EffectHandler from buff package
+type EffectHandler = buff.EffectHandler
 
 // Buff registry access functions from buff package
 var (
