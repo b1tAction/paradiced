@@ -434,7 +434,56 @@ func TestContextWithData(t *testing.T) {
 	ctx := NewContext(nil)
 	ctx.WithData(100) // 例如伤害值
 
-	if ctx.Data != 100 {
-		t.Errorf("Data = %v, expected 100", ctx.Data)
+	// 使用 GetData() 向后兼容方法
+	if ctx.GetData() != 100 {
+		t.Errorf("GetData() = %v, expected 100", ctx.GetData())
+	}
+
+	// 使用 GetInt() 类型安全方法
+	if ctx.GetInt("data") != 100 {
+		t.Errorf("GetInt(\"data\") = %d, expected 100", ctx.GetInt("data"))
+	}
+}
+
+func TestContextMetadata(t *testing.T) {
+	ctx := NewContext(nil)
+
+	// 测试直接使用 Metadata 方法
+	ctx.SetInt("damage", 50)
+	ctx.SetString("element", "fire")
+	ctx.SetBool("blocked", true)
+
+	if ctx.GetInt("damage") != 50 {
+		t.Errorf("GetInt(\"damage\") = %d, expected 50", ctx.GetInt("damage"))
+	}
+	if ctx.GetString("element") != "fire" {
+		t.Errorf("GetString(\"element\") = %s, expected fire", ctx.GetString("element"))
+	}
+	if !ctx.GetBool("blocked") {
+		t.Error("GetBool(\"blocked\") should be true")
+	}
+
+	// 测试链式调用
+	ctx.SetInt("count", 1).SetString("name", "test")
+	if ctx.GetInt("count") != 1 {
+		t.Errorf("GetInt(\"count\") = %d, expected 1", ctx.GetInt("count"))
+	}
+}
+
+func TestContextClone(t *testing.T) {
+	ctx := NewContext(&TestPlayer{UserID: "player-001"})
+	ctx.SetInt("damage", 100)
+	ctx.SetString("source", "fire")
+
+	cloned := ctx.Clone()
+
+	// 修改克隆不影响原版
+	cloned.SetInt("damage", 50)
+
+	if ctx.GetInt("damage") != 100 {
+		t.Errorf("original damage = %d, expected 100", ctx.GetInt("damage"))
+	}
+	if cloned.GetInt("damage") != 50 {
+		t.Errorf("cloned damage = %d, expected 50", cloned.GetInt("damage"))
 	}
 }
