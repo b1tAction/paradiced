@@ -5,16 +5,16 @@ import (
 	"errors"
 )
 
-// MapCell 定义单个地图格子的结构
+// MapCell defines single map cell structure.
 type MapCell struct {
-	Index     int      `json:"index"`     // 坐标序号（0~N）
-	CellType  CellType `json:"cell_type"` // 格子类型
-	IsBroken  bool     `json:"is_broken"` // 是否已被踩碎（仅对 Fragile 有效）
-	EventID   string   `json:"event_id"`  // 格子关联的事件ID（可选）
-	FogActive bool     `json:"fog_active"` // 迷雾是否已激活（仅对 Fog 有效）
+	Index     int      `json:"index"`      // Coordinate index (0~N)
+	CellType  CellType `json:"cell_type"`  // Cell type
+	IsBroken  bool     `json:"is_broken"`  // Whether broken (only for Fragile)
+	EventID   string   `json:"event_id"`   // Associated event ID (optional)
+	FogActive bool     `json:"fog_active"` // Whether fog activated (only for Fog)
 }
 
-// NewMapCell 创建新的地图格子
+// NewMapCell creates a new map cell.
 func NewMapCell(index int, cellType CellType) *MapCell {
 	return &MapCell{
 		Index:     index,
@@ -25,15 +25,15 @@ func NewMapCell(index int, cellType CellType) *MapCell {
 	}
 }
 
-// MapEngine 地图引擎，管理整个地图
+// MapEngine is the map engine, managing the entire map.
 type MapEngine struct {
-	Cells      []*MapCell `json:"cells"`      // 地图格子数组
-	Length     int        `json:"length"`     // 地图总长度
-	StartIndex int        `json:"start_index"` // 起点索引（默认0）
-	EndIndex   int        `json:"end_index"`   // 终点索引
+	Cells      []*MapCell `json:"cells"`       // Map cell array
+	Length     int        `json:"length"`      // Total map length
+	StartIndex int        `json:"start_index"` // Start index (default 0)
+	EndIndex   int        `json:"end_index"`   // End index
 }
 
-// NewMapEngine 创建新的地图引擎
+// NewMapEngine creates a new map engine.
 func NewMapEngine(length int) *MapEngine {
 	if length < 1 {
 		length = 1
@@ -50,8 +50,8 @@ func NewMapEngine(length int) *MapEngine {
 	}
 }
 
-// GenerateLinearMap 生成线性地图，可指定特定格子的类型
-// cellConfigs: map[index]cellType 用于指定特定位置的格子类型
+// GenerateLinearMap generates a linear map with specified cell types.
+// cellConfigs: map[index]cellType for specifying cell types at specific positions.
 func (m *MapEngine) GenerateLinearMap(cellConfigs map[int]CellType) error {
 	for i := 0; i < m.Length; i++ {
 		cellType := CellTypeNormal
@@ -66,7 +66,7 @@ func (m *MapEngine) GenerateLinearMap(cellConfigs map[int]CellType) error {
 	return nil
 }
 
-// GetCell 获取指定位置的格子
+// GetCell returns the cell at specified position.
 func (m *MapEngine) GetCell(index int) (*MapCell, error) {
 	if index < 0 || index >= m.Length {
 		return nil, errors.New("index out of bounds")
@@ -74,7 +74,7 @@ func (m *MapEngine) GetCell(index int) (*MapCell, error) {
 	return m.Cells[index], nil
 }
 
-// SetCellType 设置指定位置格子的类型
+// SetCellType sets cell type at specified position.
 func (m *MapEngine) SetCellType(index int, cellType CellType) error {
 	if index < 0 || index >= m.Length {
 		return errors.New("index out of bounds")
@@ -86,7 +86,7 @@ func (m *MapEngine) SetCellType(index int, cellType CellType) error {
 	return nil
 }
 
-// BreakFragile 破碎易碎格子
+// BreakFragile breaks a fragile cell.
 func (m *MapEngine) BreakFragile(index int) error {
 	cell, err := m.GetCell(index)
 	if err != nil {
@@ -99,7 +99,7 @@ func (m *MapEngine) BreakFragile(index int) error {
 	return nil
 }
 
-// ActivateFog 激活迷雾格子
+// ActivateFog activates a fog cell.
 func (m *MapEngine) ActivateFog(index int) error {
 	cell, err := m.GetCell(index)
 	if err != nil {
@@ -112,24 +112,24 @@ func (m *MapEngine) ActivateFog(index int) error {
 	return nil
 }
 
-// PathResult 移动路径计算结果
+// PathResult represents movement path calculation result.
 type PathResult struct {
-	StartIndex     int   `json:"start_index"`      // 起始位置
-	TargetIndex    int   `json:"target_index"`     // 目标位置（实际到达位置）
-	OriginalTarget int   `json:"original_target"`  // 原始目标位置（骰子步数计算）
-	Path           []int `json:"path"`             // 经过的格子索引列表
-	Interrupted    bool  `json:"interrupted"`      // 是否被中断 alias for FellDown, saved for other interrupt behavs
-	FellDown       bool  `json:"fell_down"`        // 是否掉落（最终落点为未碎fragile）
-	BrokenFragiles []int `json:"broken_fragiles"`  // 本次移动中碎裂的 Fragile 格子索引
-	ReachedEnd     bool  `json:"reached_end"`      // 是否到达终点
+	StartIndex     int   `json:"start_index"`      // Start position
+	TargetIndex    int   `json:"target_index"`     // Target position (actual arrival)
+	OriginalTarget int   `json:"original_target"`  // Original target (dice steps calculation)
+	Path           []int `json:"path"`             // List of passed cell indices
+	Interrupted    bool  `json:"interrupted"`      // Whether interrupted alias for FellDown, saved for other interrupt behavs
+	FellDown       bool  `json:"fell_down"`        // Whether fell (final landing on unbroken fragile)
+	BrokenFragiles []int `json:"broken_fragiles"`  // Indices of Fragile cells broken in this move
+	ReachedEnd     bool  `json:"reached_end"`      // Whether reached end point
 }
 
-// CalculatePath 计算移动路径
-// start: 走始位置，steps: 骰子步数
-// 返回实际移动路径，处理 Fragile 块的逻辑：
-// 1. 经过未碎 Fragile → Fragile 碎裂，玩家继续移动
-// 2. 最终落点恰好是未碎 Fragile → 碎裂 + 排落（中断）
-// 3. 最终落点恰好是已碎 Fragile → 无法到达，停在上一格
+// CalculatePath calculates movement path.
+// start: start position, steps: dice steps.
+// Returns actual movement path, handles Fragile cell logic:
+// 1. Passing unbroken Fragile → Fragile breaks, player continues moving
+// 2. Final landing on unbroken Fragile → breaks + falls (interrupted)
+// 3. Final landing on broken Fragile → cannot reach, stops at previous cell
 func (m *MapEngine) CalculatePath(start int, steps int) (*PathResult, error) {
 	if start < 0 || start >= m.Length {
 		return nil, errors.New("start index out of bounds")
@@ -141,7 +141,7 @@ func (m *MapEngine) CalculatePath(start int, steps int) (*PathResult, error) {
 	result := &PathResult{
 		StartIndex:     start,
 		TargetIndex:    start,
-		OriginalTarget: start + steps, // 原始目标（骰子步数计算，可能超过终点）
+		OriginalTarget: start + steps, // Original target (dice steps calculation, may exceed end)
 		Path:           []int{start},
 		Interrupted:    false,
 		FellDown:       false,
@@ -149,47 +149,47 @@ func (m *MapEngine) CalculatePath(start int, steps int) (*PathResult, error) {
 		ReachedEnd:     false,
 	}
 
-	// 计算目标位置（不超过地图终点）
+	// Calculate target position (not exceeding map end)
 	target := start + steps
 	if target >= m.Length {
 		target = m.Length - 1
 		result.ReachedEnd = true
 	}
 
-	// 逐格移动，记录路径并激活迷雾
+	// Move cell by cell, record path and activate fog
 	for i := start + 1; i <= target; i++ {
 		cell, err := m.GetCell(i)
 		if err != nil {
 			break
 		}
 
-		// 检查迷雾区域（经过时激活）
+		// Check fog area (activate when passing)
 		if cell.CellType == CellTypeFog {
 			cell.FogActive = true
 		}
 
-		// 记录路径
+		// Record path
 		result.Path = append(result.Path, i)
 	}
 
-	// 检查最终落点的 Fragile 状态
+	// Check Fragile status at final landing point
 	finalCell, err := m.GetCell(target)
 	if err != nil {
 		result.TargetIndex = start
 		return result, nil
 	}
 
-	// 处理最终落点的 Fragile 格子逻辑
+	// Handle Fragile cell logic at final landing point
 	if finalCell.CellType == CellTypeFragile {
 		if !finalCell.IsBroken {
-			// 最终落点是未碎的 Fragile → 碎裂 + 排落
+			// Final landing on unbroken Fragile → breaks + falls
 			finalCell.IsBroken = true
 			result.BrokenFragiles = append(result.BrokenFragiles, target)
 			result.TargetIndex = target
 			result.Interrupted = true
 			result.FellDown = true
 
-			// 检查路径中经过的其他 Fragile 格子（非最终落点），标记为碎裂
+			// Check other Fragile cells in path (not final landing), mark as broken
 			for i := start + 1; i < target; i++ {
 				cell, _ := m.GetCell(i)
 				if cell != nil && cell.CellType == CellTypeFragile && !cell.IsBroken {
@@ -200,16 +200,16 @@ func (m *MapEngine) CalculatePath(start int, steps int) (*PathResult, error) {
 
 			return result, nil
 		} else {
-			// 最终落点是已碎的 Fragile → 无法到达，停在上一格
+			// Final landing on broken Fragile → cannot reach, stop at previous cell
 			if target > start {
 				result.TargetIndex = target - 1
-				// 移除路径中的最后一个格子（无法到达）
+				// Remove last cell from path (cannot reach)
 				result.Path = result.Path[:len(result.Path)-1]
 			} else {
 				result.TargetIndex = start
 			}
 
-			// 检查路径中经过的其他 Fragile 格子（非最终落点），标记为碎裂
+			// Check other Fragile cells in path (not final landing), mark as broken
 			for i := start + 1; i < target; i++ {
 				cell, _ := m.GetCell(i)
 				if cell != nil && cell.CellType == CellTypeFragile && !cell.IsBroken {
@@ -222,10 +222,10 @@ func (m *MapEngine) CalculatePath(start int, steps int) (*PathResult, error) {
 		}
 	}
 
-	// 正常情况：最终落点不是 Fragile
+	// Normal case: final landing is not Fragile
 	result.TargetIndex = target
 
-	// 检查路径中经过的 Fragile 格子（非最终落点），标记为碎裂
+	// Check Fragile cells in path (not final landing), mark as broken
 	for i := start + 1; i <= target; i++ {
 		cell, _ := m.GetCell(i)
 		if cell != nil && cell.CellType == CellTypeFragile && !cell.IsBroken {
@@ -237,23 +237,23 @@ func (m *MapEngine) CalculatePath(start int, steps int) (*PathResult, error) {
 	return result, nil
 }
 
-// Export 导出地图数据为 JSON
+// Export exports map data as JSON.
 func (m *MapEngine) Export() ([]byte, error) {
 	return json.Marshal(m)
 }
 
-// Import 从 JSON 导入地图数据
+// Import imports map data from JSON.
 func (m *MapEngine) Import(data []byte) error {
 	return json.Unmarshal(data, m)
 }
 
-// LoadMap 从 JSON 加载地图（创建新的 MapEngine）
+// LoadMap loads map from JSON (creates new MapEngine).
 func LoadMap(data []byte) (*MapEngine, error) {
 	var engine MapEngine
 	if err := json.Unmarshal(data, &engine); err != nil {
 		return nil, err
 	}
-	// 验证数据有效性
+	// Validate data validity
 	if engine.Length < 1 {
 		return nil, errors.New("invalid map length")
 	}
@@ -263,7 +263,7 @@ func LoadMap(data []byte) (*MapEngine, error) {
 	return &engine, nil
 }
 
-// GetCellsByType 获取指定类型的所有格子
+// GetCellsByType returns all cells of specified type.
 func (m *MapEngine) GetCellsByType(cellType CellType) []*MapCell {
 	var result []*MapCell
 	for _, cell := range m.Cells {
@@ -274,7 +274,7 @@ func (m *MapEngine) GetCellsByType(cellType CellType) []*MapCell {
 	return result
 }
 
-// GetLastCheckpoint 获取指定位置之前最近的检查点
+// GetLastCheckpoint returns the last checkpoint before specified position.
 func (m *MapEngine) GetLastCheckpoint(position int) int {
 	lastCheckpoint := 0
 	for i := 0; i < position && i < m.Length; i++ {
@@ -285,7 +285,7 @@ func (m *MapEngine) GetLastCheckpoint(position int) int {
 	return lastCheckpoint
 }
 
-// Clone 克隆地图引擎
+// Clone clones the map engine.
 func (m *MapEngine) Clone() *MapEngine {
 	cells := make([]*MapCell, m.Length)
 	for i, cell := range m.Cells {
