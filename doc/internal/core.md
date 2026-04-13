@@ -12,12 +12,17 @@ internal/core 是《命运骰子》游戏的核心数据模块，负责数据结
 
 ```
 internal/core/
-├── evaluation.go     # 评分系统（0-100）
-├── faction.go        # 阵营定义（四神兽）
-├── buff.go           # Buff系统（类型/定义/注册表，支持多Phase）
-├── item.go           # Item系统（类型/定义/注册表）
-├── event.go          # Event系统（类型/定义/注册表）
-├── player.go         # Player结构（HP/LP/Buffs/Items）
+├── evaluation.go       # 评分系统（0-100）
+├── faction.go          # 阵营定义（四神兽）
+├── registry.go         # 统一注册表（单一数据源）
+├── special_effect.go   # 特殊效果枚举
+├── buff_init.go        # Buff 注册初始化
+├── event_init.go       # Event 注册初始化
+├── item_init.go        # Item 注册初始化
+├── buff.go             # Buff 枚举和实例结构
+├── item.go             # Item 枚举和实例结构
+├── event.go            # Event 枚举和定义结构
+├── player.go           # Player结构（HP/LP/Buffs/Items）
 ```
 
 ## 数据类型
@@ -80,26 +85,70 @@ func (p *Player) IncrementFireCounter() int
 
 ## Buff/Item/Event 定义
 
+### 统一注册表（GlobalRegistry）
+
+所有定义在包初始化时统一注册到 `GlobalRegistry`，实现单一数据源：
+
+```go
+// 在 buff_init.go 的 init() 中注册
+GlobalRegistry.RegisterBuff(&BuffDefinition{
+    Type:          BuffTypeFire,
+    Eval:          EvaluationGood,
+    EnglishName:   "Fire",           // 用于 String()
+    Name:          "离火",           // 中文显示名
+    Desc:          "朱雀阵营增益...",
+    Duration:      -1,
+    SpecialEffect: SpecialZhuQuePassive,  // 枚举替代字符串
+    Phases:        []event.Phase{event.PhaseBeforeTurn},
+    Priority:      10,
+}, handleZhuQueFire)  // Handler 在注册时传入
+```
+
+**注册表自动生成**：
+- `String()` 映射（使用 EnglishName）
+- `Evaluation` 映射
+- 分类列表（Good/Bad/Neutral）
+
 ### BuffDefinition（支持多Phase）
 
 ```go
 type BuffDefinition struct {
-    Type        BuffType
-    Name        string
-    Eval        Evaluation
-    Desc        string
-    Duration    int
-    HPPerTurn   int         // 每回合 HP 变化
-    LPPerTurn   int         // 每回合 LP 变化
-    Special     string      // 特殊效果标记
-    Phases      []event.Phase // 触发时机列表（支持多Phase）
-    Priority    int         // 执行优先级
-    NeedConfirm bool        // 是否需要用户确认（默认false）
+    Type          BuffType
+    Eval          Evaluation
+    EnglishName   string        // 英文标识符（用于 String()）
+    Name          string        // 中文名称（用于显示）
+    Desc          string
+    Duration      int
+    HPPerTurn     int           // 每回合 HP 变化
+    LPPerTurn     int           // 每回合 LP 变化
+    SpecialEffect SpecialEffect // 特殊效果枚举（替代字符串标记）
+    Phases        []event.Phase // 触发时机列表（支持多Phase）
+    Priority      int           // 执行优先级
+    NeedConfirm   bool          // 是否需要用户确认（默认false）
 }
 
 // 方法
 func (def *BuffDefinition) GetPhases() []event.Phase
 func (def *BuffDefinition) HasPhase(phase event.Phase) bool
+```
+
+### 访问方式（函数式API）
+
+```go
+// 获取定义
+def := core.GetBuffDefinition(buffType)
+
+// 获取字符串标识
+name := buffType.String()  // 返回 EnglishName
+
+// 获取评估分数
+eval := core.GetBuffEvaluation(buffType)
+
+// 获取自定义 Handler
+handler := core.GetBuffHandler(buffType)
+
+// 获取分类列表
+goodBuffs := core.GetBuffTypesByCategory("Good")
 ```
 
 ### Buff 实例（支持多订阅）
@@ -173,9 +222,35 @@ if config.Faction == FactionZhuQue {
 
 | 测试文件 | 覆盖内容 |
 |---------|---------|
-| buff_test.go | Evaluation、BuffType、Buff 实例、BuffDefinition、多Phase支持、SubscriptionIDs |
-| item_test.go | ItemType、Item 实例、ItemDefinition、ItemRegistry |
-| event_test.go | EventType、EventDefinition、EventRegistry |
+| registry.go | 注册表初始化、定义注册、查询方法、分类生成 |
+| special_effect.go | SpecialEffect 枚举、类型判断方法 |
+| buff_test.go | BuffType、Buff 实例、BuffDefinition、多Phase支持 |
+| item_test.go | ItemType、Item 实例、ItemDefinition |
+| event_test.go | EventType、EventDefinition |
 | player_test.go | Player 创建、数值逻辑、移动、Buff/道具管理、阵营特性 |
+
+## 新增内容流程
+
+添加新的 Buff/Event/Item 只需：
+
+1. 在枚举定义中添加常量
+2. 在对应 `_init.go` 文件中添加注册
+
+```go
+// buff.go - 添加枚举
+const (
+    ...
+    BuffTypeNewBuff  // 新Buff
+)
+
+// buff_init.go - 注册定义
+GlobalRegistry.RegisterBuff(&BuffDefinition{
+    Type:        BuffTypeNewBuff,
+    Eval:        EvaluationGood,
+    EnglishName: "NewBuff",
+    Name:        "新Buff",
+    ...
+}, nil)
+```
 
 测试覆盖率：~93% statements
