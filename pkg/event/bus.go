@@ -7,31 +7,31 @@ import (
 	"time"
 )
 
-// newID 生成唯一ID（包内共享）
+// newID generates a unique ID (package internal).
 func newID() string {
 	return fmt.Sprintf("%d-%d", time.Now().UnixNano(), time.Now().Nanosecond())
 }
 
-// Subscription 订阅信息
+// Subscription represents subscription information.
 type Subscription struct {
-	ID         string    `json:"id"`          // 订阅ID，用于取消
-	OwnerID    string    `json:"owner_id"`    // 玩家ID
-	SourceID   string    `json:"source_id"`   // Buff/道具ID
-	SourceType string    `json:"source_type"` // 来源类型 "buff" / "item"
-	Priority   int       `json:"priority"`    // 执行优先级（高先执行）
-	Decision   *Decision `json:"decision"`    // 预绑定的Decision
-	Phase      Phase     `json:"phase"`       // 订阅的Phase
+	ID         string    `json:"id"`          // Subscription ID, used for unsubscribe
+	OwnerID    string    `json:"owner_id"`    // Player ID
+	SourceID   string    `json:"source_id"`   // Buff/Item ID
+	SourceType string    `json:"source_type"` // Source type "buff" / "item"
+	Priority   int       `json:"priority"`    // Execution priority (higher executes first)
+	Decision   *Decision `json:"decision"`    // Pre-bound Decision
+	Phase      Phase     `json:"phase"`       // Subscribed Phase
 }
 
-// EventBus 事件总线
-// 每局游戏实例一个EventBus，管理Buff/道具的订阅和触发
+// EventBus is the event bus.
+// Each game instance has one EventBus, managing Buff/Item subscriptions and triggers.
 type EventBus struct {
 	subscriptions map[Phase][]*Subscription
 	mutex         sync.RWMutex
-	GameID        string `json:"game_id"` // 所属游戏实例ID
+	GameID        string `json:"game_id"` // Owning game instance ID
 }
 
-// NewEventBus 创建新的事件总线
+// NewEventBus creates a new event bus.
 func NewEventBus(gameID string) *EventBus {
 	return &EventBus{
 		subscriptions: make(map[Phase][]*Subscription),
@@ -39,8 +39,8 @@ func NewEventBus(gameID string) *EventBus {
 	}
 }
 
-// Subscribe 订阅某个Phase
-// 返回订阅ID，用于取消订阅
+// Subscribe subscribes to a Phase.
+// Returns subscription ID for unsubscribing.
 func (bus *EventBus) Subscribe(phase Phase, ownerID, sourceID, sourceType string, decision *Decision) string {
 	bus.mutex.Lock()
 	defer bus.mutex.Unlock()
@@ -60,7 +60,7 @@ func (bus *EventBus) Subscribe(phase Phase, ownerID, sourceID, sourceType string
 	return subID
 }
 
-// Unsubscribe 取消订阅
+// Unsubscribe unsubscribes by ID.
 func (bus *EventBus) Unsubscribe(subID string) bool {
 	bus.mutex.Lock()
 	defer bus.mutex.Unlock()
@@ -76,8 +76,8 @@ func (bus *EventBus) Unsubscribe(subID string) bool {
 	return false
 }
 
-// UnsubscribeBySource 按来源ID取消所有订阅
-// 用于移除Buff/道具时批量取消订阅
+// UnsubscribeBySource unsubscribes all subscriptions by source ID.
+// Used when removing Buff/Item to batch unsubscribe.
 func (bus *EventBus) UnsubscribeBySource(sourceID string) int {
 	bus.mutex.Lock()
 	defer bus.mutex.Unlock()
@@ -97,8 +97,8 @@ func (bus *EventBus) UnsubscribeBySource(sourceID string) int {
 	return count
 }
 
-// UnsubscribeByOwner 按玩家ID取消所有订阅
-// 用于玩家离开游戏时批量取消订阅
+// UnsubscribeByOwner unsubscribes all subscriptions by player ID.
+// Used when player leaves game to batch unsubscribe.
 func (bus *EventBus) UnsubscribeByOwner(ownerID string) int {
 	bus.mutex.Lock()
 	defer bus.mutex.Unlock()
@@ -118,14 +118,14 @@ func (bus *EventBus) UnsubscribeByOwner(ownerID string) int {
 	return count
 }
 
-// Publish 发布Phase事件
-// 返回需要用户确认的Decision列表
+// Publish publishes a Phase event.
+// Returns list of Decisions that need user confirmation.
 func (bus *EventBus) Publish(phase Phase, ownerID string, ctx *Context) []*Decision {
 	bus.mutex.RLock()
 	subs := bus.subscriptions[phase]
 	bus.mutex.RUnlock()
 
-	// 过滤出该玩家的订阅
+	// Filter subscriptions for this player
 	ownerSubs := make([]*Subscription, 0)
 	for _, sub := range subs {
 		if sub.OwnerID == ownerID {
@@ -133,19 +133,19 @@ func (bus *EventBus) Publish(phase Phase, ownerID string, ctx *Context) []*Decis
 		}
 	}
 
-	// 按Priority排序（高优先级先执行）
+	// Sort by Priority (higher priority executes first)
 	sort.Slice(ownerSubs, func(i, j int) bool {
 		return ownerSubs[i].Priority > ownerSubs[j].Priority
 	})
 
-	// 执行不需要确认的Decision，收集需要确认的
+	// Execute Decisions that don't need confirmation, collect those that do
 	decisions := make([]*Decision, 0)
 	for _, sub := range ownerSubs {
 		if sub.Decision.ShouldAsk() {
-			// 需要用户确认，加入等待列表
+			// Needs user confirmation, add to waiting list
 			decisions = append(decisions, sub.Decision)
 		} else {
-			// 不需要确认，直接执行默认选项
+			// No confirmation needed, execute default option directly
 			sub.Decision.Execute(sub.Decision.Default, ctx)
 		}
 	}
@@ -153,14 +153,14 @@ func (bus *EventBus) Publish(phase Phase, ownerID string, ctx *Context) []*Decis
 	return decisions
 }
 
-// GetSubscriptions 获取某个Phase的所有订阅（用于调试）
+// GetSubscriptions returns all subscriptions for a Phase (for debugging).
 func (bus *EventBus) GetSubscriptions(phase Phase) []*Subscription {
 	bus.mutex.RLock()
 	defer bus.mutex.RUnlock()
 	return bus.subscriptions[phase]
 }
 
-// GetSubscriptionCount 获取订阅总数（用于调试）
+// GetSubscriptionCount returns total subscription count (for debugging).
 func (bus *EventBus) GetSubscriptionCount() int {
 	bus.mutex.RLock()
 	defer bus.mutex.RUnlock()
@@ -171,7 +171,7 @@ func (bus *EventBus) GetSubscriptionCount() int {
 	return count
 }
 
-// Clear 清空所有订阅
+// Clear clears all subscriptions.
 func (bus *EventBus) Clear() {
 	bus.mutex.Lock()
 	defer bus.mutex.Unlock()
