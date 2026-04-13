@@ -1,0 +1,129 @@
+package action
+
+import (
+	"github.com/b1tAction/Fated/internal/core"
+	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/Fated/pkg/util"
+)
+
+// GameInterface defines the interface ActionContext needs from Game.
+// Avoids circular dependency by not importing engine package directly.
+type GameInterface interface {
+	// GetCurrentPlayer returns the current active player.
+	GetCurrentPlayer() *core.Player
+	// GetPlayer returns a player by ID.
+	GetPlayer(id string) *core.Player
+	// GetPlayers returns all players.
+	GetPlayers() []*core.Player
+}
+
+// PathResultInterface defines the interface for movement path results.
+// Used by MoveAction to get path calculation results.
+type PathResultInterface interface {
+	// GetTargetIndex returns the target position.
+	GetTargetIndex() int
+	// GetPath returns the path of visited cells.
+	GetPath() []int
+}
+
+// MapEngineInterface defines the minimal interface ActionContext needs for movement.
+// Avoids circular dependency by not importing hsm or gamemap packages.
+type MapEngineInterface interface {
+	// CalculatePath calculates movement path from start position with given steps.
+	CalculatePath(startPos int, steps int) (PathResultInterface, error)
+}
+
+// ActionContext provides context for action execution.
+// Contains references to game engine, event bus, and map engine for executing actions.
+// Embeds util.Metadata for extensible type-safe key-value storage.
+type ActionContext struct {
+	*util.Metadata // Embedded for extensible storage
+
+	Game        GameInterface      // Game instance (interface to avoid circular dependency)
+	EventBus    *event.EventBus    // EventBus for interception (nil if no interception)
+	MapEngine   MapEngineInterface // MapEngine for movement calculation
+	ActionQueue *Queue             // Queue for derived actions
+	EventLog    *TurnEventLog      // Log for recording events
+}
+
+// NewActionContext creates a new ActionContext with required components.
+func NewActionContext(game GameInterface, bus *event.EventBus, mapEngine MapEngineInterface) *ActionContext {
+	return &ActionContext{
+		Metadata:    util.NewMetadata(),
+		Game:        game,
+		EventBus:    bus,
+		MapEngine:   mapEngine,
+		ActionQueue: NewQueue(),
+		EventLog:    NewTurnEventLog(),
+	}
+}
+
+// ExecuteAction executes an action with interception support.
+// Flow:
+// 1. If action can be modified, publish to EventBus for interception
+// 2. Execute the (possibly modified) action
+// 3. Record in event log
+// 4. Process any derived actions in queue
+func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
+	// Step 1: Interception phase (if action can be modified)
+	if action.CanModify() && ctx.EventBus != nil {
+		// Create context for interception
+		interceptCtx := event.NewContext(ctx.Game.GetCurrentPlayer())
+		interceptCtx.Set("current_action", action)
+		interceptCtx.Set("action_context", ctx)
+
+		// Determine phase based on action type
+		phase := actionTypeToPhase(action.Type())
+
+		// Publish to allow Buffs/Items to modify the action
+		ctx.EventBus.Publish(phase, action.Target(), interceptCtx)
+	}
+
+	// Step 2: Execute the action
+	err := action.Execute(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Step 3: Record in event log
+	ctx.EventLog.AddEntry(action.LogEntry())
+
+	// Step 4: Process derived actions in queue
+	ctx.ProcessQueue()
+
+	return nil
+}
+
+// ProcessQueue executes all actions in the queue.
+func (ctx *ActionContext) ProcessQueue() {
+	for !ctx.ActionQueue.IsEmpty() {
+		action := ctx.ActionQueue.Pop()
+		ctx.ExecuteAction(action)
+	}
+}
+
+// PushDerivedAction adds a derived action to the queue.
+// Used by handlers to generate new actions during interception.
+func (ctx *ActionContext) PushDerivedAction(action ExecutableAction) {
+	ctx.ActionQueue.Push(action)
+}
+
+// actionTypeToPhase maps ActionType to corresponding event Phase.
+func actionTypeToPhase(at ActionType) event.Phase {
+	switch at {
+	case ActionDamage:
+		return event.PhasePreDamage
+	case ActionMove:
+		return event.PhaseOnMove
+	case ActionHeal, ActionModifyLP, ActionAddBuff, ActionRemoveBuff:
+		return event.PhaseBeforeTurn // Default phase for non-interceptable
+	default:
+		return event.PhaseBeforeTurn
+	}
+}
+
+// Clear resets the context for a new turn.
+func (ctx *ActionContext) Clear() {
+	ctx.ActionQueue.Clear()
+	ctx.EventLog.Clear()
+}
