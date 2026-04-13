@@ -15,6 +15,8 @@ const (
 	// Event-driven phases - Buff lifecycle events
 	PhaseOnBuffApplied           // Triggered when any Buff is applied to a player
 	PhaseOnBuffRemoved           // Triggered when any Buff is removed/expired from a player
+	// Item lifecycle phase
+	PhaseItemUsed                // Triggered when player actively uses an item
 )
 
 // String returns the string representation of Phase.
@@ -29,6 +31,7 @@ func (p Phase) String() string {
 		PhaseAnyTime:        "AnyTime",
 		PhaseOnBuffApplied:  "OnBuffApplied",
 		PhaseOnBuffRemoved:  "OnBuffRemoved",
+		PhaseItemUsed:       "ItemUsed",
 	}
 	if name, ok := names[p]; ok {
 		return name
@@ -38,7 +41,7 @@ func (p Phase) String() string {
 
 // IsValid checks if Phase is valid.
 func (p Phase) IsValid() bool {
-	return p >= PhaseBeforeTurn && p <= PhaseOnBuffRemoved
+	return p >= PhaseBeforeTurn && p <= PhaseItemUsed
 }
 
 // NeedsSubscription determines if the Phase needs EventBus subscription.

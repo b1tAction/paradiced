@@ -124,6 +124,16 @@ type PathResult struct {
 	ReachedEnd     bool  `json:"reached_end"`      // Whether reached end point
 }
 
+// GetTargetIndex returns the target position.
+func (r *PathResult) GetTargetIndex() int {
+	return r.TargetIndex
+}
+
+// GetPath returns the path of visited cells.
+func (r *PathResult) GetPath() []int {
+	return r.Path
+}
+
 // CalculatePath calculates movement path.
 // start: start position, steps: dice steps.
 // Returns actual movement path, handles Fragile cell logic:
