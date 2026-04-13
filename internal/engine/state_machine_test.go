@@ -456,8 +456,8 @@ func TestStateMachineExecutePreDamagePhase(t *testing.T) {
 		t.Error("CurrentCtx should be set")
 	}
 	// 验证伤害数据已保留
-	if sm.CurrentCtx.Data != 5 {
-		t.Errorf("Context Data = %v, expected 5", sm.CurrentCtx.Data)
+	if sm.CurrentCtx.GetData() != 5 {
+		t.Errorf("Context Data = %v, expected 5", sm.CurrentCtx.GetData())
 	}
 }
 

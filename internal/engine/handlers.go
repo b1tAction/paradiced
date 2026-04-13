@@ -54,13 +54,13 @@ func handleZhuQueFire(phase event.Phase, ctx *event.Context) {
 		return
 	}
 
-	// 离火计数器递增
-	player.FireCounter++
+	// 离火计数器递增（使用 Metadata 方法）
+	newCount := player.IncrementFireCounter()
 
 	// 每4回合增加1点幸运值
-	if player.FireCounter >= 4 {
+	if newCount >= 4 {
 		player.ModifyLP(1)
-		player.FireCounter = 0
+		player.SetFireCounter(0)
 	}
 }
 

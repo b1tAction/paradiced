@@ -56,8 +56,8 @@ func TestHandleZhuQueFire(t *testing.T) {
 	handleZhuQueFire(event.PhaseBeforeTurn, ctx)
 
 	// 第一次执行，计数器应该为1，LP不变
-	if player.FireCounter != 1 {
-		t.Errorf("FireCounter = %d, expected 1", player.FireCounter)
+	if player.GetFireCounter() != 1 {
+		t.Errorf("FireCounter = %d, expected 1", player.GetFireCounter())
 	}
 	if player.LP != initialLP {
 		t.Errorf("LP should not change after first trigger")
@@ -72,8 +72,8 @@ func TestHandleZhuQueFire(t *testing.T) {
 	if player.LP != initialLP+1 {
 		t.Errorf("LP = %d, expected %d (initial+1)", player.LP, initialLP+1)
 	}
-	if player.FireCounter != 0 {
-		t.Errorf("FireCounter = %d, expected 0 (reset)", player.FireCounter)
+	if player.GetFireCounter() != 0 {
+		t.Errorf("FireCounter = %d, expected 0 (reset)", player.GetFireCounter())
 	}
 }
 
@@ -88,7 +88,7 @@ func TestHandleZhuQueFireNonBeforeTurnPhase(t *testing.T) {
 
 	// 在其他 Phase 执行应该无效
 	handleZhuQueFire(event.PhaseAfterTurn, ctx)
-	if player.FireCounter != 0 {
+	if player.GetFireCounter() != 0 {
 		t.Errorf("FireCounter should be 0 when not BeforeTurn phase")
 	}
 	if player.LP != 5 {

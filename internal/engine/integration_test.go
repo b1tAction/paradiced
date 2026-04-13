@@ -142,8 +142,8 @@ func TestIntegrationHiddenBuffImmunity(t *testing.T) {
 	}
 
 	// 验证 Context 包含伤害数据
-	if sm.CurrentCtx.Data != damage {
-		t.Errorf("Context damage = %v, expected %d", sm.CurrentCtx.Data, damage)
+	if sm.CurrentCtx.GetData() != damage {
+		t.Errorf("Context damage = %v, expected %d", sm.CurrentCtx.GetData(), damage)
 	}
 }
 
@@ -329,7 +329,7 @@ func TestIntegrationContextDataPassing(t *testing.T) {
 	receivedDamage := 0
 	d := event.NewDecision("测试伤害", []event.Option{
 		{ID: "ok", Label: "OK", Action: func(ctx *event.Context) {
-			if damage, ok := ctx.Data.(int); ok {
+			if damage, ok := ctx.GetData().(int); ok {
 				receivedDamage = damage
 			}
 		}},
@@ -390,7 +390,7 @@ func TestIntegrationBuffLifecycleWithAppliedEvent(t *testing.T) {
 	receivedBuffType := core.BuffTypeNone
 	d := event.NewAutoDecision("监听Applied", []event.Option{
 		{ID: "listen", Label: "监听", Action: func(ctx *event.Context) {
-			buff, ok := ctx.Data.(*core.Buff)
+			buff, ok := ctx.GetData().(*core.Buff)
 			if ok {
 				receivedBuffType = buff.Type
 			}
@@ -428,7 +428,7 @@ func TestIntegrationBuffLifecycleWithRemovedEvent(t *testing.T) {
 	receivedBuffType := core.BuffTypeNone
 	d := event.NewAutoDecision("监听Removed", []event.Option{
 		{ID: "listen", Label: "监听", Action: func(ctx *event.Context) {
-			buff, ok := ctx.Data.(*core.Buff)
+			buff, ok := ctx.GetData().(*core.Buff)
 			if ok {
 				receivedBuffType = buff.Type
 			}
@@ -489,8 +489,8 @@ func TestIntegrationZhuQueFireHandler(t *testing.T) {
 	}
 
 	// 计数器应该重置为 0
-	if player.FireCounter != 0 {
-		t.Errorf("FireCounter = %d, expected 0", player.FireCounter)
+	if player.GetFireCounter() != 0 {
+		t.Errorf("FireCounter = %d, expected 0", player.GetFireCounter())
 	}
 }
 
@@ -549,7 +549,7 @@ func TestIntegrationBuffHearsOwnLifecycleEvent(t *testing.T) {
 	// 订阅 Applied 事件
 	appliedHandler := event.NewAutoDecision("AppliedHandler", []event.Option{
 		{ID: "handle", Label: "处理", Action: func(ctx *event.Context) {
-			buff, ok := ctx.Data.(*core.Buff)
+			buff, ok := ctx.GetData().(*core.Buff)
 			if ok && buff.Type == core.BuffTypeDivine {
 				selfAppliedTriggered = true
 			}
@@ -560,7 +560,7 @@ func TestIntegrationBuffHearsOwnLifecycleEvent(t *testing.T) {
 	// 订阅 Removed 事件
 	removedHandler := event.NewAutoDecision("RemovedHandler", []event.Option{
 		{ID: "handle", Label: "处理", Action: func(ctx *event.Context) {
-			buff, ok := ctx.Data.(*core.Buff)
+			buff, ok := ctx.GetData().(*core.Buff)
 			if ok && buff.Type == core.BuffTypeDivine {
 				selfRemovedTriggered = true
 			}

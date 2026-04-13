@@ -524,7 +524,7 @@ func TestGameBroadcastBuffApplied(t *testing.T) {
 		{ID: "ok", Label: "OK", Action: func(ctx *event.Context) {
 			received = true
 			// 验证 Context.Data 包含 Buff
-			buff, ok := ctx.Data.(*core.Buff)
+			buff, ok := ctx.GetData().(*core.Buff)
 			if !ok {
 				t.Error("Context.Data should be Buff")
 				return
@@ -559,7 +559,7 @@ func TestGameBroadcastBuffRemoved(t *testing.T) {
 		{ID: "ok", Label: "OK", Action: func(ctx *event.Context) {
 			received = true
 			// 验证 Context.Data 包含 Buff
-			buff, ok := ctx.Data.(*core.Buff)
+			buff, ok := ctx.GetData().(*core.Buff)
 			if !ok {
 				t.Error("Context.Data should be Buff")
 				return
