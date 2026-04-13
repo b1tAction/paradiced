@@ -11,7 +11,52 @@
 3. **非线性跳跃能力**：支持跳过阶段、打断、强制进入特殊状态
 4. **Phase 与 State 完美契合**：Phase 作为事件广播时机嵌入 State
 
-## 三层架构
+## 实现进度
+
+### Phase 1: 核心框架 ✅ (已完成)
+
+| 组件 | 文件 | 状态 | 说明 |
+|------|------|------|------|
+| StateID | state_id.go | ✅ | 三层枚举定义 |
+| State接口 | state.go | ✅ | Enter/Update/Exit生命周期 |
+| StateContext | state.go | ✅ | 状态上下文数据传递 |
+| Adapter接口 | adapter.go | ✅ | Game/Player/Buff/Item/Map适配器 |
+| StateStack | state_stack.go | ✅ | 中断入栈/出栈机制 |
+| HSM主结构 | hsm.go | ✅ | 状态注册、转移、生命周期管理 |
+| 全局状态 | global_states.go | ✅ | 6个Layer 1状态实现 |
+| 单元测试 | *_test.go | ✅ | 55+测试用例 |
+
+### Phase 2: 回合层状态 🚧 (进行中)
+
+| 组件 | 文件 | 状态 | 说明 |
+|------|------|------|------|
+| TurnUpkeepState | turn_states.go | ⏳ | PhaseBeforeTurn触发 |
+| MainActionState | turn_states.go | ⏳ | 等待道具/骰子选择 |
+| TurnMovingState | turn_states.go | ⏳ | 路径计算、Fragile/Fog |
+| TurnLandedState | turn_states.go | ⏳ | PhaseOnLand触发 |
+| TurnEventState | turn_states.go | ⏳ | PhasePreEvent/PreDamage |
+| TurnEndState | turn_states.go | ⏳ | PhaseAfterTurn、TickBuffs |
+
+### Phase 3: 中断层状态 ⏳ (待开始)
+
+| 组件 | 文件 | 状态 | 说明 |
+|------|------|------|------|
+| WaitDecisionState | interrupt_states.go | ⏳ | 决策等待、超时处理 |
+
+## 文件结构
+
+```
+internal/engine/hsm/
+├── state.go           # State接口和StateContext定义
+├── state_id.go        # StateID三层枚举
+├── adapter.go         # 适配器接口定义
+├── hsm.go             # HSM主结构和HSMSnapshot
+├── state_stack.go     # StateStack入栈出栈
+├── global_states.go   # Layer 1全局状态实现
+├── turn_states.go     # Layer 2回合状态实现 (Phase 2)
+├── interrupt_states.go # Layer 3中断状态实现 (Phase 3)
+└── *_test.go          # 各组件单元测试
+```
 
 ### 🌐 第一层：全局对局层 (GlobalGameState)
 
@@ -33,16 +78,16 @@
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-#### 状态定义
+#### 状态定义 (已实现)
 
-| StateID | 状态名称 | 行为 | Phase触发 | 转移条件 |
-|---------|----------|------|-----------|----------|
-| `S_MATCH_INIT` | 对局初始化 | 生成地图、分配阵营、初始Buff | - | 自动进入 MiniGame |
-| `S_ROUND_MINIGAME` | 小游戏阶段 | 下发小游戏指令、等待排名 | - | 收到所有排名后进入 Prep |
-| `S_ROUND_PREP` | 轮次筹备 | 根据排名分配骰子等级 | - | 初始化回合队列后进入 TurnLoop |
-| `S_TURN_LOOP` | 回合循环 | 管理玩家回合队列 | - | 每玩家完成后循环，有人到终点进入 BossBattle |
-| `S_BOSS_BATTLE` | Boss战 | 特殊战斗机制 | - | 战斗结束后进入 GameOver |
-| `S_GAME_OVER` | 对局结束 | 广播获胜者、数据结算 | - | 终态 |
+| StateID | 结构体名称 | 行为 | Phase触发 | 转移条件 |
+|---------|------------|------|-----------|----------|
+| `StateMatchInit` (100) | `MatchInitState` | 初始化标记、设置metadata | - | Update自动返回StateRoundMiniGame |
+| `StateRoundMiniGame` (101) | `RoundMiniGameState` | 等待小游戏排名 | - | 收到所有排名后返回StateRoundPrep |
+| `StateRoundPrep` (102) | `RoundPrepState` | 根据排名分配骰子、增加Round计数 | - | Update自动返回StateTurnLoop |
+| `StateTurnLoop` (103) | `TurnLoopState` | 管理回合队列、检查Boss触发 | - | StartPlayerTurn→StateTurnUpkeep；reachedEnd→StateBossBattle |
+| `StateBossBattle` (104) | `BossBattleState` | Boss战触发玩家记录 | - | OnBossDefeated→StateGameOver |
+| `StateGameOver` (105) | `GameOverState` | 终态，记录winner | - | 无转移（终态） |
 
 ### 🔄 第二层：玩家回合子层 (PlayerTurnState)
 
