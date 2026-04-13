@@ -60,23 +60,27 @@ func NewActionContext(game GameInterface, bus *event.EventBus, mapEngine MapEngi
 
 // ExecuteAction executes an action with interception support.
 // Flow:
-// 1. If action can be modified, publish to EventBus for interception
+// 1. PreTrigger phase - publish for interception (if not PhaseAnyTime)
 // 2. Execute the (possibly modified) action
-// 3. Record in event log
-// 4. Process any derived actions in queue
+// 3. PostTrigger phase - publish for lifecycle events (if not PhaseAnyTime)
+// 4. Record in event log
+// 5. Process any derived actions in queue
 func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
-	// Step 1: Interception phase (if action can be modified)
-	if action.CanModify() && ctx.EventBus != nil {
+	// Step 1: PreTrigger phase - interception
+	prePhase := action.PreTriggerPhase()
+	if prePhase != event.PhaseAnyTime && ctx.EventBus != nil {
 		// Create context for interception
-		interceptCtx := event.NewContext(ctx.Game.GetCurrentPlayer())
-		interceptCtx.Set("current_action", action)
-		interceptCtx.Set("action_context", ctx)
+		triggerCtx := event.NewContext(ctx.Game.GetCurrentPlayer())
+		triggerCtx.Set("current_action", action)
+		triggerCtx.Set("action_context", ctx)
 
-		// Determine phase based on action type
-		phase := actionTypeToPhase(action.Type())
+		// Publish to allow Buffs/Items to intercept/modify the action
+		ctx.EventBus.Publish(prePhase, action.Target(), triggerCtx)
 
-		// Publish to allow Buffs/Items to modify the action
-		ctx.EventBus.Publish(phase, action.Target(), interceptCtx)
+		// Check if action was blocked
+		if triggerCtx.GetBoolOrDefault("action_blocked", false) {
+			return nil // Action blocked, skip execution
+		}
 	}
 
 	// Step 2: Execute the action
@@ -85,10 +89,22 @@ func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
 		return err
 	}
 
-	// Step 3: Record in event log
+	// Step 3: PostTrigger phase - lifecycle events
+	postPhase := action.PostTriggerPhase()
+	if postPhase != event.PhaseAnyTime && ctx.EventBus != nil {
+		// Create context for post-trigger
+		triggerCtx := event.NewContext(ctx.Game.GetCurrentPlayer())
+		triggerCtx.Set("current_action", action)
+		triggerCtx.Set("action_context", ctx)
+
+		// Publish for buff entry effects, death effects, chain reactions
+		ctx.EventBus.Publish(postPhase, action.Target(), triggerCtx)
+	}
+
+	// Step 4: Record in event log
 	ctx.EventLog.AddEntry(action.LogEntry())
 
-	// Step 4: Process derived actions in queue
+	// Step 5: Process derived actions in queue
 	ctx.ProcessQueue()
 
 	return nil
@@ -106,20 +122,6 @@ func (ctx *ActionContext) ProcessQueue() {
 // Used by handlers to generate new actions during interception.
 func (ctx *ActionContext) PushDerivedAction(action ExecutableAction) {
 	ctx.ActionQueue.Push(action)
-}
-
-// actionTypeToPhase maps ActionType to corresponding event Phase.
-func actionTypeToPhase(at ActionType) event.Phase {
-	switch at {
-	case ActionDamage:
-		return event.PhasePreDamage
-	case ActionMove:
-		return event.PhaseOnMove
-	case ActionHeal, ActionModifyLP, ActionAddBuff, ActionRemoveBuff:
-		return event.PhaseBeforeTurn // Default phase for non-interceptable
-	default:
-		return event.PhaseBeforeTurn
-	}
 }
 
 // Clear resets the context for a new turn.

@@ -293,8 +293,8 @@ func TestBuffDefinitionPhase(t *testing.T) {
 
 	// Test Lost Buff Phases (reverse during move)
 	def = GetBuffDefinition(BuffTypeLost)
-	if !def.HasPhase(event.PhaseOnMove) {
-		t.Errorf("Lost should have OnMove phase")
+	if !def.HasPhase(event.PhasePreMove) {
+		t.Errorf("Lost should have PreMove phase")
 	}
 
 	// Test Corrupt Buff Phases (after turn)
@@ -429,7 +429,7 @@ func TestBuffDefinitionHasPhase(t *testing.T) {
 		{BuffTypeCurse, event.PhaseAfterTurn, false},
 		{BuffTypeHidden, event.PhasePreDamage, true},
 		{BuffTypeHidden, event.PhaseBeforeTurn, false},
-		{BuffTypeLost, event.PhaseOnMove, true},
+		{BuffTypeLost, event.PhasePreMove, true},
 		{BuffTypeLost, event.PhaseOnLand, false},
 	}
 

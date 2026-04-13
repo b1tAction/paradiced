@@ -40,7 +40,7 @@ func registerAllBuffs() {
 		Desc:          "下1回合朝反方向移动",
 		Duration:      1,
 		SpecialEffect: types.SpecialReverse,
-		Phases:        []event.Phase{event.PhaseOnMove},
+		Phases:        []event.Phase{event.PhasePreMove},
 		Priority:      100,
 	}, nil)
 

@@ -1,5 +1,7 @@
 package action
 
+import "github.com/b1tAction/Fated/pkg/event"
+
 // ActionType identifies the type of action.
 // All game effects (Buff/Item/Event/Faction) generate Actions with specific types.
 type ActionType int
@@ -62,6 +64,10 @@ func (at ActionType) String() string {
 // Action is the standard payload for all game effects.
 // Buffs/Items/Events generate Actions instead of directly modifying data.
 // This allows interception (e.g., shields blocking damage) and logging for client animation.
+//
+// Design principle: Who produces the timing, who publishes the Phase.
+// - Action publishes action timing Phases (PreTrigger, PostTrigger)
+// - HSM publishes state timing Phases (BeforeTurn, OnLand, AfterTurn)
 type Action interface {
 	// Type returns the action type.
 	Type() ActionType
@@ -75,6 +81,16 @@ type Action interface {
 
 	// Target returns the target player ID.
 	Target() string
+
+	// PreTriggerPhase returns the Phase to publish BEFORE action execution.
+	// Used for interception (e.g., PhasePreDamage for shields/隐匿).
+	// Returns PhaseAnyTime if no pre-trigger needed.
+	PreTriggerPhase() event.Phase
+
+	// PostTriggerPhase returns the Phase to publish AFTER action execution.
+	// Used for lifecycle events (e.g., PhaseOnBuffApplied for buff entry effects).
+	// Returns PhaseAnyTime if no post-trigger needed.
+	PostTriggerPhase() event.Phase
 }
 
 // LogEntry is the interface for actions that generate event log entries.
