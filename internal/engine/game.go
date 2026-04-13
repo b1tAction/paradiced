@@ -96,6 +96,13 @@ func (g *Game) GetCurrentPlayer() *core.Player {
 	return nil
 }
 
+// GetPlayers returns all players in the game.
+func (g *Game) GetPlayers() []*core.Player {
+	g.mutex.RLock()
+	defer g.mutex.RUnlock()
+	return g.Players
+}
+
 // NextTurn advances to next player's turn.
 func (g *Game) NextTurn() {
 	g.mutex.Lock()
@@ -168,7 +175,12 @@ func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
 		}
 
 		// Create closure Action (using handlers.go createBuffAction)
-		action := createBuffAction(buff, def, phase, player)
+		buffAction := createBuffAction(buff, def, phase, player)
+
+		// Wrap to match event.Option.Action signature (discards return value)
+		action := func(ctx *event.Context) {
+			buffAction(ctx) // Actions are pushed to queue via ActionContext
+		}
 
 		// Create Decision
 		decision := g.createBuffDecisionWithAction(buff, def, action)
