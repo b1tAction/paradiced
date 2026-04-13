@@ -7,21 +7,21 @@ import (
 	"github.com/b1tAction/Fated/pkg/util"
 )
 
-// Player 玩家结构体
+// Player represents a player in the game.
 type Player struct {
-	UserID      string     `json:"user_id"`      // 玩家UUID
-	Faction     Faction    `json:"faction"`      // 阵营
-	Position    int        `json:"position"`     // 当前位置
-	HP          int        `json:"hp"`           // 血量
-	LP          int        `json:"lp"`           // 幸运值（影响随机事件）
-	Inventory   []*Item    `json:"inventory"`    // 道具栏
-	ActiveBuffs []*Buff    `json:"active_buffs"` // 持续状态
-	IsDead      bool       `json:"is_dead"`      // 是否死亡
-	SkipTurn    bool       `json:"skip_turn"`    // 是否跳过回合
-	*util.Metadata          `json:"metadata"`     // 类型安全的动态数据容器
+	UserID      string     `json:"user_id"`      // Player UUID
+	Faction     Faction    `json:"faction"`      // Faction (阵营)
+	Position    int        `json:"position"`     // Current position
+	HP          int        `json:"hp"`           // Health points
+	LP          int        `json:"lp"`           // Luck points (affects random events)
+	Inventory   []*Item    `json:"inventory"`    // Item inventory
+	ActiveBuffs []*Buff    `json:"active_buffs"` // Active buffs
+	IsDead      bool       `json:"is_dead"`      // Whether player is dead
+	SkipTurn    bool       `json:"skip_turn"`    // Whether player skips turn
+	*util.Metadata          `json:"metadata"`     // Type-safe dynamic data container
 }
 
-// PlayerConfig 玩家配置
+// PlayerConfig represents player configuration.
 type PlayerConfig struct {
 	UserID   string
 	Faction  Faction
@@ -30,14 +30,14 @@ type PlayerConfig struct {
 	StartPos int
 }
 
-// DefaultPlayerConfig 默认玩家配置
+// DefaultPlayerConfig is the default player configuration.
 var DefaultPlayerConfig = PlayerConfig{
 	MaxHP:    6,
-	MaxLP:    8, // 与 ModifyLP 的 LP 范围限制一致
+	MaxLP:    8, // Consistent with ModifyLP LP range limit
 	StartPos: 0,
 }
 
-// NewPlayer 创建新玩家
+// NewPlayer creates a new player.
 func NewPlayer(config PlayerConfig) *Player {
 	if config.MaxHP <= 0 {
 		config.MaxHP = DefaultPlayerConfig.MaxHP
@@ -59,7 +59,7 @@ func NewPlayer(config PlayerConfig) *Player {
 		Metadata:    util.NewMetadata(),
 	}
 
-	// 朱雀阵营初始携带离火Buff
+	// ZhuQue朱雀 faction starts with Fire离火 buff
 	if config.Faction == FactionZhuQue {
 		player.AddBuff(NewBuff(BuffTypeFire, -1))
 	}
@@ -67,16 +67,16 @@ func NewPlayer(config PlayerConfig) *Player {
 	return player
 }
 
-// ========== 数值逻辑 ==========
+// ========== HP/LP Logic ==========
 
-// ApplyDamage 扣血并检测是否死亡
-// 注意：回城逻辑由 engine 包处理，这里只负责扣血
+// ApplyDamage deducts HP and checks for death.
+// Note: Respawn logic is handled by engine package, this only deducts HP.
 func (p *Player) ApplyDamage(amount int) error {
 	if amount < 0 {
 		return errors.New("damage amount cannot be negative")
 	}
 
-	// 隐匿状态下免疫伤害
+	// Hidden隐匿 buff grants damage immunity
 	if p.HasBuff(BuffTypeHidden) {
 		return nil
 	}
@@ -91,7 +91,7 @@ func (p *Player) ApplyDamage(amount int) error {
 	return nil
 }
 
-// Heal 回血
+// Heal restores HP.
 func (p *Player) Heal(amount int) error {
 	if amount < 0 {
 		return errors.New("heal amount cannot be negative")
@@ -100,7 +100,7 @@ func (p *Player) Heal(amount int) error {
 	return nil
 }
 
-// ModifyLP 修改幸运值
+// ModifyLP modifies luck points with range limit (0~8).
 func (p *Player) ModifyLP(amount int) {
 	p.LP += amount
 	if p.LP < 0 {
@@ -111,9 +111,9 @@ func (p *Player) ModifyLP(amount int) {
 	}
 }
 
-// ========== 移动逻辑 ==========
+// ========== Movement Logic ==========
 
-// Move 移动玩家到指定位置
+// Move moves the player to a specified position.
 func (p *Player) Move(newPosition int, maxLength int) error {
 	if newPosition < 0 {
 		return errors.New("position cannot be negative")
@@ -125,7 +125,7 @@ func (p *Player) Move(newPosition int, maxLength int) error {
 	return nil
 }
 
-// Respawn 复活回城
+// Respawn respawns the player at checkpoint.
 func (p *Player) Respawn(respawnPos int) error {
 	if respawnPos < 0 {
 		return errors.New("respawn position cannot be negative")
@@ -137,9 +137,9 @@ func (p *Player) Respawn(respawnPos int) error {
 	return nil
 }
 
-// ========== Buff 管理 ==========
+// ========== Buff Management ==========
 
-// AddBuff 添加 Buff
+// AddBuff adds a buff to the player.
 func (p *Player) AddBuff(buff *Buff) error {
 	if buff == nil {
 		return errors.New("buff cannot be nil")
@@ -151,7 +151,7 @@ func (p *Player) AddBuff(buff *Buff) error {
 	return nil
 }
 
-// RemoveBuff 移除指定类型的 Buff
+// RemoveBuff removes a buff of specified type.
 func (p *Player) RemoveBuff(buffType BuffType) bool {
 	for i, buff := range p.ActiveBuffs {
 		if buff.Type == buffType {
@@ -162,7 +162,7 @@ func (p *Player) RemoveBuff(buffType BuffType) bool {
 	return false
 }
 
-// HasBuff 检查是否有指定类型的 Buff
+// HasBuff checks if player has a buff of specified type.
 func (p *Player) HasBuff(buffType BuffType) bool {
 	for _, buff := range p.ActiveBuffs {
 		if buff.Type == buffType && buff.IsActive() {
@@ -172,7 +172,7 @@ func (p *Player) HasBuff(buffType BuffType) bool {
 	return false
 }
 
-// GetBuff 获取指定类型的 Buff
+// GetBuff gets the buff of specified type.
 func (p *Player) GetBuff(buffType BuffType) *Buff {
 	for _, buff := range p.ActiveBuffs {
 		if buff.Type == buffType {
@@ -182,7 +182,7 @@ func (p *Player) GetBuff(buffType BuffType) *Buff {
 	return nil
 }
 
-// TickBuffs 更新所有 Buff 的持续时间
+// TickBuffs updates all buff durations, returns expired buffs.
 func (p *Player) TickBuffs() []*Buff {
 	var expired []*Buff
 	for i := len(p.ActiveBuffs) - 1; i >= 0; i-- {
@@ -194,7 +194,7 @@ func (p *Player) TickBuffs() []*Buff {
 	return expired
 }
 
-// ClearNegativeBuffs 清除所有负面 Buff
+// ClearNegativeBuffs clears all negative buffs.
 func (p *Player) ClearNegativeBuffs() int {
 	count := 0
 	for i := len(p.ActiveBuffs) - 1; i >= 0; i-- {
@@ -206,9 +206,9 @@ func (p *Player) ClearNegativeBuffs() int {
 	return count
 }
 
-// ========== 道具管理 ==========
+// ========== Item Management ==========
 
-// AddItem 添加道具
+// AddItem adds an item to inventory.
 func (p *Player) AddItem(item *Item) error {
 	if item == nil {
 		return errors.New("item cannot be nil")
@@ -217,7 +217,7 @@ func (p *Player) AddItem(item *Item) error {
 	return nil
 }
 
-// RemoveItem 移除道具
+// RemoveItem removes an item from inventory.
 func (p *Player) RemoveItem(itemID string) (*Item, error) {
 	for i, item := range p.Inventory {
 		if item.ID == itemID {
@@ -229,7 +229,7 @@ func (p *Player) RemoveItem(itemID string) (*Item, error) {
 	return nil, errors.New("item not found")
 }
 
-// GetItem 获取道具
+// GetItem gets an item by ID.
 func (p *Player) GetItem(itemID string) *Item {
 	for _, item := range p.Inventory {
 		if item.ID == itemID {
@@ -239,7 +239,7 @@ func (p *Player) GetItem(itemID string) *Item {
 	return nil
 }
 
-// HasItem 检查是否有指定类型的道具
+// HasItem checks if player has an item of specified type.
 func (p *Player) HasItem(itemType ItemType) bool {
 	for _, item := range p.Inventory {
 		if item.Type == itemType {
@@ -249,43 +249,43 @@ func (p *Player) HasItem(itemType ItemType) bool {
 	return false
 }
 
-// ========== 充能计数相关方法（使用 Metadata） ==========
+// ========== Charge Count Methods (using Metadata) ==========
 
-// GetChargeCount 获取充能计数（青龙/玄武阵营使用）
+// GetChargeCount gets the charge count (used by QingLong青龙/XuanWu玄武 faction).
 func (p *Player) GetChargeCount() int {
 	return p.GetIntOrDefault("charge_count", 0)
 }
 
-// SetChargeCount 设置充能计数
+// SetChargeCount sets the charge count.
 func (p *Player) SetChargeCount(count int) {
 	p.SetInt("charge_count", count)
 }
 
-// IncrementChargeCount 递增充能计数，返回递增后的值
+// IncrementChargeCount increments the charge count, returns new value.
 func (p *Player) IncrementChargeCount() int {
 	return p.IncrementInt("charge_count", 1)
 }
 
-// ========== 离火计数相关方法（使用 Metadata） ==========
+// ========== Fire Counter Methods (using Metadata) ==========
 
-// GetFireCounter 获取离火计数（朱雀阵营使用）
+// GetFireCounter gets the fire counter (used by ZhuQue朱雀 faction).
 func (p *Player) GetFireCounter() int {
 	return p.GetIntOrDefault("fire_counter", 0)
 }
 
-// SetFireCounter 设置离火计数
+// SetFireCounter sets the fire counter.
 func (p *Player) SetFireCounter(count int) {
 	p.SetInt("fire_counter", count)
 }
 
-// IncrementFireCounter 递增离火计数，返回递增后的值
+// IncrementFireCounter increments the fire counter, returns new value.
 func (p *Player) IncrementFireCounter() int {
 	return p.IncrementInt("fire_counter", 1)
 }
 
-// ========== 辅助方法 ==========
+// ========== Helper Methods ==========
 
-// Clone 克隆玩家（用于测试）
+// Clone clones the player (used for testing).
 func (p *Player) Clone() *Player {
 	inventory := make([]*Item, len(p.Inventory))
 	for i, item := range p.Inventory {
@@ -322,18 +322,18 @@ func (p *Player) Clone() *Player {
 	}
 }
 
-// String 返回玩家信息字符串
+// String returns the player info string.
 func (p *Player) String() string {
 	return fmt.Sprintf("Player{ID: %s, Faction: %s, Pos: %d, HP: %d, LP: %d, Buffs: %d, Items: %d}",
 		p.UserID, p.Faction.String(), p.Position, p.HP, p.LP, len(p.ActiveBuffs), len(p.Inventory))
 }
 
-// IsAlive 检查玩家是否存活
+// IsAlive checks if the player is alive.
 func (p *Player) IsAlive() bool {
 	return !p.IsDead && p.HP > 0
 }
 
-// CanAct 检查玩家是否可以行动
+// CanAct checks if the player can act.
 func (p *Player) CanAct() bool {
 	return p.IsAlive() && !p.SkipTurn
 }

@@ -1,16 +1,16 @@
 package core
 
-// Faction 玩家阵营（四神兽）
+// Faction represents player faction (Four Divine Beasts).
 type Faction int
 
 const (
-	FactionQingLong Faction = iota // 青龙（东方）- 行迹
-	FactionZhuQue                  // 朱雀（南方）- 离火
-	FactionBaiHu                   // 白虎（西方）- 劫运
-	FactionXuanWu                  // 玄武（北方）- 镇厄
+	FactionQingLong Faction = iota // QingLong青龙 (East) - 行迹
+	FactionZhuQue                  // ZhuQue朱雀 (South) - 离火
+	FactionBaiHu                   // BaiHu白虎 (West) - 劫运
+	FactionXuanWu                  // XuanWu玄武 (North) - 鎮厄
 )
 
-// String 返回阵营名称
+// String returns the faction name.
 func (f Faction) String() string {
 	names := map[Faction]string{
 		FactionQingLong: "QingLong",
@@ -24,12 +24,12 @@ func (f Faction) String() string {
 	return "Unknown"
 }
 
-// IsValid 检查阵营是否有效
+// IsValid checks if the faction is valid.
 func (f Faction) IsValid() bool {
 	return f >= FactionQingLong && f <= FactionXuanWu
 }
 
-// GetFactionNames 获取所有阵营名称（中文）
+// GetFactionNames returns all faction names in Chinese.
 func (f Faction) GetFactionNames() map[Faction]string {
 	return map[Faction]string{
 		FactionQingLong: "青龙",
@@ -39,7 +39,7 @@ func (f Faction) GetFactionNames() map[Faction]string {
 	}
 }
 
-// GetChineseName 获取阵营中文名称
+// GetChineseName returns the faction Chinese name.
 func (f Faction) GetChineseName() string {
 	names := f.GetFactionNames()
 	if name, ok := names[f]; ok {
@@ -48,7 +48,7 @@ func (f Faction) GetChineseName() string {
 	return "未知"
 }
 
-// GetFactionSkillName 获取阵营被动技能名称
+// GetFactionSkillName returns the faction passive skill name.
 func (f Faction) GetFactionSkillName() string {
 	skills := map[Faction]string{
 		FactionQingLong: "行迹",
@@ -62,7 +62,7 @@ func (f Faction) GetFactionSkillName() string {
 	return "未知"
 }
 
-// GetFactionSkillDesc 获取阵营被动技能描述
+// GetFactionSkillDesc returns the faction passive skill description.
 func (f Faction) GetFactionSkillDesc() string {
 	descs := map[Faction]string{
 		FactionQingLong: "每5回合获得充能，使用后1回合内无视负面地形（迷雾debuff与Fragile）",

@@ -4,48 +4,48 @@ package core
 
 import "fmt"
 
-// Evaluation 属性评分（0~100）
-// 越低越坏，越高越好
-// 0~40: 恶性（Bad）
-// 41~65: 中性（Neutral）
-// 66~100: 良性（Good）
+// Evaluation represents attribute score (0~100).
+// Lower is worse, higher is better.
+// 0~40: Bad (恶性)
+// 41~65: Neutral (中性)
+// 66~100: Good (良性)
 type Evaluation int
 
 const (
-	// Evaluation 范围常量
-	EvaluationMin    Evaluation = 0   // 最低评分
-	EvaluationMax    Evaluation = 100 // 最高评分
+	// Evaluation range constants
+	EvaluationMin    Evaluation = 0   // Minimum score
+	EvaluationMax    Evaluation = 100 // Maximum score
 
-	// 分类边界
-	EvaluationBadThreshold     Evaluation = 40  // 恶性上限（≤40）
-	EvaluationNeutralThreshold Evaluation = 65  // 中性上限（≤65）
-	// Evaluation > 65 为良性
+	// Category thresholds
+	EvaluationBadThreshold     Evaluation = 40  // Bad upper bound (≤40)
+	EvaluationNeutralThreshold Evaluation = 65  // Neutral upper bound (≤65)
+	// Evaluation > 65 is Good
 )
 
-// 预定义的 Evaluation 常量（常用评分）
+// Predefined Evaluation constants (common scores).
 const (
-	// 恶性评分（0~40）
-	EvaluationVeryBad   Evaluation = 10  // 极恶（如雷劫）
-	EvaluationBad       Evaluation = 25  // 较恶（如诅咒）
-	EvaluationMildBad   Evaluation = 35  // 轻恶（如蚊虫叮咬）
+	// Bad scores (0~40)
+	EvaluationVeryBad   Evaluation = 10  // Very bad (e.g., 雷劫ThunderStrike)
+	EvaluationBad       Evaluation = 25  // Bad (e.g., 诅咒Curse)
+	EvaluationMildBad   Evaluation = 35  // Mild bad (e.g., 蚊虫叮咬MosquitoBite)
 
-	// 中性评分（41~65）
-	EvaluationNeutral   Evaluation = 50  // 标准中性（如交换）
-	EvaluationMixed     Evaluation = 55  // 混合效果（如尝一口）
+	// Neutral scores (41~65)
+	EvaluationNeutral   Evaluation = 50  // Standard neutral (e.g., 交换Exchange)
+	EvaluationMixed     Evaluation = 55  // Mixed effect (e.g., 培一口Taste)
 
-	// 良性评分（66~100）
-	EvaluationMildGood  Evaluation = 70  // 轻良（如草药）
-	EvaluationGood      Evaluation = 80  // 较良（如奶茶）
-	EvaluationVeryGood  Evaluation = 90  // 极良（如神眷）
-	EvaluationExcellent Evaluation = 100 // 最佳
+	// Good scores (66~100)
+	EvaluationMildGood  Evaluation = 70  // Mild good (e.g., 草药Herb)
+	EvaluationGood      Evaluation = 80  // Good (e.g., 奶茶Tea)
+	EvaluationVeryGood  Evaluation = 90  // Very good (e.g., 神眷Divine)
+	EvaluationExcellent Evaluation = 100 // Best
 )
 
-// IsValid 检查评分是否在有效范围内
+// IsValid checks if the score is in valid range.
 func (e Evaluation) IsValid() bool {
 	return e >= EvaluationMin && e <= EvaluationMax
 }
 
-// GetCategory 获取评分类别
+// GetCategory returns the evaluation category.
 func (e Evaluation) GetCategory() string {
 	if e <= EvaluationBadThreshold {
 		return "Bad"
@@ -55,28 +55,28 @@ func (e Evaluation) GetCategory() string {
 	return "Good"
 }
 
-// IsGood 判断是否为良性
+// IsGood checks if the evaluation is good.
 func (e Evaluation) IsGood() bool {
 	return e > EvaluationNeutralThreshold
 }
 
-// IsNeutral 判断是否为中性
+// IsNeutral checks if the evaluation is neutral.
 func (e Evaluation) IsNeutral() bool {
 	return e > EvaluationBadThreshold && e <= EvaluationNeutralThreshold
 }
 
-// IsBad 判断是否为恶性
+// IsBad checks if the evaluation is bad.
 func (e Evaluation) IsBad() bool {
 	return e <= EvaluationBadThreshold
 }
 
-// String 返回评分描述
+// String returns the evaluation description.
 func (e Evaluation) String() string {
 	return fmt.Sprintf("Evaluation(%d): %s", e, e.GetCategory())
 }
 
-// Compare 比较两个评分
-// 返回 1 表示当前评分更好，-1 表示更差，0 表示相同
+// Compare compares two evaluations.
+// Returns 1 if current is better, -1 if worse, 0 if equal.
 func (e Evaluation) Compare(other Evaluation) int {
 	if e > other {
 		return 1
