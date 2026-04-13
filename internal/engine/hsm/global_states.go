@@ -1,5 +1,9 @@
 package hsm
 
+import (
+	"github.com/b1tAction/Fated/internal/core"
+)
+
 // ========== Global States (Layer 1) ==========
 
 // BaseGlobalState provides common functionality for global layer states.
@@ -74,7 +78,7 @@ func NewRoundMiniGameState() *RoundMiniGameState {
 func (s *RoundMiniGameState) Enter(ctx *StateContext) {
 	// Start mini-game phase
 	// Broadcast MiniGameStart to all clients
-	s.totalPlayers = len(ctx.Game.GetAllPlayers())
+	s.totalPlayers = len(ctx.Game.Players) // Direct access to Game.Players
 	s.resultsReceived = 0
 
 	ctx.SetMetadata("mini_game_started", true)
@@ -124,19 +128,19 @@ func (s *RoundPrepState) Enter(ctx *StateContext) {
 	// Rank 3 -> Copper dice (1-5)
 	// Rank 4 -> Wood dice (1-3)
 
-	players := ctx.Game.GetAllPlayers()
+	players := ctx.Game.Players // Direct access
 	for _, player := range players {
 		// Default assignment based on position (will be updated by mini-game results)
 		rank := len(players) // Default to lowest rank
-		if r, ok := ctx.GetMetadata("result_"+player.GetUserID()).(int); ok {
+		if r, ok := ctx.GetMetadata("result_"+player.UserID).(int); ok {
 			rank = r
 		}
-		s.diceAssignments[player.GetUserID()] = rank
-		ctx.SetMetadata("dice_"+player.GetUserID(), getDiceType(rank))
+		s.diceAssignments[player.UserID] = rank
+		ctx.SetMetadata("dice_"+player.UserID, getDiceType(rank))
 	}
 
 	// Increment round counter
-	ctx.Game.SetRound(ctx.Game.GetRound() + 1)
+	ctx.Game.State.Round++ // Direct access
 
 	ctx.Success = true
 }
@@ -187,9 +191,9 @@ func NewTurnLoopState() *TurnLoopState {
 func (s *TurnLoopState) Enter(ctx *StateContext) {
 	// Initialize turn queue
 	// First player starts their turn
-	players := ctx.Game.GetAllPlayers()
+	players := ctx.Game.Players // Direct access
 	if len(players) > 0 {
-		ctx.Game.SetTurn(0)
+		ctx.Game.State.Turn = 0 // Direct access
 	}
 
 	ctx.SetMetadata("turn_loop_active", true)
@@ -219,7 +223,7 @@ func (s *TurnLoopState) Exit(ctx *StateContext) {
 
 // StartPlayerTurn initiates a player's turn (called by external controller).
 func (s *TurnLoopState) StartPlayerTurn(ctx *StateContext) StateID {
-	players := ctx.Game.GetAllPlayers()
+	players := ctx.Game.Players // Direct access
 	if s.currentPlayerIndex >= len(players) {
 		// All players completed, next round
 		s.currentPlayerIndex = 0
@@ -228,7 +232,7 @@ func (s *TurnLoopState) StartPlayerTurn(ctx *StateContext) StateID {
 	}
 
 	// Set current player
-	ctx.Game.SetTurn(s.currentPlayerIndex)
+	ctx.Game.State.Turn = s.currentPlayerIndex // Direct access
 
 	// Transition to TurnUpkeep (first turn state)
 	return StateTurnUpkeep
@@ -266,7 +270,7 @@ func (s *TurnLoopState) CanTransitionTo(target StateID) bool {
 
 type BossBattleState struct {
 	BaseGlobalState
-	triggerPlayer PlayerAdapter
+	triggerPlayer *core.Player // Direct type
 	bossDefeated  bool
 }
 
@@ -282,7 +286,7 @@ func (s *BossBattleState) Enter(ctx *StateContext) {
 	// Get the player who triggered boss battle
 	// This would be set by TurnLoop before transitioning
 	if playerID, ok := ctx.GetMetadata("boss_trigger_player").(string); ok {
-		s.triggerPlayer = ctx.Game.GetPlayer(playerID)
+		s.triggerPlayer = ctx.Game.GetPlayer(playerID) // Returns *core.Player directly
 	}
 
 	ctx.SetMetadata("boss_battle_active", true)
@@ -314,7 +318,7 @@ func (s *BossBattleState) OnBossDefeated() {
 
 type GameOverState struct {
 	BaseGlobalState
-	winner PlayerAdapter
+	winner *core.Player // Direct type
 }
 
 // NewGameOverState creates a new GameOver state.
@@ -330,7 +334,7 @@ func (s *GameOverState) Enter(ctx *StateContext) {
 	// Cleanup resources
 
 	if winnerID, ok := ctx.GetMetadata("winner_id").(string); ok {
-		s.winner = ctx.Game.GetPlayer(winnerID)
+		s.winner = ctx.Game.GetPlayer(winnerID) // Returns *core.Player directly
 	}
 
 	ctx.Success = true
