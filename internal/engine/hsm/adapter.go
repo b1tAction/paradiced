@@ -1,196 +1,153 @@
 package hsm
 
 import (
+	"github.com/b1tAction/Fated/internal/gamemap"
 	"github.com/b1tAction/Fated/pkg/event"
 )
 
-// GameAdapter provides an interface for HSM to interact with Game without direct dependency.
-// This allows HSM to be tested independently and decouples state logic from game implementation.
-type GameAdapter interface {
-	// Basic game info
-	GetID() string
-	GetRound() int
-	GetTurn() int
-	GetCurrentPhase() string
-
-	// State management
-	SetRound(round int)
-	SetTurn(turn int)
-	SetWaiting(waiting bool)
-
-	// Player management
-	GetPlayer(playerID string) PlayerAdapter
-	GetCurrentPlayer() PlayerAdapter
-	GetAllPlayers() []PlayerAdapter
-	NextTurn() // Advance to next player
-
-	// EventBus integration
-	GetBus() EventBusAdapter
-	PublishPhase(phase event.Phase, playerID string, ctx *StateContext) []*event.Decision
-
-	// Buff/Item subscription
-	SubscribeBuff(player PlayerAdapter, buff BuffAdapter)
-	UnsubscribeBuff(buff BuffAdapter)
-	ApplyBuffToPlayer(player PlayerAdapter, buff BuffAdapter)
-	RemoveBuffFromPlayer(player PlayerAdapter, buff BuffAdapter)
-
-	SubscribeItem(player PlayerAdapter, item ItemAdapter)
-	UnsubscribeItem(item ItemAdapter)
-
-	// RNG integration
-	DrawEvent(lp int) EventAdapter
-	DrawItem(lp int) ItemAdapter
-
-	// Map integration
-	GetMapEngine() MapEngineAdapter
-}
-
-// PlayerAdapter provides an interface for HSM to interact with Player.
-type PlayerAdapter interface {
-	GetUserID() string
-	GetFaction() FactionAdapter
-	GetPosition() int
-	GetHP() int
-	GetLP() int
-	IsDead() bool
-	CanAct() bool
-	GetSkipTurn() bool
-
-	SetPosition(pos int)
-	SetHP(hp int)
-	SetLP(lp int)
-	SetSkipTurn(skip bool)
-	SetDead(dead bool)
-
-	// Movement
-	Move(pos int, maxLen int)
-
-	// HP/LP modification
-	ApplyDamage(amount int)
-	Heal(amount int)
-	ModifyLP(amount int)
-
-	// Buff management
-	AddBuff(buff BuffAdapter)
-	RemoveBuff(buffType BuffTypeAdapter)
-	HasBuff(buffType BuffTypeAdapter) bool
-	GetBuff(buffType BuffTypeAdapter) BuffAdapter
-	GetAllBuffs() []BuffAdapter
-	TickBuffs() []BuffAdapter // Returns expired buffs
-	ClearNegativeBuffs() int
-
-	// Item management
-	AddItem(item ItemAdapter)
-	RemoveItem(itemID string) ItemAdapter
-	GetItem(itemID string) ItemAdapter
-	HasItem(itemType ItemTypeAdapter) bool
-	GetAllItems() []ItemAdapter
-
-	// Charge/Fire counter (faction-specific)
-	GetChargeCount() int
-	SetChargeCount(count int)
-	IncrementChargeCount() int
-
-	GetFireCounter() int
-	SetFireCounter(count int)
-	IncrementFireCounter() int
-
-	// Respawn
-	Respawn(pos int)
-
-	// Clone for testing
-	Clone() PlayerAdapter
-}
-
-// EventBusAdapter provides interface for EventBus operations.
+// EventBusAdapter isolates HSM from pkg/event package details.
+// This interface allows HSM to interact with EventBus without direct coupling
+// to the concrete implementation, enabling easier testing and future changes.
 type EventBusAdapter interface {
-	Publish(phase event.Phase, playerID string, ctx interface{}) []*event.Decision
-	Subscribe(phase event.Phase, playerID string, sourceID string, sourceType string, decision *event.Decision)
-	Unsubscribe(phase event.Phase, playerID string, sourceID string)
+	// Publish publishes a Phase event and returns Decisions that need user confirmation.
+	Publish(phase event.Phase, playerID string, ctx *event.Context) []*event.Decision
+
+	// Subscribe subscribes to a Phase with a pre-bound Decision.
+	Subscribe(phase event.Phase, ownerID, sourceID, sourceType string, decision *event.Decision) string
+
+	// Unsubscribe removes a subscription by ID.
+	Unsubscribe(subID string) bool
+
+	// UnsubscribeBySource removes all subscriptions by source ID (e.g., Buff/Item removal).
+	UnsubscribeBySource(sourceID string) int
+
+	// UnsubscribeByOwner removes all subscriptions by player ID (e.g., player leaving).
+	UnsubscribeByOwner(ownerID string) int
+
+	// GetSubscriptionCount returns total subscription count (for debugging).
 	GetSubscriptionCount() int
+
+	// Clear removes all subscriptions.
+	Clear()
 }
 
-// BuffAdapter provides interface for Buff operations.
-type BuffAdapter interface {
-	GetType() BuffTypeAdapter
-	GetID() string
-	GetDuration() int
-	SetDuration(duration int)
-	GetCharge() int
-	SetCharge(charge int)
-	TickDuration() bool // Returns false if expired
-	GetSubscriptionIDs() []string
-	IsActive() bool
-	IsPositive() bool
+// EventBusWrapper wraps event.EventBus to implement EventBusAdapter.
+type EventBusWrapper struct {
+	bus *event.EventBus
 }
 
-// BuffTypeAdapter provides interface for BuffType operations.
-type BuffTypeAdapter interface {
-	String() string
-	IsPositive() bool
+// NewEventBusWrapper creates a new EventBusWrapper.
+func NewEventBusWrapper(bus *event.EventBus) EventBusAdapter {
+	return &EventBusWrapper{bus: bus}
 }
 
-// ItemAdapter provides interface for Item operations.
-type ItemAdapter interface {
-	GetType() ItemTypeAdapter
-	GetID() string
-	IsUsable() bool
-	GetTargetID() string
-	GetSubscriptionID() string
+// Publish publishes a Phase event.
+func (w *EventBusWrapper) Publish(phase event.Phase, playerID string, ctx *event.Context) []*event.Decision {
+	return w.bus.Publish(phase, playerID, ctx)
 }
 
-// ItemTypeAdapter provides interface for ItemType operations.
-type ItemTypeAdapter interface {
-	String() string
+// Subscribe subscribes to a Phase.
+func (w *EventBusWrapper) Subscribe(phase event.Phase, ownerID, sourceID, sourceType string, decision *event.Decision) string {
+	return w.bus.Subscribe(phase, ownerID, sourceID, sourceType, decision)
 }
 
-// FactionAdapter provides interface for Faction operations.
-type FactionAdapter interface {
-	String() string
+// Unsubscribe removes a subscription by ID.
+func (w *EventBusWrapper) Unsubscribe(subID string) bool {
+	return w.bus.Unsubscribe(subID)
 }
 
-// EventAdapter provides interface for Event operations.
-type EventAdapter interface {
-	GetName() string
-	GetDesc() string
-	GetEvaluation() int
-	Execute(player PlayerAdapter, ctx *StateContext)
+// UnsubscribeBySource removes all subscriptions by source ID.
+func (w *EventBusWrapper) UnsubscribeBySource(sourceID string) int {
+	return w.bus.UnsubscribeBySource(sourceID)
 }
 
-// MapEngineAdapter provides interface for MapEngine operations.
+// UnsubscribeByOwner removes all subscriptions by player ID.
+func (w *EventBusWrapper) UnsubscribeByOwner(ownerID string) int {
+	return w.bus.UnsubscribeByOwner(ownerID)
+}
+
+// GetSubscriptionCount returns total subscription count.
+func (w *EventBusWrapper) GetSubscriptionCount() int {
+	return w.bus.GetSubscriptionCount()
+}
+
+// Clear removes all subscriptions.
+func (w *EventBusWrapper) Clear() {
+	w.bus.Clear()
+}
+
+// MapEngineAdapter isolates HSM from internal/gamemap package.
+// This interface allows HSM to interact with MapEngine without direct coupling,
+// enabling easier testing and potential future changes to map implementation.
 type MapEngineAdapter interface {
+	// GetLength returns the total map length.
 	GetLength() int
-	GetCell(pos int) CellAdapter
-	CalculatePath(startPos int, steps int) PathResultAdapter
+
+	// GetCell returns the cell at specified position.
+	GetCell(pos int) (*gamemap.MapCell, error)
+
+	// CalculatePath calculates movement path from start position with given steps.
+	CalculatePath(startPos int, steps int) (*gamemap.PathResult, error)
+
+	// GetLastCheckpoint returns the last checkpoint before specified position.
 	GetLastCheckpoint(pos int) int
-	SetCellType(pos int, cellType CellTypeAdapter)
-	ActivateFog(pos int)
+
+	// SetCellType sets cell type at specified position.
+	SetCellType(pos int, cellType gamemap.CellType) error
+
+	// ActivateFog activates a fog cell at specified position.
+	ActivateFog(pos int) error
+
+	// IsFogActivated checks if fog is activated at specified position.
+	// Returns false if cell is not a fog cell or fog is not activated.
 	IsFogActivated(pos int) bool
 }
 
-// CellAdapter provides interface for Cell operations.
-type CellAdapter interface {
-	GetPosition() int
-	GetType() CellTypeAdapter
-	IsFragile() bool
-	IsFog() bool
-	IsCheckpoint() bool
-	IsBoss() bool
-	IsBroken() bool
-	SetBroken(broken bool)
-	GetEventID() string
+// MapEngineWrapper wraps gamemap.MapEngine to implement MapEngineAdapter.
+type MapEngineWrapper struct {
+	engine *gamemap.MapEngine
 }
 
-// CellTypeAdapter provides interface for CellType operations.
-type CellTypeAdapter interface {
-	String() string
+// NewMapEngineWrapper creates a new MapEngineWrapper.
+func NewMapEngineWrapper(engine *gamemap.MapEngine) MapEngineAdapter {
+	return &MapEngineWrapper{engine: engine}
 }
 
-// PathResultAdapter provides interface for PathResult operations.
-type PathResultAdapter interface {
-	GetTargetIndex() int
-	GetPath() []int
-	GetFellDown() bool
-	GetReachedEnd() bool
-	GetInterrupted() bool
+// GetLength returns the total map length.
+func (w *MapEngineWrapper) GetLength() int {
+	return w.engine.Length
+}
+
+// GetCell returns the cell at specified position.
+func (w *MapEngineWrapper) GetCell(pos int) (*gamemap.MapCell, error) {
+	return w.engine.GetCell(pos)
+}
+
+// CalculatePath calculates movement path.
+func (w *MapEngineWrapper) CalculatePath(startPos int, steps int) (*gamemap.PathResult, error) {
+	return w.engine.CalculatePath(startPos, steps)
+}
+
+// GetLastCheckpoint returns the last checkpoint before specified position.
+func (w *MapEngineWrapper) GetLastCheckpoint(pos int) int {
+	return w.engine.GetLastCheckpoint(pos)
+}
+
+// SetCellType sets cell type at specified position.
+func (w *MapEngineWrapper) SetCellType(pos int, cellType gamemap.CellType) error {
+	return w.engine.SetCellType(pos, cellType)
+}
+
+// ActivateFog activates a fog cell.
+func (w *MapEngineWrapper) ActivateFog(pos int) error {
+	return w.engine.ActivateFog(pos)
+}
+
+// IsFogActivated checks if fog is activated at specified position.
+func (w *MapEngineWrapper) IsFogActivated(pos int) bool {
+	cell, err := w.engine.GetCell(pos)
+	if err != nil {
+		return false
+	}
+	return cell.CellType == gamemap.CellTypeFog && cell.FogActive
 }
