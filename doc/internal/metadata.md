@@ -1,28 +1,28 @@
-# pkg/util/metadata - Type-Safe Dynamic Data Container
+# pkg/util/metadata - 类型安全动态数据容器
 
-## Overview
+## 概述
 
-`pkg/util/metadata` is a type-safe key-value storage container that solves these problems:
+`pkg/util/metadata` 是一个类型安全的键值存储容器，解决了以下问题：
 
-1. `Context.Data` as `interface{}` is too simplistic, lacking type safety
-2. `Player` contains `FireCounter`, `ChargeCount` and other data unrelated to core entity
-3. Future extensibility for more dynamic data
+1. `Context.Data` 作为 `interface{}` 太过简陋，缺乏类型安全
+2. `Player` 包含 `FireCounter`、`ChargeCount` 等与核心实体不相关的数据
+3. 未来需要更灵活的动态数据扩展
 
-Through Go's **anonymous embedding (Struct Embedding)** feature, `Context`, `Player` and other structs directly inherit all methods from `Metadata`.
+通过 Go 的**匿名嵌套（Struct Embedding）**特性，`Context`、`Player` 等结构体可以直接继承 `Metadata` 的所有方法。
 
 ---
 
-## File Structure
+## 文件结构
 
 ```
 pkg/util/
-├── metadata.go      # Metadata core implementation
-├── metadata_test.go # Test file
+├── metadata.go      # Metadata 核心实现
+├── metadata_test.go # 测试文件
 ```
 
 ---
 
-## Metadata Struct
+## Metadata 结构体
 
 ```go
 type Metadata struct {
@@ -34,86 +34,86 @@ func NewMetadata() *Metadata
 
 ---
 
-## Core Methods
+## 核心方法
 
-### Type-Safe Reading (Returns Error)
+### 类型安全读取（返回错误）
 
-| Method | Description |
+| 方法 | 描述 |
 |--------|-------------|
-| `GetInt(key string) (int, error)` | Gets integer, returns error if key not found or type mismatch |
-| `GetBool(key string) (bool, error)` | Gets boolean, returns error if key not found or type mismatch |
-| `GetString(key string) (string, error)` | Gets string, returns error if key not found or type mismatch |
-| `GetFloat64(key string) (float64, error)` | Gets float64, returns error if key not found or type mismatch |
-| `Get(key string) (interface{}, bool)` | Gets raw value, returns (nil, false) if not found |
+| `GetInt(key string) (int, error)` | 获取整数，键不存在或类型不匹配时返回错误 |
+| `GetBool(key string) (bool, error)` | 获取布尔值，键不存在或类型不匹配时返回错误 |
+| `GetString(key string) (string, error)` | 获取字符串，键不存在或类型不匹配时返回错误 |
+| `GetFloat64(key string) (float64, error)` | 获取浮点数，键不存在或类型不匹配时返回错误 |
+| `Get(key string) (interface{}, bool)` | 获取原始值，不存在时返回 (nil, false) |
 
-### Type-Safe Reading (With Default - No Error)
+### 类型安全读取（带默认值 - 无错误）
 
-| Method | Description |
+| 方法 | 描述 |
 |--------|-------------|
-| `GetIntOrDefault(key, default) int` | Gets integer, returns default if key not found or type mismatch |
-| `GetBoolOrDefault(key, default) bool` | Gets boolean, returns default if key not found or type mismatch |
-| `GetStringOrDefault(key, default) string` | Gets string, returns default if key not found or type mismatch |
-| `GetFloat64OrDefault(key, default) float64` | Gets float64, returns default if key not found or type mismatch |
+| `GetIntOrDefault(key, default) int` | 获取整数，键不存在或类型不匹配时返回默认值 |
+| `GetBoolOrDefault(key, default) bool` | 获取布尔值，键不存在或类型不匹配时返回默认值 |
+| `GetStringOrDefault(key, default) string` | 获取字符串，键不存在或类型不匹配时返回默认值 |
+| `GetFloat64OrDefault(key, default) float64` | 获取浮点数，键不存在或类型不匹配时返回默认值 |
 
-### Type-Safe Writing (Chainable)
+### 类型安全写入（链式调用）
 
-| Method | Description |
+| 方法 | 描述 |
 |--------|-------------|
-| `SetInt(key, value) *Metadata` | Sets integer value |
-| `SetBool(key, value) *Metadata` | Sets boolean value |
-| `SetString(key, value) *Metadata` | Sets string value |
-| `Set(key, value) *Metadata` | Sets any type value |
+| `SetInt(key, value) *Metadata` | 设置整数值 |
+| `SetBool(key, value) *Metadata` | 设置布尔值 |
+| `SetString(key, value) *Metadata` | 设置字符串值 |
+| `Set(key, value) *Metadata` | 设置任意类型值 |
 
-### Utility Methods
+### 辅助方法
 
-| Method | Description |
+| 方法 | 描述 |
 |--------|-------------|
-| `HasKey(key) bool` | Checks if key exists |
-| `Delete(key)` | Deletes key |
-| `Clear()` | Clears all keys |
-| `Keys() []string` | Returns all key names |
-| `Size() int` | Returns key count |
-| `Clone() *Metadata` | Clones (independent copy) |
-| `IncrementInt(key, delta) int` | Increments integer value |
-| `DecrementInt(key, delta) int` | Decrements integer value |
-| `Merge(other *Metadata) *Metadata` | Merges another Metadata |
+| `HasKey(key) bool` | 检查键是否存在 |
+| `Delete(key)` | 删除键 |
+| `Clear()` | 清空所有键 |
+| `Keys() []string` | 返回所有键名 |
+| `Size() int` | 返回键数量 |
+| `Clone() *Metadata` | 克隆（独立副本） |
+| `IncrementInt(key, delta) int` | 递增整数值 |
+| `DecrementInt(key, delta) int` | 递减整数值 |
+| `Merge(other *Metadata) *Metadata` | 合并另一个 Metadata |
 
 ---
 
-## Usage Examples
+## 使用示例
 
-### Basic Usage
+### 基本用法
 
 ```go
 m := util.NewMetadata()
 
-// Set values
+// 设置值
 m.SetInt("count", 10)
 m.SetString("name", "test")
 m.SetBool("active", true)
 
-// Chain calls
+// 式调用
 m.SetInt("turn", 1).SetString("event", "fog")
 
-// Get values with error handling
+// 获取值（带错误处理）
 count, err := m.GetInt("count")
 if err != nil {
-    // Handle error: key not found or type mismatch
+    // 处理错误：键不存在或类型不匹配
 }
 
-// Or use GetIntOrDefault for graceful handling
+// 或使用 GetIntOrDefault 进行优雅处理
 count := m.GetIntOrDefault("count", 0)          // 10
 name := m.GetStringOrDefault("name", "")        // "test"
 active := m.GetBoolOrDefault("active", false)   // true
 
-// Default value for missing key
+// 键不存在时返回默认值
 val := m.GetIntOrDefault("missing", 5)  // 5
 
-// Increment
-m.IncrementInt("counter", 1)  // Returns new value
+// 递增
+m.IncrementInt("counter", 1)  // 返回新值
 ```
 
-### Embedding in Struct
+### 嵌入到结构体中
 
 ```go
 import "github.com/b1tAction/Fated/pkg/util"
@@ -121,8 +121,8 @@ import "github.com/b1tAction/Fated/pkg/util"
 type Player struct {
     UserID   string
     Faction  Faction
-    // ... other core fields
-    *util.Metadata  // Anonymous embedding
+    // ... 其他核心字段
+    *util.Metadata  // 匿名嵌套
 }
 
 func NewPlayer(config PlayerConfig) *Player {
@@ -133,18 +133,18 @@ func NewPlayer(config PlayerConfig) *Player {
     }
 }
 
-// Usage example
+// 使用示例
 player := NewPlayer(config)
 player.SetInt("fire_counter", 0)
 player.IncrementInt("fire_counter", 1)
 ```
 
-### Convenience Methods for Known Data
+### 已知数据的便捷方法
 
-For data with known purposes, add convenience methods:
+对于已知用途的数据，可以添加便捷方法：
 
 ```go
-// Player convenience methods
+// Player 便捷方法
 func (p *Player) GetFireCounter() int {
     return p.GetIntOrDefault("fire_counter", 0)
 }
@@ -160,56 +160,56 @@ func (p *Player) IncrementFireCounter() int {
 
 ---
 
-## Migrated Data
+## 数据迁移
 
 ### Player
 
-| Original Field | Metadata Key | Convenience Methods |
+| 原字段 | Metadata 键名 | 便捷方法 |
 |---------------|--------------|---------------------|
 | `ChargeCount int` | `charge_count` | `GetChargeCount/SetChargeCount` |
 | `FireCounter int` | `fire_counter` | `GetFireCounter/SetFireCounter` |
 
 ### Context
 
-| Original Field | Metadata Key | Convenience Methods |
+| 原字段 | Metadata 键名 | 便捷方法 |
 |---------------|--------------|---------------------|
 | `Data interface{}` | `data` | `WithData/GetData` |
 
 ---
 
-## Design Philosophy
+## 设计哲学
 
-### Why Use Metadata
+### 为什么使用 Metadata
 
-1. **DRY Principle**: Type conversion and safety checks centralized in `Metadata`, one place to add methods benefits all.
-2. **Flat Serialization**: JSON serialization is clean, frontend parsing is easy.
-3. **Unified Architecture**: `Context` (transient) and `Player` (persistent) managed by same component.
-4. **Flexible Extension**: Future Cell states like `FellDown`, `Interrupted` can be migrated.
+1. **DRY 原则**：类型转换和安全检查集中在 `Metadata` 中，一处添加方法，多处受益。
+2. **扁平序列化**：JSON 序列化干净整洁，前端解析轻松。
+3. **架构统一**：`Context`（瞬态）和 `Player`（持久态）由同一组件管理。
+4. **灵活扩展**：未来 Cell 状态如 `FellDown`、`Interrupted` 可以迁移到此。
 
-### Key Naming Convention
+### 键名命名约定
 
-- Use `snake_case` format
-- Examples: `fire_counter`, `charge_count`, `turn_count`
-
----
-
-## Test Coverage
-
-`pkg/util/metadata_test.go` includes comprehensive tests:
-
-- Initialization tests
-- Set/Get basic operations
-- Type-safe reading tests (with error handling)
-- GetOrDefault tests
-- HasKey/Delete/Clear tests
-- Clone independence tests
-- IncrementInt/DecrementInt tests
-- Merge tests
-- Chainable calls tests
+- 使用 `snake_case` 格式
+- 示例：`fire_counter`、`charge_count`、`turn_count`
 
 ---
 
-## Related Documentation
+## 测试覆盖
 
-- [core.md](./core.md) - Player/Buff struct definitions
-- [event_bus_system.md](./event_bus_system.md) - Context usage
+`pkg/util/metadata_test.go` 包含全面的测试：
+
+- 初始化测试
+- Set/Get 基本操作
+- 类型安全读取测试（带错误处理）
+- GetOrDefault 测试
+- HasKey/Delete/Clear 测试
+- Clone 独立性测试
+- IncrementInt/DecrementInt 测试
+- Merge 测试
+- 式调用测试
+
+---
+
+## 相关文档
+
+- [core.md](./core.md) - Player/Buff 结构定义
+- [event_bus_system.md](./event_bus_system.md) - Context 使用
