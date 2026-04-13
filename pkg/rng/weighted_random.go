@@ -7,22 +7,22 @@ import (
 	"time"
 )
 
-// WeightedItem 带权重的抽卡项
+// WeightedItem represents a weighted draw item.
 type WeightedItem struct {
-	ID     string      `json:"id"`     // 唯一标识
-	Type   string      `json:"type"`   // 类型分类
-	Weight int         `json:"weight"` // 权重值
-	Data   interface{} `json:"data"`   // 附加数据
+	ID     string      `json:"id"`     // Unique identifier
+	Type   string      `json:"type"`   // Type category
+	Weight int         `json:"weight"` // Weight value
+	Data   interface{} `json:"data"`   // Additional data
 }
 
-// WeightedPool 带权重的抽卡池
+// WeightedPool represents a weighted draw pool.
 type WeightedPool struct {
-	Items       []WeightedItem `json:"items"`       // 抽卡项列表
-	TotalWeight int            `json:"total_weight"` // 总权重
-	rng         *rand.Rand     `json:"-"`           // 随机数生成器
+	Items       []WeightedItem `json:"items"`       // Draw items list
+	TotalWeight int            `json:"total_weight"` // Total weight
+	rng         *rand.Rand     `json:"-"`           // Random number generator
 }
 
-// NewWeightedPool 创建新的抽卡池
+// NewWeightedPool creates a new draw pool.
 func NewWeightedPool() *WeightedPool {
 	return &WeightedPool{
 		Items:       make([]WeightedItem, 0),
@@ -31,7 +31,7 @@ func NewWeightedPool() *WeightedPool {
 	}
 }
 
-// NewWeightedPoolWithSeed 创建带指定种子随机源的抽卡池（用于测试）
+// NewWeightedPoolWithSeed creates a draw pool with specified seed (for testing).
 func NewWeightedPoolWithSeed(seed int64) *WeightedPool {
 	return &WeightedPool{
 		Items:       make([]WeightedItem, 0),
@@ -40,7 +40,7 @@ func NewWeightedPoolWithSeed(seed int64) *WeightedPool {
 	}
 }
 
-// AddItem 添加抽卡项
+// AddItem adds a draw item.
 func (p *WeightedPool) AddItem(id string, itemType string, weight int, data interface{}) error {
 	if weight <= 0 {
 		return errors.New("weight must be positive")
@@ -60,7 +60,7 @@ func (p *WeightedPool) AddItem(id string, itemType string, weight int, data inte
 	return nil
 }
 
-// RemoveItem 移除抽卡项
+// RemoveItem removes a draw item.
 func (p *WeightedPool) RemoveItem(id string) bool {
 	for i, item := range p.Items {
 		if item.ID == id {
@@ -72,7 +72,7 @@ func (p *WeightedPool) RemoveItem(id string) bool {
 	return false
 }
 
-// GetItem 获取指定 ID 的项
+// GetItem returns the item with specified ID.
 func (p *WeightedPool) GetItem(id string) *WeightedItem {
 	for _, item := range p.Items {
 		if item.ID == id {
@@ -82,7 +82,7 @@ func (p *WeightedPool) GetItem(id string) *WeightedItem {
 	return nil
 }
 
-// GetItemsByType 获取指定类型的所有项
+// GetItemsByType returns all items of specified type.
 func (p *WeightedPool) GetItemsByType(itemType string) []WeightedItem {
 	var result []WeightedItem
 	for _, item := range p.Items {
@@ -93,7 +93,7 @@ func (p *WeightedPool) GetItemsByType(itemType string) []WeightedItem {
 	return result
 }
 
-// Draw 执行一次抽卡
+// Draw performs a single draw.
 func (p *WeightedPool) Draw() (*WeightedItem, error) {
 	if len(p.Items) == 0 {
 		return nil, errors.New("pool is empty")
@@ -102,41 +102,41 @@ func (p *WeightedPool) Draw() (*WeightedItem, error) {
 		return nil, errors.New("total weight must be positive")
 	}
 
-	// 生成随机权重值
+	// Generate random weight value
 	r := p.rng.Intn(p.TotalWeight)
 
-	// 找到对应的项
- 	cumulative := 0
+	// Find corresponding item
+	cumulative := 0
 	for _, item := range p.Items {
-	 cumulative += item.Weight
+		cumulative += item.Weight
 		if r < cumulative {
 			return &item, nil
 		}
 	}
 
-	// 理论上不应该到达这里
+	// Should not reach here theoretically
 	return &p.Items[len(p.Items)-1], nil
 }
 
-// DrawWithType 按类型抽卡
-// 只在指定类型的项中进行抽取
+// DrawWithType draws by type.
+// Only draws from items of specified type.
 func (p *WeightedPool) DrawWithType(itemType string) (*WeightedItem, error) {
 	items := p.GetItemsByType(itemType)
 	if len(items) == 0 {
 		return nil, errors.New("no items of specified type")
 	}
 
-	// 计算该类型的总权重
+	// Calculate total weight for this type
 	totalWeight := 0
 	for _, item := range items {
 		totalWeight += item.Weight
 	}
 
-	// 在该类型范围内抽取
+	// Draw within this type range
 	r := p.rng.Intn(totalWeight)
- 	cumulative := 0
+	cumulative := 0
 	for _, item := range items {
-	 cumulative += item.Weight
+		cumulative += item.Weight
 		if r < cumulative {
 			return &item, nil
 		}
@@ -145,7 +145,7 @@ func (p *WeightedPool) DrawWithType(itemType string) (*WeightedItem, error) {
 	return &items[len(items)-1], nil
 }
 
-// DrawMultiple 执行多次抽卡（不重复）
+// DrawMultiple performs multiple draws (no repeat).
 func (p *WeightedPool) DrawMultiple(count int) ([]WeightedItem, error) {
 	if count > len(p.Items) {
 		return nil, errors.New("count exceeds pool size")
@@ -154,7 +154,7 @@ func (p *WeightedPool) DrawMultiple(count int) ([]WeightedItem, error) {
 		return nil, errors.New("count must be positive")
 	}
 
-	// 创建临时池用于抽取
+	// Create temporary pool for drawing
 	tempPool := &WeightedPool{
 		Items:       make([]WeightedItem, len(p.Items)),
 		TotalWeight: p.TotalWeight,
@@ -175,7 +175,7 @@ func (p *WeightedPool) DrawMultiple(count int) ([]WeightedItem, error) {
 	return result, nil
 }
 
-// DrawMultipleWithType 按类型多次抽卡（不重复）
+// DrawMultipleWithType draws multiple by type (no repeat).
 func (p *WeightedPool) DrawMultipleWithType(itemType string, count int) ([]WeightedItem, error) {
 	items := p.GetItemsByType(itemType)
 	if count > len(items) {
@@ -185,7 +185,7 @@ func (p *WeightedPool) DrawMultipleWithType(itemType string, count int) ([]Weigh
 		return nil, errors.New("count must be positive")
 	}
 
-	// 创建临时池
+	// Create temporary pool
 	tempPool := &WeightedPool{
 		Items:       items,
 		TotalWeight: 0,
@@ -208,19 +208,19 @@ func (p *WeightedPool) DrawMultipleWithType(itemType string, count int) ([]Weigh
 	return result, nil
 }
 
-// ========== 幸运值调节系统 ==========
+// ========== Luck Adjustment System ==========
 
-// LuckModifier 幸运值调节配置
+// LuckModifier represents luck adjustment configuration.
 type LuckModifier struct {
-	BaseWeight    int     `json:"base_weight"`    // 基础权重
-	LuckFactor    float64 `json:"luck_factor"`    // 幸运值影响因子
-	MinWeight     int     `json:"min_weight"`     // 最小权重
-	MaxWeight     int     `json:"max_weight"`     // 最大权重
-	GoodType      string  `json:"good_type"`      // 好事件类型
-	BadType       string  `json:"bad_type"`       // 坏事件类型
+	BaseWeight int     `json:"base_weight"`    // Base weight
+	LuckFactor float64 `json:"luck_factor"`    // Luck influence factor
+	MinWeight  int     `json:"min_weight"`     // Minimum weight
+	MaxWeight  int     `json:"max_weight"`     // Maximum weight
+	GoodType   string  `json:"good_type"`      // Good event type
+	BadType    string  `json:"bad_type"`       // Bad event type
 }
 
-// NewLuckModifier 创建幸运值调节器
+// NewLuckModifier creates a luck modifier.
 func NewLuckModifier(baseWeight int, luckFactor float64) *LuckModifier {
 	return &LuckModifier{
 		BaseWeight: baseWeight,
@@ -230,21 +230,21 @@ func NewLuckModifier(baseWeight int, luckFactor float64) *LuckModifier {
 	}
 }
 
-// CalculateWeight 根据幸运值计算调整后的权重
-// luck: 玩家幸运值 (0~8)
-// isGoodEvent: 是否为良性事件
+// CalculateWeight calculates adjusted weight based on luck.
+// luck: player luck value (0~8)
+// isGoodEvent: whether it's a good event
 func (lm *LuckModifier) CalculateWeight(luck int, isGoodEvent bool) int {
 	adjusted := float64(lm.BaseWeight)
 
 	if isGoodEvent {
-		// 幸运值增加良性事件权重
+		// Luck increases good event weight
 		adjusted += adjusted * lm.LuckFactor * float64(luck)
 	} else {
-		// 幸运值减少恶性事件权重
+		// Luck decreases bad event weight
 		adjusted -= adjusted * lm.LuckFactor * float64(luck)
 	}
 
-	// 限制范围
+	// Limit range
 	result := int(adjusted)
 	if result < lm.MinWeight {
 		result = lm.MinWeight
@@ -256,13 +256,13 @@ func (lm *LuckModifier) CalculateWeight(luck int, isGoodEvent bool) int {
 	return result
 }
 
-// LuckAdjustedPool 幸运值调节后的抽卡池
+// LuckAdjustedPool represents luck-adjusted draw pool.
 type LuckAdjustedPool struct {
-	BasePool     *WeightedPool `json:"base_pool"`     // 基础抽卡池
-	LuckModifier *LuckModifier `json:"luck_modifier"` // 幸运值调节器
+	BasePool     *WeightedPool `json:"base_pool"`     // Base draw pool
+	LuckModifier *LuckModifier `json:"luck_modifier"` // Luck modifier
 }
 
-// NewLuckAdjustedPool 创建幸运值调节抽卡池
+// NewLuckAdjustedPool creates a luck-adjusted draw pool.
 func NewLuckAdjustedPool(basePool *WeightedPool, modifier *LuckModifier) *LuckAdjustedPool {
 	return &LuckAdjustedPool{
 		BasePool:     basePool,
@@ -270,13 +270,13 @@ func NewLuckAdjustedPool(basePool *WeightedPool, modifier *LuckModifier) *LuckAd
 	}
 }
 
-// DrawWithLuck 根据幸运值抽卡
+// DrawWithLuck draws based on luck value.
 func (lap *LuckAdjustedPool) DrawWithLuck(luck int) (*WeightedItem, error) {
 	if lap.BasePool == nil {
 		return nil, errors.New("base pool is nil")
 	}
 
-	// 创建调节后的临时池
+	// Create adjusted temporary pool
 	adjustedPool := NewWeightedPoolWithSeed(lap.BasePool.rng.Int63())
 	for _, item := range lap.BasePool.Items {
 		isGood := item.Type == lap.LuckModifier.GoodType
@@ -287,16 +287,16 @@ func (lap *LuckAdjustedPool) DrawWithLuck(luck int) (*WeightedItem, error) {
 	return adjustedPool.Draw()
 }
 
-// ========== 抽卡概率配置 ==========
+// ========== Draw Probability Configuration ==========
 
-// ProbabilityConfig 抽卡概率配置
+// ProbabilityConfig represents draw probability configuration.
 type ProbabilityConfig struct {
-	ID           string  `json:"id"`
-	Name         string  `json:"name"`
-	Probabilities map[string]float64 `json:"probabilities"` // ID -> 概率百分比
+	ID           string             `json:"id"`
+	Name         string             `json:"name"`
+	Probabilities map[string]float64 `json:"probabilities"` // ID -> probability percentage
 }
 
-// NewProbabilityConfig 创建概率配置
+// NewProbabilityConfig creates a probability configuration.
 func NewProbabilityConfig(id string, name string) *ProbabilityConfig {
 	return &ProbabilityConfig{
 		ID:           id,
@@ -305,7 +305,7 @@ func NewProbabilityConfig(id string, name string) *ProbabilityConfig {
 	}
 }
 
-// SetProbability 设置概率
+// SetProbability sets probability.
 func (pc *ProbabilityConfig) SetProbability(itemID string, probability float64) error {
 	if probability < 0 || probability > 100 {
 		return errors.New("probability must be between 0 and 100")
@@ -314,17 +314,17 @@ func (pc *ProbabilityConfig) SetProbability(itemID string, probability float64) 
 	return nil
 }
 
-// Validate 验证概率总和是否为100%
+// Validate validates if probability sum is 100%.
 func (pc *ProbabilityConfig) Validate() bool {
 	total := 0.0
 	for _, p := range pc.Probabilities {
 		total += p
 	}
-	// 允许一定误差
+	// Allow some error margin
 	return total >= 99.9 && total <= 100.1
 }
 
-// ToWeightedPool 转换为权重抽卡池
+// ToWeightedPool converts to weighted draw pool.
 func (pc *ProbabilityConfig) ToWeightedPool() (*WeightedPool, error) {
 	if !pc.Validate() {
 		return nil, errors.New("probabilities do not sum to 100%")
@@ -332,7 +332,7 @@ func (pc *ProbabilityConfig) ToWeightedPool() (*WeightedPool, error) {
 
 	pool := NewWeightedPool()
 	for itemID, probability := range pc.Probabilities {
-		// 概率转换为权重（乘以100）
+		// Convert probability to weight (multiply by 100)
 		weight := int(probability * 10)
 		if weight <= 0 {
 			weight = 1
@@ -343,16 +343,16 @@ func (pc *ProbabilityConfig) ToWeightedPool() (*WeightedPool, error) {
 	return pool, nil
 }
 
-// ========== 抽卡结果统计 ==========
+// ========== Draw Statistics ==========
 
-// DrawStatistics 抽卡统计
+// DrawStatistics represents draw statistics.
 type DrawStatistics struct {
-	TotalDraws    int            `json:"total_draws"`    // 总抽卡次数
-	ItemCounts    map[string]int `json:"item_counts"`    // 各项抽中次数
-	TypeCounts    map[string]int `json:"type_counts"`    // 各类型抽中次数
+	TotalDraws int            `json:"total_draws"` // Total draw count
+	ItemCounts map[string]int `json:"item_counts"` // Item draw counts
+	TypeCounts map[string]int `json:"type_counts"` // Type draw counts
 }
 
-// NewDrawStatistics 创建统计对象
+// NewDrawStatistics creates a statistics object.
 func NewDrawStatistics() *DrawStatistics {
 	return &DrawStatistics{
 		TotalDraws: 0,
@@ -361,14 +361,14 @@ func NewDrawStatistics() *DrawStatistics {
 	}
 }
 
-// Record 记录一次抽卡
+// Record records a draw.
 func (ds *DrawStatistics) Record(item *WeightedItem) {
 	ds.TotalDraws++
 	ds.ItemCounts[item.ID]++
 	ds.TypeCounts[item.Type]++
 }
 
-// GetProbability 计算某项的实际抽中概率
+// GetProbability calculates actual draw probability for an item.
 func (ds *DrawStatistics) GetProbability(itemID string) float64 {
 	if ds.TotalDraws == 0 {
 		return 0
@@ -376,9 +376,9 @@ func (ds *DrawStatistics) GetProbability(itemID string) float64 {
 	return float64(ds.ItemCounts[itemID]) / float64(ds.TotalDraws) * 100
 }
 
-// GetTopItems 获取抽中最多的项
+// GetTopItems returns top drawn items.
 func (ds *DrawStatistics) GetTopItems(limit int) []string {
-	// 按次数排序
+	// Sort by count
 	items := make([]struct {
 		id    string
 		count int
@@ -403,16 +403,16 @@ func (ds *DrawStatistics) GetTopItems(limit int) []string {
 	return result
 }
 
-// ========== 预定义抽卡池 ==========
+// ========== Predefined Draw Pools ==========
 
-// EventPool 游戏事件抽卡池
+// EventPool represents game event draw pool.
 type EventPool struct {
-	GoodPool *WeightedPool `json:"good_pool"` // 良性事件池
-	BadPool  *WeightedPool `json:"bad_pool"`  // 恶性事件池
-	NeutralPool *WeightedPool `json:"neutral_pool"` // 中性事件池
+	GoodPool    *WeightedPool `json:"good_pool"`    // Good event pool
+	BadPool     *WeightedPool `json:"bad_pool"`     // Bad event pool
+	NeutralPool *WeightedPool `json:"neutral_pool"` // Neutral event pool
 }
 
-// NewEventPool 创建事件抽卡池
+// NewEventPool creates an event draw pool.
 func NewEventPool() *EventPool {
 	return &EventPool{
 		GoodPool:    NewWeightedPool(),
@@ -421,33 +421,33 @@ func NewEventPool() *EventPool {
 	}
 }
 
-// AddGoodEvent 添加良性事件
+// AddGoodEvent adds a good event.
 func (ep *EventPool) AddGoodEvent(id string, weight int, data interface{}) error {
 	return ep.GoodPool.AddItem(id, "good", weight, data)
 }
 
-// AddBadEvent 添加恶性事件
+// AddBadEvent adds a bad event.
 func (ep *EventPool) AddBadEvent(id string, weight int, data interface{}) error {
 	return ep.BadPool.AddItem(id, "bad", weight, data)
 }
 
-// AddNeutralEvent 添加中性事件
+// AddNeutralEvent adds a neutral event.
 func (ep *EventPool) AddNeutralEvent(id string, weight int, data interface{}) error {
 	return ep.NeutralPool.AddItem(id, "neutral", weight, data)
 }
 
-// DrawEvent 抽取事件
-// luck: 幸运值，影响好/坏事件概率
+// DrawEvent draws an event.
+// luck: luck value, affects good/bad event probability
 func (ep *EventPool) DrawEvent(luck int, rng *rand.Rand) (*WeightedItem, string, error) {
-	// 计算好/坏/中性事件的整体概率
-	// 基础概率：好30%，坏30%，中性40%
-	// 幸运值影响：每点幸运值增加好事件概率5%，减少坏事件概率5%
+	// Calculate overall probability for good/bad/neutral events
+	// Base probability: good 30%, bad 30%, neutral 40%
+	// Luck influence: each luck point increases good event 5%, decreases bad event 5%
 
 	goodProb := 30 + luck*5
 	badProb := 30 - luck*5
 	neutralProb := 40
 
-	// 限制概率范围
+	// Limit probability range
 	if goodProb > 70 {
 		goodProb = 70
 	}
@@ -455,19 +455,19 @@ func (ep *EventPool) DrawEvent(luck int, rng *rand.Rand) (*WeightedItem, string,
 		badProb = 10
 	}
 
-	// 创建类型选择池
+	// Create type selection pool
 	typePool := NewWeightedPoolWithSeed(rng.Int63())
 	typePool.AddItem("good", "type", goodProb, nil)
 	typePool.AddItem("bad", "type", badProb, nil)
 	typePool.AddItem("neutral", "type", neutralProb, nil)
 
-	// 选择事件类型
+	// Select event type
 	typeItem, err := typePool.Draw()
 	if err != nil {
 		return nil, "", err
 	}
 
-	// 从对应池中抽取
+	// Draw from corresponding pool
 	switch typeItem.ID {
 	case "good":
 		item, err := ep.GoodPool.Draw()
@@ -483,14 +483,14 @@ func (ep *EventPool) DrawEvent(luck int, rng *rand.Rand) (*WeightedItem, string,
 	return nil, "", errors.New("unknown event type")
 }
 
-// ItemPool 道具抽卡池
+// ItemPool represents item draw pool.
 type ItemPool struct {
-	CommonPool   *WeightedPool `json:"common_pool"`   // 普通道具池
-	RarePool     *WeightedPool `json:"rare_pool"`     // 稀有道具池
-	EpicPool     *WeightedPool `json:"epic_pool"`     // 史诗道具池
+	CommonPool *WeightedPool `json:"common_pool"` // Common item pool
+	RarePool   *WeightedPool `json:"rare_pool"`   // Rare item pool
+	EpicPool   *WeightedPool `json:"epic_pool"`   // Epic item pool
 }
 
-// NewItemPool 创建道具抽卡池
+// NewItemPool creates an item draw pool.
 func NewItemPool() *ItemPool {
 	return &ItemPool{
 		CommonPool: NewWeightedPool(),
@@ -499,32 +499,32 @@ func NewItemPool() *ItemPool {
 	}
 }
 
-// AddCommonItem 添加普通道具
+// AddCommonItem adds a common item.
 func (ip *ItemPool) AddCommonItem(id string, weight int, data interface{}) error {
 	return ip.CommonPool.AddItem(id, "common", weight, data)
 }
 
-// AddRareItem 添加稀有道具
+// AddRareItem adds a rare item.
 func (ip *ItemPool) AddRareItem(id string, weight int, data interface{}) error {
 	return ip.RarePool.AddItem(id, "rare", weight, data)
 }
 
-// AddEpicItem 添加史诗道具
+// AddEpicItem adds an epic item.
 func (ip *ItemPool) AddEpicItem(id string, weight int, data interface{}) error {
 	return ip.EpicPool.AddItem(id, "epic", weight, data)
 }
 
-// DrawItem 抽取道具
-// luck: 幸运值，影响稀有度概率
+// DrawItem draws an item.
+// luck: luck value, affects rarity probability
 func (ip *ItemPool) DrawItem(luck int, rng *rand.Rand) (*WeightedItem, string, error) {
-	// 基础概率：普通70%，稀有20%，史诗10%
-	// 幸运值影响：每点幸运值增加稀有/史诗概率各2%
+	// Base probability: common 70%, rare 20%, epic 10%
+	// Luck influence: each luck point increases rare/epic 2%
 
 	commonProb := 70 - luck*4
 	rareProb := 20 + luck*2
 	epicProb := 10 + luck*2
 
-	// 限制概率范围
+	// Limit probability range
 	if commonProb < 50 {
 		commonProb = 50
 	}
@@ -535,19 +535,19 @@ func (ip *ItemPool) DrawItem(luck int, rng *rand.Rand) (*WeightedItem, string, e
 		epicProb = 20
 	}
 
-	// 创建稀有度选择池
+	// Create rarity selection pool
 	rarityPool := NewWeightedPoolWithSeed(rng.Int63())
 	rarityPool.AddItem("common", "rarity", commonProb, nil)
 	rarityPool.AddItem("rare", "rarity", rareProb, nil)
 	rarityPool.AddItem("epic", "rarity", epicProb, nil)
 
-	// 选择稀有度
+	// Select rarity
 	rarityItem, err := rarityPool.Draw()
 	if err != nil {
 		return nil, "", err
 	}
 
-	// 从对应池中抽取
+	// Draw from corresponding pool
 	switch rarityItem.ID {
 	case "common":
 		item, err := ip.CommonPool.Draw()
@@ -562,27 +562,28 @@ func (ip *ItemPool) DrawItem(luck int, rng *rand.Rand) (*WeightedItem, string, e
 
 	return nil, "", errors.New("unknown rarity type")
 }
-// ========== 属性分类抽卡池 ==========
 
-// AttributeType 属性类型（用于抽卡池分类）
+// ========== Attribute-based Draw Pool ==========
+
+// AttributeType represents attribute type (for pool classification).
 type AttributeType string
 
 const (
-	AttributeGood    AttributeType = "good"    // 良性
-	AttributeNeutral AttributeType = "neutral" // 中性
-	AttributeBad     AttributeType = "bad"     // 恶性
+	AttributeGood    AttributeType = "good"    // Good attribute
+	AttributeNeutral AttributeType = "neutral" // Neutral attribute
+	AttributeBad     AttributeType = "bad"     // Bad attribute
 )
 
-// AttributeBasedPool 基于属性的抽卡池
-// 支持按属性分类存储和抽取
+// AttributeBasedPool represents attribute-based draw pool.
+// Supports storage and drawing by attribute classification.
 type AttributeBasedPool struct {
-	GoodPool    *WeightedPool `json:"good_pool"`    // 良性池
-	NeutralPool *WeightedPool `json:"neutral_pool"` // 中性池
-	BadPool     *WeightedPool `json:"bad_pool"`     // 恶性池
-	rng         *rand.Rand    `json:"-"`            // 随机数生成器
+	GoodPool    *WeightedPool `json:"good_pool"`    // Good pool
+	NeutralPool *WeightedPool `json:"neutral_pool"` // Neutral pool
+	BadPool     *WeightedPool `json:"bad_pool"`     // Bad pool
+	rng         *rand.Rand    `json:"-"`            // Random number generator
 }
 
-// NewAttributeBasedPool 创建属性分类抽卡池
+// NewAttributeBasedPool creates an attribute-based draw pool.
 func NewAttributeBasedPool() *AttributeBasedPool {
 	return &AttributeBasedPool{
 		GoodPool:    NewWeightedPool(),
@@ -592,7 +593,7 @@ func NewAttributeBasedPool() *AttributeBasedPool {
 	}
 }
 
-// NewAttributeBasedPoolWithSeed 创建带指定种子的属性分类抽卡池（用于测试）
+// NewAttributeBasedPoolWithSeed creates an attribute-based draw pool with specified seed (for testing).
 func NewAttributeBasedPoolWithSeed(seed int64) *AttributeBasedPool {
 	return &AttributeBasedPool{
 		GoodPool:    NewWeightedPoolWithSeed(seed),
@@ -602,7 +603,7 @@ func NewAttributeBasedPoolWithSeed(seed int64) *AttributeBasedPool {
 	}
 }
 
-// AddItem 添加项到指定属性池
+// AddItem adds an item to specified attribute pool.
 func (abp *AttributeBasedPool) AddItem(id string, attr AttributeType, weight int, data interface{}) error {
 	switch attr {
 	case AttributeGood:
@@ -615,22 +616,22 @@ func (abp *AttributeBasedPool) AddItem(id string, attr AttributeType, weight int
 	return errors.New("unknown attribute type")
 }
 
-// AddGoodItem 添加良性项
+// AddGoodItem adds a good item.
 func (abp *AttributeBasedPool) AddGoodItem(id string, weight int, data interface{}) error {
 	return abp.AddItem(id, AttributeGood, weight, data)
 }
 
-// AddNeutralItem 添加中性项
+// AddNeutralItem adds a neutral item.
 func (abp *AttributeBasedPool) AddNeutralItem(id string, weight int, data interface{}) error {
 	return abp.AddItem(id, AttributeNeutral, weight, data)
 }
 
-// AddBadItem 添加恶性项
+// AddBadItem adds a bad item.
 func (abp *AttributeBasedPool) AddBadItem(id string, weight int, data interface{}) error {
 	return abp.AddItem(id, AttributeBad, weight, data)
 }
 
-// GetPoolByAttribute 获取指定属性的池
+// GetPoolByAttribute returns the pool for specified attribute.
 func (abp *AttributeBasedPool) GetPoolByAttribute(attr AttributeType) *WeightedPool {
 	switch attr {
 	case AttributeGood:
@@ -643,7 +644,7 @@ func (abp *AttributeBasedPool) GetPoolByAttribute(attr AttributeType) *WeightedP
 	return nil
 }
 
-// DrawFromAttribute 从指定属性池抽取
+// DrawFromAttribute draws from specified attribute pool.
 func (abp *AttributeBasedPool) DrawFromAttribute(attr AttributeType) (*WeightedItem, error) {
 	pool := abp.GetPoolByAttribute(attr)
 	if pool == nil {
@@ -652,17 +653,17 @@ func (abp *AttributeBasedPool) DrawFromAttribute(attr AttributeType) (*WeightedI
 	return pool.Draw()
 }
 
-// DrawWithLuck 根据幸运值抽取
-// luck: 幸运值，影响好/坏属性的概率分布
-// 基础概率：好30%，坏30%，中性40%
-// 幸运值每点增加好事件5%，减少坏事件5%
+// DrawWithLuck draws based on luck value.
+// luck: luck value, affects good/bad attribute probability distribution
+// Base probability: good 30%, bad 30%, neutral 40%
+// Each luck point increases good 5%, decreases bad 5%
 func (abp *AttributeBasedPool) DrawWithLuck(luck int) (*WeightedItem, AttributeType, error) {
-	// 计算属性选择概率
+	// Calculate attribute selection probability
 	goodProb := 30 + luck*5
 	badProb := 30 - luck*5
 	neutralProb := 40
 
-	// 限制概率范围
+	// Limit probability range
 	if goodProb > 70 {
 		goodProb = 70
 	}
@@ -670,13 +671,13 @@ func (abp *AttributeBasedPool) DrawWithLuck(luck int) (*WeightedItem, AttributeT
 		badProb = 10
 	}
 
-	// 创建属性选择池
+	// Create attribute selection pool
 	attrPool := NewWeightedPoolWithSeed(abp.rng.Int63())
 	attrPool.AddItem("good", "attr", goodProb, nil)
 	attrPool.AddItem("bad", "attr", badProb, nil)
 	attrPool.AddItem("neutral", "attr", neutralProb, nil)
 
-	// 选择属性
+	// Select attribute
 	attrItem, err := attrPool.Draw()
 	if err != nil {
 		return nil, "", err
@@ -687,14 +688,14 @@ func (abp *AttributeBasedPool) DrawWithLuck(luck int) (*WeightedItem, AttributeT
 	return item, attr, err
 }
 
-// DrawWithLuckAndSeed 根据幸运值和指定种子抽取（用于测试）
+// DrawWithLuckAndSeed draws based on luck value and specified seed (for testing).
 func (abp *AttributeBasedPool) DrawWithLuckAndSeed(luck int, seed int64) (*WeightedItem, AttributeType, error) {
-	// 计算属性选择概率
+	// Calculate attribute selection probability
 	goodProb := 30 + luck*5
 	badProb := 30 - luck*5
 	neutralProb := 40
 
-	// 限制概率范围
+	// Limit probability range
 	if goodProb > 70 {
 		goodProb = 70
 	}
@@ -702,13 +703,13 @@ func (abp *AttributeBasedPool) DrawWithLuckAndSeed(luck int, seed int64) (*Weigh
 		badProb = 10
 	}
 
-	// 创建属性选择池
+	// Create attribute selection pool
 	attrPool := NewWeightedPoolWithSeed(seed)
 	attrPool.AddItem("good", "attr", goodProb, nil)
 	attrPool.AddItem("bad", "attr", badProb, nil)
 	attrPool.AddItem("neutral", "attr", neutralProb, nil)
 
-	// 选择属性
+	// Select attribute
 	attrItem, err := attrPool.Draw()
 	if err != nil {
 		return nil, "", err
@@ -724,12 +725,12 @@ func (abp *AttributeBasedPool) DrawWithLuckAndSeed(luck int, seed int64) (*Weigh
 	return item, attr, err
 }
 
-// GetTotalWeight 获取所有池的总权重
+// GetTotalWeight returns total weight of all pools.
 func (abp *AttributeBasedPool) GetTotalWeight() int {
 	return abp.GoodPool.TotalWeight + abp.NeutralPool.TotalWeight + abp.BadPool.TotalWeight
 }
 
-// GetAttributeWeights 获取各属性池的权重
+// GetAttributeWeights returns weights of each attribute pool.
 func (abp *AttributeBasedPool) GetAttributeWeights() map[AttributeType]int {
 	return map[AttributeType]int{
 		AttributeGood:    abp.GoodPool.TotalWeight,
@@ -738,7 +739,7 @@ func (abp *AttributeBasedPool) GetAttributeWeights() map[AttributeType]int {
 	}
 }
 
-// Clear 清空所有池
+// Clear clears all pools.
 func (abp *AttributeBasedPool) Clear() {
 	abp.GoodPool = NewWeightedPool()
 	abp.NeutralPool = NewWeightedPool()
