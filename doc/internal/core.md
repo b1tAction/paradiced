@@ -53,18 +53,29 @@ const (
 
 ```go
 type Player struct {
-    UserID      string   // 玩家UUID
-    Faction     Faction  // 阵营
-    Position    int      // 当前位置
-    HP          int      // 血量（默认最大6）
-    LP          int      // 幸运值（范围0~8，影响随机事件）
-    Inventory   []*Item  // 道具栏
-    ActiveBuffs []*Buff  // 持续状态
-    IsDead      bool     // 是否死亡
-    SkipTurn    bool     // 是否跳过回合
-    ChargeCount int      // 充能计数（青龙/玄武）
-    FireCounter int      // 离火计数（朱雀）
+    UserID      string     // 玩家UUID
+    Faction     Faction    // 阵营
+    Position    int        // 当前位置
+    HP          int        // 血量（默认最大6）
+    LP          int        // 幸运值（范围0~8，影响随机事件）
+    Inventory   []*Item    // 道具栏
+    ActiveBuffs []*Buff    // 持续状态
+    IsDead      bool       // 是否死亡
+    SkipTurn    bool       // 是否跳过回合
+    *util.Metadata          // 类型安全的动态数据容器
 }
+
+// Metadata 存储的键名约定：
+// - "charge_count": 充能计数（青龙/玄武阵营）
+// - "fire_counter": 离火计数（朱雀阵营）
+// - 其他自定义数据可通过 SetInt/SetString 等方法添加
+
+// 便捷方法（向后兼容）：
+func (p *Player) GetChargeCount() int
+func (p *Player) SetChargeCount(count int)
+func (p *Player) GetFireCounter() int
+func (p *Player) SetFireCounter(count int)
+func (p *Player) IncrementFireCounter() int
 ```
 
 ## Buff/Item/Event 定义
