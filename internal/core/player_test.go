@@ -567,3 +567,125 @@ func TestPlayerCanAct(t *testing.T) {
 		t.Error("player with HP=0 should not be able to act")
 	}
 }
+
+// ========== Metadata Tests ==========
+
+func TestPlayerMetadataInitialized(t *testing.T) {
+	player := NewPlayer(PlayerConfig{UserID: "test"})
+
+	// Metadata 应该被初始化
+	if player.Metadata == nil {
+		t.Error("player Metadata should be initialized")
+	}
+	if player.Size() != 0 {
+		t.Errorf("initial metadata size = %d, expected 0", player.Size())
+	}
+}
+
+func TestPlayerChargeCount(t *testing.T) {
+	player := NewPlayer(PlayerConfig{UserID: "test", Faction: FactionQingLong})
+
+	// 初始充能计数为 0
+	if player.GetChargeCount() != 0 {
+		t.Errorf("initial charge count = %d, expected 0", player.GetChargeCount())
+	}
+
+	// 设置充能计数
+	player.SetChargeCount(5)
+	if player.GetChargeCount() != 5 {
+		t.Errorf("charge count = %d, expected 5", player.GetChargeCount())
+	}
+
+	// 递增充能计数
+	result := player.IncrementChargeCount()
+	if result != 6 {
+		t.Errorf("increment result = %d, expected 6", result)
+	}
+	if player.GetChargeCount() != 6 {
+		t.Errorf("charge count after increment = %d, expected 6", player.GetChargeCount())
+	}
+}
+
+func TestPlayerFireCounter(t *testing.T) {
+	player := NewPlayer(PlayerConfig{UserID: "test", Faction: FactionZhuQue})
+
+	// 初始离火计数为 0
+	if player.GetFireCounter() != 0 {
+		t.Errorf("initial fire counter = %d, expected 0", player.GetFireCounter())
+	}
+
+	// 设置离火计数
+	player.SetFireCounter(3)
+	if player.GetFireCounter() != 3 {
+		t.Errorf("fire counter = %d, expected 3", player.GetFireCounter())
+	}
+
+	// 递增离火计数
+	result := player.IncrementFireCounter()
+	if result != 4 {
+		t.Errorf("increment result = %d, expected 4", result)
+	}
+	if player.GetFireCounter() != 4 {
+		t.Errorf("fire counter after increment = %d, expected 4", player.GetFireCounter())
+	}
+}
+
+func TestPlayerCloneWithMetadata(t *testing.T) {
+	original := NewPlayer(PlayerConfig{UserID: "test"})
+	original.SetChargeCount(5)
+	original.SetFireCounter(3)
+	original.SetInt("custom_value", 100)
+
+	cloned := original.Clone()
+
+	// 修改克隆的 Metadata 不影响原版
+	cloned.SetChargeCount(10)
+	cloned.SetFireCounter(0)
+	cloned.SetInt("custom_value", 200)
+
+	if original.GetChargeCount() != 5 {
+		t.Errorf("original charge count = %d, expected 5", original.GetChargeCount())
+	}
+	if original.GetFireCounter() != 3 {
+		t.Errorf("original fire counter = %d, expected 3", original.GetFireCounter())
+	}
+	if original.GetInt("custom_value") != 100 {
+		t.Errorf("original custom_value = %d, expected 100", original.GetInt("custom_value"))
+	}
+
+	// 克隆的值应该是修改后的
+	if cloned.GetChargeCount() != 10 {
+		t.Errorf("cloned charge count = %d, expected 10", cloned.GetChargeCount())
+	}
+	if cloned.GetFireCounter() != 0 {
+		t.Errorf("cloned fire counter = %d, expected 0", cloned.GetFireCounter())
+	}
+	if cloned.GetInt("custom_value") != 200 {
+		t.Errorf("cloned custom_value = %d, expected 200", cloned.GetInt("custom_value"))
+	}
+}
+
+func TestPlayerMetadataDirectUsage(t *testing.T) {
+	player := NewPlayer(PlayerConfig{UserID: "test"})
+
+	// 直接使用 Metadata 方法
+	player.SetInt("turn_count", 10)
+	player.SetString("last_event", "fog")
+	player.SetBool("has_visited_checkpoint", true)
+
+	if player.GetInt("turn_count") != 10 {
+		t.Errorf("GetInt(\"turn_count\") = %d, expected 10", player.GetInt("turn_count"))
+	}
+	if player.GetString("last_event") != "fog" {
+		t.Errorf("GetString(\"last_event\") = %s, expected fog", player.GetString("last_event"))
+	}
+	if !player.GetBool("has_visited_checkpoint") {
+		t.Error("GetBool(\"has_visited_checkpoint\") should be true")
+	}
+
+	// 链式调用
+	player.SetInt("chain1", 1).SetString("chain2", "test").SetBool("chain3", true)
+	if !player.HasKey("chain1") || !player.HasKey("chain2") || !player.HasKey("chain3") {
+		t.Error("chained keys should all exist")
+	}
+}

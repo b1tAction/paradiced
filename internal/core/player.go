@@ -3,21 +3,22 @@ package core
 import (
 	"errors"
 	"fmt"
+
+	"github.com/b1tAction/Fated/pkg/util"
 )
 
 // Player 玩家结构体
 type Player struct {
-	UserID      string   `json:"user_id"`      // 玩家UUID
-	Faction     Faction  `json:"faction"`      // 阵营
-	Position    int      `json:"position"`     // 当前位置
-	HP          int      `json:"hp"`           // 血量
-	LP          int      `json:"lp"`           // 幸运值（影响随机事件）
-	Inventory   []*Item  `json:"inventory"`    // 道具栏
-	ActiveBuffs []*Buff  `json:"active_buffs"` // 持续状态
-	IsDead      bool     `json:"is_dead"`      // 是否死亡
-	SkipTurn    bool     `json:"skip_turn"`    // 是否跳过回合
-	ChargeCount int      `json:"charge_count"` // 充能计数（青龙/玄武）
-	FireCounter int      `json:"fire_counter"` // 离火计数（朱雀）
+	UserID      string     `json:"user_id"`      // 玩家UUID
+	Faction     Faction    `json:"faction"`      // 阵营
+	Position    int        `json:"position"`     // 当前位置
+	HP          int        `json:"hp"`           // 血量
+	LP          int        `json:"lp"`           // 幸运值（影响随机事件）
+	Inventory   []*Item    `json:"inventory"`    // 道具栏
+	ActiveBuffs []*Buff    `json:"active_buffs"` // 持续状态
+	IsDead      bool       `json:"is_dead"`      // 是否死亡
+	SkipTurn    bool       `json:"skip_turn"`    // 是否跳过回合
+	*util.Metadata          `json:"metadata"`     // 类型安全的动态数据容器
 }
 
 // PlayerConfig 玩家配置
@@ -55,8 +56,7 @@ func NewPlayer(config PlayerConfig) *Player {
 		ActiveBuffs: make([]*Buff, 0),
 		IsDead:      false,
 		SkipTurn:    false,
-		ChargeCount: 0,
-		FireCounter: 0,
+		Metadata:    util.NewMetadata(),
 	}
 
 	// 朱雀阵营初始携带离火Buff
@@ -249,6 +249,40 @@ func (p *Player) HasItem(itemType ItemType) bool {
 	return false
 }
 
+// ========== 充能计数相关方法（使用 Metadata） ==========
+
+// GetChargeCount 获取充能计数（青龙/玄武阵营使用）
+func (p *Player) GetChargeCount() int {
+	return p.GetIntOrDefault("charge_count", 0)
+}
+
+// SetChargeCount 设置充能计数
+func (p *Player) SetChargeCount(count int) {
+	p.SetInt("charge_count", count)
+}
+
+// IncrementChargeCount 递增充能计数，返回递增后的值
+func (p *Player) IncrementChargeCount() int {
+	return p.IncrementInt("charge_count", 1)
+}
+
+// ========== 离火计数相关方法（使用 Metadata） ==========
+
+// GetFireCounter 获取离火计数（朱雀阵营使用）
+func (p *Player) GetFireCounter() int {
+	return p.GetIntOrDefault("fire_counter", 0)
+}
+
+// SetFireCounter 设置离火计数
+func (p *Player) SetFireCounter(count int) {
+	p.SetInt("fire_counter", count)
+}
+
+// IncrementFireCounter 递增离火计数，返回递增后的值
+func (p *Player) IncrementFireCounter() int {
+	return p.IncrementInt("fire_counter", 1)
+}
+
 // ========== 辅助方法 ==========
 
 // Clone 克隆玩家（用于测试）
@@ -266,9 +300,11 @@ func (p *Player) Clone() *Player {
 	buffs := make([]*Buff, len(p.ActiveBuffs))
 	for i, buff := range p.ActiveBuffs {
 		buffs[i] = &Buff{
-			Type:     buff.Type,
-			Duration: buff.Duration,
-			Charge:   buff.Charge,
+			Type:            buff.Type,
+			ID:              buff.ID,
+			Duration:        buff.Duration,
+			Charge:          buff.Charge,
+			SubscriptionIDs: make([]string, 0),
 		}
 	}
 
@@ -282,8 +318,7 @@ func (p *Player) Clone() *Player {
 		ActiveBuffs: buffs,
 		IsDead:      p.IsDead,
 		SkipTurn:    p.SkipTurn,
-		ChargeCount: p.ChargeCount,
-		FireCounter: p.FireCounter,
+		Metadata:    p.Metadata.Clone(),
 	}
 }
 
