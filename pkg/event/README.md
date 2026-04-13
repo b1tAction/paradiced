@@ -4,16 +4,20 @@
 
 ## 功能
 
-- **Phase 系统**: 定义 9 种触发时机
-  - `BeforeTurn`: 回合开始前
-  - `OnMove`: 移动时
-  - `OnLand`: 落地后
-  - `PreEvent`: 事件触发前
-  - `PreDamage`: 受伤前
-  - `AfterTurn`: 回合结束后
-  - `AnyTime`: 任何时候可用（主动触发）
-  - `OnBuffApplied`: Buff 挂载时
-  - `OnBuffRemoved`: Buff 移除时
+- **Phase 系统**: 定义 10 种触发时机
+  - **HSM 发布（状态时机）**:
+    - `BeforeTurn`: 回合开始前（TurnUpkeep.Enter）
+    - `OnLand`: 落地后（TurnLanded.Enter）
+    - `AfterTurn`: 回合结束后（TurnEnd.Enter）
+  - **Action 发布（动作时机）**:
+    - `PreDamage`: 伤害应用前（隐匿、护盾拦截）
+    - `PreEvent`: 事件触发前（辟邪、玄武）
+    - `PreMove`: 移动前（迷途反向）
+    - `OnBuffApplied`: Buff 添加后（入场效果）
+    - `OnBuffRemoved`: Buff 移除前（亡语）
+  - **特殊 Phase**:
+    - `AnyTime`: 任何时候可用（主动触发）
+    - `ItemUsed`: 道具主动使用时触发
 
 - **EventBus**: 管理 Buff/道具的订阅和触发
   - Subscribe/Unsubscribe 订阅管理
@@ -120,19 +124,22 @@ d := event.NewDecisionBuilder("选择目标：").
 | SourceID | string | 来源 ID（Buff/Item） |
 | SourceType | string | 来源类型（"buff"/"item"） |
 
-## Phase 与订阅关系
+## Phase 与发布者关系
 
-| Phase | 说明 | 需订阅 EventBus |
-|-------|------|----------------|
-| BeforeTurn | 回合开始前 | ✓ |
-| OnMove | 移动过程中 | ✓ |
-| OnLand | 落地后 | ✓ |
-| PreEvent | 事件触发前 | ✓ |
-| PreDamage | 受伤前 | ✓ |
-| AfterTurn | 回合结束后 | ✓ |
-| AnyTime | 任何时候可用 | ❌（主动触发） |
-| OnBuffApplied | Buff 挂载时 | ✓ |
-| OnBuffRemoved | Buff 移除时 | ✓ |
+**设计原则：谁产生时机，谁发布 Phase**
+
+| Phase | 发布者 | 说明 | 需订阅 EventBus |
+|-------|--------|------|----------------|
+| BeforeTurn | HSM | 回合开始前 | ✓ |
+| OnLand | HSM | 落地后 | ✓ |
+| AfterTurn | HSM | 回合结束后 | ✓ |
+| PreDamage | Action | 伤害应用前 | ✓ |
+| PreEvent | Action | 事件触发前 | ✓ |
+| PreMove | Action | 移动前 | ✓ |
+| OnBuffApplied | Action | Buff 添加后 | ✓ |
+| OnBuffRemoved | Action | Buff 移除前 | ✓ |
+| AnyTime | - | 任何时候可用 | ❌（主动触发） |
+| ItemUsed | Game | 道具使用时 | ✓ |
 
 ## 测试覆盖率
 

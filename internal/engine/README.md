@@ -11,12 +11,7 @@
 - Buff/道具订阅管理
 - 回合轮转
 - Buff生命周期管理（Apply/Remove）
-
-### StateMachine
-
-- Phase 触发
-- 用户决策等待
-- 状态流转
+- Action系统集成
 
 ### Handlers
 
@@ -24,48 +19,82 @@ EventHandler 策略注册表，实现定制化的 Buff 效果：
 
 - 朱雀离火：每4回合 LP+1
 - 其他 Buff 的默认处理逻辑
+- 所有效果通过 Action 系统执行
 
 ## 文件结构
 
 ```
 internal/engine/
 ├── game.go           # Game 实例和 EventBus 管理
-├── state_machine.go  # Phase 触发状态机
-├── handlers.go       # EventHandler 策略注册表
-└── integration_test.go # 集成测试
+├── handlers.go       # EventHandler 策略注册表，Action系统集成
+├── game_test.go      # Game 单元测试
+├── handlers_test.go  # Handlers 单元测试
+└── action/           # Action 子包
+    ├── action.go     # ExecutableAction 接口定义
+    ├── types.go      # 具体Action类型实现
+    ├── context.go    # ActionContext 执行上下文
+    ├── queue.go      # Queue 衍生动作队列
+    ├── turn_event_log.go # TurnEventLog 事件日志
+    └── types_test.go # Action 类型测试
+└── hsm/              # 分层状态机子包
+    ├── state.go      # State 接口和全局状态
+    ├── context.go    # StateContext
+    └── state_test.go # HSM 测试
+```
+
+## Action 系统集成
+
+所有游戏效果（Buff/Item/Event/Faction被动）通过 Action 系统执行：
+
+```
+Buff Handler → 返回 Action → ActionContext.ExecuteAction →
+  PreTrigger Phase → Execute → PostTrigger Phase → EventLog → ProcessQueue
+```
+
+### Action 执行流程
+
+```go
+// 创建 ActionContext
+actionCtx := action.NewActionContext(game, bus, mapEngine)
+
+// 执行 DamageAction
+damageAction := action.NewDamageAction(player, 10, "Event_Trap")
+actionCtx.ExecuteAction(damageAction)
+
+// PreTrigger: 发布 PhasePreDamage，隐匿 Buff 可拦截
+// Execute: player.ApplyDamage(10)
+// PostTrigger: 无（PhaseAnyTime）
+// EventLog: 记录 HPChange 事件
+
+// 处理衍生动作
+actionCtx.ProcessQueue()
 ```
 
 ## Phase 触发流程
 
-```go
-// 使用 StateMachine
-sm := engine.NewStateMachine(game)
+**设计原则：谁产生时机，谁发布 Phase**
 
-// BeforeTurn
-if sm.TriggerPhaseAndWait(event.PhaseBeforeTurn, player) {
-    // 等待用户确认骰子升级卡等
-}
-
-// OnMove
-sm.ExecuteOnMovePhase(player)
-
-// OnLand
-if sm.TriggerPhaseAndWait(event.PhaseOnLand, player) {
-    // 等待用户确认任意门等
-}
-
-// PreEvent
-sm.ExecutePreEventPhase(player)
-
-// AfterTurn
-sm.ExecuteAfterTurnPhase(player)
-```
+| Phase | 发布者 | 触发位置 |
+|-------|--------|----------|
+| BeforeTurn | HSM | TurnUpkeep.Enter() |
+| OnLand | HSM | TurnLanded.Enter() |
+| AfterTurn | HSM | TurnEnd.Enter() |
+| PreMove | Action | MoveAction.Execute() |
+| PreEvent | Action | DrawEventAction.Execute() |
+| PreDamage | Action | DamageAction.Execute() |
 
 ## 与其他包的关系
 
 - `internal/core`: Player, Buff, Item 类型
 - `internal/gamemap`: MapEngine 地图引擎
 - `pkg/event`: EventBus, Decision, Phase, Context
+- `pkg/protocol`: Player/Game 接口
+- `pkg/action`: Action 接口层
+
+## 相关文档
+
+- [action/README.md](action/README.md) - Action 实现详情
+- [hsm/README.md](hsm/README.md) - 分层状态机详情
 
 ## 测试覆盖率
 

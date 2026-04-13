@@ -91,14 +91,56 @@ buff.GetAllBuffTypes() []BuffType
 | Buff | 评分 | 阶段 | 效果 |
 |------|------|------|------|
 | Curse | Bad | BeforeTurn | LP-1/回合 |
-| Lost | MildBad | OnMove | 反向移动 |
+| Lost | MildBad | PreMove | 反向移动（在移动前拦截） |
 | Corrupt | Bad | AfterTurn | HP-1/2回合 |
 | Poison | VeryBad | BeforeTurn | 恶性事件 |
-| Hidden | Neutral | PreDamage | 免疫 |
+| Hidden | Neutral | PreDamage | 免疫（伤害前拦截） |
 | Divine | VeryGood | BeforeTurn | LP+1/回合 |
 | Rain | Good | AfterTurn | HP+1/2回合 |
-| Exorcism | MildGood | PreEvent | 免疫毒瘴 |
+| Exorcism | MildGood | PreEvent | 免疫毒瘴（事件前拦截） |
 | Fire | Good | BeforeTurn | 朱雀被动 |
+
+## EffectHandler 签名
+
+Buff Handler 使用统一的 `EffectHandler` 签名，返回 Action：
+
+```go
+type EffectHandler func(phase event.Phase, ctx *event.Context) action.Action
+
+// 示例：离火 Buff Handler
+func handleZhuQueFire(phase event.Phase, ctx *event.Context) action.Action {
+    // 使用 protocol.PlayerLite 最小接口
+    player, ok := ctx.Player.(protocol.PlayerLite)
+    if !ok {
+        return nil
+    }
+    
+    if phase != event.PhaseBeforeTurn {
+        return nil
+    }
+    
+    newCount := player.IncrementFireCounter()
+    if newCount >= 4 {
+        player.ModifyLP(1)
+        player.SetFireCounter(0)
+    }
+    return nil // 直接修改，不返回 Action
+}
+```
+
+## 与 protocol 包的关系
+
+Buff Handler 使用 `protocol.PlayerLite` 接口而非本地定义的 Player 接口：
+
+```go
+// protocol.PlayerLite 最小接口
+type PlayerLite interface {
+    ModifyLP(amount int)
+    GetFireCounter() int
+    SetFireCounter(count int)
+    IncrementFireCounter() int
+}
+```
 
 ## 测试
 
