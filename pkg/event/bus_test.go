@@ -432,41 +432,48 @@ func TestContextWithEvent(t *testing.T) {
 
 func TestContextWithData(t *testing.T) {
 	ctx := NewContext(nil)
-	ctx.WithData(100) // 例如伤害值
+	ctx.WithData(100) // e.g. damage value
 
-	// 使用 GetData() 向后兼容方法
+	// Use GetData() backward-compatible method
 	if ctx.GetData() != 100 {
 		t.Errorf("GetData() = %v, expected 100", ctx.GetData())
 	}
 
-	// 使用 GetInt() 类型安全方法
-	if ctx.GetInt("data") != 100 {
-		t.Errorf("GetInt(\"data\") = %d, expected 100", ctx.GetInt("data"))
+	// Use GetIntOrDefault for type-safe retrieval
+	if ctx.GetIntOrDefault("data", 0) != 100 {
+		t.Errorf("GetIntOrDefault(\"data\") = %d, expected 100", ctx.GetIntOrDefault("data", 0))
+	}
+
+	// GetInt now returns error for nonexistent keys
+	_, err := ctx.GetInt("nonexistent")
+	if err == nil {
+		t.Error("GetInt for nonexistent key should return error")
 	}
 }
 
 func TestContextMetadata(t *testing.T) {
 	ctx := NewContext(nil)
 
-	// 测试直接使用 Metadata 方法
+	// Test direct use of Metadata methods
 	ctx.SetInt("damage", 50)
 	ctx.SetString("element", "fire")
 	ctx.SetBool("blocked", true)
 
-	if ctx.GetInt("damage") != 50 {
-		t.Errorf("GetInt(\"damage\") = %d, expected 50", ctx.GetInt("damage"))
+	// Use GetIntOrDefault/GetStringOrDefault/GetBoolOrDefault for safe retrieval
+	if ctx.GetIntOrDefault("damage", 0) != 50 {
+		t.Errorf("GetIntOrDefault(\"damage\") = %d, expected 50", ctx.GetIntOrDefault("damage", 0))
 	}
-	if ctx.GetString("element") != "fire" {
-		t.Errorf("GetString(\"element\") = %s, expected fire", ctx.GetString("element"))
+	if ctx.GetStringOrDefault("element", "") != "fire" {
+		t.Errorf("GetStringOrDefault(\"element\") = %s, expected fire", ctx.GetStringOrDefault("element", ""))
 	}
-	if !ctx.GetBool("blocked") {
-		t.Error("GetBool(\"blocked\") should be true")
+	if !ctx.GetBoolOrDefault("blocked", false) {
+		t.Error("GetBoolOrDefault(\"blocked\") should be true")
 	}
 
-	// 测试链式调用
+	// Test chained calls
 	ctx.SetInt("count", 1).SetString("name", "test")
-	if ctx.GetInt("count") != 1 {
-		t.Errorf("GetInt(\"count\") = %d, expected 1", ctx.GetInt("count"))
+	if ctx.GetIntOrDefault("count", 0) != 1 {
+		t.Errorf("GetIntOrDefault(\"count\") = %d, expected 1", ctx.GetIntOrDefault("count", 0))
 	}
 }
 
@@ -477,13 +484,13 @@ func TestContextClone(t *testing.T) {
 
 	cloned := ctx.Clone()
 
-	// 修改克隆不影响原版
+	// Modify clone doesn't affect original
 	cloned.SetInt("damage", 50)
 
-	if ctx.GetInt("damage") != 100 {
-		t.Errorf("original damage = %d, expected 100", ctx.GetInt("damage"))
+	if ctx.GetIntOrDefault("damage", 0) != 100 {
+		t.Errorf("original damage = %d, expected 100", ctx.GetIntOrDefault("damage", 0))
 	}
-	if cloned.GetInt("damage") != 50 {
-		t.Errorf("cloned damage = %d, expected 50", cloned.GetInt("damage"))
+	if cloned.GetIntOrDefault("damage", 0) != 50 {
+		t.Errorf("cloned damage = %d, expected 50", cloned.GetIntOrDefault("damage", 0))
 	}
 }

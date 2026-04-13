@@ -638,7 +638,7 @@ func TestPlayerCloneWithMetadata(t *testing.T) {
 
 	cloned := original.Clone()
 
-	// 修改克隆的 Metadata 不影响原版
+	// Modify cloned Metadata doesn't affect original
 	cloned.SetChargeCount(10)
 	cloned.SetFireCounter(0)
 	cloned.SetInt("custom_value", 200)
@@ -649,41 +649,41 @@ func TestPlayerCloneWithMetadata(t *testing.T) {
 	if original.GetFireCounter() != 3 {
 		t.Errorf("original fire counter = %d, expected 3", original.GetFireCounter())
 	}
-	if original.GetInt("custom_value") != 100 {
-		t.Errorf("original custom_value = %d, expected 100", original.GetInt("custom_value"))
+	if original.GetIntOrDefault("custom_value", 0) != 100 {
+		t.Errorf("original custom_value = %d, expected 100", original.GetIntOrDefault("custom_value", 0))
 	}
 
-	// 克隆的值应该是修改后的
+	// Cloned values should be modified
 	if cloned.GetChargeCount() != 10 {
 		t.Errorf("cloned charge count = %d, expected 10", cloned.GetChargeCount())
 	}
 	if cloned.GetFireCounter() != 0 {
 		t.Errorf("cloned fire counter = %d, expected 0", cloned.GetFireCounter())
 	}
-	if cloned.GetInt("custom_value") != 200 {
-		t.Errorf("cloned custom_value = %d, expected 200", cloned.GetInt("custom_value"))
+	if cloned.GetIntOrDefault("custom_value", 0) != 200 {
+		t.Errorf("cloned custom_value = %d, expected 200", cloned.GetIntOrDefault("custom_value", 0))
 	}
 }
 
 func TestPlayerMetadataDirectUsage(t *testing.T) {
 	player := NewPlayer(PlayerConfig{UserID: "test"})
 
-	// 直接使用 Metadata 方法
+	// Direct use of Metadata methods
 	player.SetInt("turn_count", 10)
 	player.SetString("last_event", "fog")
 	player.SetBool("has_visited_checkpoint", true)
 
-	if player.GetInt("turn_count") != 10 {
-		t.Errorf("GetInt(\"turn_count\") = %d, expected 10", player.GetInt("turn_count"))
+	if player.GetIntOrDefault("turn_count", 0) != 10 {
+		t.Errorf("GetIntOrDefault(\"turn_count\") = %d, expected 10", player.GetIntOrDefault("turn_count", 0))
 	}
-	if player.GetString("last_event") != "fog" {
-		t.Errorf("GetString(\"last_event\") = %s, expected fog", player.GetString("last_event"))
+	if player.GetStringOrDefault("last_event", "") != "fog" {
+		t.Errorf("GetStringOrDefault(\"last_event\") = %s, expected fog", player.GetStringOrDefault("last_event", ""))
 	}
-	if !player.GetBool("has_visited_checkpoint") {
-		t.Error("GetBool(\"has_visited_checkpoint\") should be true")
+	if !player.GetBoolOrDefault("has_visited_checkpoint", false) {
+		t.Error("GetBoolOrDefault(\"has_visited_checkpoint\") should be true")
 	}
 
-	// 链式调用
+	// Chained calls
 	player.SetInt("chain1", 1).SetString("chain2", "test").SetBool("chain3", true)
 	if !player.HasKey("chain1") || !player.HasKey("chain2") || !player.HasKey("chain3") {
 		t.Error("chained keys should all exist")
