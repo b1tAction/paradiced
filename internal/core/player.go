@@ -69,6 +69,23 @@ func NewPlayer(config PlayerConfig) *Player {
 	return player
 }
 
+// ========== Getter Methods (implement protocol.Player) ==========
+
+// GetUserID returns the player's user ID.
+func (p *Player) GetUserID() string { return p.UserID }
+
+// GetHP returns the player's current HP.
+func (p *Player) GetHP() int { return p.HP }
+
+// GetLP returns the player's current LP.
+func (p *Player) GetLP() int { return p.LP }
+
+// GetPosition returns the player's current position.
+func (p *Player) GetPosition() int { return p.Position }
+
+// GetFaction returns the player's faction.
+func (p *Player) GetFaction() Faction { return p.Faction }
+
 // ========== HP/LP Logic ==========
 
 // ApplyDamage deducts HP and checks for death.

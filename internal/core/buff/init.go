@@ -4,6 +4,7 @@ import (
 	"github.com/b1tAction/Fated/internal/core/types"
 	"github.com/b1tAction/Fated/pkg/action"
 	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/Fated/pkg/protocol"
 )
 
 // GlobalBuffRegistry is the global Buff definition registry.
@@ -140,7 +141,7 @@ func registerAllBuffs() {
 // Returns nil (no Action) - modifies LP directly via Player interface.
 func handleZhuQueFire(phase event.Phase, ctx *event.Context) action.Action {
 	// Get Player interface from Context
-	player, ok := ctx.Player.(Player)
+	player, ok := ctx.Player.(protocol.PlayerLite)
 	if !ok {
 		return nil
 	}
@@ -160,12 +161,4 @@ func handleZhuQueFire(phase event.Phase, ctx *event.Context) action.Action {
 	}
 
 	return nil // No Action returned - uses direct modification
-}
-
-// Player interface defines the methods needed for Buff handlers.
-// This allows Buff handlers to work with Player type from core package.
-type Player interface {
-	IncrementFireCounter() int
-	SetFireCounter(count int)
-	ModifyLP(amount int)
 }

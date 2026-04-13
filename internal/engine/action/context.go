@@ -1,37 +1,10 @@
 package action
 
 import (
-	"github.com/b1tAction/Fated/internal/core"
 	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/Fated/pkg/protocol"
 	"github.com/b1tAction/Fated/pkg/util"
 )
-
-// GameInterface defines the interface ActionContext needs from Game.
-// Avoids circular dependency by not importing engine package directly.
-type GameInterface interface {
-	// GetCurrentPlayer returns the current active player.
-	GetCurrentPlayer() *core.Player
-	// GetPlayer returns a player by ID.
-	GetPlayer(id string) *core.Player
-	// GetPlayers returns all players.
-	GetPlayers() []*core.Player
-}
-
-// PathResultInterface defines the interface for movement path results.
-// Used by MoveAction to get path calculation results.
-type PathResultInterface interface {
-	// GetTargetIndex returns the target position.
-	GetTargetIndex() int
-	// GetPath returns the path of visited cells.
-	GetPath() []int
-}
-
-// MapEngineInterface defines the minimal interface ActionContext needs for movement.
-// Avoids circular dependency by not importing hsm or gamemap packages.
-type MapEngineInterface interface {
-	// CalculatePath calculates movement path from start position with given steps.
-	CalculatePath(startPos int, steps int) (PathResultInterface, error)
-}
 
 // ActionContext provides context for action execution.
 // Contains references to game engine, event bus, and map engine for executing actions.
@@ -39,15 +12,15 @@ type MapEngineInterface interface {
 type ActionContext struct {
 	*util.Metadata // Embedded for extensible storage
 
-	Game        GameInterface      // Game instance (interface to avoid circular dependency)
+	Game        protocol.Game      // Game instance (interface to avoid circular dependency)
 	EventBus    *event.EventBus    // EventBus for interception (nil if no interception)
-	MapEngine   MapEngineInterface // MapEngine for movement calculation
+	MapEngine   protocol.MapEngine // MapEngine for movement calculation
 	ActionQueue *Queue             // Queue for derived actions
 	EventLog    *TurnEventLog      // Log for recording events
 }
 
 // NewActionContext creates a new ActionContext with required components.
-func NewActionContext(game GameInterface, bus *event.EventBus, mapEngine MapEngineInterface) *ActionContext {
+func NewActionContext(game protocol.Game, bus *event.EventBus, mapEngine protocol.MapEngine) *ActionContext {
 	return &ActionContext{
 		Metadata:    util.NewMetadata(),
 		Game:        game,
