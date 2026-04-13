@@ -4,25 +4,54 @@
 
 ## 概述
 
-internal/core 是《命运骰子》游戏的核心数据模块，负责数据结构定义、评分系统、阵营系统、Buff/道具/事件管理和玩家基础逻辑。
+internal/core 是《命运骰子》游戏的核心数据模块，采用**Direct Import模式**设计，支持独立子包导入。
 
-此包无外部依赖（仅依赖 pkg/event），可独立使用。
-
-## 文件结构
+## 包结构
 
 ```
 internal/core/
-├── evaluation.go       # 评分系统（0-100）
-├── faction.go          # 阵营定义（四神兽）
-├── registry.go         # 统一注册表（单一数据源）
-├── special_effect.go   # 特殊效果枚举
-├── buff_init.go        # Buff 注册初始化
-├── event_init.go       # Event 注册初始化
-├── item_init.go        # Item 注册初始化
-├── buff.go             # Buff 枚举和实例结构
-├── item.go             # Item 枚举和实例结构
-├── event.go            # Event 枚举和定义结构
+├── types/              # 共享基础类型（无依赖）
+│   ├── evaluation.go   # 评分系统（0-100）
+│   └── special_effect.go # 特殊效果枚举
+├── buff/               # Buff 子包
+│   ├── buff.go         # BuffType、Buff、BuffDefinition、Registry
+│   └── init.go         # init() + registerAllBuffs() + handlers
+├── event/              # Event 子包
+│   ├── event.go        # EventType、EventDefinition、Registry
+│   └── init.go         # init() + registerAllEvents()
+├── item/               # Item 子包
+│   ├── item.go         # ItemType、Item、ItemDefinition、Registry
+│   └── init.go         # init() + registerAllItems()
 ├── player.go           # Player结构（HP/LP/Buffs/Items）
+├── faction.go          # 阵营定义（四神兽）
+└── init.go             # 统一入口（重导出所有类型）
+```
+
+## Direct Import 模式
+
+```go
+// 只需要 Buff（自动初始化）
+import "github.com/b1tAction/Fated/internal/core/buff"
+buff.GetBuffDefinition(buff.BuffTypeFire)
+
+// 只需要 Event（自动初始化）
+import "github.com/b1tAction/Fated/internal/core/event"
+event.GetEventDefinition(event.EventTypeHerb)
+
+// 需要完整游戏逻辑（自动初始化所有子包）
+import "github.com/b1tAction/Fated/internal/core"
+core.GetBuffDefinition(core.BuffTypeFire)
+```
+
+## 依赖关系
+
+```
+types/    ← 独立，无外部依赖
+buff/     ← import types
+event/    ← import buff, types (EventDefinition.BuffType)
+item/     ← import buff, types (ItemDefinition.BuffType)
+core/     ← import buff, event, item, types（重导出）
+engine/   ← import core
 ```
 
 ## 数据类型
@@ -83,72 +112,51 @@ func (p *Player) SetFireCounter(count int)
 func (p *Player) IncrementFireCounter() int
 ```
 
-## Buff/Item/Event 定义
+## 统一注册表
 
-### 统一注册表（GlobalRegistry）
-
-所有定义在包初始化时统一注册到 `GlobalRegistry`，实现单一数据源：
+每个子包有独立的 Registry，在各自的 init.go 中初始化：
 
 ```go
-// 在 buff_init.go 的 init() 中注册
-GlobalRegistry.RegisterBuff(&BuffDefinition{
-    Type:          BuffTypeFire,
-    Eval:          EvaluationGood,
-    EnglishName:   "Fire",           // 用于 String()
-    Name:          "离火",           // 中文显示名
-    Desc:          "朱雀阵营增益...",
-    Duration:      -1,
-    SpecialEffect: SpecialZhuQuePassive,  // 枚举替代字符串
-    Phases:        []event.Phase{event.PhaseBeforeTurn},
-    Priority:      10,
-}, handleZhuQueFire)  // Handler 在注册时传入
-```
-
-**注册表自动生成**：
-- `String()` 映射（使用 EnglishName）
-- `Evaluation` 映射
-- 分类列表（Good/Bad/Neutral）
-
-### BuffDefinition（支持多Phase）
-
-```go
-type BuffDefinition struct {
-    Type          BuffType
-    Eval          Evaluation
-    EnglishName   string        // 英文标识符（用于 String()）
-    Name          string        // 中文名称（用于显示）
-    Desc          string
-    Duration      int
-    HPPerTurn     int           // 每回合 HP 变化
-    LPPerTurn     int           // 每回合 LP 变化
-    SpecialEffect SpecialEffect // 特殊效果枚举（替代字符串标记）
-    Phases        []event.Phase // 触发时机列表（支持多Phase）
-    Priority      int           // 执行优先级
-    NeedConfirm   bool          // 是否需要用户确认（默认false）
+// buff/init.go
+var GlobalBuffRegistry *BuffRegistry
+func init() {
+    GlobalBuffRegistry = NewBuffRegistry()
+    registerAllBuffs()
 }
 
-// 方法
-func (def *BuffDefinition) GetPhases() []event.Phase
-func (def *BuffDefinition) HasPhase(phase event.Phase) bool
+// event/init.go
+var GlobalEventRegistry *EventRegistry
+func init() {
+    GlobalEventRegistry = NewEventRegistry()
+    registerAllEvents()
+}
+
+// item/init.go
+var GlobalItemRegistry *ItemRegistry
+func init() {
+    GlobalItemRegistry = NewItemRegistry()
+    registerAllItems()
+}
 ```
 
-### 访问方式（函数式API）
+core/init.go 提供 CombinedRegistry 用于向后兼容：
 
 ```go
-// 获取定义
-def := core.GetBuffDefinition(buffType)
+// 统一入口，重导出所有类型
+type CombinedRegistry struct{}
+var GlobalRegistry = &CombinedRegistry{}
+```
 
-// 获取字符串标识
-name := buffType.String()  // 返回 EnglishName
+### 访问方式
 
-// 获取评估分数
-eval := core.GetBuffEvaluation(buffType)
+```go
+// 通过子包直接访问（推荐）
+buff.GetBuffDefinition(buff.BuffTypeFire)
+event.GetEventDefinition(event.EventTypeHerb)
 
-// 获取自定义 Handler
-handler := core.GetBuffHandler(buffType)
-
-// 获取分类列表
-goodBuffs := core.GetBuffTypesByCategory("Good")
+// 通过 core 包访问（向后兼容）
+core.GetBuffDefinition(core.BuffTypeFire)
+core.GlobalBuffRegistry.GetBuffTypesByEvaluationRange(...)
 ```
 
 ### Buff 实例（支持多订阅）
@@ -220,33 +228,33 @@ if config.Faction == FactionZhuQue {
 
 ## 测试覆盖
 
-| 测试文件 | 覆盖内容 |
-|---------|---------|
-| registry.go | 注册表初始化、定义注册、查询方法、分类生成 |
-| special_effect.go | SpecialEffect 枚举、类型判断方法 |
-| buff_test.go | BuffType、Buff 实例、BuffDefinition、多Phase支持 |
-| item_test.go | ItemType、Item 实例、ItemDefinition |
-| event_test.go | EventType、EventDefinition |
-| player_test.go | Player 创建、数值逻辑、移动、Buff/道具管理、阵营特性 |
+| 子包 | 测试文件 | 覆盖内容 |
+|------|---------|---------|
+| types/ | evaluation_test.go | Evaluation 评分系统 |
+| types/ | special_effect_test.go | SpecialEffect 枚举 |
+| buff/ | buff_test.go | BuffType、Buff实例、BuffDefinition、多Phase |
+| event/ | event_test.go | EventType、EventDefinition |
+| item/ | item_test.go | ItemType、Item实例、ItemDefinition |
+| core | player_test.go | Player 创建、数值逻辑、Buff/道具管理 |
 
 ## 新增内容流程
 
 添加新的 Buff/Event/Item 只需：
 
-1. 在枚举定义中添加常量
-2. 在对应 `_init.go` 文件中添加注册
+1. 在子包的枚举定义中添加常量
+2. 在子包的 init.go 中添加注册
 
 ```go
-// buff.go - 添加枚举
+// buff/buff.go - 添加枚举
 const (
     ...
     BuffTypeNewBuff  // 新Buff
 )
 
-// buff_init.go - 注册定义
-GlobalRegistry.RegisterBuff(&BuffDefinition{
+// buff/init.go - 注册定义
+GlobalBuffRegistry.RegisterBuff(&BuffDefinition{
     Type:        BuffTypeNewBuff,
-    Eval:        EvaluationGood,
+    Eval:        types.EvaluationGood,
     EnglishName: "NewBuff",
     Name:        "新Buff",
     ...

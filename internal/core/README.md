@@ -1,65 +1,88 @@
 # internal/core - Core Data Structures
 
-核心数据结构包，定义游戏的基础类型和数据结构。
+核心数据结构包，提供游戏实体的统一入口。
 
-## 功能
+## 概述
 
-此包无外部依赖（仅依赖 pkg/event），可独立使用。
+core 包采用 **Direct Import** 模式，重导出所有子包类型。导入 core 包自动初始化所有子包。
 
-### 数据类型
-
-- **Evaluation**: 0-100 评分系统
-  - 0-40: 恶性（Bad）
-  - 41-65: 中性（Neutral）
-  - 66-100: 良性（Good）
-
-- **Faction**: 四阵营（青龙/朱雀/白虎/玄武）
-
-- **Buff**: Buff 类型、实例、定义、注册表
-
-- **Item**: 道具类型、实例、定义、注册表
-
-- **Event**: 事件类型、定义、注册表
-
-- **Player**: 玩家结构体
-  - HP/LP 管理
-  - Buff/道具管理
-  - 移动逻辑
-
-## 文件结构
-
-```
-internal/core/
-├── evaluation.go  # 评分系统
-├── faction.go     # 阵营定义
-├── buff.go        # Buff 系统
-├── item.go        # Item 系统
-├── event.go       # Event 系统
-└── player.go      # Player 结构
-```
-
-## 使用示例
+## 使用方式
 
 ```go
+// 完整游戏逻辑（自动初始化所有子包）
+import "github.com/b1tAction/Fated/internal/core"
+
+// 直接使用重导出的类型
+core.BuffTypeDivine
+core.EventTypeHerb
+core.ItemTypeAnyDoor
+
+// 使用重导出的函数
+core.GetBuffDefinition(core.BuffTypeFire)
+core.GetEventEvaluation(core.EventTypeThunder)
+
+// 使用向后兼容的 CombinedRegistry
+core.GlobalRegistry.GetBuffTypesByEvaluationRange(0, 40)
+```
+
+## 子包结构
+
+| 子包 | 描述 | 依赖 |
+|------|------|------|
+| types/ | 共享基础类型 | 无 |
+| buff/ | Buff 系统 | types |
+| event/ | Event 系统 | buff, types |
+| item/ | Item 系统 | buff, types |
+
+## 核心文件
+
+| 文件 | 描述 |
+|------|------|
+| init.go | 统一入口，重导出所有类型 |
+| player.go | Player 结构体 |
+| faction.go | Faction 阵营定义 |
+
+## Player 结构
+
+```go
+type Player struct {
+    UserID      string
+    Faction     Faction
+    Position    int
+    HP          int        // 默认最大6
+    LP          int        // 范围0~8
+    Inventory   []*item.Item
+    ActiveBuffs []*buff.Buff
+    IsDead      bool
+    SkipTurn    bool
+    *util.Metadata
+}
+
 // 创建玩家
 player := core.NewPlayer(core.PlayerConfig{
     UserID:  "player-001",
     Faction: core.FactionZhuQue,
 })
-
-// 添加 Buff
-buff := core.NewBuff(core.BuffTypeCurse, 3)
-player.AddBuff(buff)
-
-// 获取 Buff 定义
-def := core.BuffTypeCurse.GetBuffDefinition()
-fmt.Println(def.Name)    // "诅咒"
-fmt.Println(def.Eval)    // 25 (Bad)
-fmt.Println(def.Phase)   // BeforeTurn
 ```
 
-## 与其他包的关系
+## Faction 阵营
 
-- `pkg/event`: Phase 类型依赖
-- `internal/engine`: 使用 core 的数据类型
-- `internal/gamemap`: 无依赖
+| 阵营 | 技能 | 描述 |
+|------|------|------|
+| QingLong | 行迹 | 每5回合充能，无视负面地形 |
+| ZhuQue | 离火 | 每4回合LP+1 |
+| BaiHu | 劫运 | 反超偷Buff |
+| XuanWu | 镇厄 | 每5回合充能，抵消恶性事件 |
+
+## 测试
+
+```bash
+go test ./internal/core/...
+```
+
+## 相关文档
+
+- [types/README.md](types/README.md)
+- [buff/README.md](buff/README.md)
+- [event/README.md](event/README.md)
+- [item/README.md](item/README.md)

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/b1tAction/Fated/internal/core/buff"
+	"github.com/b1tAction/Fated/internal/core/item"
 	"github.com/b1tAction/Fated/pkg/util"
 )
 
@@ -14,8 +16,8 @@ type Player struct {
 	Position    int        `json:"position"`     // Current position
 	HP          int        `json:"hp"`           // Health points
 	LP          int        `json:"lp"`           // Luck points (affects random events)
-	Inventory   []*Item    `json:"inventory"`    // Item inventory
-	ActiveBuffs []*Buff    `json:"active_buffs"` // Active buffs
+	Inventory   []*item.Item `json:"inventory"`    // Item inventory
+	ActiveBuffs []*buff.Buff `json:"active_buffs"` // Active buffs
 	IsDead      bool       `json:"is_dead"`      // Whether player is dead
 	SkipTurn    bool       `json:"skip_turn"`    // Whether player skips turn
 	*util.Metadata          `json:"metadata"`     // Type-safe dynamic data container
@@ -52,8 +54,8 @@ func NewPlayer(config PlayerConfig) *Player {
 		Position:    config.StartPos,
 		HP:          config.MaxHP,
 		LP:          config.MaxLP,
-		Inventory:   make([]*Item, 0),
-		ActiveBuffs: make([]*Buff, 0),
+		Inventory:   make([]*item.Item, 0),
+		ActiveBuffs: make([]*buff.Buff, 0),
 		IsDead:      false,
 		SkipTurn:    false,
 		Metadata:    util.NewMetadata(),
@@ -61,7 +63,7 @@ func NewPlayer(config PlayerConfig) *Player {
 
 	// ZhuQue朱雀 faction starts with Fire离火 buff
 	if config.Faction == FactionZhuQue {
-		player.AddBuff(NewBuff(BuffTypeFire, -1))
+		player.AddBuff(buff.NewBuff(buff.BuffTypeFire, -1))
 	}
 
 	return player
@@ -77,7 +79,7 @@ func (p *Player) ApplyDamage(amount int) error {
 	}
 
 	// Hidden隐匿 buff grants damage immunity
-	if p.HasBuff(BuffTypeHidden) {
+	if p.HasBuff(buff.BuffTypeHidden) {
 		return nil
 	}
 
@@ -140,21 +142,21 @@ func (p *Player) Respawn(respawnPos int) error {
 // ========== Buff Management ==========
 
 // AddBuff adds a buff to the player.
-func (p *Player) AddBuff(buff *Buff) error {
-	if buff == nil {
+func (p *Player) AddBuff(buffInstance *buff.Buff) error {
+	if buffInstance == nil {
 		return errors.New("buff cannot be nil")
 	}
-	if p.HasBuff(BuffTypeHidden) && !buff.Type.IsPositive() {
+	if p.HasBuff(buff.BuffTypeHidden) && !buffInstance.Type.IsPositive() {
 		return nil
 	}
-	p.ActiveBuffs = append(p.ActiveBuffs, buff)
+	p.ActiveBuffs = append(p.ActiveBuffs, buffInstance)
 	return nil
 }
 
 // RemoveBuff removes a buff of specified type.
-func (p *Player) RemoveBuff(buffType BuffType) bool {
-	for i, buff := range p.ActiveBuffs {
-		if buff.Type == buffType {
+func (p *Player) RemoveBuff(buffType buff.BuffType) bool {
+	for i, b := range p.ActiveBuffs {
+		if b.Type == buffType {
 			p.ActiveBuffs = append(p.ActiveBuffs[:i], p.ActiveBuffs[i+1:]...)
 			return true
 		}
@@ -163,9 +165,9 @@ func (p *Player) RemoveBuff(buffType BuffType) bool {
 }
 
 // HasBuff checks if player has a buff of specified type.
-func (p *Player) HasBuff(buffType BuffType) bool {
-	for _, buff := range p.ActiveBuffs {
-		if buff.Type == buffType && buff.IsActive() {
+func (p *Player) HasBuff(buffType buff.BuffType) bool {
+	for _, b := range p.ActiveBuffs {
+		if b.Type == buffType && b.IsActive() {
 			return true
 		}
 	}
@@ -173,18 +175,18 @@ func (p *Player) HasBuff(buffType BuffType) bool {
 }
 
 // GetBuff gets the buff of specified type.
-func (p *Player) GetBuff(buffType BuffType) *Buff {
-	for _, buff := range p.ActiveBuffs {
-		if buff.Type == buffType {
-			return buff
+func (p *Player) GetBuff(buffType buff.BuffType) *buff.Buff {
+	for _, b := range p.ActiveBuffs {
+		if b.Type == buffType {
+			return b
 		}
 	}
 	return nil
 }
 
 // TickBuffs updates all buff durations, returns expired buffs.
-func (p *Player) TickBuffs() []*Buff {
-	var expired []*Buff
+func (p *Player) TickBuffs() []*buff.Buff {
+	var expired []*buff.Buff
 	for i := len(p.ActiveBuffs) - 1; i >= 0; i-- {
 		if !p.ActiveBuffs[i].TickDuration() {
 			expired = append(expired, p.ActiveBuffs[i])
@@ -209,18 +211,18 @@ func (p *Player) ClearNegativeBuffs() int {
 // ========== Item Management ==========
 
 // AddItem adds an item to inventory.
-func (p *Player) AddItem(item *Item) error {
-	if item == nil {
+func (p *Player) AddItem(itemInstance *item.Item) error {
+	if itemInstance == nil {
 		return errors.New("item cannot be nil")
 	}
-	p.Inventory = append(p.Inventory, item)
+	p.Inventory = append(p.Inventory, itemInstance)
 	return nil
 }
 
 // RemoveItem removes an item from inventory.
-func (p *Player) RemoveItem(itemID string) (*Item, error) {
-	for i, item := range p.Inventory {
-		if item.ID == itemID {
+func (p *Player) RemoveItem(itemID string) (*item.Item, error) {
+	for i, it := range p.Inventory {
+		if it.ID == itemID {
 			removed := p.Inventory[i]
 			p.Inventory = append(p.Inventory[:i], p.Inventory[i+1:]...)
 			return removed, nil
@@ -230,19 +232,19 @@ func (p *Player) RemoveItem(itemID string) (*Item, error) {
 }
 
 // GetItem gets an item by ID.
-func (p *Player) GetItem(itemID string) *Item {
-	for _, item := range p.Inventory {
-		if item.ID == itemID {
-			return item
+func (p *Player) GetItem(itemID string) *item.Item {
+	for _, it := range p.Inventory {
+		if it.ID == itemID {
+			return it
 		}
 	}
 	return nil
 }
 
 // HasItem checks if player has an item of specified type.
-func (p *Player) HasItem(itemType ItemType) bool {
-	for _, item := range p.Inventory {
-		if item.Type == itemType {
+func (p *Player) HasItem(itemType item.ItemType) bool {
+	for _, it := range p.Inventory {
+		if it.Type == itemType {
 			return true
 		}
 	}
@@ -287,23 +289,23 @@ func (p *Player) IncrementFireCounter() int {
 
 // Clone clones the player (used for testing).
 func (p *Player) Clone() *Player {
-	inventory := make([]*Item, len(p.Inventory))
-	for i, item := range p.Inventory {
-		inventory[i] = &Item{
-			Type:     item.Type,
-			ID:       item.ID,
-			Usable:   item.Usable,
-			TargetID: item.TargetID,
+	inventory := make([]*item.Item, len(p.Inventory))
+	for i, it := range p.Inventory {
+		inventory[i] = &item.Item{
+			Type:     it.Type,
+			ID:       it.ID,
+			Usable:   it.Usable,
+			TargetID: it.TargetID,
 		}
 	}
 
-	buffs := make([]*Buff, len(p.ActiveBuffs))
-	for i, buff := range p.ActiveBuffs {
-		buffs[i] = &Buff{
-			Type:            buff.Type,
-			ID:              buff.ID,
-			Duration:        buff.Duration,
-			Charge:          buff.Charge,
+	buffs := make([]*buff.Buff, len(p.ActiveBuffs))
+	for i, b := range p.ActiveBuffs {
+		buffs[i] = &buff.Buff{
+			Type:            b.Type,
+			ID:              b.ID,
+			Duration:        b.Duration,
+			Charge:          b.Charge,
 			SubscriptionIDs: make([]string, 0),
 		}
 	}
