@@ -125,25 +125,34 @@ internal/engine/hsm/
 | StateID | 状态名称 | 行为 | Phase触发 | 转移条件 |
 |---------|----------|------|-----------|----------|
 | `S_TURN_UPKEEP` | 回合准备 | 检查SkipTurn、IsDead | `PhaseBeforeTurn` | 可行动→MainAction；不可→TurnEnd |
-| `S_MAIN_ACTION` | 主行动 | 等待道具/骰子选择 | `PhaseAnyTime`道具可用 | 收到RollDice→TurnMoving |
-| `S_TURN_MOVING` | 移动结算 | 路径计算、Fragile/Fog处理 | `PhaseOnMove` | 正常→TurnLanded；坠落→TurnEnd |
+| `S_MAIN_ACTION` | 主行动 | 等待道具/骰子选择 | `PhaseItemUsed`道具可用 | 收到RollDice→TurnMoving |
+| `S_TURN_MOVING` | 移动结算 | 路径计算、Fragile/Fog处理 | Action发布`PhasePreMove` | 正常→TurnLanded；坠落→TurnEnd |
 | `S_TURN_LANDED` | 落地结算 | 触发落地事件 | `PhaseOnLand` | 自动进入TurnEvent |
-| `S_TURN_EVENT` | 事件结算 | 抽取事件、执行效果 | `PhasePreEvent` → `PhasePreDamage` | 完成后→TurnEnd |
+| `S_TURN_EVENT` | 事件结算 | 抽取事件、执行效果 | Action发布`PhasePreEvent`/`PhasePreDamage` | 完成后→TurnEnd |
 | `S_TURN_END` | 回合收尾 | TickBuff、死亡检查 | `PhaseAfterTurn` | 完成后返回父状态 |
 
-#### Phase 与 State 映射
+#### Phase 与发布者映射
+
+**设计原则：谁产生时机，谁发布Phase**
 
 ```go
-// Phase 在各 State 中的触发时机
-PhaseBeforeTurn    → S_TURN_UPKEEP.Enter()
-PhaseOnMove        → S_TURN_MOVING.Enter()
-PhaseOnLand        → S_TURN_LANDED.Enter()
-PhasePreEvent      → S_TURN_EVENT.Enter() [事件免疫检查]
-PhasePreDamage     → S_TURN_EVENT.Update() [伤害时触发]
-PhaseAfterTurn     → S_TURN_END.Enter()
-PhaseAnyTime       → 全局可用，由客户端主动触发
-PhaseOnBuffApplied → Buff添加时广播（跨状态）
-PhaseOnBuffRemoved → Buff移除时广播（跨状态）
+// ========== HSM发布的Phase（状态时机） ==========
+// 这些Phase在State.Enter()方法中发布
+PhaseBeforeTurn    → S_TURN_UPKEEP.Enter()    // 回合开始前
+PhaseOnLand        → S_TURN_LANDED.Enter()    // 落地后
+PhaseAfterTurn     → S_TURN_END.Enter()       // 回合结束后
+
+// ========== Action发布的Phase（动作时机） ==========
+// 这些Phase由ActionContext.ExecuteAction()发布
+PhasePreDamage     → DamageAction.PreTriggerPhase()    // 伤害应用前
+PhasePreEvent      → DrawEventAction.PreTriggerPhase() // 事件触发前
+PhasePreMove       → MoveAction.PreTriggerPhase()      // 移动前
+PhaseOnBuffApplied → AddBuffAction.PostTriggerPhase()  // Buff添加后
+PhaseOnBuffRemoved → RemoveBuffAction.PreTriggerPhase() // Buff移除前
+
+// ========== 特殊Phase ==========
+PhaseAnyTime   → 全局可用，由客户端主动触发
+PhaseItemUsed  → game.UseItem()发布，道具使用时
 ```
 
 ### ⏸️ 第三层：中断与决策层 (InterruptState)
@@ -356,10 +365,11 @@ S_MAIN_ACTION (主行动)
 
 S_TURN_MOVING (移动结算)
 ├── Enter()
-│   ├── 触发 PhaseOnMove
-│   │   ├── 迷途 Buff: 反向计算 TargetIndex
-│   ├── 调用 MapEngine.CalculatePath(position, diceSteps)
-│   ├── 检查迷途 Buff → 修正移动方向
+│   ├── 创建 MoveAction，通过 ActionContext.ExecuteAction()
+│   │   ├── Action发布 PhasePreMove（PreTrigger阶段）
+│   │   │   ├── 迷途 Buff订阅PhasePreMove，篡改Steps为负数
+│   │   ├── 执行 Execute() → 调用 MapEngine.CalculatePath(position, diceSteps)
+│   │   ├── 检查迷途 Buff → 修正移动方向（已通过Phase篡改）
 ├── 路径处理
 │   ├── Fragile 处理
 │   │   ├── 首次经过 → 标记已碎

@@ -40,33 +40,44 @@ internal/engine/
 
 ## Phase枚举
 
+**设计原则：谁产生时机，谁发布Phase**
+
 ```go
 type Phase int
 
 const (
-    PhaseBeforeTurn  Phase = iota  // 回合开始前（神眷、诅咒 LP±1）
-    PhaseOnMove                    // 移动时（迷途反向）
-    PhaseOnLand                    // 落地后（任意门、落点事件）
-    PhasePreEvent                  // 事件触发前（辟邪、玄武、护盾道具）
-    PhasePreDamage                 // 受伤前（隐匿、护盾）
-    PhaseAfterTurn                 // 回合结束后（甘霖/腐化 HP±1）
-    PhaseAnyTime                   // 任何时候可用（道具主动使用）
-    PhaseOnBuffApplied             // Buff被挂载时触发（生命周期事件）
-    PhaseOnBuffRemoved             // Buff被移除时触发（生命周期事件）
+    // ========== HSM发布的Phase（状态时机） ==========
+    // 这些Phase由HSM状态机Enter()方法发布
+    PhaseBeforeTurn  Phase = iota  // TurnUpkeep.Enter() - 回合开始前（神眷/诅咒 LP±1, 离火每4回合）
+    PhaseOnLand                    // TurnLanded.Enter() - 落地后（落地事件、格子效果）
+    PhaseAfterTurn                 // TurnEnd.Enter() - 回合结束后（甘霖/腐化 HP±1, TickDuration）
+
+    // ========== Action发布的Phase（动作时机） ==========
+    // 这些Phase由ActionContext.ExecuteAction()发布
+    PhasePreDamage    // DamageAction.Execute() - 伤害应用前（隐匿、护盾拦截）
+    PhasePreEvent     // DrawEventAction.Execute() - 事件触发前（辟邪、玄武）
+    PhasePreMove      // MoveAction.Execute() - 移动前（迷途反向）
+    PhaseOnBuffApplied  // AddBuffAction.Execute() - Buff添加后（入场效果、连锁反应）
+    PhaseOnBuffRemoved  // RemoveBuffAction.Execute() - Buff移除前（亡语）
+
+    // ========== 特殊Phase ==========
+    PhaseAnyTime   // 任何时候可用（道具主动使用）- 玩家手动触发
+    PhaseItemUsed  // 道具主动使用时触发 - game.UseItem()
 )
 ```
 
-| Phase | 说明 | 需订阅EventBus |
-|-------|------|---------------|
-| BeforeTurn | 回合开始前 | ✓ |
-| OnMove | 移动过程中 | ✓ |
-| OnLand | 落地后 | ✓ |
-| PreEvent | 事件触发前 | ✓ |
-| PreDamage | 受伤前 | ✓ |
-| AfterTurn | 回合结束后 | ✓ |
-| AnyTime | 任何时候可用 | ❌（主动触发） |
-| OnBuffApplied | Buff被挂载时 | ✓ |
-| OnBuffRemoved | Buff被移除时 | ✓ |
+| Phase | 发布者 | 说明 | 需订阅EventBus |
+|-------|--------|------|---------------|
+| BeforeTurn | HSM | 回合开始前 | ✓ |
+| OnLand | HSM | 落地后 | ✓ |
+| AfterTurn | HSM | 回合结束后 | ✓ |
+| PreDamage | Action | 受伤前 | ✓ |
+| PreEvent | Action | 事件触发前 | ✓ |
+| PreMove | Action | 移动前 | ✓ |
+| OnBuffApplied | Action | Buff添加后 | ✓ |
+| OnBuffRemoved | Action | Buff移除前 | ✓ |
+| AnyTime | - | 任何时候可用 | ❌（主动触发） |
+| ItemUsed | Game | 道具使用时 | ✓ |
 
 ## 多Phase支持
 
@@ -140,7 +151,7 @@ var BuffHandlers = map[core.BuffType]EventHandler{
 |------|--------|-------------|------|
 | 神眷 | [BeforeTurn] | false | 自动LP+1 |
 | 诅咒 | [BeforeTurn] | false | 自动LP-1 |
-| 迷途 | [OnMove] | false | 自动反向 |
+| 迷途 | [PreMove] | false | 自动反向 |
 | 隐匿 | [PreDamage] | false | 自动免疫（高优先级） |
 | 辟邪 | [PreEvent] | false | 自动免疫毒瘴 |
 | 甘霖 | [AfterTurn] | false | 每2回合HP+1 |
@@ -151,7 +162,7 @@ var BuffHandlers = map[core.BuffType]EventHandler{
 | Item | Phase | NeedConfirm | 说明 |
 |------|-------|-------------|------|
 | 反方向的钟 | AnyTime | true | 主动使用，需确认目标 |
-| 任意门 | OnLand | true | 落地后，需确认目标 |
+| 任意门 | ItemUsed | true | 落地后使用，需确认目标 |
 | 骰子交换 | AnyTime | true | 主动使用，需确认目标 |
 | 骰子升级卡 | BeforeTurn | true | 回合开始前，需确认 |
 
