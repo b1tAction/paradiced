@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/b1tAction/Fated/internal/core"
+	engineaction "github.com/b1tAction/Fated/internal/engine/action"
 	"github.com/b1tAction/Fated/pkg/event"
 )
 
@@ -105,7 +106,7 @@ func TestFireBuffHandlerNonBeforeTurnPhase(t *testing.T) {
 }
 
 func TestExecuteDefaultBuffAction(t *testing.T) {
-	// Test default handler HP/LP modification
+	// Test default handler HP/LP modification using Action system
 	tests := []struct {
 		name       string
 		buffType   core.BuffType
@@ -159,7 +160,13 @@ func TestExecuteDefaultBuffAction(t *testing.T) {
 			player.LP = tt.initLP
 
 			def := core.GetBuffDefinition(tt.buffType)
-			executeDefaultBuffAction(def, player)
+
+			// Create ActionContext
+			actionCtx := engineaction.NewActionContext(nil, nil, nil)
+			executeDefaultBuffAction(def, player, actionCtx)
+
+			// Process the queue to execute actions
+			actionCtx.ProcessQueue()
 
 			if player.HP != tt.expectedHP {
 				t.Errorf("HP = %d, expected %d", player.HP, tt.expectedHP)
@@ -185,7 +192,12 @@ func TestExecuteDefaultBuffActionWithHPDamage(t *testing.T) {
 		HPPerTurn: -2, // Damage 2 HP per turn
 	}
 
-	executeDefaultBuffAction(def, player)
+	// Create ActionContext
+	actionCtx := engineaction.NewActionContext(nil, nil, nil)
+	executeDefaultBuffAction(def, player, actionCtx)
+
+	// Process the queue to execute actions
+	actionCtx.ProcessQueue()
 
 	if player.HP != 4 {
 		t.Errorf("HP = %d, expected 4 (damage 2 HP)", player.HP)
@@ -206,7 +218,12 @@ func TestExecuteDefaultBuffActionWithHealing(t *testing.T) {
 		HPPerTurn: 2, // Heal 2 HP per turn
 	}
 
-	executeDefaultBuffAction(def, player)
+	// Create ActionContext
+	actionCtx := engineaction.NewActionContext(nil, nil, nil)
+	executeDefaultBuffAction(def, player, actionCtx)
+
+	// Process the queue to execute actions
+	actionCtx.ProcessQueue()
 
 	if player.HP != 8 {
 		t.Errorf("HP = %d, expected 8 (heal 2 HP)", player.HP)
