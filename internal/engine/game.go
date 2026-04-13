@@ -8,7 +8,7 @@ import (
 	"github.com/b1tAction/Fated/pkg/event"
 )
 
-// Game 游戏实例，包含EventBus和所有玩家
+// Game is the game instance, containing EventBus and all players.
 type Game struct {
 	ID        string          `json:"id"`
 	Bus       *event.EventBus `json:"bus"`
@@ -17,15 +17,15 @@ type Game struct {
 	mutex     sync.RWMutex
 }
 
-// GameState 游戏状态
+// GameState represents game state.
 type GameState struct {
-	Round        int    `json:"round"`         // 当前轮次
-	Turn         int    `json:"turn"`          // 当前回合（玩家索引）
-	CurrentPhase string `json:"current_phase"` // 当前阶段
-	Waiting      bool   `json:"waiting"`       // 是否等待用户决策
+	Round        int    `json:"round"`         // Current round
+	Turn         int    `json:"turn"`          // Current turn (player index)
+	CurrentPhase string `json:"current_phase"` // Current phase
+	Waiting      bool   `json:"waiting"`       // Waiting for user decision
 }
 
-// NewGame 创建新的游戏实例
+// NewGame creates a new game instance.
 func NewGame(gameID string) *Game {
 	return &Game{
 		ID:      gameID,
@@ -35,7 +35,7 @@ func NewGame(gameID string) *Game {
 	}
 }
 
-// AddPlayer 添加玩家到游戏
+// AddPlayer adds a player to the game.
 func (g *Game) AddPlayer(player *core.Player) {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
@@ -44,7 +44,7 @@ func (g *Game) AddPlayer(player *core.Player) {
 	g.subscribePlayerEffects(player)
 }
 
-// RemovePlayer 移除玩家
+// RemovePlayer removes a player.
 func (g *Game) RemovePlayer(userID string) {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
@@ -58,7 +58,7 @@ func (g *Game) RemovePlayer(userID string) {
 	}
 }
 
-// GetPlayer 获取指定玩家
+// GetPlayer returns the specified player.
 func (g *Game) GetPlayer(userID string) *core.Player {
 	g.mutex.RLock()
 	defer g.mutex.RUnlock()
@@ -71,7 +71,7 @@ func (g *Game) GetPlayer(userID string) *core.Player {
 	return nil
 }
 
-// GetCurrentPlayer 获取当前回合的玩家
+// GetCurrentPlayer returns the current turn player.
 func (g *Game) GetCurrentPlayer() *core.Player {
 	g.mutex.RLock()
 	defer g.mutex.RUnlock()
@@ -82,7 +82,7 @@ func (g *Game) GetCurrentPlayer() *core.Player {
 	return nil
 }
 
-// NextTurn 下一个玩家回合
+// NextTurn advances to next player's turn.
 func (g *Game) NextTurn() {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
@@ -94,7 +94,7 @@ func (g *Game) NextTurn() {
 	}
 }
 
-// subscribePlayerEffects 订阅玩家的Buff和道具效果
+// subscribePlayerEffects subscribes player's Buff and Item effects.
 func (g *Game) subscribePlayerEffects(player *core.Player) {
 	for _, buff := range player.ActiveBuffs {
 		g.SubscribeBuff(player, buff)
@@ -105,7 +105,7 @@ func (g *Game) subscribePlayerEffects(player *core.Player) {
 	}
 }
 
-// createBuffDecision 为Buff创建Decision
+// createBuffDecision creates a Decision for Buff.
 func (g *Game) createBuffDecision(buff *core.Buff, def *core.BuffDefinition) *event.Decision {
 	if def.NeedConfirm {
 		return event.NewDecision(def.Desc, []event.Option{
@@ -117,7 +117,7 @@ func (g *Game) createBuffDecision(buff *core.Buff, def *core.BuffDefinition) *ev
 	})
 }
 
-// createItemDecision 为道具创建Decision
+// createItemDecision creates a Decision for Item.
 func (g *Game) createItemDecision(item *core.Item, def *core.ItemDefinition) *event.Decision {
 	if def.NeedConfirm {
 		return event.NewDecision(def.Desc, []event.Option{
@@ -130,11 +130,11 @@ func (g *Game) createItemDecision(item *core.Item, def *core.ItemDefinition) *ev
 	})
 }
 
-// SubscribeBuff 当玩家获得新Buff时订阅
-// 支持多Phase订阅：遍历 def.Phases 为每个Phase创建订阅
-// 注意：如果 Buff 已经有订阅（SubscriptionIDs 不为空），不会重复订阅
+// SubscribeBuff subscribes when player gets a new Buff.
+// Supports multi-phase subscription: iterates def.Phases to create subscription for each Phase.
+// Note: If Buff already has subscriptions (SubscriptionIDs not empty), won't subscribe again.
 func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
-	// 防止重复订阅
+	// Prevent duplicate subscriptions
 	if len(buff.SubscriptionIDs) > 0 {
 		return
 	}
@@ -144,51 +144,51 @@ func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
 		return
 	}
 
-	// 初始化 SubscriptionIDs 列表
+	// Initialize SubscriptionIDs list
 	buff.SubscriptionIDs = make([]string, 0)
 
-	// 获取定制处理器
+	// Get custom handler
 	handler := GetHandler(buff.Type)
 	hasCustomHandler := handler != nil
 
-	// 为每个 Phase 创建订阅
+	// Create subscription for each Phase
 	for _, phase := range def.GetPhases() {
 		if !phase.NeedsSubscription() {
 			continue
 		}
 
-		// 创建闭包 Action
+		// Create closure Action
 		action := g.createBuffAction(buff, def, phase, player, hasCustomHandler, handler)
 
-		// 创建 Decision
+		// Create Decision
 		decision := g.createBuffDecisionWithAction(buff, def, action)
 
-		// 向 EventBus 注册
+		// Register with EventBus
 		subID := g.Bus.Subscribe(phase, player.UserID, buff.ID, "buff", decision)
 		buff.SubscriptionIDs = append(buff.SubscriptionIDs, subID)
 	}
 }
 
-// createBuffAction 创建 Buff 触发时的 Action 闭包
+// createBuffAction creates an Action closure when Buff triggers.
 func (g *Game) createBuffAction(buff *core.Buff, def *core.BuffDefinition, phase event.Phase, player *core.Player, hasCustomHandler bool, handler EventHandler) func(ctx *event.Context) {
 	return func(ctx *event.Context) {
-		// 从 Context 获取 Player（确保类型正确）
+		// Get Player from Context (ensure correct type)
 		p, ok := ctx.Player.(*core.Player)
 		if !ok {
 			return
 		}
 
 		if hasCustomHandler {
-			// 调用定制处理器
+			// Call custom handler
 			handler(phase, ctx)
 		} else {
-			// 执行默认数值效果
+			// Execute default value effect
 			executeDefaultBuffAction(def, p)
 		}
 	}
 }
 
-// createBuffDecisionWithAction 创建带有 Action 的 Buff Decision
+// createBuffDecisionWithAction creates a Buff Decision with Action.
 func (g *Game) createBuffDecisionWithAction(buff *core.Buff, def *core.BuffDefinition, action func(ctx *event.Context)) *event.Decision {
 	if def.NeedConfirm {
 		return event.NewDecision(def.Desc, []event.Option{
@@ -200,8 +200,8 @@ func (g *Game) createBuffDecisionWithAction(buff *core.Buff, def *core.BuffDefin
 	})
 }
 
-// UnsubscribeBuff 当Buff移除时取消订阅
-// 支持多订阅取消：遍历 buff.SubscriptionIDs 取消所有订阅
+// UnsubscribeBuff unsubscribes when Buff is removed.
+// Supports multi-subscription unsubscribe: iterates buff.SubscriptionIDs to unsubscribe all.
 func (g *Game) UnsubscribeBuff(buff *core.Buff) {
 	for _, subID := range buff.SubscriptionIDs {
 		if subID != "" {
@@ -211,7 +211,7 @@ func (g *Game) UnsubscribeBuff(buff *core.Buff) {
 	buff.SubscriptionIDs = make([]string, 0)
 }
 
-// SubscribeItem 当玩家获得新道具时订阅
+// SubscribeItem subscribes when player gets a new Item.
 func (g *Game) SubscribeItem(player *core.Player, item *core.Item) {
 	def := item.Type.GetItemDefinition()
 	if def.Phase.NeedsSubscription() {
@@ -221,7 +221,7 @@ func (g *Game) SubscribeItem(player *core.Player, item *core.Item) {
 	}
 }
 
-// UnsubscribeItem 当道具移除时取消订阅
+// UnsubscribeItem unsubscribes when Item is removed.
 func (g *Game) UnsubscribeItem(item *core.Item) {
 	if item.SubscriptionID != "" {
 		g.Bus.Unsubscribe(item.SubscriptionID)
@@ -229,61 +229,61 @@ func (g *Game) UnsubscribeItem(item *core.Item) {
 	}
 }
 
-// ========== Buff 生命周期管理 ==========
+// ========== Buff Lifecycle Management ==========
 
-// ApplyBuffToPlayer 为玩家添加 Buff 并处理完整的生命周期
-// 流程顺序：
-//  1. 底层数据添加 (player.AddBuff)
-//  2. 挂载到 EventBus (SubscribeBuff) - 此时 Buff 已在监听列表
-//  3. 广播 Applied 事件 - Buff 可以听到自己的 Applied 事件
+// ApplyBuffToPlayer adds Buff to player and handles complete lifecycle.
+// Process order:
+//  1. Underlying data add (player.AddBuff)
+//  2. Subscribe to EventBus (SubscribeBuff) - Buff is now in listener list
+//  3. Broadcast Applied event - Buff can hear its own Applied event
 func (g *Game) ApplyBuffToPlayer(player *core.Player, buff *core.Buff) error {
-	// 1. 底层数据添加
+	// 1. Underlying data add
 	if err := player.AddBuff(buff); err != nil {
 		return err
 	}
 
-	// 2. 挂载到 EventBus
+	// 2. Subscribe to EventBus
 	g.SubscribeBuff(player, buff)
 
-	// 3. 广播 Applied 事件
+	// 3. Broadcast Applied event
 	g.BroadcastBuffApplied(player, buff)
 
 	return nil
 }
 
-// RemoveBuffFromPlayer 从玩家移除 Buff 并处理完整的生命周期
-// 流程顺序：
-//  1. 广播 Removed 事件（在移除前） - Buff 可以听到自己的 Removed 事件
-//  2. 取消订阅 (UnsubscribeBuff)
-//  3. 底层数据移除 (player.RemoveBuff)
+// RemoveBuffFromPlayer removes Buff from player and handles complete lifecycle.
+// Process order:
+//  1. Broadcast Removed event (before removal) - Buff can hear its own Removed event
+//  2. Unsubscribe (UnsubscribeBuff)
+//  3. Underlying data remove (player.RemoveBuff)
 func (g *Game) RemoveBuffFromPlayer(player *core.Player, buff *core.Buff) bool {
-	// 1. 先广播 Removed 事件
+	// 1. Broadcast Removed event first
 	g.BroadcastBuffRemoved(player, buff)
 
-	// 2. 取消订阅
+	// 2. Unsubscribe
 	g.UnsubscribeBuff(buff)
 
-	// 3. 底层数据移除
+	// 3. Underlying data remove
 	return player.RemoveBuff(buff.Type)
 }
 
-// BroadcastBuffApplied 广播 Buff Applied 事件
-// 触发 PhaseOnBuffApplied，所有订阅该 Phase 的 Buff/道具都会收到通知
+// BroadcastBuffApplied broadcasts Buff Applied event.
+// Triggers PhaseOnBuffApplied, all Buffs/Items subscribed to this Phase receive notification.
 func (g *Game) BroadcastBuffApplied(player *core.Player, buff *core.Buff) {
 	ctx := event.NewContext(player).WithData(buff)
 	g.Bus.Publish(event.PhaseOnBuffApplied, player.UserID, ctx)
 }
 
-// BroadcastBuffRemoved 广播 Buff Removed 事件
-// 触发 PhaseOnBuffRemoved，所有订阅该 Phase 的 Buff/道具都会收到通知
+// BroadcastBuffRemoved broadcasts Buff Removed event.
+// Triggers PhaseOnBuffRemoved, all Buffs/Items subscribed to this Phase receive notification.
 func (g *Game) BroadcastBuffRemoved(player *core.Player, buff *core.Buff) {
 	ctx := event.NewContext(player).WithData(buff)
 	g.Bus.Publish(event.PhaseOnBuffRemoved, player.UserID, ctx)
 }
 
-// ========== 辅助方法 ==========
+// ========== Helper Methods ==========
 
-// GetActiveBuffCount 获取玩家当前活跃的 Buff 数量
+// GetActiveBuffCount returns the player's current active Buff count.
 func (g *Game) GetActiveBuffCount(playerID string) int {
 	player := g.GetPlayer(playerID)
 	if player == nil {
@@ -292,7 +292,7 @@ func (g *Game) GetActiveBuffCount(playerID string) int {
 	return len(player.ActiveBuffs)
 }
 
-// GetBuffSubscriptionCount 获取 Buff 的订阅数量
+// GetBuffSubscriptionCount returns Buff's subscription count.
 func (g *Game) GetBuffSubscriptionCount(buff *core.Buff) int {
 	return len(buff.SubscriptionIDs)
 }

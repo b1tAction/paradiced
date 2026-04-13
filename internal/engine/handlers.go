@@ -6,31 +6,31 @@ import (
 	"github.com/b1tAction/Fated/pkg/event"
 )
 
-// EventHandler 是高度定制化的 Buff 效果处理函数
-// 通过策略模式，每个 Buff 可以有自己的专属处理逻辑
-// 参数:
-//   - phase: 当前触发的 Phase
-//   - ctx: 事件上下文，包含 Player、Data 等信息
+// EventHandler is a highly customized Buff effect handler function.
+// Through strategy pattern, each Buff can have its own dedicated handling logic.
+// Parameters:
+//   - phase: currently triggered Phase
+//   - ctx: event context, containing Player, Data etc.
 type EventHandler func(phase event.Phase, ctx *event.Context)
 
-// BuffHandlers 是 Buff 处理策略注册表
-// 将 BuffType 映射到其定制化的 EventHandler
-// 如果 Buff 没有注册定制处理器，则使用默认的数值处理器
+// BuffHandlers is the Buff handling strategy registry.
+// Maps BuffType to its customized EventHandler.
+// If Buff has no registered custom handler, default value handler is used.
 var BuffHandlers = map[core.BuffType]EventHandler{
-	core.BuffTypeFire: handleZhuQueFire, // 朱雀离火：每4回合LP+1
-	// 更多定制处理器可以在这里注册
-	// 例如：
-	// core.BuffTypeHidden: handleHiddenImmunity,    // 隐匿：免疫伤害
-	// core.BuffTypeLost: handleLostReverse,         // 迈途：反向移动
+	core.BuffTypeFire: handleZhuQueFire, // ZhuQue Fire: LP+1 every 4 turns
+	// More custom handlers can be registered here
+	// For example:
+	// core.BuffTypeHidden: handleHiddenImmunity,    // Hidden: damage immunity
+	// core.BuffTypeLost: handleLostReverse,         // Lost: reverse movement
 }
 
-// HasCustomHandler 检查 Buff 是否有定制处理器
+// HasCustomHandler checks if Buff has a custom handler.
 func HasCustomHandler(buffType core.BuffType) bool {
 	_, ok := BuffHandlers[buffType]
 	return ok
 }
 
-// GetHandler 获取 Buff 的定制处理器
+// GetHandler returns Buff's custom handler.
 func GetHandler(buffType core.BuffType) EventHandler {
 	if handler, ok := BuffHandlers[buffType]; ok {
 		return handler
@@ -38,56 +38,56 @@ func GetHandler(buffType core.BuffType) EventHandler {
 	return nil
 }
 
-// ========== 定制处理器实现 ==========
+// ========== Custom Handler Implementations ==========
 
-// handleZhuQueFire 朱雀离火 Buff 的定制处理器
-// 效果：每4回合 LP+1
-// 这是离火 Buff 的特殊逻辑，需要计数器来追踪回合
+// handleZhuQueFire is the custom handler for ZhuQue Fire Buff.
+// Effect: LP+1 every 4 turns.
+// This is Fire Buff's special logic, needs counter to track turns.
 func handleZhuQueFire(phase event.Phase, ctx *event.Context) {
 	player, ok := ctx.Player.(*core.Player)
 	if !ok {
 		return
 	}
 
-	// 只在 BeforeTurn Phase 执行
+	// Only execute in BeforeTurn Phase
 	if phase != event.PhaseBeforeTurn {
 		return
 	}
 
-	// 离火计数器递增（使用 Metadata 方法）
+	// Increment Fire counter (using Metadata method)
 	newCount := player.IncrementFireCounter()
 
-	// 每4回合增加1点幸运值
+	// Add 1 LP every 4 turns
 	if newCount >= 4 {
 		player.ModifyLP(1)
 		player.SetFireCounter(0)
 	}
 }
 
-// ========== 默认处理器 ==========
+// ========== Default Handler ==========
 
-// executeDefaultBuffAction 执行默认的 Buff 数值效果
-// 用于没有定制处理器的 Buff，根据 HPPerTurn/LPPerTurn 修改数值
+// executeDefaultBuffAction executes default Buff value effects.
+// Used for Buffs without custom handlers, modifies values based on HPPerTurn/LPPerTurn.
 func executeDefaultBuffAction(def *core.BuffDefinition, player *core.Player) {
-	// 修改 HP
+	// Modify HP
 	if def.HPPerTurn != 0 {
 		if def.HPPerTurn > 0 {
 			player.Heal(def.HPPerTurn)
 		} else {
-			player.ApplyDamage(-def.HPPerTurn) // HPPerTurn 为负数表示扣血
+			player.ApplyDamage(-def.HPPerTurn) // Negative HPPerTurn means damage
 		}
 	}
 
-	// 修改 LP
+	// Modify LP
 	if def.LPPerTurn != 0 {
 		player.ModifyLP(def.LPPerTurn)
 	}
 }
 
-// ========== 注册新处理器 ==========
+// ========== Register New Handlers ==========
 
-// RegisterBuffHandler 注册新的 Buff 处理器
-// 允许外部扩展 BuffHandlers 注册表
+// RegisterBuffHandler registers a new Buff handler.
+// Allows external extension of BuffHandlers registry.
 func RegisterBuffHandler(buffType core.BuffType, handler EventHandler) {
 	BuffHandlers[buffType] = handler
 }

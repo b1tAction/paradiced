@@ -7,15 +7,15 @@ import (
 	"github.com/b1tAction/Fated/pkg/event"
 )
 
-// StateMachine 状态机，处理Phase触发和用户决策等待
+// StateMachine is the state machine for handling Phase triggers and user decision waiting.
 type StateMachine struct {
 	Game        *Game
-	WaitingFor  []*event.Decision // 当前等待的决策列表
-	CurrentCtx  *event.Context    // 当前上下文
-	FlowState   string            // 流程状态标记
+	WaitingFor  []*event.Decision // Current waiting decision list
+	CurrentCtx  *event.Context    // Current context
+	FlowState   string            // Flow state marker
 }
 
-// NewStateMachine 创建状态机
+// NewStateMachine creates a state machine.
 func NewStateMachine(game *Game) *StateMachine {
 	return &StateMachine{
 		Game:       game,
@@ -24,12 +24,12 @@ func NewStateMachine(game *Game) *StateMachine {
 	}
 }
 
-// TriggerPhase 触发某个Phase
+// TriggerPhase triggers a Phase.
 func (sm *StateMachine) TriggerPhase(phase event.Phase, player *core.Player) []*event.Decision {
 	return sm.TriggerPhaseWithCtx(phase, player, nil)
 }
 
-// TriggerPhaseWithCtx 触发某个Phase，可传入预设的Context
+// TriggerPhaseWithCtx triggers a Phase with preset Context.
 func (sm *StateMachine) TriggerPhaseWithCtx(phase event.Phase, player *core.Player, presetCtx *event.Context) []*event.Decision {
 	ctx := presetCtx
 	if ctx == nil {
@@ -53,7 +53,7 @@ func (sm *StateMachine) TriggerPhaseWithCtx(phase event.Phase, player *core.Play
 	return decisions
 }
 
-// TriggerPhaseAndWait 触发Phase并进入等待状态
+// TriggerPhaseAndWait triggers Phase and enters waiting state.
 func (sm *StateMachine) TriggerPhaseAndWait(phase event.Phase, player *core.Player) bool {
 	decisions := sm.TriggerPhase(phase, player)
 
@@ -65,14 +65,14 @@ func (sm *StateMachine) TriggerPhaseAndWait(phase event.Phase, player *core.Play
 	return false
 }
 
-// EnterWaitingState 进入等待状态
+// EnterWaitingState enters waiting state.
 func (sm *StateMachine) EnterWaitingState(decisions []*event.Decision) {
 	sm.WaitingFor = decisions
 	sm.FlowState = "waiting"
 	sm.Game.State.Waiting = true
 }
 
-// OnUserChoice 处理用户选择
+// OnUserChoice handles user choice.
 func (sm *StateMachine) OnUserChoice(choice int) {
 	if len(sm.WaitingFor) == 0 {
 		return
@@ -84,20 +84,20 @@ func (sm *StateMachine) OnUserChoice(choice int) {
 	sm.WaitingFor = sm.WaitingFor[1:]
 
 	if len(sm.WaitingFor) > 0 {
-		// 继续等待下一个Decision
+		// Continue waiting for next Decision
 	} else {
 		sm.ExitWaitingState()
 	}
 }
 
-// ExitWaitingState 退出等待状态
+// ExitWaitingState exits waiting state.
 func (sm *StateMachine) ExitWaitingState() {
 	sm.WaitingFor = make([]*event.Decision, 0)
 	sm.FlowState = "running"
 	sm.Game.State.Waiting = false
 }
 
-// GetCurrentDecision 获取当前需要用户确认的Decision
+// GetCurrentDecision returns the current Decision needing user confirmation.
 func (sm *StateMachine) GetCurrentDecision() *event.Decision {
 	if len(sm.WaitingFor) > 0 {
 		return sm.WaitingFor[0]
@@ -105,22 +105,22 @@ func (sm *StateMachine) GetCurrentDecision() *event.Decision {
 	return nil
 }
 
-// IsWaiting 检查是否在等待用户输入
+// IsWaiting checks if waiting for user input.
 func (sm *StateMachine) IsWaiting() bool {
 	return sm.FlowState == "waiting"
 }
 
-// GetWaitingCount 获取等待的Decision数量
+// GetWaitingCount returns waiting Decision count.
 func (sm *StateMachine) GetWaitingCount() int {
 	return len(sm.WaitingFor)
 }
 
-// ContinueFlow 继续流程
+// ContinueFlow continues flow.
 func (sm *StateMachine) ContinueFlow() {
 	sm.ExitWaitingState()
 }
 
-// CancelWaiting 取消等待状态
+// CancelWaiting cancels waiting state.
 func (sm *StateMachine) CancelWaiting() {
 	for _, decision := range sm.WaitingFor {
 		decision.Execute(decision.Default, sm.CurrentCtx)
@@ -128,35 +128,35 @@ func (sm *StateMachine) CancelWaiting() {
 	sm.ExitWaitingState()
 }
 
-// ========== Phase执行器 ==========
+// ========== Phase Executors ==========
 
-// ExecuteBeforeTurnPhase 执行回合开始前Phase
+// ExecuteBeforeTurnPhase executes BeforeTurn Phase.
 func (sm *StateMachine) ExecuteBeforeTurnPhase(player *core.Player) []*event.Decision {
 	return sm.TriggerPhase(event.PhaseBeforeTurn, player)
 }
 
-// ExecuteOnMovePhase 执行移动Phase
+// ExecuteOnMovePhase executes OnMove Phase.
 func (sm *StateMachine) ExecuteOnMovePhase(player *core.Player) []*event.Decision {
 	return sm.TriggerPhase(event.PhaseOnMove, player)
 }
 
-// ExecuteOnLandPhase 执行落地Phase
+// ExecuteOnLandPhase executes OnLand Phase.
 func (sm *StateMachine) ExecuteOnLandPhase(player *core.Player) []*event.Decision {
 	return sm.TriggerPhase(event.PhaseOnLand, player)
 }
 
-// ExecutePreEventPhase 执行事件前Phase
+// ExecutePreEventPhase executes PreEvent Phase.
 func (sm *StateMachine) ExecutePreEventPhase(player *core.Player) []*event.Decision {
 	return sm.TriggerPhase(event.PhasePreEvent, player)
 }
 
-// ExecutePreDamagePhase 执行受伤前Phase
+// ExecutePreDamagePhase executes PreDamage Phase.
 func (sm *StateMachine) ExecutePreDamagePhase(player *core.Player, damage int) []*event.Decision {
 	ctx := event.NewContext(player).WithData(damage)
 	return sm.TriggerPhaseWithCtx(event.PhasePreDamage, player, ctx)
 }
 
-// ExecuteAfterTurnPhase 执行回合结束后Phase
+// ExecuteAfterTurnPhase executes AfterTurn Phase.
 func (sm *StateMachine) ExecuteAfterTurnPhase(player *core.Player) []*event.Decision {
 	return sm.TriggerPhase(event.PhaseAfterTurn, player)
 }
