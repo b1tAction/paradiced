@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-// ========== 初始化测试 ==========
+// ========== Initialization Tests ==========
 
 func TestNewMetadata(t *testing.T) {
 	m := NewMetadata()
@@ -19,12 +19,11 @@ func TestNewMetadata(t *testing.T) {
 	}
 }
 
-// ========== Set/Get 基本操作测试 ==========
+// ========== Set/Get Basic Tests ==========
 
 func TestSetAndGet(t *testing.T) {
 	m := NewMetadata()
 
-	// 设置并获取任意类型
 	m.Set("key1", 100)
 	m.Set("key2", "hello")
 	m.Set("key3", true)
@@ -45,7 +44,7 @@ func TestSetAndGet(t *testing.T) {
 		t.Errorf("key2 = %v, expected hello", val2)
 	}
 
-	// 获取不存在的键
+	// Get nonexistent key
 	val, ok := m.Get("nonexistent")
 	if ok {
 		t.Error("nonexistent key should not exist")
@@ -61,50 +60,66 @@ func TestSetOverwrite(t *testing.T) {
 	m.Set("key", 100)
 	m.Set("key", 200)
 
-	if m.GetInt("key") != 200 {
-		t.Errorf("overwritten key = %d, expected 200", m.GetInt("key"))
+	val, err := m.GetInt("key")
+	if err != nil {
+		t.Fatalf("GetInt failed: %v", err)
+	}
+	if val != 200 {
+		t.Errorf("overwritten key = %d, expected 200", val)
 	}
 }
 
-// ========== GetInt/SetInt 测试 ==========
+// ========== GetInt/SetInt Tests ==========
 
 func TestGetInt(t *testing.T) {
 	m := NewMetadata()
 
-	// 设置并获取整型
+	// Set and get integer
 	m.SetInt("count", 42)
-	if m.GetInt("count") != 42 {
-		t.Errorf("GetInt = %d, expected 42", m.GetInt("count"))
+	val, err := m.GetInt("count")
+	if err != nil {
+		t.Fatalf("GetInt failed: %v", err)
+	}
+	if val != 42 {
+		t.Errorf("GetInt = %d, expected 42", val)
 	}
 
-	// 获取不存在的键，返回 0
-	if m.GetInt("nonexistent") != 0 {
-		t.Errorf("GetInt nonexistent = %d, expected 0", m.GetInt("nonexistent"))
+	// Get nonexistent key returns error
+	_, err = m.GetInt("nonexistent")
+	if err == nil {
+		t.Error("GetInt nonexistent should return error")
 	}
 
-	// 类型不匹配时返回 0
+	// Type mismatch returns error
 	m.Set("string_key", "not an int")
-	if m.GetInt("string_key") != 0 {
-		t.Errorf("GetInt with wrong type = %d, expected 0", m.GetInt("string_key"))
+	_, err = m.GetInt("string_key")
+	if err == nil {
+		t.Error("GetInt with wrong type should return error")
 	}
 }
 
 func TestGetIntOrDefault(t *testing.T) {
 	m := NewMetadata()
 
-	// 存在的键返回实际值
+	// Existing key returns actual value
 	m.SetInt("existing", 10)
 	if m.GetIntOrDefault("existing", 5) != 10 {
 		t.Errorf("GetIntOrDefault existing = %d, expected 10", m.GetIntOrDefault("existing", 5))
 	}
 
-	// 不存在的键返回默认值
+	// Nonexistent key returns default
 	if m.GetIntOrDefault("nonexistent", 5) != 5 {
 		t.Errorf("GetIntOrDefault nonexistent = %d, expected 5", m.GetIntOrDefault("nonexistent", 5))
 	}
+
+	// Type mismatch returns default
+	m.Set("string_key", "not an int")
+	if m.GetIntOrDefault("string_key", 5) != 5 {
+		t.Errorf("GetIntOrDefault with wrong type = %d, expected 5", m.GetIntOrDefault("string_key", 5))
+	}
 }
 
-// ========== GetBool/SetBool 测试 ==========
+// ========== GetBool/SetBool Tests ==========
 
 func TestGetBool(t *testing.T) {
 	m := NewMetadata()
@@ -112,64 +127,125 @@ func TestGetBool(t *testing.T) {
 	m.SetBool("flag_true", true)
 	m.SetBool("flag_false", false)
 
-	if !m.GetBool("flag_true") {
+	val, err := m.GetBool("flag_true")
+	if err != nil {
+		t.Fatalf("GetBool failed: %v", err)
+	}
+	if !val {
 		t.Error("GetBool flag_true should be true")
 	}
-	if m.GetBool("flag_false") {
+
+	val, err = m.GetBool("flag_false")
+	if err != nil {
+		t.Fatalf("GetBool failed: %v", err)
+	}
+	if val {
 		t.Error("GetBool flag_false should be false")
 	}
 
-	// 不存在的键返回 false
-	if m.GetBool("nonexistent") {
-		t.Error("GetBool nonexistent should be false")
+	// Nonexistent key returns error
+	_, err = m.GetBool("nonexistent")
+	if err == nil {
+		t.Error("GetBool nonexistent should return error")
 	}
 
-	// 类型不匹配返回 false
+	// Type mismatch returns error
 	m.Set("int_key", 100)
-	if m.GetBool("int_key") {
-		t.Error("GetBool with wrong type should be false")
+	_, err = m.GetBool("int_key")
+	if err == nil {
+		t.Error("GetBool with wrong type should return error")
 	}
 }
 
-// ========== GetString/SetString 测试 ==========
+func TestGetBoolOrDefault(t *testing.T) {
+	m := NewMetadata()
+
+	m.SetBool("flag", true)
+	if !m.GetBoolOrDefault("flag", false) {
+		t.Error("GetBoolOrDefault flag should be true")
+	}
+
+	if m.GetBoolOrDefault("nonexistent", true) != true {
+		t.Error("GetBoolOrDefault nonexistent should return default true")
+	}
+}
+
+// ========== GetString/SetString Tests ==========
 
 func TestGetString(t *testing.T) {
 	m := NewMetadata()
 
 	m.SetString("name", "test")
-	if m.GetString("name") != "test" {
-		t.Errorf("GetString = %s, expected test", m.GetString("name"))
+	val, err := m.GetString("name")
+	if err != nil {
+		t.Fatalf("GetString failed: %v", err)
+	}
+	if val != "test" {
+		t.Errorf("GetString = %s, expected test", val)
 	}
 
-	// 不存在的键返回空字符串
-	if m.GetString("nonexistent") != "" {
-		t.Errorf("GetString nonexistent = %s, expected empty", m.GetString("nonexistent"))
+	// Nonexistent key returns error
+	_, err = m.GetString("nonexistent")
+	if err == nil {
+		t.Error("GetString nonexistent should return error")
 	}
 
-	// 类型不匹配返回空字符串
+	// Type mismatch returns error
 	m.Set("int_key", 100)
-	if m.GetString("int_key") != "" {
-		t.Errorf("GetString with wrong type = %s, expected empty", m.GetString("int_key"))
+	_, err = m.GetString("int_key")
+	if err == nil {
+		t.Error("GetString with wrong type should return error")
 	}
 }
 
-// ========== GetFloat64/SetFloat64 测试 ==========
+func TestGetStringOrDefault(t *testing.T) {
+	m := NewMetadata()
+
+	m.SetString("name", "test")
+	if m.GetStringOrDefault("name", "default") != "test" {
+		t.Errorf("GetStringOrDefault name = %s, expected test", m.GetStringOrDefault("name", "default"))
+	}
+
+	if m.GetStringOrDefault("nonexistent", "default") != "default" {
+		t.Errorf("GetStringOrDefault nonexistent = %s, expected default", m.GetStringOrDefault("nonexistent", "default"))
+	}
+}
+
+// ========== GetFloat64/SetFloat64 Tests ==========
 
 func TestGetFloat64(t *testing.T) {
 	m := NewMetadata()
 
 	m.SetFloat64("ratio", 3.14)
-	if m.GetFloat64("ratio") != 3.14 {
-		t.Errorf("GetFloat64 = %f, expected 3.14", m.GetFloat64("ratio"))
+	val, err := m.GetFloat64("ratio")
+	if err != nil {
+		t.Fatalf("GetFloat64 failed: %v", err)
+	}
+	if val != 3.14 {
+		t.Errorf("GetFloat64 = %f, expected 3.14", val)
 	}
 
-	// 不存在的键返回 0
-	if m.GetFloat64("nonexistent") != 0 {
-		t.Errorf("GetFloat64 nonexistent = %f, expected 0", m.GetFloat64("nonexistent"))
+	// Nonexistent key returns error
+	_, err = m.GetFloat64("nonexistent")
+	if err == nil {
+		t.Error("GetFloat64 nonexistent should return error")
 	}
 }
 
-// ========== HasKey/Delete/Clear 测试 ==========
+func TestGetFloat64OrDefault(t *testing.T) {
+	m := NewMetadata()
+
+	m.SetFloat64("ratio", 3.14)
+	if m.GetFloat64OrDefault("ratio", 1.0) != 3.14 {
+		t.Errorf("GetFloat64OrDefault ratio = %f, expected 3.14", m.GetFloat64OrDefault("ratio", 1.0))
+	}
+
+	if m.GetFloat64OrDefault("nonexistent", 1.0) != 1.0 {
+		t.Errorf("GetFloat64OrDefault nonexistent = %f, expected 1.0", m.GetFloat64OrDefault("nonexistent", 1.0))
+	}
+}
+
+// ========== HasKey/Delete/Clear Tests ==========
 
 func TestHasKey(t *testing.T) {
 	m := NewMetadata()
@@ -197,7 +273,7 @@ func TestDelete(t *testing.T) {
 		t.Error("key should not exist after delete")
 	}
 
-	// 删除不存在的键不会 panic
+	// Deleting nonexistent key doesn't panic
 	m.Delete("nonexistent")
 }
 
@@ -222,7 +298,7 @@ func TestClear(t *testing.T) {
 	}
 }
 
-// ========== Keys 测试 ==========
+// ========== Keys Tests ==========
 
 func TestKeys(t *testing.T) {
 	m := NewMetadata()
@@ -236,19 +312,19 @@ func TestKeys(t *testing.T) {
 		t.Errorf("keys count = %d, expected 3", len(keys))
 	}
 
-	// 验证所有键都在返回列表中
+	// Verify all keys are in the returned list
 	keySet := make(map[string]bool)
 	for _, k := range keys {
 		keySet[k] = true
 	}
-	for expected := range []string{"a", "b", "c"} {
-		if !keySet[keys[expected]] {
-			t.Errorf("key %s not found in Keys()", keys[expected])
+	for _, expected := range []string{"a", "b", "c"} {
+		if !keySet[expected] {
+			t.Errorf("key %s not found in Keys()", expected)
 		}
 	}
 }
 
-// ========== Clone 测试 ==========
+// ========== Clone Tests ==========
 
 func TestClone(t *testing.T) {
 	m := NewMetadata()
@@ -257,29 +333,46 @@ func TestClone(t *testing.T) {
 
 	cloned := m.Clone()
 
-	// 克隆副本独立
+	// Clone is independent
 	cloned.SetInt("count", 20)
 	cloned.SetString("name", "cloned")
 
-	// 原版不受影响
-	if m.GetInt("count") != 10 {
-		t.Errorf("original count = %d, expected 10", m.GetInt("count"))
+	// Original unaffected
+	val, err := m.GetInt("count")
+	if err != nil {
+		t.Fatalf("GetInt failed: %v", err)
 	}
-	if m.GetString("name") != "original" {
-		t.Errorf("original name = %s, expected original", m.GetString("name"))
+	if val != 10 {
+		t.Errorf("original count = %d, expected 10", val)
 	}
 
-	// 克隆副本值正确
-	if cloned.GetInt("count") != 20 {
-		t.Errorf("cloned count = %d, expected 20", cloned.GetInt("count"))
+	sval, err := m.GetString("name")
+	if err != nil {
+		t.Fatalf("GetString failed: %v", err)
 	}
-	if cloned.GetString("name") != "cloned" {
-		t.Errorf("cloned name = %s, expected cloned", cloned.GetString("name"))
+	if sval != "original" {
+		t.Errorf("original name = %s, expected original", sval)
+	}
+
+	// Clone values correct
+	val, err = cloned.GetInt("count")
+	if err != nil {
+		t.Fatalf("GetInt failed: %v", err)
+	}
+	if val != 20 {
+		t.Errorf("cloned count = %d, expected 20", val)
+	}
+
+	sval, err = cloned.GetString("name")
+	if err != nil {
+		t.Fatalf("GetString failed: %v", err)
+	}
+	if sval != "cloned" {
+		t.Errorf("cloned name = %s, expected cloned", sval)
 	}
 }
 
 func TestCloneNil(t *testing.T) {
-	// Clone 空 Metadata
 	m := NewMetadata()
 	cloned := m.Clone()
 
@@ -291,27 +384,31 @@ func TestCloneNil(t *testing.T) {
 	}
 }
 
-// ========== IncrementInt/DecrementInt 测试 ==========
+// ========== IncrementInt/DecrementInt Tests ==========
 
 func TestIncrementInt(t *testing.T) {
 	m := NewMetadata()
 
-	// 从 0 开始递增
+	// Increment from 0 (key doesn't exist)
 	result := m.IncrementInt("counter", 1)
 	if result != 1 {
 		t.Errorf("first increment = %d, expected 1", result)
 	}
-	if m.GetInt("counter") != 1 {
-		t.Errorf("counter = %d, expected 1", m.GetInt("counter"))
+	val, err := m.GetInt("counter")
+	if err != nil {
+		t.Fatalf("GetInt failed: %v", err)
+	}
+	if val != 1 {
+		t.Errorf("counter = %d, expected 1", val)
 	}
 
-	// 继续递增
+	// Continue incrementing
 	result = m.IncrementInt("counter", 5)
 	if result != 6 {
 		t.Errorf("second increment = %d, expected 6", result)
 	}
 
-	// 递增负数（实际上是递减）
+	// Increment with negative (effectively decrement)
 	result = m.IncrementInt("counter", -2)
 	if result != 4 {
 		t.Errorf("increment with negative = %d, expected 4", result)
@@ -328,7 +425,7 @@ func TestDecrementInt(t *testing.T) {
 	}
 }
 
-// ========== Merge 测试 ==========
+// ========== Merge Tests ==========
 
 func TestMerge(t *testing.T) {
 	m1 := NewMetadata()
@@ -336,19 +433,24 @@ func TestMerge(t *testing.T) {
 	m1.SetInt("b", 2)
 
 	m2 := NewMetadata()
-	m2.SetInt("b", 20) // 相同键，会被覆盖
+	m2.SetInt("b", 20) // Same key, will be overwritten
 	m2.SetInt("c", 3)
 
 	m1.Merge(m2)
 
-	if m1.GetInt("a") != 1 {
-		t.Errorf("a = %d, expected 1", m1.GetInt("a"))
+	val, err := m1.GetInt("a")
+	if err != nil || val != 1 {
+		t.Errorf("a = %d, expected 1", val)
 	}
-	if m1.GetInt("b") != 20 {
-		t.Errorf("b = %d, expected 20 (overwritten)", m1.GetInt("b"))
+
+	val, err = m1.GetInt("b")
+	if err != nil || val != 20 {
+		t.Errorf("b = %d, expected 20 (overwritten)", val)
 	}
-	if m1.GetInt("c") != 3 {
-		t.Errorf("c = %d, expected 3", m1.GetInt("c"))
+
+	val, err = m1.GetInt("c")
+	if err != nil || val != 3 {
+		t.Errorf("c = %d, expected 3", val)
 	}
 }
 
@@ -356,15 +458,16 @@ func TestMergeNil(t *testing.T) {
 	m := NewMetadata()
 	m.SetInt("key", 100)
 
-	// 合并 nil 不应 panic
+	// Merge nil shouldn't panic
 	m.Merge(nil)
 
-	if m.GetInt("key") != 100 {
-		t.Errorf("key = %d, expected 100 (unchanged)", m.GetInt("key"))
+	val, err := m.GetInt("key")
+	if err != nil || val != 100 {
+		t.Errorf("key = %d, expected 100 (unchanged)", val)
 	}
 }
 
-// ========== ToMap 测试 ==========
+// ========== ToMap Tests ==========
 
 func TestToMap(t *testing.T) {
 	m := NewMetadata()
@@ -380,35 +483,40 @@ func TestToMap(t *testing.T) {
 		t.Errorf("mapCopy[b] = %v, expected hello", mapCopy["b"])
 	}
 
-	// 修改副本不影响原版
+	// Modifying copy doesn't affect original
 	mapCopy["a"] = 100
-	if m.GetInt("a") != 1 {
-		t.Errorf("original a = %d, expected 1", m.GetInt("a"))
+	val, err := m.GetInt("a")
+	if err != nil || val != 1 {
+		t.Errorf("original a = %d, expected 1", val)
 	}
 }
 
-// ========== 链式调用测试 ==========
+// ========== Chained Calls Tests ==========
 
 func TestChainedCalls(t *testing.T) {
 	m := NewMetadata()
 
-	// 链式设置多个值
 	m.SetInt("int", 10).
 		SetString("string", "hello").
 		SetBool("bool", true)
 
-	if m.GetInt("int") != 10 {
-		t.Errorf("int = %d, expected 10", m.GetInt("int"))
+	val, err := m.GetInt("int")
+	if err != nil || val != 10 {
+		t.Errorf("int = %d, expected 10", val)
 	}
-	if m.GetString("string") != "hello" {
-		t.Errorf("string = %s, expected hello", m.GetString("string"))
+
+	sval, err := m.GetString("string")
+	if err != nil || sval != "hello" {
+		t.Errorf("string = %s, expected hello", sval)
 	}
-	if !m.GetBool("bool") {
+
+	bval, err := m.GetBool("bool")
+	if err != nil || !bval {
 		t.Error("bool should be true")
 	}
 }
 
-// ========== Size 测试 ==========
+// ========== Size Tests ==========
 
 func TestSize(t *testing.T) {
 	m := NewMetadata()
