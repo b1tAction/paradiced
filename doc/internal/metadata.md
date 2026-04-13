@@ -1,28 +1,28 @@
-# pkg/util/metadata - Metadata 类型安全动态数据容器
+# pkg/util/metadata - Type-Safe Dynamic Data Container
 
-## 概述
+## Overview
 
-`pkg/util/metadata` 是一个类型安全的键值存储容器，用于解决以下问题：
+`pkg/util/metadata` is a type-safe key-value storage container that solves these problems:
 
-1. `Context.Data` 为 `interface{}` 类型太过简陋，缺乏类型安全
-2. `Player` 中存有 `FireCounter`、`ChargeCount` 等与核心实体无关的数据
-3. 未来可以扩展更多动态数据
+1. `Context.Data` as `interface{}` is too simplistic, lacking type safety
+2. `Player` contains `FireCounter`, `ChargeCount` and other data unrelated to core entity
+3. Future extensibility for more dynamic data
 
-通过 Go 的**匿名嵌入（Struct Embedding）**特性，让 `Context`、`Player` 等结构体直接继承 `Metadata` 的所有方法。
+Through Go's **anonymous embedding (Struct Embedding)** feature, `Context`, `Player` and other structs directly inherit all methods from `Metadata`.
 
 ---
 
-## 文件结构
+## File Structure
 
 ```
 pkg/util/
-├── metadata.go      # Metadata 核心实现
-├── metadata_test.go # 测试文件
+├── metadata.go      # Metadata core implementation
+├── metadata_test.go # Test file
 ```
 
 ---
 
-## Metadata 结构体
+## Metadata Struct
 
 ```go
 type Metadata struct {
@@ -34,72 +34,86 @@ func NewMetadata() *Metadata
 
 ---
 
-## 核心方法
+## Core Methods
 
-### 类型安全读取
+### Type-Safe Reading (Returns Error)
 
-| 方法 | 说明 |
-|------|------|
-| `GetInt(key string) int` | 安全获取整型，不存在返回 0 |
-| `GetIntOrDefault(key, default) int` | 安全获取整型，带默认值 |
-| `GetBool(key string) bool` | 安全获取布尔值 |
-| `GetString(key string) string` | 安全获取字符串 |
-| `GetFloat64(key string) float64` | 安全获取浮点数 |
-| `Get(key string) (interface{}, bool)` | 获取原始值 |
+| Method | Description |
+|--------|-------------|
+| `GetInt(key string) (int, error)` | Gets integer, returns error if key not found or type mismatch |
+| `GetBool(key string) (bool, error)` | Gets boolean, returns error if key not found or type mismatch |
+| `GetString(key string) (string, error)` | Gets string, returns error if key not found or type mismatch |
+| `GetFloat64(key string) (float64, error)` | Gets float64, returns error if key not found or type mismatch |
+| `Get(key string) (interface{}, bool)` | Gets raw value, returns (nil, false) if not found |
 
-### 类型安全写入（链式调用）
+### Type-Safe Reading (With Default - No Error)
 
-| 方法 | 说明 |
-|------|------|
-| `SetInt(key, value) *Metadata` | 设置整型值 |
-| `SetBool(key, value) *Metadata` | 设置布尔值 |
-| `SetString(key, value) *Metadata` | 设置字符串 |
-| `Set(key, value) *Metadata` | 设置任意类型值 |
+| Method | Description |
+|--------|-------------|
+| `GetIntOrDefault(key, default) int` | Gets integer, returns default if key not found or type mismatch |
+| `GetBoolOrDefault(key, default) bool` | Gets boolean, returns default if key not found or type mismatch |
+| `GetStringOrDefault(key, default) string` | Gets string, returns default if key not found or type mismatch |
+| `GetFloat64OrDefault(key, default) float64` | Gets float64, returns default if key not found or type mismatch |
 
-### 辅助方法
+### Type-Safe Writing (Chainable)
 
-| 方法 | 说明 |
-|------|------|
-| `HasKey(key) bool` | 检查键是否存在 |
-| `Delete(key)` | 删除键 |
-| `Clear()` | 清空所有键 |
-| `Keys() []string` | 返回所有键名 |
-| `Size() int` | 返回键数量 |
-| `Clone() *Metadata` | 克隆（独立副本） |
-| `IncrementInt(key, delta) int` | 递增整型值 |
-| `DecrementInt(key, delta) int` | 递减整型值 |
-| `Merge(other *Metadata) *Metadata` | 合并另一个 Metadata |
+| Method | Description |
+|--------|-------------|
+| `SetInt(key, value) *Metadata` | Sets integer value |
+| `SetBool(key, value) *Metadata` | Sets boolean value |
+| `SetString(key, value) *Metadata` | Sets string value |
+| `Set(key, value) *Metadata` | Sets any type value |
+
+### Utility Methods
+
+| Method | Description |
+|--------|-------------|
+| `HasKey(key) bool` | Checks if key exists |
+| `Delete(key)` | Deletes key |
+| `Clear()` | Clears all keys |
+| `Keys() []string` | Returns all key names |
+| `Size() int` | Returns key count |
+| `Clone() *Metadata` | Clones (independent copy) |
+| `IncrementInt(key, delta) int` | Increments integer value |
+| `DecrementInt(key, delta) int` | Decrements integer value |
+| `Merge(other *Metadata) *Metadata` | Merges another Metadata |
 
 ---
 
-## 使用示例
+## Usage Examples
 
-### 基本使用
+### Basic Usage
 
 ```go
 m := util.NewMetadata()
 
-// 设置值
+// Set values
 m.SetInt("count", 10)
 m.SetString("name", "test")
 m.SetBool("active", true)
 
-// 链式调用
+// Chain calls
 m.SetInt("turn", 1).SetString("event", "fog")
 
-// 获取值
-count := m.GetInt("count")          // 10
-name := m.GetString("name")         // "test"
-active := m.GetBool("active")       // true
+// Get values with error handling
+count, err := m.GetInt("count")
+if err != nil {
+    // Handle error: key not found or type mismatch
+}
 
-// 带默认值获取
+// Or use GetIntOrDefault for graceful handling
+count := m.GetIntOrDefault("count", 0)          // 10
+name := m.GetStringOrDefault("name", "")        // "test"
+active := m.GetBoolOrDefault("active", false)   // true
+
+// Default value for missing key
 val := m.GetIntOrDefault("missing", 5)  // 5
 
-// 递增
-m.IncrementInt("counter", 1)  // 返回递增后的值
+// Increment
+m.IncrementInt("counter", 1)  // Returns new value
 ```
 
-### 嵌入到结构体
+### Embedding in Struct
 
 ```go
 import "github.com/b1tAction/Fated/pkg/util"
@@ -107,8 +121,8 @@ import "github.com/b1tAction/Fated/pkg/util"
 type Player struct {
     UserID   string
     Faction  Faction
-    // ... 其他核心字段
-    *util.Metadata  // 匿名嵌入
+    // ... other core fields
+    *util.Metadata  // Anonymous embedding
 }
 
 func NewPlayer(config PlayerConfig) *Player {
@@ -119,18 +133,18 @@ func NewPlayer(config PlayerConfig) *Player {
     }
 }
 
-// 使用示例
+// Usage example
 player := NewPlayer(config)
 player.SetInt("fire_counter", 0)
 player.IncrementInt("fire_counter", 1)
 ```
 
-### 向后兼容方法
+### Convenience Methods for Known Data
 
-对于已知用途的数据，可以添加便捷方法：
+For data with known purposes, add convenience methods:
 
 ```go
-// Player 便捷方法
+// Player convenience methods
 func (p *Player) GetFireCounter() int {
     return p.GetIntOrDefault("fire_counter", 0)
 }
@@ -146,55 +160,56 @@ func (p *Player) IncrementFireCounter() int {
 
 ---
 
-## 已迁移的数据
+## Migrated Data
 
 ### Player
 
-| 原字段 | Metadata 键 | 便捷方法 |
-|--------|------------|---------|
+| Original Field | Metadata Key | Convenience Methods |
+|---------------|--------------|---------------------|
 | `ChargeCount int` | `charge_count` | `GetChargeCount/SetChargeCount` |
 | `FireCounter int` | `fire_counter` | `GetFireCounter/SetFireCounter` |
 
 ### Context
 
-| 原字段 | Metadata 键 | 便捷方法 |
-|--------|------------|---------|
+| Original Field | Metadata Key | Convenience Methods |
+|---------------|--------------|---------------------|
 | `Data interface{}` | `data` | `WithData/GetData` |
 
 ---
 
-## 设计理念
+## Design Philosophy
 
-### 为什么使用 Metadata
+### Why Use Metadata
 
-1. **DRY 原则**：类型转换、安全校验集中在 `Metadata`，一处添加方法多处受益。
-2. **扁平序列化**：JSON 序列化干净，前端解析无压力。
-3. **架构统一**：`Context`（瞬态）、`Player`（持久）用同一组件管理动态数据。
-4. **灵活扩展**：未来 Cell 的 `FellDown`、`Interrupted` 等状态也可迁移。
+1. **DRY Principle**: Type conversion and safety checks centralized in `Metadata`, one place to add methods benefits all.
+2. **Flat Serialization**: JSON serialization is clean, frontend parsing is easy.
+3. **Unified Architecture**: `Context` (transient) and `Player` (persistent) managed by same component.
+4. **Flexible Extension**: Future Cell states like `FellDown`, `Interrupted` can be migrated.
 
-### 键名约定
+### Key Naming Convention
 
-- 使用 `snake_case` 格式
-- 例如：`fire_counter`、`charge_count`、`turn_count`
-
----
-
-## 测试覆盖
-
-`pkg/util/metadata_test.go` 包含全面测试：
-
-- 初始化测试
-- Set/Get 基本操作
-- 类型安全读取测试
-- HasKey/Delete/Clear 测试
-- Clone 独立性测试
-- IncrementInt/DecrementInt 测试
-- Merge 测试
-- 链式调用测试
+- Use `snake_case` format
+- Examples: `fire_counter`, `charge_count`, `turn_count`
 
 ---
 
-## 相关文档
+## Test Coverage
 
-- [core.md](./core.md) - Player/Buff 结构体定义
-- [event_bus_system.md](./event_bus_system.md) - Context 使用方式
+`pkg/util/metadata_test.go` includes comprehensive tests:
+
+- Initialization tests
+- Set/Get basic operations
+- Type-safe reading tests (with error handling)
+- GetOrDefault tests
+- HasKey/Delete/Clear tests
+- Clone independence tests
+- IncrementInt/DecrementInt tests
+- Merge tests
+- Chainable calls tests
+
+---
+
+## Related Documentation
+
+- [core.md](./core.md) - Player/Buff struct definitions
+- [event_bus_system.md](./event_bus_system.md) - Context usage
