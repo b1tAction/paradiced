@@ -9,8 +9,8 @@ import (
 
 // ========== Integration Tests: Game + EventBus + StateMachine ==========
 
-// TestIntegrationFullTurnFlow 测试完整的回合流程
-func TestIntegrationFullTurnFlow(t *testing.T) {
+// TestIntegrationStateMachineFlow 测试状态机的完整回合流程
+func TestIntegrationStateMachineFlow(t *testing.T) {
 	// 1. 创建游戏和玩家
 	game := NewGame("game-001", 0)
 	player := core.NewPlayer(core.PlayerConfig{
