@@ -130,10 +130,38 @@ type ActionContext struct {
 
 ### ExecuteAction 流程
 
-1. 检查 `CanModify()`，若可拦截则 Publish 到 EventBus
+**设计原则：谁产生时机，谁发布Phase**
+
+1. **PreTrigger阶段** - 发布Phase供拦截（如 `PhasePreDamage`、`PhasePreMove`）
+   - 若 `PreTriggerPhase() != PhaseAnyTime`，则 Publish 到 EventBus
+   - 检查 `action_blocked` 标志，若被阻断则跳过执行
 2. 执行 `Execute(ctx)`
-3. 记录 `LogEntry()` 到 EventLog
-4. 处理 ActionQueue 中的衍生动作
+3. **PostTrigger阶段** - 发布Phase供生命周期事件（如 `PhaseOnBuffApplied`、`PhaseOnBuffRemoved`）
+4. 记录 `LogEntry()` 到 EventLog
+5. 处理 ActionQueue 中的衍生动作
+
+### Phase方法实现
+
+```go
+// DamageAction - 伤害前可被拦截
+func (a *DamageAction) PreTriggerPhase() event.Phase {
+    if a.IsPiercing { return event.PhaseAnyTime } // 穿透伤害不触发拦截
+    return event.PhasePreDamage
+}
+func (a *DamageAction) PostTriggerPhase() event.Phase { return event.PhaseAnyTime }
+
+// MoveAction - 移动前可被篡改
+func (a *MoveAction) PreTriggerPhase() event.Phase { return event.PhasePreMove }
+func (a *MoveAction) PostTriggerPhase() event.Phase { return event.PhaseAnyTime }
+
+// AddBuffAction - 添加后触发入场效果
+func (a *AddBuffAction) PreTriggerPhase() event.Phase { return event.PhaseAnyTime }
+func (a *AddBuffAction) PostTriggerPhase() event.Phase { return event.PhaseOnBuffApplied }
+
+// RemoveBuffAction - 移除前触发亡语
+func (a *RemoveBuffAction) PreTriggerPhase() event.Phase { return event.PhaseOnBuffRemoved }
+func (a *RemoveBuffAction) PostTriggerPhase() event.Phase { return event.PhaseAnyTime }
+```
 
 ### 接口定义（避免循环依赖）
 

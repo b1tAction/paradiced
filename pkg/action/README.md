@@ -35,11 +35,33 @@ const (
 
 ```go
 type Action interface {
-    Type() ActionType    // 动作类型
-    CanModify() bool     // 是否可被拦截篡改
-    Source() string      // 来源标识（BuffID/ItemID等）
-    Target() string      // 目标玩家ID
+    Type() ActionType            // 动作类型
+    CanModify() bool             // 是否可被拦截篡改
+    Source() string              // 来源标识（BuffID/ItemID等）
+    Target() string              // 目标玩家ID
+    PreTriggerPhase() event.Phase  // 执行前触发Phase（用于拦截）
+    PostTriggerPhase() event.Phase // 执行后触发Phase（用于生命周期事件）
 }
+```
+
+### Phase 设计原则
+
+**谁产生时机，谁发布Phase：**
+- HSM发布状态时机Phase（BeforeTurn, OnLand, AfterTurn）
+- Action发布动作时机Phase（PreDamage, PreEvent, PreMove, OnBuffApplied, OnBuffRemoved）
+
+```go
+// HSM发布的Phase（状态时机）
+PhaseBeforeTurn  // TurnUpkeep.Enter() - 回合开始前
+PhaseOnLand      // TurnLanded.Enter() - 落地后
+PhaseAfterTurn   // TurnEnd.Enter() - 回合结束后
+
+// Action发布的Phase（动作时机）
+PhasePreDamage     // DamageAction - 伤害应用前（隐匿、护盾拦截）
+PhasePreEvent      // DrawEventAction - 事件触发前（辟邪）
+PhasePreMove       // MoveAction - 移动前（迷途反向）
+PhaseOnBuffApplied // AddBuffAction - Buff添加后（入场效果）
+PhaseOnBuffRemoved // RemoveBuffAction - Buff移除前（亡语）
 ```
 
 ### TurnEventLogEntry
@@ -88,9 +110,9 @@ func CurseHandler(phase event.Phase, ctx *event.Context) Action {
     }
 }
 
-// 迷途Buff：反向移动
+// 迷途Buff：反向移动（在PreMove时篡改）
 func LostHandler(phase event.Phase, ctx *event.Context) Action {
-    if phase != event.PhaseOnMove {
+    if phase != event.PhasePreMove {
         return nil
     }
     action := ctx.Get("current_action")
