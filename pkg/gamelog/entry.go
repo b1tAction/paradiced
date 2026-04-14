@@ -4,23 +4,21 @@ package gamelog
 import (
 	"time"
 
+	"github.com/b1tAction/Fated/pkg/constants"
 	"github.com/b1tAction/Fated/pkg/util"
 )
 
 // EntryType identifies the type of log entry.
-type EntryType string
+// Alias to constants.EntryType for unified enum system.
+type EntryType = constants.EntryType
 
+// EntryType constants - aliases to constants package.
 const (
-	// EntryTypeAction represents Action execution (includes all ActionTypes).
-	EntryTypeAction EntryType = "action"
-	// EntryTypeState represents HSM State transition.
-	EntryTypeState EntryType = "state"
-	// EntryTypeMiniGame represents mini-game results.
-	EntryTypeMiniGame EntryType = "mini_game"
-	// EntryTypeBoss represents Boss battle events.
-	EntryTypeBoss EntryType = "boss"
-	// EntryTypeDecision represents user decision/choice.
-	EntryTypeDecision EntryType = "decision"
+	EntryTypeAction   = constants.EntryTypeAction
+	EntryTypeState    = constants.EntryTypeState
+	EntryTypeMiniGame = constants.EntryTypeMiniGame
+	EntryTypeBoss     = constants.EntryTypeBoss
+	EntryTypeDecision = constants.EntryTypeDecision
 )
 
 // LogEntry represents a single game event for client playback.
