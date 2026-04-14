@@ -56,14 +56,17 @@ type ItemDefinition struct {
 ```go
 type Item struct {
     Type           ItemType
-    ID             string
+    ID             string       // UUID v7, auto-generated
     Usable         bool
     TargetID       string
-    SubscriptionID string  // EventBus 订阅ID
+    SubscriptionID string       // EventBus 订阅ID
 }
 
-item.NewItem(item.ItemTypeAnyDoor, "item-001")
-item.GenerateItemID()  // 生成唯一ID
+// NewItem auto-generates UUID v7 ID
+item.NewItem(item.ItemTypeAnyDoor)
+
+// NewItemWithID creates item with specific ID (for testing)
+item.NewItemWithID(item.ItemTypeAnyDoor, "test-item-001")
 ```
 
 ## 注册表 API

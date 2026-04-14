@@ -7,13 +7,14 @@ import (
 	"github.com/b1tAction/fated/internal/core"
 	"github.com/b1tAction/fated/internal/engine"
 	"github.com/b1tAction/fated/pkg/event"
+	"github.com/b1tAction/fated/pkg/id"
 )
 
 // ========== WaitDecisionState Tests ==========
 
 func TestWaitDecisionState_Enter(t *testing.T) {
-	game := engine.NewGame("test", 0)
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player1"})
+	game := engine.NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	game.AddPlayer(player)
 
 	decision := event.NewDecision("Choose an option", []event.Option{
@@ -54,8 +55,8 @@ func TestWaitDecisionState_Enter_NoDecision(t *testing.T) {
 }
 
 func TestWaitDecisionState_Enter_ContextDecision(t *testing.T) {
-	game := engine.NewGame("test", 0)
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player1"})
+	game := engine.NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	game.AddPlayer(player)
 
 	decision := event.NewDecision("Choose an option", []event.Option{
@@ -173,8 +174,8 @@ func TestWaitDecisionState_ExecuteOption(t *testing.T) {
 		},
 	})
 
-	game := engine.NewGame("test", 0)
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player1"})
+	game := engine.NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	game.AddPlayer(player)
 
 	state := NewWaitDecisionState().WithDecision(decision)
@@ -280,7 +281,7 @@ func TestBaseInterruptState_CanTransitionTo(t *testing.T) {
 // ========== RegisterInterruptStates Tests ==========
 
 func TestRegisterInterruptStates(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 
 	err := RegisterInterruptStates(hsm)

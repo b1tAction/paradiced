@@ -3,27 +3,25 @@
 package buff
 
 import (
-	"fmt"
-	"time"
-
 	"github.com/b1tAction/fated/pkg/constants"
 	"github.com/b1tAction/fated/pkg/handler"
+	"github.com/b1tAction/fated/pkg/id"
 )
 
 // ========== Buff Instance ==========
 
 type Buff struct {
 	Type            constants.BuffType `json:"type"`
-	ID              string             `json:"id"` // Buff instance ID
+	ID              id.BuffID          `json:"id"` // Buff instance ID (UUID v7)
 	Duration        int                `json:"duration"`
 	Charge          int                `json:"charge"`
-	SubscriptionIDs []string           `json:"subscription_ids"` // EventBus subscription IDs
+	SubscriptionIDs []string           `json:"subscription_ids"` // EventBus subscription IDs (UUID strings)
 }
 
 func NewBuff(buffType constants.BuffType, duration int) *Buff {
 	return &Buff{
 		Type:            buffType,
-		ID:              fmt.Sprintf("buff-%d", time.Now().UnixNano()),
+		ID:              id.NewBuffID(),
 		Duration:        duration,
 		Charge:          0,
 		SubscriptionIDs: make([]string, 0),

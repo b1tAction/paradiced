@@ -7,6 +7,7 @@ import (
 	"github.com/b1tAction/fated/internal/core"
 	"github.com/b1tAction/fated/internal/engine"
 	"github.com/b1tAction/fated/internal/gamemap"
+	"github.com/b1tAction/fated/pkg/id"
 	"github.com/b1tAction/fated/pkg/rng"
 )
 
@@ -14,8 +15,8 @@ import (
 
 func TestTurnUpkeepState_Enter_NormalFlow(t *testing.T) {
 	// Setup
-	game := engine.NewGame("test", 0)
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player1"})
+	game := engine.NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.HP = 5
 	player.LP = 3
 	player.Position = 10
@@ -48,8 +49,8 @@ func TestTurnUpkeepState_Enter_NormalFlow(t *testing.T) {
 
 func TestTurnUpkeepState_Enter_SkipTurn(t *testing.T) {
 	// Setup
-	game := engine.NewGame("test", 0)
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player1"})
+	game := engine.NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.SkipTurn = true
 	game.AddPlayer(player)
 
@@ -76,8 +77,8 @@ func TestTurnUpkeepState_Enter_SkipTurn(t *testing.T) {
 
 func TestTurnUpkeepState_Enter_DeadPlayer(t *testing.T) {
 	// Setup
-	game := engine.NewGame("test", 0)
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player1"})
+	game := engine.NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.IsDead = true
 	player.Position = 50
 	game.AddPlayer(player)
@@ -136,8 +137,8 @@ func TestTurnUpkeepState_Update_NormalFlow(t *testing.T) {
 // ========== MainActionState Tests ==========
 
 func TestMainActionState_Enter(t *testing.T) {
-	game := engine.NewGame("test", 0)
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player1"})
+	game := engine.NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	game.AddPlayer(player)
 
 	state := NewMainActionState()
@@ -210,7 +211,7 @@ func TestMainActionState_Update_Waiting(t *testing.T) {
 
 func TestMainActionState_defaultDiceRoll(t *testing.T) {
 	state := NewMainActionState()
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	ctx := NewStateContext().WithPlayer(player)
 
 	tests := []struct {
@@ -225,7 +226,7 @@ func TestMainActionState_defaultDiceRoll(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		ctx.SetDiceType("player1", tt.diceType)
+		ctx.SetDiceType(player.ID.UUID(), tt.diceType)
 		result := state.defaultDiceRoll(ctx)
 		if result != tt.expected {
 			t.Errorf("defaultDiceRoll for %s should return %d, got %d", tt.diceType.String(), tt.expected, result)
@@ -236,8 +237,8 @@ func TestMainActionState_defaultDiceRoll(t *testing.T) {
 // ========== TurnMovingState Tests ==========
 
 func TestTurnMovingState_Enter_FellDown(t *testing.T) {
-	game := engine.NewGame("test", 0)
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player1"})
+	game := engine.NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.HP = 5
 	player.Position = 20
 	game.AddPlayer(player)
@@ -315,8 +316,8 @@ func TestTurnMovingState_Update_NormalFlow(t *testing.T) {
 // ========== TurnLandedState Tests ==========
 
 func TestTurnLandedState_Enter(t *testing.T) {
-	game := engine.NewGame("test", 0)
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player1"})
+	game := engine.NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.Position = 30
 	game.AddPlayer(player)
 
@@ -356,8 +357,8 @@ func TestTurnLandedState_Update(t *testing.T) {
 // ========== TurnEventState Tests ==========
 
 func TestTurnEventState_Enter(t *testing.T) {
-	game := engine.NewGame("test", 0)
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player1"})
+	game := engine.NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.Position = 20
 	game.AddPlayer(player)
 
@@ -389,8 +390,8 @@ func TestTurnEventState_Update(t *testing.T) {
 // ========== TurnEndState Tests ==========
 
 func TestTurnEndState_Enter(t *testing.T) {
-	game := engine.NewGame("test", 0)
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player1"})
+	game := engine.NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.HP = 5
 	player.LP = 3
 	player.Position = 20
@@ -410,8 +411,8 @@ func TestTurnEndState_Enter(t *testing.T) {
 }
 
 func TestTurnEndState_Enter_TickBuffs(t *testing.T) {
-	game := engine.NewGame("test", 0)
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player1"})
+	game := engine.NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	game.AddPlayer(player)
 
 	// Add buff with 1 duration (will expire)
@@ -440,9 +441,9 @@ func TestTurnEndState_Enter_TickBuffs(t *testing.T) {
 }
 
 func TestTurnEndState_Enter_FactionCharging(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{
-		UserID:  "player1",
+		ID:      id.NewPlayerID(),
 		Faction: core.FactionQingLong,
 	})
 	game.AddPlayer(player)

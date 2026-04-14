@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/id"
 )
 
 // ========== ItemType Tests ==========
@@ -48,30 +49,40 @@ func TestItemTypeGetEvaluation(t *testing.T) {
 // ========== Item Instance Tests ==========
 
 func TestNewItem(t *testing.T) {
-	it := NewItem(constants.ItemTypeReverseClock, "test-id-001")
+	it := NewItem(constants.ItemTypeReverseClock)
 	if it.Type != constants.ItemTypeReverseClock {
 		t.Errorf("item.Type = %s, expected ReverseClock", it.Type)
 	}
-	if it.ID != "test-id-001" {
-		t.Errorf("item.ID = %s, expected test-id-001", it.ID)
+	// ID should be auto-generated UUID v7
+	if it.ID.IsZero() {
+		t.Errorf("item.ID = %s, expected valid UUID v7", it.ID.UUID())
 	}
 	if !it.Usable {
 		t.Error("new item should be usable")
 	}
 }
 
-func TestGenerateItemID(t *testing.T) {
-	id1 := GenerateItemID()
-	id2 := GenerateItemID()
-
-	// IDs should be different (timestamp-based)
-	if id1 == id2 {
-		t.Errorf("GenerateItemID() should produce unique IDs, got %s twice", id1)
+func TestNewItemWithID(t *testing.T) {
+	testID := id.NewItemID()
+	it := NewItemWithID(constants.ItemTypeReverseClock, testID)
+	if it.Type != constants.ItemTypeReverseClock {
+		t.Errorf("item.Type = %s, expected ReverseClock", it.Type)
 	}
+	if it.ID != testID {
+		t.Errorf("item.ID = %s, expected %s", it.ID.UUID(), testID.UUID())
+	}
+	if !it.Usable {
+		t.Error("new item should be usable")
+	}
+}
 
-	// IDs should have correct prefix
-	if len(id1) < 5 || id1[:5] != "item-" {
-		t.Errorf("GenerateItemID() should produce IDs starting with 'item-', got %s", id1)
+func TestNewItemUniqueness(t *testing.T) {
+	it1 := NewItem(constants.ItemTypeReverseClock)
+	it2 := NewItem(constants.ItemTypeReverseClock)
+
+	// IDs should be unique
+	if it1.ID == it2.ID {
+		t.Errorf("NewItem should generate unique IDs, got %s twice", it1.ID)
 	}
 }
 

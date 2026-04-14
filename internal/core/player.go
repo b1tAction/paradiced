@@ -7,12 +7,13 @@ import (
 	"github.com/b1tAction/fated/internal/core/buff"
 	"github.com/b1tAction/fated/internal/core/item"
 	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/id"
 	"github.com/b1tAction/fated/pkg/util"
 )
 
 // Player represents a player in the game.
 type Player struct {
-	UserID         string            `json:"user_id"`      // Player UUID
+	ID             id.PlayerID       `json:"id"`           // Player unique identifier (UUID v7)
 	Faction        Faction           `json:"faction"`      // Faction (阵营)
 	Position       int               `json:"position"`     // Current position
 	HP             int               `json:"hp"`           // Health points
@@ -26,7 +27,7 @@ type Player struct {
 
 // PlayerConfig represents player configuration.
 type PlayerConfig struct {
-	UserID   string
+	ID       id.PlayerID // Player unique identifier
 	Faction  Faction
 	MaxHP    int
 	MaxLP    int
@@ -49,8 +50,13 @@ func NewPlayer(config PlayerConfig) *Player {
 		config.MaxLP = DefaultPlayerConfig.MaxLP
 	}
 
+	// Generate ID if not provided
+	if config.ID.IsZero() {
+		config.ID = id.NewPlayerID()
+	}
+
 	player := &Player{
-		UserID:      config.UserID,
+		ID:          config.ID,
 		Faction:     config.Faction,
 		Position:    config.StartPos,
 		HP:          config.MaxHP,
@@ -72,8 +78,11 @@ func NewPlayer(config PlayerConfig) *Player {
 
 // ========== Getter Methods (implement protocol.Player) ==========
 
-// GetUserID returns the player's user ID.
-func (p *Player) GetUserID() string { return p.UserID }
+// GetID returns the player's ID.
+func (p *Player) GetID() id.PlayerID { return p.ID }
+
+// GetIDString returns the player's ID as pure UUID string (for protocol compatibility).
+func (p *Player) GetIDString() string { return p.ID.UUID() }
 
 // GetHP returns the player's current HP.
 func (p *Player) GetHP() int { return p.HP }
@@ -238,9 +247,9 @@ func (p *Player) AddItem(itemInstance *item.Item) error {
 }
 
 // RemoveItem removes an item from inventory.
-func (p *Player) RemoveItem(itemID string) (*item.Item, error) {
+func (p *Player) RemoveItem(itemID id.ItemID) (*item.Item, error) {
 	for i, it := range p.Inventory {
-		if it.ID == itemID {
+		if it.ID.Equal(itemID.ID) {
 			removed := p.Inventory[i]
 			p.Inventory = append(p.Inventory[:i], p.Inventory[i+1:]...)
 			return removed, nil
@@ -250,9 +259,9 @@ func (p *Player) RemoveItem(itemID string) (*item.Item, error) {
 }
 
 // GetItem gets an item by ID.
-func (p *Player) GetItem(itemID string) *item.Item {
+func (p *Player) GetItem(itemID id.ItemID) *item.Item {
 	for _, it := range p.Inventory {
-		if it.ID == itemID {
+		if it.ID.Equal(itemID.ID) {
 			return it
 		}
 	}
@@ -329,7 +338,7 @@ func (p *Player) Clone() *Player {
 	}
 
 	return &Player{
-		UserID:      p.UserID,
+		ID:          p.ID,
 		Faction:     p.Faction,
 		Position:    p.Position,
 		HP:          p.HP,
@@ -345,7 +354,7 @@ func (p *Player) Clone() *Player {
 // String returns the player info string.
 func (p *Player) String() string {
 	return fmt.Sprintf("Player{ID: %s, Faction: %s, Pos: %d, HP: %d, LP: %d, Buffs: %d, Items: %d}",
-		p.UserID, p.Faction.String(), p.Position, p.HP, p.LP, len(p.ActiveBuffs), len(p.Inventory))
+		p.ID.UUID(), p.Faction.String(), p.Position, p.HP, p.LP, len(p.ActiveBuffs), len(p.Inventory))
 }
 
 // IsAlive checks if the player is alive.

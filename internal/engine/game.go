@@ -10,18 +10,19 @@ import (
 	"github.com/b1tAction/fated/pkg/constants"
 	"github.com/b1tAction/fated/pkg/event"
 	"github.com/b1tAction/fated/pkg/gamelog"
+	"github.com/b1tAction/fated/pkg/id"
 	"github.com/b1tAction/fated/pkg/rng"
 )
 
 // Game is the game instance, containing EventBus and all players.
 type Game struct {
-	ID      string           `json:"id"`
-	Bus     *event.EventBus  `json:"bus"`
-	Players []*core.Player   `json:"players"`
-	State   *GameState       `json:"state"`
-	RNG     *rand.Rand       `json:"-"`   // Game unique random source
-	Draw    *rng.DrawEngine  `json:"-"`   // Draw engine for random draws
-	Log     *gamelog.GameLog `json:"log"` // Global game log for playback
+	ID      id.GameID         `json:"id"`
+	Bus     *event.EventBus   `json:"bus"`
+	Players []*core.Player    `json:"players"`
+	State   *GameState        `json:"state"`
+	RNG     *rand.Rand        `json:"-"`   // Game unique random source
+	Draw    *rng.DrawEngine   `json:"-"`   // Draw engine for random draws
+	Log     *gamelog.GameLog  `json:"log"` // Global game log for playback
 	mutex   sync.RWMutex
 }
 
@@ -35,7 +36,7 @@ type GameState struct {
 
 // NewGame creates a new game instance.
 // seed: random seed (0 for auto-generated from current time)
-func NewGame(gameID string, seed int64) *Game {
+func NewGame(gameID id.GameID, seed int64) *Game {
 	rngSource := seed
 	if rngSource == 0 {
 		rngSource = time.Now().UnixNano()
@@ -44,7 +45,7 @@ func NewGame(gameID string, seed int64) *Game {
 
 	return &Game{
 		ID:      gameID,
-		Bus:     event.NewEventBus(gameID),
+		Bus:     event.NewEventBus(gameID.UUID()),
 		Players: make([]*core.Player, 0),
 		State:   &GameState{Round: 1, Turn: 0, CurrentPhase: "init", Waiting: false},
 		RNG:     rngInst,
@@ -63,13 +64,13 @@ func (g *Game) AddPlayer(player *core.Player) {
 }
 
 // RemovePlayer removes a player.
-func (g *Game) RemovePlayer(userID string) {
+func (g *Game) RemovePlayer(playerID id.PlayerID) {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
 	for i, p := range g.Players {
-		if p.UserID == userID {
-			g.Bus.UnsubscribeByOwner(userID)
+		if p.ID.Equal(playerID.ID) {
+			g.Bus.UnsubscribeByOwner(playerID.UUID())
 			g.Players = append(g.Players[:i], g.Players[i+1:]...)
 			return
 		}
@@ -77,12 +78,12 @@ func (g *Game) RemovePlayer(userID string) {
 }
 
 // GetPlayer returns the specified player.
-func (g *Game) GetPlayer(userID string) *core.Player {
+func (g *Game) GetPlayer(playerID id.PlayerID) *core.Player {
 	g.mutex.RLock()
 	defer g.mutex.RUnlock()
 
 	for _, p := range g.Players {
-		if p.UserID == userID {
+		if p.ID.Equal(playerID.ID) {
 			return p
 		}
 	}
@@ -196,8 +197,8 @@ func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
 		decision := g.createBuffDecisionWithAction(buff, def, action)
 
 		// Register with EventBus
-		subID := g.Bus.Subscribe(phase, player.UserID, buff.ID, "buff", decision)
-		buff.SubscriptionIDs = append(buff.SubscriptionIDs, subID)
+		subID := g.Bus.Subscribe(phase, player.ID, buff.ID.UUID(), "buff", decision)
+		buff.SubscriptionIDs = append(buff.SubscriptionIDs, subID.UUID())
 	}
 }
 
@@ -216,8 +217,9 @@ func (g *Game) createBuffDecisionWithAction(buff *core.Buff, def *core.BuffDefin
 // UnsubscribeBuff unsubscribes when Buff is removed.
 // Supports multi-subscription unsubscribe: iterates buff.SubscriptionIDs to unsubscribe all.
 func (g *Game) UnsubscribeBuff(buff *core.Buff) {
-	for _, subID := range buff.SubscriptionIDs {
-		if subID != "" {
+	for _, subIDStr := range buff.SubscriptionIDs {
+		if subIDStr != "" {
+			subID := id.MustParseSubscriptionID(subIDStr)
 			g.Bus.Unsubscribe(subID)
 		}
 	}
@@ -232,15 +234,16 @@ func (g *Game) SubscribeItem(player *core.Player, item *core.Item) {
 	}
 	if def.Phase.NeedsSubscription() {
 		decision := g.createItemDecision(item, def)
-		subID := g.Bus.Subscribe(def.Phase, player.UserID, item.ID, "item", decision)
-		item.SubscriptionID = subID
+		subID := g.Bus.Subscribe(def.Phase, player.ID, item.ID.UUID(), "item", decision)
+		item.SubscriptionID = subID.UUID()
 	}
 }
 
 // UnsubscribeItem unsubscribes when Item is removed.
 func (g *Game) UnsubscribeItem(item *core.Item) {
 	if item.SubscriptionID != "" {
-		g.Bus.Unsubscribe(item.SubscriptionID)
+		subID := id.MustParseSubscriptionID(item.SubscriptionID)
+		g.Bus.Unsubscribe(subID)
 		item.SubscriptionID = ""
 	}
 }
@@ -287,20 +290,20 @@ func (g *Game) RemoveBuffFromPlayer(player *core.Player, buff *core.Buff) bool {
 // Triggers PhaseOnBuffApplied, all Buffs/Items subscribed to this Phase receive notification.
 func (g *Game) BroadcastBuffApplied(player *core.Player, buff *core.Buff) {
 	ctx := event.NewContext(player).WithData(buff)
-	g.Bus.Publish(constants.PhaseOnBuffApplied, player.UserID, ctx)
+	g.Bus.Publish(constants.PhaseOnBuffApplied, player.ID.UUID(), ctx)
 }
 
 // BroadcastBuffRemoved broadcasts Buff Removed event.
 // Triggers PhaseOnBuffRemoved, all Buffs/Items subscribed to this Phase receive notification.
 func (g *Game) BroadcastBuffRemoved(player *core.Player, buff *core.Buff) {
 	ctx := event.NewContext(player).WithData(buff)
-	g.Bus.Publish(constants.PhaseOnBuffRemoved, player.UserID, ctx)
+	g.Bus.Publish(constants.PhaseOnBuffRemoved, player.ID.UUID(), ctx)
 }
 
 // ========== Helper Methods ==========
 
 // GetActiveBuffCount returns the player's current active Buff count.
-func (g *Game) GetActiveBuffCount(playerID string) int {
+func (g *Game) GetActiveBuffCount(playerID id.PlayerID) int {
 	player := g.GetPlayer(playerID)
 	if player == nil {
 		return 0

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/id"
 )
 
 // TestPlayer 用于测试的简单玩家结构
@@ -91,7 +92,7 @@ func TestNewDecision(t *testing.T) {
 	if len(d.Options) != 2 {
 		t.Errorf("Options count = %d, expected 2", len(d.Options))
 	}
-	if d.ID == "" {
+	if d.ID.IsZero() {
 		t.Error("ID should not be empty")
 	}
 }
@@ -242,8 +243,9 @@ func TestEventBusSubscribe(t *testing.T) {
 	bus := NewEventBus("game-001")
 	d := NewDecision("test", []Option{{ID: "yes", Label: "是"}})
 
-	subID := bus.Subscribe(constants.PhasePreDamage, "player-001", "buff-001", "buff", d)
-	if subID == "" {
+	playerID := id.NewPlayerID()
+	subID := bus.Subscribe(constants.PhasePreDamage, playerID, "buff-001", "buff", d)
+	if subID.IsZero() {
 		t.Error("Subscribe should return subscription ID")
 	}
 
@@ -255,8 +257,8 @@ func TestEventBusSubscribe(t *testing.T) {
 	if len(subs) != 1 {
 		t.Errorf("PreDamage subscriptions = %d, expected 1", len(subs))
 	}
-	if subs[0].OwnerID != "player-001" {
-		t.Errorf("OwnerID = %s, expected player-001", subs[0].OwnerID)
+	if subs[0].OwnerID != playerID.UUID() {
+		t.Errorf("OwnerID = %s, expected %s", subs[0].OwnerID, playerID.UUID())
 	}
 }
 
@@ -264,7 +266,8 @@ func TestEventBusUnsubscribe(t *testing.T) {
 	bus := NewEventBus("game-001")
 	d := NewDecision("test", []Option{})
 
-	subID := bus.Subscribe(constants.PhasePreDamage, "player-001", "buff-001", "buff", d)
+	playerID := id.NewPlayerID()
+	subID := bus.Subscribe(constants.PhasePreDamage, playerID, "buff-001", "buff", d)
 
 	// 取消订阅
 	ok := bus.Unsubscribe(subID)
@@ -287,9 +290,11 @@ func TestEventBusUnsubscribeBySource(t *testing.T) {
 	bus := NewEventBus("game-001")
 	d := NewDecision("test", []Option{})
 
-	bus.Subscribe(constants.PhasePreDamage, "player-001", "buff-001", "buff", d)
-	bus.Subscribe(constants.PhasePreEvent, "player-001", "buff-001", "buff", d)
-	bus.Subscribe(constants.PhasePreDamage, "player-002", "buff-002", "buff", d)
+	playerID1 := id.NewPlayerID()
+	playerID2 := id.NewPlayerID()
+	bus.Subscribe(constants.PhasePreDamage, playerID1, "buff-001", "buff", d)
+	bus.Subscribe(constants.PhasePreEvent, playerID1, "buff-001", "buff", d)
+	bus.Subscribe(constants.PhasePreDamage, playerID2, "buff-002", "buff", d)
 
 	// 移除buff-001的所有订阅
 	count := bus.UnsubscribeBySource("buff-001")
@@ -306,12 +311,14 @@ func TestEventBusUnsubscribeByOwner(t *testing.T) {
 	bus := NewEventBus("game-001")
 	d := NewDecision("test", []Option{})
 
-	bus.Subscribe(constants.PhasePreDamage, "player-001", "buff-001", "buff", d)
-	bus.Subscribe(constants.PhasePreEvent, "player-001", "buff-002", "buff", d)
-	bus.Subscribe(constants.PhasePreDamage, "player-002", "buff-003", "buff", d)
+	playerID1 := id.NewPlayerID()
+	playerID2 := id.NewPlayerID()
+	bus.Subscribe(constants.PhasePreDamage, playerID1, "buff-001", "buff", d)
+	bus.Subscribe(constants.PhasePreEvent, playerID1, "buff-002", "buff", d)
+	bus.Subscribe(constants.PhasePreDamage, playerID2, "buff-003", "buff", d)
 
-	// 移除player-001的所有订阅
-	count := bus.UnsubscribeByOwner("player-001")
+	// 移除playerID1的所有订阅
+	count := bus.UnsubscribeByOwner(playerID1.UUID())
 	if count != 2 {
 		t.Errorf("Removed count = %d, expected 2", count)
 	}
@@ -335,12 +342,13 @@ func TestEventBusPublish(t *testing.T) {
 	})
 	d2.WithPriority(50) // 低优先级
 
-	bus.Subscribe(constants.PhasePreDamage, "player-001", "buff-001", "buff", d1)
-	bus.Subscribe(constants.PhasePreDamage, "player-001", "item-001", "item", d2)
+	playerID := id.NewPlayerID()
+	bus.Subscribe(constants.PhasePreDamage, playerID, "buff-001", "buff", d1)
+	bus.Subscribe(constants.PhasePreDamage, playerID, "item-001", "item", d2)
 
 	// 发布
 	ctx := NewContext(nil)
-	decisions := bus.Publish(constants.PhasePreDamage, "player-001", ctx)
+	decisions := bus.Publish(constants.PhasePreDamage, playerID.UUID(), ctx)
 
 	// 只返回需要确认的Decision
 	if len(decisions) != 1 {
@@ -361,11 +369,12 @@ func TestEventBusPublishPriorityOrder(t *testing.T) {
 	d2 := NewDecision("低优先级", []Option{{ID: "b", Label: "B"}})
 	d2.WithPriority(50)
 
-	bus.Subscribe(constants.PhasePreEvent, "player-001", "buff-001", "buff", d1)
-	bus.Subscribe(constants.PhasePreEvent, "player-001", "buff-002", "buff", d2)
+	playerID := id.NewPlayerID()
+	bus.Subscribe(constants.PhasePreEvent, playerID, "buff-001", "buff", d1)
+	bus.Subscribe(constants.PhasePreEvent, playerID, "buff-002", "buff", d2)
 
 	ctx := NewContext(nil)
-	decisions := bus.Publish(constants.PhasePreEvent, "player-001", ctx)
+	decisions := bus.Publish(constants.PhasePreEvent, playerID.UUID(), ctx)
 
 	if len(decisions) != 2 {
 		t.Errorf("Decisions count = %d, expected 2", len(decisions))
@@ -384,11 +393,13 @@ func TestEventBusPublishFilterOwner(t *testing.T) {
 	bus := NewEventBus("game-001")
 	d := NewDecision("test", []Option{{ID: "ok", Label: "OK"}})
 
-	bus.Subscribe(constants.PhasePreDamage, "player-001", "buff-001", "buff", d)
-	bus.Subscribe(constants.PhasePreDamage, "player-002", "buff-002", "buff", d)
+	playerID1 := id.NewPlayerID()
+	playerID2 := id.NewPlayerID()
+	bus.Subscribe(constants.PhasePreDamage, playerID1, "buff-001", "buff", d)
+	bus.Subscribe(constants.PhasePreDamage, playerID2, "buff-002", "buff", d)
 
 	ctx := NewContext(nil)
-	decisions := bus.Publish(constants.PhasePreDamage, "player-001", ctx)
+	decisions := bus.Publish(constants.PhasePreDamage, playerID1.UUID(), ctx)
 
 	// 只返回player-001的Decision
 	if len(decisions) != 1 {
@@ -400,8 +411,10 @@ func TestEventBusClear(t *testing.T) {
 	bus := NewEventBus("game-001")
 	d := NewDecision("test", []Option{})
 
-	bus.Subscribe(constants.PhasePreDamage, "player-001", "buff-001", "buff", d)
-	bus.Subscribe(constants.PhasePreEvent, "player-002", "buff-002", "buff", d)
+	playerID1 := id.NewPlayerID()
+	playerID2 := id.NewPlayerID()
+	bus.Subscribe(constants.PhasePreDamage, playerID1, "buff-001", "buff", d)
+	bus.Subscribe(constants.PhasePreEvent, playerID2, "buff-002", "buff", d)
 
 	bus.Clear()
 

@@ -3,26 +3,45 @@
 package item
 
 import (
-	"fmt"
-	"time"
-
 	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/id"
 )
 
 // ========== Item Instance ==========
 
 type Item struct {
 	Type           constants.ItemType `json:"type"`
-	ID             string             `json:"id"`
+	ID             id.ItemID          `json:"id"` // Item instance ID (UUID v7)
 	Usable         bool               `json:"usable"`
-	TargetID       string             `json:"target_id"`
+	TargetID       string             `json:"target_id"`       // Target player ID (UUID string for protocol)
 	SubscriptionID string             `json:"subscription_id"` // EventBus subscription ID (managed by engine package)
 }
 
-func NewItem(itemType constants.ItemType, id string) *Item {
+// NewItem creates a new Item instance with auto-generated UUID v7 ID.
+func NewItem(itemType constants.ItemType) *Item {
 	return &Item{
 		Type:   itemType,
-		ID:     id,
+		ID:     id.NewItemID(),
+		Usable: true,
+	}
+}
+
+// NewItemWithID creates a new Item instance with a specific ID.
+// Used for testing and special cases where ID needs to be controlled.
+func NewItemWithID(itemType constants.ItemType, itemID id.ItemID) *Item {
+	return &Item{
+		Type:   itemType,
+		ID:     itemID,
+		Usable: true,
+	}
+}
+
+// NewItemWithStringID creates a new Item with ID from string (for backward compatibility).
+// Deprecated: Use NewItemWithID with id.ItemID instead.
+func NewItemWithStringID(itemType constants.ItemType, idStr string) *Item {
+	return &Item{
+		Type:   itemType,
+		ID:     id.MustParseItemID(idStr),
 		Usable: true,
 	}
 }
@@ -203,9 +222,4 @@ func GetAllItemDefinitions() []*ItemDefinition {
 // GetItemName returns the Item Chinese display name from GlobalItemRegistry.
 func GetItemName(it constants.ItemType) string {
 	return GlobalItemRegistry.GetItemName(it)
-}
-
-// GenerateItemID generates an Item ID (for engine package use).
-func GenerateItemID() string {
-	return fmt.Sprintf("item-%d", time.Now().UnixNano())
 }

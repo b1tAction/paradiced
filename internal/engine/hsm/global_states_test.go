@@ -5,6 +5,7 @@ import (
 
 	"github.com/b1tAction/fated/internal/core"
 	"github.com/b1tAction/fated/internal/engine"
+	"github.com/b1tAction/fated/pkg/id"
 	"github.com/b1tAction/fated/pkg/rng"
 )
 
@@ -15,7 +16,7 @@ func TestStateMatchInit(t *testing.T) {
 		t.Errorf("MatchInitState.ID() = %s, want StateMatchInit", state.ID().String())
 	}
 
-	game := engine.NewGame("game-1", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	ctx := NewStateContext().WithGame(game)
 	state.Enter(ctx)
 	if !ctx.Success {
@@ -42,10 +43,10 @@ func TestStateRoundMiniGame(t *testing.T) {
 		t.Errorf("RoundMiniGameState.ID() = %s, want StateRoundMiniGame", state.ID().String())
 	}
 
-	game := engine.NewGame("game-1", 0)
-	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p1"}))
-	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p2"}))
-	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p3"}))
+	game := engine.NewGame(id.NewGameID(), 0)
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()}))
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()}))
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()}))
 
 	ctx := NewStateContext().WithGame(game)
 	state.Enter(ctx)
@@ -88,17 +89,21 @@ func TestStateRoundPrep(t *testing.T) {
 		t.Errorf("RoundPrepState.ID() = %s, want StateRoundPrep", state.ID().String())
 	}
 
-	game := engine.NewGame("game-1", 0)
-	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p1"}))
-	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p2"}))
-	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p3"}))
-	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p4"}))
+	game := engine.NewGame(id.NewGameID(), 0)
+	p1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	p2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	p3 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	p4 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(p1)
+	game.AddPlayer(p2)
+	game.AddPlayer(p3)
+	game.AddPlayer(p4)
 
 	ctx := NewStateContext().WithGame(game)
-	ctx.SetMiniGameRank("p1", 1)
-	ctx.SetMiniGameRank("p2", 2)
-	ctx.SetMiniGameRank("p3", 3)
-	ctx.SetMiniGameRank("p4", 4)
+	ctx.SetMiniGameRank(p1.ID.UUID(), 1)
+	ctx.SetMiniGameRank(p2.ID.UUID(), 2)
+	ctx.SetMiniGameRank(p3.ID.UUID(), 3)
+	ctx.SetMiniGameRank(p4.ID.UUID(), 4)
 
 	state.Enter(ctx)
 
@@ -120,10 +125,10 @@ func TestStateRoundPrep(t *testing.T) {
 	}
 
 	// Verify dice types set correctly
-	if ctx.GetDiceType("p1") != rng.DiceTypeGold {
+	if ctx.GetDiceType(p1.ID.UUID()) != rng.DiceTypeGold {
 		t.Error("p1 should have gold dice")
 	}
-	if ctx.GetDiceType("p2") != rng.DiceTypeSilver {
+	if ctx.GetDiceType(p2.ID.UUID()) != rng.DiceTypeSilver {
 		t.Error("p2 should have silver dice")
 	}
 
@@ -140,9 +145,9 @@ func TestStateTurnLoop(t *testing.T) {
 		t.Errorf("TurnLoopState.ID() = %s, want StateTurnLoop", state.ID().String())
 	}
 
-	game := engine.NewGame("game-1", 0)
-	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p1"}))
-	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p2"}))
+	game := engine.NewGame(id.NewGameID(), 0)
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()}))
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()}))
 
 	ctx := NewStateContext().WithGame(game)
 
@@ -209,11 +214,12 @@ func TestStateBossBattle(t *testing.T) {
 		t.Errorf("BossBattleState.ID() = %s, want StateBossBattle", state.ID().String())
 	}
 
-	game := engine.NewGame("game-1", 0)
-	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p1"}))
+	game := engine.NewGame(id.NewGameID(), 0)
+	triggerPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(triggerPlayer)
 
 	ctx := NewStateContext().WithGame(game)
-	ctx.SetString(KeyBossTrigger, "p1")
+	ctx.SetString(KeyBossTrigger, triggerPlayer.ID.UUID())
 
 	state.Enter(ctx)
 
@@ -252,11 +258,12 @@ func TestStateGameOver(t *testing.T) {
 		t.Errorf("GameOverState.ID() = %s, want StateGameOver", state.ID().String())
 	}
 
-	game := engine.NewGame("game-1", 0)
-	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "winner"}))
+	game := engine.NewGame(id.NewGameID(), 0)
+	winnerPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(winnerPlayer)
 
 	ctx := NewStateContext().WithGame(game)
-	ctx.SetString(KeyWinner, "winner")
+	ctx.SetString(KeyWinner, winnerPlayer.ID.UUID())
 
 	state.Enter(ctx)
 
@@ -305,7 +312,7 @@ func TestGlobalStateFactory(t *testing.T) {
 }
 
 func TestRegisterGlobalStates(t *testing.T) {
-	game := engine.NewGame("game-1", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 
 	err := RegisterGlobalStates(hsm)
@@ -341,9 +348,9 @@ func TestDiceTypeFromRank(t *testing.T) {
 }
 
 func TestHSMGlobalStateFlow(t *testing.T) {
-	game := engine.NewGame("game-1", 0)
-	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p1"}))
-	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p2"}))
+	game := engine.NewGame(id.NewGameID(), 0)
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()}))
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()}))
 
 	hsm := NewHSM(game)
 
@@ -364,9 +371,9 @@ func TestHSMGlobalStateFlow(t *testing.T) {
 
 func TestTurnLoopAllPlayersComplete(t *testing.T) {
 	state := NewTurnLoopState()
-	game := engine.NewGame("game-1", 0)
-	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p1"}))
-	game.AddPlayer(core.NewPlayer(core.PlayerConfig{UserID: "p2"}))
+	game := engine.NewGame(id.NewGameID(), 0)
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()}))
+	game.AddPlayer(core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()}))
 
 	ctx := NewStateContext().WithGame(game)
 

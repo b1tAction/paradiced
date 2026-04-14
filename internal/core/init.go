@@ -119,7 +119,6 @@ var (
 	GetAllItemTypes        = item.GetAllItemTypes
 	GetItemTypesByCategory = item.GetItemTypesByCategory
 	GetAllItemDefinitions  = item.GetAllItemDefinitions
-	GenerateItemID         = item.GenerateItemID
 )
 
 // GlobalBuffRegistry from buff package (for advanced use)

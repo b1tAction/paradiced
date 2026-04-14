@@ -43,7 +43,7 @@ func (b *Builder) BuildStateSync() *pkgnet.StateSync {
 
 	var turnPlayerID string
 	if turnPlayer != nil {
-		turnPlayerID = turnPlayer.UserID
+		turnPlayerID = turnPlayer.ID.UUID()
 	}
 
 	return &pkgnet.StateSync{
@@ -71,7 +71,7 @@ func (b *Builder) BuildPlayers() []pkgnet.Player {
 // BuildPlayer builds a single player state snapshot.
 func (b *Builder) BuildPlayer(p *core.Player) pkgnet.Player {
 	return pkgnet.Player{
-		UserID:      p.UserID,
+		UserID:      p.ID.UUID(),
 		Faction:     p.Faction.String(),
 		Position:    p.Position,
 		HP:          p.HP,
@@ -103,7 +103,7 @@ func (b *Builder) BuildItems(inventory []*item.Item) []pkgnet.Item {
 	result := make([]pkgnet.Item, len(inventory))
 	for i, it := range inventory {
 		result[i] = pkgnet.Item{
-			ID:   it.ID,
+			ID:   it.ID.UUID(),
 			Type: string(it.Type), // ItemType is already a string
 		}
 	}
@@ -134,7 +134,7 @@ func (b *Builder) BuildAvailable(player *core.Player) *pkgnet.Available {
 	for _, it := range player.Inventory {
 		if it.Usable {
 			usableItems = append(usableItems, pkgnet.Item{
-				ID:   it.ID,
+				ID:   it.ID.UUID(),
 				Type: string(it.Type), // ItemType is already a string
 			})
 		}

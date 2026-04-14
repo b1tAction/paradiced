@@ -8,6 +8,7 @@ import (
 	"github.com/b1tAction/fated/pkg/constants"
 	"github.com/b1tAction/fated/pkg/event"
 	"github.com/b1tAction/fated/pkg/gamelog"
+	"github.com/b1tAction/fated/pkg/id"
 )
 
 // ========== ActionType Tests ==========
@@ -53,7 +54,7 @@ func TestQueuePushPop(t *testing.T) {
 	}
 
 	// Create mock actions for testing
-	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	action1 := NewDamageAction(player, 10, "test1")
 	action2 := NewHealAction(player, 5, "test2")
 
@@ -98,7 +99,7 @@ func TestQueuePushPop(t *testing.T) {
 
 func TestQueueClear(t *testing.T) {
 	q := NewQueue()
-	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	q.Push(NewDamageAction(player, 10, "test"))
 	q.Push(NewHealAction(player, 5, "test"))
 
@@ -115,7 +116,7 @@ func TestQueueClear(t *testing.T) {
 // ========== DamageAction Tests ==========
 
 func TestDamageAction(t *testing.T) {
-	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.HP = 100
 
 	action := NewDamageAction(player, 20, "Event_Trap")
@@ -130,8 +131,8 @@ func TestDamageAction(t *testing.T) {
 	if action.Source() != "Event_Trap" {
 		t.Errorf("Source should be Event_Trap, got %s", action.Source())
 	}
-	if action.Target() != "p1" {
-		t.Errorf("Target should be p1, got %s", action.Target())
+	if action.Target() != player.ID.UUID() {
+		t.Errorf("Target should be %s, got %s", player.ID.UUID(), action.Target())
 	}
 
 	// Execute with minimal context
@@ -159,7 +160,7 @@ func TestDamageAction(t *testing.T) {
 }
 
 func TestPiercingDamageAction(t *testing.T) {
-	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.HP = 100
 
 	action := NewPiercingDamageAction(player, 30, "Boss")
@@ -180,7 +181,7 @@ func TestPiercingDamageAction(t *testing.T) {
 }
 
 func TestBlockedDamageAction(t *testing.T) {
-	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.HP = 100
 
 	action := NewDamageAction(player, 20, "Event_Trap")
@@ -198,7 +199,7 @@ func TestBlockedDamageAction(t *testing.T) {
 // ========== HealAction Tests ==========
 
 func TestHealAction(t *testing.T) {
-	player := core.NewPlayer(core.PlayerConfig{UserID: "p1", MaxHP: 100})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 100})
 	player.HP = 50
 
 	action := NewHealAction(player, 30, "Buff_Rain")
@@ -226,7 +227,7 @@ func TestHealAction(t *testing.T) {
 // ========== ModifyLPAction Tests ==========
 
 func TestModifyLPAction(t *testing.T) {
-	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.LP = 5
 
 	// LP+1
@@ -254,7 +255,7 @@ func TestModifyLPAction(t *testing.T) {
 // ========== AddBuffAction Tests ==========
 
 func TestAddBuffAction(t *testing.T) {
-	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 
 	action := NewAddBuffAction(player, constants.BuffTypeDivine, 3, "Event_DivineGift")
 
@@ -290,7 +291,7 @@ func TestAddBuffAction(t *testing.T) {
 // ========== RemoveBuffAction Tests ==========
 
 func TestRemoveBuffAction(t *testing.T) {
-	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.AddBuff(buff.NewBuff(constants.BuffTypeCurse, 2))
 	player.AddBuff(buff.NewBuff(constants.BuffTypeDivine, 3))
 
@@ -314,7 +315,7 @@ func TestRemoveBuffAction(t *testing.T) {
 // ========== TeleportAction Tests ==========
 
 func TestTeleportAction(t *testing.T) {
-	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.Position = 5
 
 	action := NewTeleportAction(player, 20, "Item_AnyDoor")
@@ -342,8 +343,8 @@ func TestTeleportAction(t *testing.T) {
 // ========== StealBuffAction Tests ==========
 
 func TestStealBuffAction(t *testing.T) {
-	target := core.NewPlayer(core.PlayerConfig{UserID: "target"})
-	source := core.NewPlayer(core.PlayerConfig{UserID: "source"})
+	target := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	source := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	target.AddBuff(buff.NewBuff(constants.BuffTypeCurse, 2))
 	target.AddBuff(buff.NewBuff(constants.BuffTypeDivine, 3))
 
@@ -352,8 +353,8 @@ func TestStealBuffAction(t *testing.T) {
 	if action.Type() != ActionStealBuff {
 		t.Errorf("Type should be ActionStealBuff, got %s", action.Type())
 	}
-	if action.SourcePlayer.UserID != "source" {
-		t.Errorf("SourcePlayer should be source, got %s", action.SourcePlayer.UserID)
+	if action.SourcePlayer != source {
+		t.Errorf("SourcePlayer should be source, got %s", action.SourcePlayer.ID.UUID())
 	}
 
 	ctx := NewActionContext(nil, nil, nil)
@@ -376,8 +377,8 @@ func TestStealBuffAction(t *testing.T) {
 }
 
 func TestStealBuffActionNoBuffs(t *testing.T) {
-	target := core.NewPlayer(core.PlayerConfig{UserID: "target"})
-	source := core.NewPlayer(core.PlayerConfig{UserID: "source"})
+	target := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	source := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 
 	action := NewStealBuffAction(target, source, "Faction_BaiHu")
 
@@ -396,7 +397,7 @@ func TestStealBuffActionNoBuffs(t *testing.T) {
 // ========== RespawnAction Tests ==========
 
 func TestRespawnAction(t *testing.T) {
-	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.IsDead = true
 	player.Position = 100
 
@@ -431,7 +432,7 @@ func TestRespawnAction(t *testing.T) {
 // ========== FellDownAction Tests ==========
 
 func TestFellDownAction(t *testing.T) {
-	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.HP = 10
 	player.Position = 30
 
@@ -466,7 +467,7 @@ func TestFellDownAction(t *testing.T) {
 // ========== ActionContext Tests ==========
 
 func TestActionContextExecuteAction(t *testing.T) {
-	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.HP = 100
 
 	ctx := NewActionContext(nil, nil, nil)
@@ -484,7 +485,7 @@ func TestActionContextExecuteAction(t *testing.T) {
 }
 
 func TestActionContextProcessQueue(t *testing.T) {
-	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.HP = 100
 
 	ctx := NewActionContext(nil, nil, nil)
@@ -512,7 +513,7 @@ func TestActionContextProcessQueue(t *testing.T) {
 }
 
 func TestActionContextClear(t *testing.T) {
-	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	ctx := NewActionContext(nil, nil, nil)
 
 	ctx.PushDerivedAction(NewDamageAction(player, 10, "test"))
@@ -549,7 +550,7 @@ func TestActionContextMetadata(t *testing.T) {
 // ========== LogEntry Tests ==========
 
 func TestLogEntryMetadata(t *testing.T) {
-	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.Position = 10
 
 	// Test MoveAction LogEntry with metadata
@@ -587,7 +588,7 @@ func TestContextDerivedActions(t *testing.T) {
 	}
 
 	// Add actions
-	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	healAction := NewHealAction(player, 10, "test")
 	removeAction := NewRemoveBuffAction(player, constants.BuffTypeDivine, "test")
 
@@ -607,7 +608,7 @@ func TestContextDerivedActions(t *testing.T) {
 }
 
 func TestRespawnActionPreTriggerPhase(t *testing.T) {
-	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	action := NewRespawnAction(player, 50, "DeathRespawn")
 
 	// RespawnAction now has PhasePreRespawn for interception

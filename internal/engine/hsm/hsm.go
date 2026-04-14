@@ -8,6 +8,7 @@ import (
 	"github.com/b1tAction/fated/internal/core"
 	"github.com/b1tAction/fated/internal/engine"
 	"github.com/b1tAction/fated/pkg/event"
+	"github.com/b1tAction/fated/pkg/id"
 )
 
 // HSM is the main Hierarchical State Machine structure.
@@ -185,7 +186,7 @@ func (hsm *HSM) TransitionTo(targetID StateID, ctx *StateContext) error {
 		fromID := hsm.GetCurrentStateID()
 		playerID := ""
 		if hsm.turnPlayer != nil {
-			playerID = hsm.turnPlayer.UserID
+			playerID = hsm.turnPlayer.ID.UUID()
 		}
 		hsm.game.Log.LogStateTransition(fromID.String(), targetID.String(), playerID)
 	}
@@ -602,7 +603,13 @@ func (hsm *HSM) RestoreFromSnapshot(snapshot *HSMSnapshot) error {
 		}
 		hsm.turnState = state
 		hsm.turnStateID = snapshot.TurnStateID
-		hsm.turnPlayer = hsm.game.GetPlayer(snapshot.TurnPlayerID)
+		// Parse TurnPlayerID string to id.PlayerID
+		if snapshot.TurnPlayerID != "" {
+			parsedID, err := id.ParsePlayerID(snapshot.TurnPlayerID)
+			if err == nil {
+				hsm.turnPlayer = hsm.game.GetPlayer(parsedID)
+			}
+		}
 	}
 
 	// Restore interrupt stack
@@ -630,7 +637,7 @@ func getPlayerID(player *core.Player) string {
 	if player == nil {
 		return ""
 	}
-	return player.UserID
+	return player.ID.UUID()
 }
 
 func snapshotDecision(decision *event.Decision) *DecisionSnapshot {
@@ -638,7 +645,7 @@ func snapshotDecision(decision *event.Decision) *DecisionSnapshot {
 		return nil
 	}
 	return &DecisionSnapshot{
-		ID:      decision.ID,
+		ID:      decision.ID.UUID(),
 		Prompt:  decision.Prompt,
 		Default: decision.Default,
 	}

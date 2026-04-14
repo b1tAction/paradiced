@@ -9,6 +9,7 @@ import (
 	"github.com/b1tAction/fated/internal/gamemap"
 	"github.com/b1tAction/fated/pkg/constants"
 	"github.com/b1tAction/fated/pkg/event"
+	"github.com/b1tAction/fated/pkg/id"
 	"github.com/b1tAction/fated/pkg/rng"
 )
 
@@ -27,7 +28,7 @@ func TestNewStateContext(t *testing.T) {
 }
 
 func TestStateContextWithMethods(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	ctx := NewStateContext().WithGame(game)
 	if ctx.Game != game {
 		t.Error("Game not set correctly")
@@ -37,7 +38,7 @@ func TestStateContextWithMethods(t *testing.T) {
 	}
 
 	// Test WithPlayer
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player-1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	ctx = ctx.WithPlayer(player)
 	if ctx.Player != player {
 		t.Error("Player not set correctly")
@@ -189,7 +190,7 @@ func TestStateContextClear(t *testing.T) {
 }
 
 func TestStateContextWithBus(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 
 	// Test WithGame creates adapter
 	ctx := NewStateContext().WithGame(game)
@@ -223,10 +224,10 @@ type mockEventBusAdapter struct{}
 func (m *mockEventBusAdapter) Publish(phase constants.Phase, playerID string, ctx *event.Context) []*event.Decision {
 	return nil
 }
-func (m *mockEventBusAdapter) Subscribe(phase constants.Phase, ownerID, sourceID, sourceType string, decision *event.Decision) string {
-	return ""
+func (m *mockEventBusAdapter) Subscribe(phase constants.Phase, ownerID id.PlayerID, sourceID, sourceType string, decision *event.Decision) id.SubscriptionID {
+	return id.NewSubscriptionID()
 }
-func (m *mockEventBusAdapter) Unsubscribe(subID string) bool           { return false }
+func (m *mockEventBusAdapter) Unsubscribe(subID id.SubscriptionID) bool           { return false }
 func (m *mockEventBusAdapter) UnsubscribeBySource(sourceID string) int { return 0 }
 func (m *mockEventBusAdapter) UnsubscribeByOwner(ownerID string) int   { return 0 }
 func (m *mockEventBusAdapter) GetSubscriptionCount() int               { return 0 }

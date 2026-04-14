@@ -6,6 +6,7 @@ import (
 	"github.com/b1tAction/fated/pkg/constants"
 	"github.com/b1tAction/fated/pkg/event"
 	"github.com/b1tAction/fated/pkg/gamelog"
+	"github.com/b1tAction/fated/pkg/id"
 	"github.com/b1tAction/fated/pkg/protocol"
 )
 
@@ -19,10 +20,10 @@ type EventBusAdapter interface {
 	Publish(phase constants.Phase, playerID string, ctx *event.Context) []*event.Decision
 
 	// Subscribe subscribes to a Phase with a pre-bound Decision.
-	Subscribe(phase constants.Phase, ownerID, sourceID, sourceType string, decision *event.Decision) string
+	Subscribe(phase constants.Phase, ownerID id.PlayerID, sourceID, sourceType string, decision *event.Decision) id.SubscriptionID
 
 	// Unsubscribe removes a subscription by ID.
-	Unsubscribe(subID string) bool
+	Unsubscribe(subID id.SubscriptionID) bool
 
 	// UnsubscribeBySource removes all subscriptions by source ID (e.g., Buff/Item removal).
 	UnsubscribeBySource(sourceID string) int
@@ -53,12 +54,12 @@ func (w *EventBusWrapper) Publish(phase constants.Phase, playerID string, ctx *e
 }
 
 // Subscribe subscribes to a Phase.
-func (w *EventBusWrapper) Subscribe(phase constants.Phase, ownerID, sourceID, sourceType string, decision *event.Decision) string {
+func (w *EventBusWrapper) Subscribe(phase constants.Phase, ownerID id.PlayerID, sourceID, sourceType string, decision *event.Decision) id.SubscriptionID {
 	return w.bus.Subscribe(phase, ownerID, sourceID, sourceType, decision)
 }
 
 // Unsubscribe removes a subscription by ID.
-func (w *EventBusWrapper) Unsubscribe(subID string) bool {
+func (w *EventBusWrapper) Unsubscribe(subID id.SubscriptionID) bool {
 	return w.bus.Unsubscribe(subID)
 }
 
@@ -67,7 +68,7 @@ func (w *EventBusWrapper) UnsubscribeBySource(sourceID string) int {
 	return w.bus.UnsubscribeBySource(sourceID)
 }
 
-// UnsubscribeByOwner removes all subscriptions by player ID.
+// UnsubscribeByOwner removes all subscriptions by player ID (UUID string).
 func (w *EventBusWrapper) UnsubscribeByOwner(ownerID string) int {
 	return w.bus.UnsubscribeByOwner(ownerID)
 }
@@ -101,8 +102,8 @@ func (w *GameWrapper) GetCurrentPlayer() interface{} {
 }
 
 // GetPlayer returns a player by ID as interface{}.
-func (w *GameWrapper) GetPlayer(id string) interface{} {
-	return w.game.GetPlayer(id)
+func (w *GameWrapper) GetPlayer(playerID id.PlayerID) interface{} {
+	return w.game.GetPlayer(playerID)
 }
 
 // GetPlayers returns all players as []interface{}.

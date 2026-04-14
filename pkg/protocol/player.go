@@ -1,5 +1,7 @@
 package protocol
 
+import "github.com/b1tAction/fated/pkg/id"
+
 // Faction represents player's faction (Four Divine Beasts 阵营).
 // Defined in protocol to avoid circular dependency.
 type Faction int
@@ -49,7 +51,8 @@ func (f Faction) GetChineseName() string {
 // PlayerReader defines read-only methods for Player.
 // Used by handlers that only need to inspect player state.
 type PlayerReader interface {
-	GetUserID() string
+	GetID() id.PlayerID
+	GetIDString() string // Pure UUID string for protocol compatibility
 	GetHP() int
 	GetLP() int
 	GetPosition() int

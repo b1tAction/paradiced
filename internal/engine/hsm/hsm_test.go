@@ -7,10 +7,11 @@ import (
 	"github.com/b1tAction/fated/internal/core"
 	"github.com/b1tAction/fated/internal/engine"
 	"github.com/b1tAction/fated/pkg/event"
+	"github.com/b1tAction/fated/pkg/id"
 )
 
 func TestNewHSM(t *testing.T) {
-	game := engine.NewGame("game-1", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 
 	if hsm == nil {
@@ -31,7 +32,7 @@ func TestNewHSM(t *testing.T) {
 }
 
 func TestHSMRegisterState(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 
 	// Register valid state
@@ -66,7 +67,7 @@ func TestHSMRegisterState(t *testing.T) {
 }
 
 func TestHSMRegisterStates(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 
 	states := []State{
@@ -86,7 +87,7 @@ func TestHSMRegisterStates(t *testing.T) {
 }
 
 func TestHSMStart(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 	hsm.RegisterState(&mockState{id: StateMatchInit})
 
@@ -111,7 +112,7 @@ func TestHSMStart(t *testing.T) {
 }
 
 func TestHSMStop(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 	state := &mockState{id: StateMatchInit}
 	hsm.RegisterState(state)
@@ -128,7 +129,7 @@ func TestHSMStop(t *testing.T) {
 }
 
 func TestHSMTransitionToGlobalState(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 
 	// Register global states
@@ -158,7 +159,7 @@ func TestHSMTransitionToGlobalState(t *testing.T) {
 }
 
 func TestHSMTransitionToInvalidState(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 	hsm.RegisterState(&mockState{id: StateMatchInit})
 
@@ -176,7 +177,7 @@ func TestHSMTransitionToInvalidState(t *testing.T) {
 }
 
 func TestHSMTransitionToTurnState(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 
 	// Register states
@@ -190,7 +191,7 @@ func TestHSMTransitionToTurnState(t *testing.T) {
 	}
 
 	// Set turn player
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player-1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	hsm.SetTurnPlayer(player)
 
 	// Transition to turn state
@@ -205,7 +206,7 @@ func TestHSMTransitionToTurnState(t *testing.T) {
 }
 
 func TestHSMTransitionToTurnStateWithoutTurnLoop(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 	hsm.RegisterState(&mockState{id: StateMatchInit})
 	hsm.RegisterState(&mockState{id: StateTurnUpkeep})
@@ -221,9 +222,9 @@ func TestHSMTransitionToTurnStateWithoutTurnLoop(t *testing.T) {
 }
 
 func TestHSMSetTurnPlayer(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player-1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 
 	hsm.SetTurnPlayer(player)
 
@@ -233,7 +234,7 @@ func TestHSMSetTurnPlayer(t *testing.T) {
 }
 
 func TestHSMUpdate(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 
 	// Register state that stays in current state
@@ -256,7 +257,7 @@ func TestHSMUpdate(t *testing.T) {
 }
 
 func TestHSMUpdateNotRunning(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 
 	// Update without starting
@@ -270,7 +271,7 @@ func TestHSMUpdateNotRunning(t *testing.T) {
 }
 
 func TestHSMIsPaused(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 
 	if hsm.IsPaused() {
@@ -279,7 +280,7 @@ func TestHSMIsPaused(t *testing.T) {
 }
 
 func TestHSMIsWaiting(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 
 	if hsm.IsWaiting() {
@@ -288,7 +289,7 @@ func TestHSMIsWaiting(t *testing.T) {
 }
 
 func TestHSMIsInTurn(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 	hsm.RegisterState(&mockState{id: StateTurnLoop})
 
@@ -311,13 +312,13 @@ func TestHSMIsInTurn(t *testing.T) {
 }
 
 func TestHSMCreateSnapshot(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 	hsm.RegisterState(&mockState{id: StateMatchInit})
 	hsm.RegisterState(&mockState{id: StateTurnUpkeep})
 
 	hsm.Start(StateMatchInit, nil)
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player-1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	hsm.SetTurnPlayer(player)
 
 	snapshot := hsm.CreateSnapshot()
@@ -331,13 +332,13 @@ func TestHSMCreateSnapshot(t *testing.T) {
 	if snapshot.Running != true {
 		t.Error("Snapshot running should be true")
 	}
-	if snapshot.TurnPlayerID != "player-1" {
-		t.Errorf("Snapshot turn player = %s, want player-1", snapshot.TurnPlayerID)
+	if snapshot.TurnPlayerID != player.ID.UUID() {
+		t.Errorf("Snapshot turn player = %s, want %s", snapshot.TurnPlayerID, player.ID.UUID())
 	}
 }
 
 func TestHSMRestoreFromSnapshot(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 	hsm.RegisterState(&mockState{id: StateMatchInit})
 	hsm.RegisterState(&mockState{id: StateRoundMiniGame})
@@ -364,7 +365,7 @@ func TestHSMRestoreFromSnapshot(t *testing.T) {
 }
 
 func TestHSMRestoreFromSnapshotNil(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 
 	err := hsm.RestoreFromSnapshot(nil)
@@ -374,7 +375,7 @@ func TestHSMRestoreFromSnapshotNil(t *testing.T) {
 }
 
 func TestHSMRestoreFromSnapshotUnknownState(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 
 	snapshot := &HSMSnapshot{
@@ -389,7 +390,7 @@ func TestHSMRestoreFromSnapshotUnknownState(t *testing.T) {
 }
 
 func TestHSMString(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 	hsm.RegisterState(&mockState{id: StateMatchInit})
 
@@ -416,7 +417,7 @@ func TestHSMString(t *testing.T) {
 }
 
 func TestHSMOnUserChoice(t *testing.T) {
-	game := engine.NewGame("test", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	hsm := NewHSM(game)
 
 	// No pending decision
@@ -430,7 +431,7 @@ func TestHSMOnUserChoice(t *testing.T) {
 	hsm.RegisterState(&mockState{id: StateTurnUpkeep})
 	hsm.RegisterState(&mockState{id: StateWaitDecision})
 	hsm.Start(StateTurnLoop, nil)
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player-1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	hsm.SetTurnPlayer(player)
 	hsm.TransitionTo(StateTurnUpkeep, nil)
 

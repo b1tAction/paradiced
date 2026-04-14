@@ -60,12 +60,13 @@ type BuffDefinition struct {
 ```go
 type Buff struct {
     Type            BuffType
-    ID              string
+    ID              string       // UUID v7, auto-generated
     Duration        int
     Charge          int
-    SubscriptionIDs []string  // EventBus 订阅ID列表
+    SubscriptionIDs []string     // EventBus 订阅ID列表
 }
 
+// NewBuff auto-generates UUID v7 ID
 buff.NewBuff(buff.BuffTypeCurse, 3)
 ```
 

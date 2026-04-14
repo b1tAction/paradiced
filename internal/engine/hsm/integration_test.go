@@ -12,6 +12,7 @@ import (
 	"github.com/b1tAction/fated/pkg/constants"
 	"github.com/b1tAction/fated/pkg/event"
 	"github.com/b1tAction/fated/pkg/gamelog"
+	"github.com/b1tAction/fated/pkg/id"
 )
 
 // ========== Integration Tests: Turn Flow with GameLog ==========
@@ -19,12 +20,12 @@ import (
 // TestTurnFlow_GameLog_Integration tests complete turn flow with GameLog recording.
 func TestTurnFlow_GameLog_Integration(t *testing.T) {
 	// Setup game and map
-	game := engine.NewGame("test-game", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	mapEngine := gamemap.NewMapEngine(100)
 	configs := map[int]gamemap.CellType{30: gamemap.CellTypeCheckpoint}
 	mapEngine.GenerateLinearMap(configs)
 
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player1"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.HP = 5
 	player.LP = 3
 	player.Position = 10
@@ -58,11 +59,11 @@ func TestTurnFlow_GameLog_Integration(t *testing.T) {
 // TestTurnFlow_BuffEffect_GameLog tests Buff effect triggers and GameLog recording.
 func TestTurnFlow_BuffEffect_GameLog(t *testing.T) {
 	// Setup
-	game := engine.NewGame("test-game", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	mapEngine := gamemap.NewMapEngine(100)
 	mapEngine.GenerateLinearMap(nil)
 
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player1", MaxHP: 6})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 6})
 	player.HP = 5
 	player.LP = 3
 	player.Position = 10
@@ -88,7 +89,7 @@ func TestTurnFlow_BuffEffect_GameLog(t *testing.T) {
 	triggerCtx.Set("action_context", actionCtx)
 
 	// Publish PhaseBeforeTurn
-	game.Bus.Publish(constants.PhaseBeforeTurn, player.UserID, triggerCtx)
+	game.Bus.Publish(constants.PhaseBeforeTurn, player.ID.UUID(), triggerCtx)
 
 	// Process any derived actions
 	actionCtx.ProcessQueue()
@@ -103,19 +104,19 @@ func TestTurnFlow_BuffEffect_GameLog(t *testing.T) {
 // TestTurnFlow_Respawn_GameLog tests RespawnAction and GameLog recording.
 func TestTurnFlow_Respawn_GameLog(t *testing.T) {
 	// Setup
-	game := engine.NewGame("test-game", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	mapEngine := gamemap.NewMapEngine(100)
 	configs := map[int]gamemap.CellType{30: gamemap.CellTypeCheckpoint}
 	mapEngine.GenerateLinearMap(configs)
 
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player1", MaxHP: 6})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 6})
 	player.HP = 5
 	player.Position = 50
 	player.IsDead = true
 	game.AddPlayer(player)
 
 	// Start turn log
-	game.Log.StartTurn(1, 0, player.UserID)
+	game.Log.StartTurn(1, 0, player.ID.UUID())
 
 	// Create ActionContext
 	mapAdapter := NewMapEngineWrapper(mapEngine)
@@ -156,8 +157,8 @@ func TestTurnFlow_Respawn_GameLog(t *testing.T) {
 	if respawnEntry == nil {
 		t.Error("Should have respawn entry in GameLog")
 	} else {
-		if respawnEntry.Target != "player1" {
-			t.Errorf("Respawn target should be player1, got %s", respawnEntry.Target)
+		if respawnEntry.Target != player.ID.UUID() {
+			t.Errorf("Respawn target should be %s, got %s", player.ID.UUID(), respawnEntry.Target)
 		}
 		if respawnEntry.Source != "DeathRespawn" {
 			t.Errorf("Respawn source should be DeathRespawn, got %s", respawnEntry.Source)
@@ -173,15 +174,15 @@ func TestTurnFlow_Respawn_GameLog(t *testing.T) {
 // TestTurnFlow_Damage_GameLog tests DamageAction and GameLog recording.
 func TestTurnFlow_Damage_GameLog(t *testing.T) {
 	// Setup
-	game := engine.NewGame("test-game", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	mapEngine := gamemap.NewMapEngine(100)
 
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player1", MaxHP: 6})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 6})
 	player.HP = 5
 	game.AddPlayer(player)
 
 	// Start turn log
-	game.Log.StartTurn(1, 0, player.UserID)
+	game.Log.StartTurn(1, 0, player.ID.UUID())
 
 	// Create ActionContext
 	mapAdapter := NewMapEngineWrapper(mapEngine)
@@ -229,12 +230,12 @@ func TestTurnFlow_Damage_GameLog(t *testing.T) {
 // TestTurnFlow_CompleteTurn tests a complete turn with multiple actions.
 func TestTurnFlow_CompleteTurn(t *testing.T) {
 	// Setup
-	game := engine.NewGame("test-game", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	mapEngine := gamemap.NewMapEngine(100)
 	configs := map[int]gamemap.CellType{30: gamemap.CellTypeCheckpoint}
 	mapEngine.GenerateLinearMap(configs)
 
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player1", MaxHP: 6})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 6})
 	player.HP = 5
 	player.LP = 3
 	player.Position = 10
@@ -248,7 +249,7 @@ func TestTurnFlow_CompleteTurn(t *testing.T) {
 	mapAdapter := NewMapEngineWrapper(mapEngine)
 
 	// === Step 1: Start Turn ===
-	game.Log.StartTurn(1, 0, player.UserID)
+	game.Log.StartTurn(1, 0, player.ID.UUID())
 
 	// === Step 2: BeforeTurn Phase ===
 	actionCtx := engineaction.NewActionContext(
@@ -259,7 +260,7 @@ func TestTurnFlow_CompleteTurn(t *testing.T) {
 
 	triggerCtx := event.NewContext(player)
 	triggerCtx.Set("action_context", actionCtx)
-	game.Bus.Publish(constants.PhaseBeforeTurn, player.UserID, triggerCtx)
+	game.Bus.Publish(constants.PhaseBeforeTurn, player.ID.UUID(), triggerCtx)
 	actionCtx.ProcessQueue()
 
 	// === Step 3: Simulate Movement ===
@@ -290,8 +291,8 @@ func TestTurnFlow_CompleteTurn(t *testing.T) {
 	if segment.Turn != 0 {
 		t.Errorf("Turn should be 0, got %d", segment.Turn)
 	}
-	if segment.PlayerID != "player1" {
-		t.Errorf("PlayerID should be player1, got %s", segment.PlayerID)
+	if segment.PlayerID != player.ID.UUID() {
+		t.Errorf("PlayerID should be %s, got %s", player.ID.UUID(), segment.PlayerID)
 	}
 
 	// Verify entries count
@@ -363,19 +364,19 @@ func TestTurnFlow_CompleteTurn(t *testing.T) {
 // TestTurnFlow_Interrupt_Respawn tests intercepting RespawnAction.
 func TestTurnFlow_Interrupt_Respawn(t *testing.T) {
 	// Setup
-	game := engine.NewGame("test-game", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	mapEngine := gamemap.NewMapEngine(100)
 	configs := map[int]gamemap.CellType{30: gamemap.CellTypeCheckpoint}
 	mapEngine.GenerateLinearMap(configs)
 
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player1", MaxHP: 6})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 6})
 	player.HP = 0 // Dead
 	player.Position = 50
 	player.IsDead = true
 	game.AddPlayer(player)
 
 	// Start turn log
-	game.Log.StartTurn(1, 0, player.UserID)
+	game.Log.StartTurn(1, 0, player.ID.UUID())
 
 	// Create ActionContext
 	mapAdapter := NewMapEngineWrapper(mapEngine)
@@ -419,15 +420,15 @@ func TestTurnFlow_Interrupt_Respawn(t *testing.T) {
 // TestDerivedActions_FromHandler tests ctx.AddDerivedAction() from handler.
 func TestDerivedActions_FromHandler(t *testing.T) {
 	// Setup
-	game := engine.NewGame("test-game", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 	mapEngine := gamemap.NewMapEngine(100)
 
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player1", MaxHP: 6, MaxLP: 3}) // Set MaxLP to 3 for testing
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 6, MaxLP: 3}) // Set MaxLP to 3 for testing
 	player.HP = 3
 	player.LP = 0 // Start with LP=0 to test increment
 	game.AddPlayer(player)
 
-	game.Log.StartTurn(1, 0, player.UserID)
+	game.Log.StartTurn(1, 0, player.ID.UUID())
 
 	// Create ActionContext
 	mapAdapter := NewMapEngineWrapper(mapEngine)
@@ -490,19 +491,19 @@ func TestDerivedActions_FromHandler(t *testing.T) {
 
 // TestGameLog_JSON_Output tests full GameLog JSON output for client.
 func TestGameLog_JSON_Output(t *testing.T) {
-	game := engine.NewGame("test-game", 0)
+	game := engine.NewGame(id.NewGameID(), 0)
 
-	player := core.NewPlayer(core.PlayerConfig{UserID: "player1", MaxHP: 6})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 6})
 	player.HP = 5
 	game.AddPlayer(player)
 
 	// Simulate a full turn with actions
-	game.Log.StartTurn(1, 0, player.UserID)
+	game.Log.StartTurn(1, 0, player.ID.UUID())
 
 	// Add various entries
-	game.Log.AddEntry(gamelog.NewActionEntry("modify_lp", player.UserID, 1, "Buff_Divine"))
-	game.Log.AddEntry(gamelog.NewActionEntry("move", player.UserID, 5, "DiceRoll"))
-	game.Log.AddEntry(gamelog.NewActionEntry("damage", player.UserID, -2, "Event_Trap"))
+	game.Log.AddEntry(gamelog.NewActionEntry("modify_lp", player.ID.UUID(), 1, "Buff_Divine"))
+	game.Log.AddEntry(gamelog.NewActionEntry("move", player.ID.UUID(), 5, "DiceRoll"))
+	game.Log.AddEntry(gamelog.NewActionEntry("damage", player.ID.UUID(), -2, "Event_Trap"))
 
 	game.Log.EndTurn()
 
@@ -543,8 +544,8 @@ func TestGameLog_JSON_Output(t *testing.T) {
 	if seg.Round != 1 {
 		t.Errorf("Round should be 1, got %d", seg.Round)
 	}
-	if seg.PlayerID != "player1" {
-		t.Errorf("PlayerID should be player1, got %s", seg.PlayerID)
+	if seg.PlayerID != player.ID.UUID() {
+		t.Errorf("PlayerID should be %s, got %s", player.ID.UUID(), seg.PlayerID)
 	}
 	if len(seg.Entries) != 3 {
 		t.Errorf("Should have 3 entries, got %d", len(seg.Entries))

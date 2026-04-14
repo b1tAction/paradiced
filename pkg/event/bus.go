@@ -1,28 +1,22 @@
 package event
 
 import (
-	"fmt"
 	"sort"
 	"sync"
-	"time"
 
 	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/id"
 )
-
-// newID generates a unique ID (package internal).
-func newID() string {
-	return fmt.Sprintf("%d-%d", time.Now().UnixNano(), time.Now().Nanosecond())
-}
 
 // Subscription represents subscription information.
 type Subscription struct {
-	ID         string          `json:"id"`          // Subscription ID, used for unsubscribe
-	OwnerID    string          `json:"owner_id"`    // Player ID
-	SourceID   string          `json:"source_id"`   // Buff/Item ID
-	SourceType string          `json:"source_type"` // Source type "buff" / "item"
-	Priority   int             `json:"priority"`    // Execution priority (higher executes first)
-	Decision   *Decision       `json:"decision"`    // Pre-bound Decision
-	Phase      constants.Phase `json:"phase"`       // Subscribed Phase
+	ID         id.SubscriptionID  `json:"id"`          // Subscription ID, used for unsubscribe
+	OwnerID    string             `json:"owner_id"`    // Player ID (UUID string)
+	SourceID   string             `json:"source_id"`   // Buff/Item ID (UUID string)
+	SourceType string             `json:"source_type"` // Source type "buff" / "item"
+	Priority   int                `json:"priority"`    // Execution priority (higher executes first)
+	Decision   *Decision          `json:"decision"`    // Pre-bound Decision
+	Phase      constants.Phase    `json:"phase"`       // Subscribed Phase
 }
 
 // EventBus is the event bus.
@@ -30,7 +24,7 @@ type Subscription struct {
 type EventBus struct {
 	subscriptions map[constants.Phase][]*Subscription
 	mutex         sync.RWMutex
-	GameID        string `json:"game_id"` // Owning game instance ID
+	GameID        string `json:"game_id"` // Owning game instance ID (UUID string)
 }
 
 // NewEventBus creates a new event bus.
@@ -43,14 +37,14 @@ func NewEventBus(gameID string) *EventBus {
 
 // Subscribe subscribes to a Phase.
 // Returns subscription ID for unsubscribing.
-func (bus *EventBus) Subscribe(phase constants.Phase, ownerID, sourceID, sourceType string, decision *Decision) string {
+func (bus *EventBus) Subscribe(phase constants.Phase, ownerID id.PlayerID, sourceID, sourceType string, decision *Decision) id.SubscriptionID {
 	bus.mutex.Lock()
 	defer bus.mutex.Unlock()
 
-	subID := newID()
+	subID := id.NewSubscriptionID()
 	sub := &Subscription{
 		ID:         subID,
-		OwnerID:    ownerID,
+		OwnerID:    ownerID.UUID(),
 		SourceID:   sourceID,
 		SourceType: sourceType,
 		Priority:   decision.Priority,
@@ -63,13 +57,13 @@ func (bus *EventBus) Subscribe(phase constants.Phase, ownerID, sourceID, sourceT
 }
 
 // Unsubscribe unsubscribes by ID.
-func (bus *EventBus) Unsubscribe(subID string) bool {
+func (bus *EventBus) Unsubscribe(subID id.SubscriptionID) bool {
 	bus.mutex.Lock()
 	defer bus.mutex.Unlock()
 
 	for phase, subs := range bus.subscriptions {
 		for i, sub := range subs {
-			if sub.ID == subID {
+			if sub.ID.Equal(subID.ID) {
 				bus.subscriptions[phase] = append(subs[:i], subs[i+1:]...)
 				return true
 			}
@@ -99,7 +93,7 @@ func (bus *EventBus) UnsubscribeBySource(sourceID string) int {
 	return count
 }
 
-// UnsubscribeByOwner unsubscribes all subscriptions by player ID.
+// UnsubscribeByOwner unsubscribes all subscriptions by player ID (UUID string).
 // Used when player leaves game to batch unsubscribe.
 func (bus *EventBus) UnsubscribeByOwner(ownerID string) int {
 	bus.mutex.Lock()

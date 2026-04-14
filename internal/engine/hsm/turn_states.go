@@ -64,7 +64,7 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 
 	// Start turn log segment
 	if ctx.Game != nil && ctx.Game.Log != nil {
-		ctx.Game.Log.StartTurn(ctx.Game.State.Round, ctx.Game.State.Turn, player.UserID)
+		ctx.Game.Log.StartTurn(ctx.Game.State.Round, ctx.Game.State.Turn, player.ID.UUID())
 	}
 
 	// Create ActionContext for executing Actions
@@ -99,7 +99,7 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 	triggerCtx.Set("current_player", player)
 
 	// Publish PhaseBeforeTurn to trigger Buff effects
-	s.decisions = ctx.Bus.Publish(constants.PhaseBeforeTurn, player.UserID, triggerCtx)
+	s.decisions = ctx.Bus.Publish(constants.PhaseBeforeTurn, player.ID.UUID(), triggerCtx)
 
 	// Step 4: Execute any derived Actions from handlers
 	s.actionCtx.ProcessQueue()
@@ -227,7 +227,7 @@ func (s *MainActionState) OnUseItem(ctx *StateContext, itemID string) {
 	triggerCtx.Set("item_id", itemID)
 	triggerCtx.Set("action_context", s.actionCtx)
 
-	ctx.Bus.Publish(constants.PhaseItemUsed, player.UserID, triggerCtx)
+	ctx.Bus.Publish(constants.PhaseItemUsed, player.ID.UUID(), triggerCtx)
 
 	// Process derived actions
 	s.actionCtx.ProcessQueue()
@@ -237,7 +237,7 @@ func (s *MainActionState) OnUseItem(ctx *StateContext, itemID string) {
 // Default values for timeout auto-roll scenarios.
 func (s *MainActionState) defaultDiceRoll(ctx *StateContext) int {
 	// Get dice type from context (assigned in RoundPrep)
-	diceType := ctx.GetDiceType(ctx.Player.UserID)
+	diceType := ctx.GetDiceType(ctx.Player.ID.UUID())
 	switch diceType {
 	case rng.DiceTypeGold:
 		return 6 // Gold dice: weighted toward high numbers
@@ -427,7 +427,7 @@ func (s *TurnLandedState) Enter(ctx *StateContext) {
 	triggerCtx.Set("cell_type", s.cellType)
 	triggerCtx.Set("position", player.Position)
 
-	s.decisions = ctx.Bus.Publish(constants.PhaseOnLand, player.UserID, triggerCtx)
+	s.decisions = ctx.Bus.Publish(constants.PhaseOnLand, player.ID.UUID(), triggerCtx)
 
 	// Process derived actions
 	s.actionCtx.ProcessQueue()
@@ -573,7 +573,7 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 	triggerCtx := event.NewContext(player)
 	triggerCtx.Set("action_context", s.actionCtx)
 
-	decisions := ctx.Bus.Publish(constants.PhaseAfterTurn, player.UserID, triggerCtx)
+	decisions := ctx.Bus.Publish(constants.PhaseAfterTurn, player.ID.UUID(), triggerCtx)
 
 	// Process derived actions (甘霖/腐化 effects)
 	s.actionCtx.ProcessQueue()

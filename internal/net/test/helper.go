@@ -8,6 +8,7 @@ import (
 	internalnet "github.com/b1tAction/fated/internal/net"
 	"github.com/b1tAction/fated/internal/engine"
 	"github.com/b1tAction/fated/internal/engine/hsm"
+	"github.com/b1tAction/fated/pkg/id"
 	"github.com/b1tAction/fated/pkg/rng"
 )
 
@@ -26,7 +27,7 @@ type TestHelper struct {
 
 // NewTestHelper creates a new test helper with a random seed.
 func NewTestHelper(seed int64) *TestHelper {
-	game := engine.NewGame("test_game", seed)
+	game := engine.NewGame(id.NewGameID(), seed)
 	hsmInstance := hsm.NewHSM(game)
 
 	// Register states (simplified for testing)

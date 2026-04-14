@@ -2,6 +2,7 @@ package hsm
 
 import (
 	"github.com/b1tAction/fated/internal/core"
+	"github.com/b1tAction/fated/pkg/id"
 	"github.com/b1tAction/fated/pkg/rng"
 )
 
@@ -133,13 +134,13 @@ func (s *RoundPrepState) Enter(ctx *StateContext) {
 	for _, player := range players {
 		// Default assignment based on position (will be updated by mini-game results)
 		rank := len(players) // Default to lowest rank
-		playerRank := ctx.GetMiniGameRank(player.UserID)
+		playerRank := ctx.GetMiniGameRank(player.ID.UUID())
 		if playerRank > 0 {
 			rank = playerRank
 		}
-		s.diceAssignments[player.UserID] = rank
+		s.diceAssignments[player.ID.UUID()] = rank
 		// Store dice type as rng.DiceType for context
-		ctx.SetDiceType(player.UserID, rng.RankToDiceType(rank))
+		ctx.SetDiceType(player.ID.UUID(), rng.RankToDiceType(rank))
 	}
 
 	// Increment round counter
@@ -276,7 +277,10 @@ func (s *BossBattleState) Enter(ctx *StateContext) {
 	// This would be set by TurnLoop before transitioning
 	triggerID := ctx.GetStringOrDefault(KeyBossTrigger, "")
 	if triggerID != "" {
-		s.triggerPlayer = ctx.Game.GetPlayer(triggerID)
+		parsedID, err := id.ParsePlayerID(triggerID)
+		if err == nil {
+			s.triggerPlayer = ctx.Game.GetPlayer(parsedID)
+		}
 	}
 
 	ctx.SetBool(KeyBossBattleActive, true)
@@ -325,7 +329,10 @@ func (s *GameOverState) Enter(ctx *StateContext) {
 
 	winnerID := ctx.GetStringOrDefault(KeyWinner, "")
 	if winnerID != "" {
-		s.winner = ctx.Game.GetPlayer(winnerID)
+		parsedID, err := id.ParsePlayerID(winnerID)
+		if err == nil {
+			s.winner = ctx.Game.GetPlayer(parsedID)
+		}
 	}
 
 	ctx.Success = true

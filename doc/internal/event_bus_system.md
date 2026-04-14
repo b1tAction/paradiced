@@ -112,7 +112,7 @@ Buff 实例存储多个订阅ID：
 ```go
 type Buff struct {
     Type            BuffType
-    SubscriptionIDs []string  // 多订阅ID
+    SubscriptionIDs []id.SubscriptionID  // 多订阅ID（类型安全）
     // ...
 }
 ```
@@ -322,7 +322,7 @@ HSM 在回合开始/结束时管理日志分段：
 ```go
 // TurnUpkeepState.Enter() - 开始回合日志
 func (s *TurnUpkeepState) Enter(ctx *StateContext) {
-    ctx.Game.Log.StartTurn(ctx.Game.State.Round, ctx.Game.State.Turn, player.UserID)
+    ctx.Game.Log.StartTurn(ctx.Game.State.Round, ctx.Game.State.Turn, player.ID.UUID())
     // ...
 }
 

@@ -2,6 +2,8 @@ package core
 
 import (
 	"testing"
+
+	"github.com/b1tAction/fated/pkg/id"
 )
 
 // ========== Faction Tests ==========
@@ -45,8 +47,9 @@ func TestFactionIsValid(t *testing.T) {
 // ========== Player Tests ==========
 
 func TestNewPlayer(t *testing.T) {
+	testID := id.NewPlayerID()
 	config := PlayerConfig{
-		UserID:   "player-001",
+		ID:       testID,
 		Faction:  FactionQingLong,
 		MaxHP:    10,
 		MaxLP:    5,
@@ -54,8 +57,8 @@ func TestNewPlayer(t *testing.T) {
 	}
 
 	player := NewPlayer(config)
-	if player.UserID != "player-001" {
-		t.Errorf("player.UserID = %s, expected player-001", player.UserID)
+	if player.ID != testID {
+		t.Errorf("player.ID = %s, expected %s", player.ID.UUID(), testID.UUID())
 	}
 	if player.Faction != FactionQingLong {
 		t.Errorf("player.Faction = %d, expected QingLong", player.Faction)
@@ -76,7 +79,7 @@ func TestNewPlayer(t *testing.T) {
 
 func TestNewPlayerZhuQue(t *testing.T) {
 	config := PlayerConfig{
-		UserID:  "player-002",
+		ID:      id.NewPlayerID(),
 		Faction: FactionZhuQue,
 	}
 
@@ -89,7 +92,7 @@ func TestNewPlayerZhuQue(t *testing.T) {
 
 func TestNewPlayerDefaultConfig(t *testing.T) {
 	config := PlayerConfig{
-		UserID:  "player-003",
+		ID:      id.NewPlayerID(),
 		Faction: FactionBaiHu,
 		MaxHP:   0, // 使用默认值
 		MaxLP:   0,
@@ -108,7 +111,7 @@ func TestNewPlayerDefaultConfig(t *testing.T) {
 
 func TestApplyDamage(t *testing.T) {
 	player := NewPlayer(PlayerConfig{
-		UserID:  "player-001",
+		ID:      id.NewPlayerID(),
 		Faction: FactionQingLong,
 		MaxHP:   10,
 	})
@@ -129,7 +132,7 @@ func TestApplyDamage(t *testing.T) {
 
 func TestApplyDamageDeath(t *testing.T) {
 	player := NewPlayer(PlayerConfig{
-		UserID:  "player-001",
+		ID:      id.NewPlayerID(),
 		Faction: FactionQingLong,
 		MaxHP:   10,
 	})
@@ -159,7 +162,7 @@ func TestApplyDamageNegative(t *testing.T) {
 }
 
 func TestApplyDamageHiddenImmune(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test"})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
 	player.AddBuff(NewBuff(BuffTypeHidden, 3))
 
 	err := player.ApplyDamage(5)
@@ -176,7 +179,7 @@ func TestApplyDamageHiddenImmune(t *testing.T) {
 }
 
 func TestHeal(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test", MaxHP: 10})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
 	player.HP = 5
 
 	err := player.Heal(3)
@@ -195,7 +198,7 @@ func TestHeal(t *testing.T) {
 }
 
 func TestModifyLP(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test", MaxLP: 5})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID(), MaxLP: 5})
 
 	// 增加 LP
 	player.ModifyLP(2)
@@ -225,7 +228,7 @@ func TestModifyLP(t *testing.T) {
 // ========== Movement Tests ==========
 
 func TestMove(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test"})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
 
 	err := player.Move(10, 50)
 	if err != nil {
@@ -252,7 +255,7 @@ func TestMove(t *testing.T) {
 }
 
 func TestRespawn(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test", MaxHP: 10})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
 	player.HP = 0
 	player.IsDead = true
 	player.Position = 50
@@ -275,7 +278,7 @@ func TestRespawn(t *testing.T) {
 // ========== Buff Management Tests ==========
 
 func TestAddBuff(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test"})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
 	buff := NewBuff(BuffTypeCurse, 3)
 
 	err := player.AddBuff(buff)
@@ -291,7 +294,7 @@ func TestAddBuff(t *testing.T) {
 }
 
 func TestAddBuffNil(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test"})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
 	err := player.AddBuff(nil)
 	if err == nil {
 		t.Error("AddBuff nil should return error")
@@ -299,7 +302,7 @@ func TestAddBuffNil(t *testing.T) {
 }
 
 func TestAddBuffHiddenImmune(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test"})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
 	player.AddBuff(NewBuff(BuffTypeHidden, 3))
 
 	// 隐匿状态下免疫负面 Buff
@@ -323,7 +326,7 @@ func TestAddBuffHiddenImmune(t *testing.T) {
 }
 
 func TestRemoveBuff(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test"})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
 	player.AddBuff(NewBuff(BuffTypeCurse, 3))
 	player.AddBuff(NewBuff(BuffTypeDivine, 3))
 
@@ -346,7 +349,7 @@ func TestRemoveBuff(t *testing.T) {
 }
 
 func TestGetBuff(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test"})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
 	player.AddBuff(NewBuff(BuffTypeCurse, 3))
 
 	buff := player.GetBuff(BuffTypeCurse)
@@ -365,7 +368,7 @@ func TestGetBuff(t *testing.T) {
 }
 
 func TestTickBuffs(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test"})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
 	player.AddBuff(NewBuff(BuffTypeCurse, 1)) // 只剩1回合
 	player.AddBuff(NewBuff(BuffTypeDivine, 3))
 
@@ -382,7 +385,7 @@ func TestTickBuffs(t *testing.T) {
 }
 
 func TestClearNegativeBuffs(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test"})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
 	player.AddBuff(NewBuff(BuffTypeCurse, 3))
 	player.AddBuff(NewBuff(BuffTypePoison, 3))
 	player.AddBuff(NewBuff(BuffTypeDivine, 3))
@@ -402,8 +405,8 @@ func TestClearNegativeBuffs(t *testing.T) {
 // ========== Item Management Tests ==========
 
 func TestAddItem(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test"})
-	item := NewItem(ItemTypeReverseClock, "item-001")
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
+	item := NewItem(ItemTypeReverseClock)
 
 	err := player.AddItem(item)
 	if err != nil {
@@ -418,7 +421,7 @@ func TestAddItem(t *testing.T) {
 }
 
 func TestAddItemNil(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test"})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
 	err := player.AddItem(nil)
 	if err == nil {
 		t.Error("AddItem nil should return error")
@@ -426,39 +429,42 @@ func TestAddItemNil(t *testing.T) {
 }
 
 func TestRemoveItem(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test"})
-	player.AddItem(NewItem(ItemTypeReverseClock, "item-001"))
-	player.AddItem(NewItem(ItemTypeAnyDoor, "item-002"))
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
+	item1 := NewItem(ItemTypeReverseClock)
+	item2 := NewItem(ItemTypeAnyDoor)
+	player.AddItem(item1)
+	player.AddItem(item2)
 
-	removed, err := player.RemoveItem("item-001")
+	removed, err := player.RemoveItem(item1.ID)
 	if err != nil {
 		t.Fatalf("RemoveItem failed: %v", err)
 	}
-	if removed.ID != "item-001" {
-		t.Errorf("removed.ID = %s, expected item-001", removed.ID)
+	if removed.ID != item1.ID {
+		t.Errorf("removed.ID = %s, expected %s", removed.ID, item1.ID)
 	}
 	if player.HasItem(ItemTypeReverseClock) {
 		t.Error("player should not have ReverseClock after removal")
 	}
 
 	// 移除不存在的道具
-	_, err = player.RemoveItem("item-999")
+	_, err = player.RemoveItem(id.NewItemID())
 	if err == nil {
 		t.Error("RemoveItem non-existent should return error")
 	}
 }
 
 func TestGetItem(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test"})
-	player.AddItem(NewItem(ItemTypeReverseClock, "item-001"))
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
+	item := NewItem(ItemTypeReverseClock)
+	player.AddItem(item)
 
-	item := player.GetItem("item-001")
-	if item == nil {
+	found := player.GetItem(item.ID)
+	if found == nil {
 		t.Error("GetItem should return item")
 	}
 
-	item = player.GetItem("item-999")
-	if item != nil {
+	notFound := player.GetItem(id.NewItemID())
+	if notFound != nil {
 		t.Error("GetItem non-existent should return nil")
 	}
 }
@@ -467,7 +473,7 @@ func TestGetItem(t *testing.T) {
 
 func TestTriggerFactionSkillZhuQue(t *testing.T) {
 	player := NewPlayer(PlayerConfig{
-		UserID:  "test",
+		ID:      id.NewPlayerID(),
 		Faction: FactionZhuQue,
 		MaxLP:   5,
 	})
@@ -485,10 +491,10 @@ func TestTriggerFactionSkillZhuQue(t *testing.T) {
 
 func TestPlayerClone(t *testing.T) {
 	original := NewPlayer(PlayerConfig{
-		UserID:  "test",
+		ID:      id.NewPlayerID(),
 		Faction: FactionQingLong,
 	})
-	original.AddItem(NewItem(ItemTypeReverseClock, "item-001"))
+	original.AddItem(NewItem(ItemTypeReverseClock))
 	original.AddBuff(NewBuff(BuffTypeCurse, 3))
 	original.HP = 5
 
@@ -513,25 +519,26 @@ func TestPlayerClone(t *testing.T) {
 }
 
 func TestPlayerString(t *testing.T) {
+	testID := id.NewPlayerID()
 	player := NewPlayer(PlayerConfig{
-		UserID:  "player-001",
+		ID:      testID,
 		Faction: FactionQingLong,
 		MaxHP:   10,
 		MaxLP:   5,
 	})
 	player.Position = 20
-	player.AddItem(NewItem(ItemTypeReverseClock, "item-001"))
+	player.AddItem(NewItem(ItemTypeReverseClock))
 	player.AddBuff(NewBuff(BuffTypeCurse, 3))
 
 	str := player.String()
-	expected := "Player{ID: player-001, Faction: QingLong, Pos: 20, HP: 10, LP: 5, Buffs: 1, Items: 1}"
+	expected := "Player{ID: " + testID.UUID() + ", Faction: QingLong, Pos: 20, HP: 10, LP: 5, Buffs: 1, Items: 1}"
 	if str != expected {
 		t.Errorf("String() = %s, expected %s", str, expected)
 	}
 }
 
 func TestPlayerIsAlive(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test", MaxHP: 10})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
 
 	if !player.IsAlive() {
 		t.Error("player should be alive initially")
@@ -550,7 +557,7 @@ func TestPlayerIsAlive(t *testing.T) {
 }
 
 func TestPlayerCanAct(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test", MaxHP: 10})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
 
 	if !player.CanAct() {
 		t.Error("player should be able to act initially")
@@ -571,7 +578,7 @@ func TestPlayerCanAct(t *testing.T) {
 // ========== Metadata Tests ==========
 
 func TestPlayerMetadataInitialized(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test"})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
 
 	// Metadata 应该被初始化
 	if player.Metadata == nil {
@@ -583,7 +590,7 @@ func TestPlayerMetadataInitialized(t *testing.T) {
 }
 
 func TestPlayerChargeCount(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test", Faction: FactionQingLong})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID(), Faction: FactionQingLong})
 
 	// 初始充能计数为 0
 	if player.GetChargeCount() != 0 {
@@ -607,7 +614,7 @@ func TestPlayerChargeCount(t *testing.T) {
 }
 
 func TestPlayerFireCounter(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test", Faction: FactionZhuQue})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID(), Faction: FactionZhuQue})
 
 	// 初始离火计数为 0
 	if player.GetFireCounter() != 0 {
@@ -631,7 +638,7 @@ func TestPlayerFireCounter(t *testing.T) {
 }
 
 func TestPlayerCloneWithMetadata(t *testing.T) {
-	original := NewPlayer(PlayerConfig{UserID: "test"})
+	original := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
 	original.SetChargeCount(5)
 	original.SetFireCounter(3)
 	original.SetInt("custom_value", 100)
@@ -666,7 +673,7 @@ func TestPlayerCloneWithMetadata(t *testing.T) {
 }
 
 func TestPlayerMetadataDirectUsage(t *testing.T) {
-	player := NewPlayer(PlayerConfig{UserID: "test"})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
 
 	// Direct use of Metadata methods
 	player.SetInt("turn_count", 10)

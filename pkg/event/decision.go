@@ -2,6 +2,8 @@ package event
 
 import (
 	"time"
+
+	"github.com/b1tAction/fated/pkg/id"
 )
 
 // Option represents a decision option.
@@ -14,7 +16,7 @@ type Option struct {
 // Decision represents a user decision request.
 // Used for effects that require user confirmation (e.g., whether to use a shield).
 type Decision struct {
-	ID          string              `json:"id"`           // Decision ID
+	ID          id.DecisionID       `json:"id"`           // Decision ID
 	Prompt      string              `json:"prompt"`       // Prompt text
 	Options     []Option            `json:"options"`      // Available options list
 	Priority    int                 `json:"priority"`     // Execution priority (higher executes first)
@@ -23,14 +25,14 @@ type Decision struct {
 	NeedConfirm bool                `json:"need_confirm"` // Whether user confirmation is needed (default true)
 	Condition   func() bool         `json:"-"`            // Dynamic condition check (optional)
 	OnChoice    func(int, *Context) `json:"-"`            // Callback after user selection
-	SourceID    string              `json:"source_id"`    // Source ID (Buff/Item)
+	SourceID    string              `json:"source_id"`    // Source ID (Buff/Item UUID)
 	SourceType  string              `json:"source_type"`  // Source type "buff" / "item"
 }
 
 // NewDecision creates a new decision (needs confirmation by default).
 func NewDecision(prompt string, options []Option) *Decision {
 	return &Decision{
-		ID:          newID(),
+		ID:          id.NewDecisionID(),
 		Prompt:      prompt,
 		Options:     options,
 		Priority:    0,
@@ -42,7 +44,7 @@ func NewDecision(prompt string, options []Option) *Decision {
 // NewAutoDecision creates an auto-executing decision (no confirmation needed).
 func NewAutoDecision(prompt string, options []Option) *Decision {
 	return &Decision{
-		ID:          newID(),
+		ID:          id.NewDecisionID(),
 		Prompt:      prompt,
 		Options:     options,
 		Priority:    0,
@@ -141,7 +143,7 @@ func (d *Decision) IsTimedOut(startTime time.Time) bool {
 // Clone clones the decision (used for templates).
 func (d *Decision) Clone() *Decision {
 	return &Decision{
-		ID:         newID(),
+		ID:         id.NewDecisionID(),
 		Prompt:     d.Prompt,
 		Options:    d.Options, // Shared Options reference, Action functions are immutable
 		Priority:   d.Priority,

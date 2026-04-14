@@ -7,6 +7,7 @@ import (
 	engineaction "github.com/b1tAction/fated/internal/engine/action"
 	"github.com/b1tAction/fated/pkg/constants"
 	"github.com/b1tAction/fated/pkg/event"
+	"github.com/b1tAction/fated/pkg/id"
 )
 
 // ========== EventHandler Tests ==========
@@ -45,7 +46,7 @@ func TestGetBuffHandler(t *testing.T) {
 func TestFireBuffHandlerBehavior(t *testing.T) {
 	// Test Fire buff handler behavior via GetBuffHandler
 	player := core.NewPlayer(core.PlayerConfig{
-		UserID:  "player-001",
+		ID:      id.NewPlayerID(),
 		Faction: core.FactionZhuQue,
 		MaxLP:   5,
 	})
@@ -88,7 +89,7 @@ func TestFireBuffHandlerBehavior(t *testing.T) {
 func TestFireBuffHandlerNonBeforeTurnPhase(t *testing.T) {
 	// Fire only executes in BeforeTurn Phase
 	player := core.NewPlayer(core.PlayerConfig{
-		UserID:  "player-001",
+		ID:      id.NewPlayerID(),
 		Faction: core.FactionZhuQue,
 		MaxLP:   5,
 	})
@@ -153,9 +154,9 @@ func TestExecuteDefaultBuffAction(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			player := core.NewPlayer(core.PlayerConfig{
-				UserID: "player-001",
-				MaxHP:  tt.initHP,
-				MaxLP:  tt.initLP,
+				ID:    id.NewPlayerID(),
+				MaxHP: tt.initHP,
+				MaxLP: tt.initLP,
 			})
 			player.HP = tt.initHP
 			player.LP = tt.initLP
@@ -182,8 +183,8 @@ func TestExecuteDefaultBuffAction(t *testing.T) {
 func TestExecuteDefaultBuffActionWithHPDamage(t *testing.T) {
 	// Test HPPerTurn negative calling ApplyDamage
 	player := core.NewPlayer(core.PlayerConfig{
-		UserID: "player-001",
-		MaxHP:  6,
+		ID:    id.NewPlayerID(),
+		MaxHP: 6,
 	})
 	player.HP = 6
 
@@ -208,8 +209,8 @@ func TestExecuteDefaultBuffActionWithHPDamage(t *testing.T) {
 func TestExecuteDefaultBuffActionWithHealing(t *testing.T) {
 	// Test HPPerTurn positive calling Heal
 	player := core.NewPlayer(core.PlayerConfig{
-		UserID: "player-001",
-		MaxHP:  6,
+		ID:    id.NewPlayerID(),
+		MaxHP: 6,
 	})
 	player.HP = 6
 

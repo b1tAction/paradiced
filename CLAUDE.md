@@ -35,10 +35,12 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 │   ├── event/          # EventBus system (Bus, Decision, Context)
 │   ├── gamelog/        # Unified game log system for client playback
 │   ├── handler/        # Effect handler types (EffectHandler for Buff/Item/Event)
+│   ├── id/             # Typed ID wrapper system (PlayerID, BuffID, ItemID, etc.)
 │   ├── net/            # Network protocol layer (OpCode, Message, StateSync, MatchHandler)
 │   ├── protocol/       # Public interfaces (Player, Game, MapEngine, Faction)
 │   ├── rng/            # Random number engine (WeightedPool, LuckModifier, DiceManager)
 │   └── util/           # Utilities (Metadata with JSON serialization)
+│   └── uuid/           # UUID v7 generation (github.com/google/uuid wrapper)
 └── doc/
     ├── internal/       # Internal package documentation
     └── background.md   # Game design document (Chinese)
@@ -85,6 +87,17 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 #### Handler System (`pkg/handler`)
 - **EffectHandler**: Unified handler function signature for Buff/Item/Event/Faction effects
 - Handlers use ctx.AddDerivedAction() to generate multiple actions
+
+#### ID System (`pkg/id`)
+- **PlayerID**: Player unique identifier (prefix: "player")
+- **BuffID**: Buff instance identifier (prefix: "buff")
+- **ItemID**: Item instance identifier (prefix: "item")
+- **GameID**: Game instance identifier (prefix: "game")
+- **SubscriptionID**: EventBus subscription identifier (prefix: "sub")
+- **DecisionID**: Decision identifier (prefix: "dec")
+- ID.String() returns prefix+UUID for debugging (e.g., "player-{uuid}")
+- ID.UUID() returns pure UUID for protocol transmission
+- JSON serialization outputs pure UUID (type recognized by field name)
 
 #### Core Data Structures (`internal/core`)
 - **Player**: User entity with HP/LP/Buffs/Items/Metadata (implements protocol.Player)
@@ -138,11 +151,16 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - Documentation files in Chinese
 - Follow TDD principles
 - No external dependencies in core packages
+- **禁止使用类型别名**：不使用 `type PlayerID = id.PlayerID` 等别名写法，应直接使用 `id.PlayerID`。类型别名削弱类型安全，增加维护成本。
+
+### Environment
+- **GOMODCACHE**: `/app/.gomodcache` (本地模块缓存位置)
+- 运行测试和构建时需设置: `GOMODCACHE=/app/.gomodcache go test ./...`
 
 ### Testing
 Run tests with:
 ```bash
-go test ./...
+GOMODCACHE=/app/.gomodcache go test ./...
 ```
 
 ### Commit Convention
@@ -187,4 +205,5 @@ go test ./...
 - [pkg/protocol/README.md](pkg/protocol/README.md) - Protocol interface layer
 - [pkg/action/README.md](pkg/action/README.md) - Action interface layer
 - [pkg/handler/README.md](pkg/handler/README.md) - Effect handler types
+- [pkg/id/README.md](pkg/id/README.md) - Typed ID wrapper system
 - [internal/engine/action/README.md](internal/engine/action/README.md) - Action implementation
