@@ -27,15 +27,17 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 │   ├── engine/         # Game engine (Game, Handlers)
 │   │   ├── action/     # Action system (DamageAction, HealAction, etc.)
 │   │   └── hsm/        # Hierarchical State Machine
-│   └── gamemap/        # Map system (Cell, MapEngine, PathResult)
+│   ├── gamemap/        # Map system (Cell, MapEngine, PathResult)
+│   └── net/            # Sync data builder (Builder, test helper)
 ├── pkg/
 │   ├── action/         # Action interface layer (ActionType string, Action interface)
 │   ├── constants/      # Unified enum types (BuffType, EventType, ItemType, Phase, etc.)
 │   ├── event/          # EventBus system (Bus, Decision, Context)
 │   ├── gamelog/        # Unified game log system for client playback
 │   ├── handler/        # Effect handler types (EffectHandler for Buff/Item/Event)
+│   ├── net/            # Network protocol layer (OpCode, Message, StateSync, MatchHandler)
 │   ├── protocol/       # Public interfaces (Player, Game, MapEngine, Faction)
-│   ├── rng/            # Random number engine (WeightedPool, LuckModifier)
+│   ├── rng/            # Random number engine (WeightedPool, LuckModifier, DiceManager)
 │   └── util/           # Utilities (Metadata with JSON serialization)
 └── doc/
     ├── internal/       # Internal package documentation
