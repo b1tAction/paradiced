@@ -18,7 +18,6 @@ pkg/constants/
 ├── buff.go         # BuffType - Buff 类型
 ├── event.go        # EventType - 事件类型
 ├── item.go         # ItemType - 道具类型
-├── effect.go       # SpecialEffect - 特殊效果
 ├── faction.go      # Faction - 四神兽阵营
 ├── cell.go         # CellType - 地图格子类型
 ├── state.go        # StateID - HSM 状态标识
@@ -165,12 +164,6 @@ pkg/constants/
 - `faction_*` - Faction 来源
 - `system_*` + 特殊值 - System 来源
 
-### SpecialEffect - 特殊效果类型
-
-提供 `IsValid()`、`IsBuffEffect()`、`IsItemEffect()`、`IsEventEffect()` 方法。
-
-用于标识 Buff/Item/Event 的特殊行为（非简单 HP/LP 变化）。
-
 ### Evaluation - 评分系统
 
 使用 `int` 类型（非 string），便于数值比较。
@@ -202,7 +195,7 @@ pkg/constants/
 | BuffType | internal/core/buff | pkg/constants | ✓ 已完成 |
 | EventType | internal/core/event | pkg/constants | ✓ 已完成 |
 | ItemType | internal/core/item | pkg/constants | ✓ 已完成 |
-| SpecialEffect | internal/core/types | pkg/constants | ✓ 已完成 |
+| SpecialEffect | internal/core/types | pkg/constants | ✗ 已删除（效果逻辑迁移至Handler） |
 | Faction | internal/core | pkg/constants | ✓ 已完成 |
 | CellType | internal/gamemap | pkg/constants | ✓ 已完成 |
 | StateID | internal/engine/hsm | pkg/constants | ✓ 已完成 |
