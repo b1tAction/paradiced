@@ -6,12 +6,32 @@ internal/engine/action 包提供了 Action 接口的具体实现。
 
 | 文件 | 说明 |
 |------|------|
-| `action.go` | ExecutableAction接口定义，类型别名 |
+| `action.go` | ExecutableAction接口定义，ActionType常量 |
 | `types.go` | 具体Action类型（DamageAction, HealAction等） |
 | `context.go` | ActionContext执行上下文 |
 | `queue.go` | Queue衍生动作队列 |
-| `turn_event_log.go` | TurnEventLog事件日志 |
-| `types_test.go` | 测试文件 |
+
+## ActionType 常量
+
+ActionType 使用 snake_case string 类型（定义在 pkg/action）：
+
+```go
+const (
+    ActionDamage     ActionType = "damage"
+    ActionHeal       ActionType = "heal"
+    ActionModifyLP   ActionType = "modify_lp"
+    ActionMove       ActionType = "move"
+    ActionAddBuff    ActionType = "add_buff"
+    ActionRemoveBuff ActionType = "remove_buff"
+    ActionRespawn    ActionType = "respawn"
+    ActionSkipTurn   ActionType = "skip_turn"
+    ActionDrawEvent  ActionType = "draw_event"
+    ActionTeleport   ActionType = "teleport"
+    ActionStealBuff  ActionType = "steal_buff"
+    ActionFellDown   ActionType = "fell_down"
+    ActionUnknown    ActionType = "unknown"
+)
+```
 
 ## Action类型详解
 
@@ -114,17 +134,41 @@ type StealBuffAction struct {
 
 - 白虎"劫运"阵营被动
 
+### RespawnAction
+
+```go
+type RespawnAction struct {
+    TargetPlayer  *core.Player // 玩家
+    CheckpointPos int          // 检查点位置
+    SourceID      string       // "DeathRespawn", "FragileRespawn"
+}
+```
+
+- 玩家死亡重生时使用
+
+### FellDownAction
+
+```go
+type FellDownAction struct {
+    TargetPlayer *core.Player // 玩家
+    Position     int          // 坠落位置
+    Damage       int          // 坠落伤害
+    SourceID     string       // "FragileCell"
+}
+```
+
+- Fragile块坠落时使用
+
 ## ActionContext
 
 ```go
 type ActionContext struct {
     *util.Metadata              // 嵌入，支持扩展存储
 
-    Game        GameInterface   // 游戏接口（避免循环依赖）
+    Game        protocol.Game   // 游戏接口（获取全局日志）
     EventBus    *event.EventBus // 用于拦截
-    MapEngine   MapEngineInterface // 用于移动计算
+    MapEngine   protocol.MapEngine // 用于移动计算
     ActionQueue *Queue          // 衍生动作队列
-    EventLog    *TurnEventLog   // 事件日志
 }
 ```
 
@@ -137,7 +181,7 @@ type ActionContext struct {
    - 检查 `action_blocked` 标志，若被阻断则跳过执行
 2. 执行 `Execute(ctx)`
 3. **PostTrigger阶段** - 发布Phase供生命周期事件（如 `PhaseOnBuffApplied`、`PhaseOnBuffRemoved`）
-4. 记录 `LogEntry()` 到 EventLog
+4. 记录 `LogEntry()` 到全局 GameLog（通过 `protocol.Game.GetGameLog()`）
 5. 处理 ActionQueue 中的衍生动作
 
 ### Phase方法实现
@@ -163,17 +207,40 @@ func (a *RemoveBuffAction) PreTriggerPhase() event.Phase { return event.PhaseOnB
 func (a *RemoveBuffAction) PostTriggerPhase() event.Phase { return event.PhaseAnyTime }
 ```
 
+### LogEntry 方法实现
+
+所有 Action 的 `LogEntry()` 返回 `gamelog.LogEntry`，ActionType 使用 `string(a.Type())`：
+
+```go
+func (a *DamageAction) LogEntry() gamelog.LogEntry {
+    metadata := util.NewMetadata()
+    metadata.SetString("blocked_by", a.BlockedBy)
+    metadata.SetBool("piercing", a.IsPiercing)
+
+    return gamelog.LogEntry{
+        Timestamp:  time.Now(),
+        Type:       gamelog.EntryTypeAction,
+        ActionType: string(a.Type()), // "damage"
+        Target:     a.TargetPlayer.UserID,
+        Delta:      -a.Amount,
+        Source:     a.SourceID,
+        Metadata:   metadata,
+    }
+}
+```
+
 ### 接口定义（避免循环依赖）
 
 ```go
-type GameInterface interface {
-    GetCurrentPlayer() *core.Player
-    GetPlayer(id string) *core.Player
-    GetPlayers() []*core.Player
+type Game interface {
+    GetCurrentPlayer() interface{}
+    GetPlayer(id string) interface{}
+    GetPlayers() []interface{}
+    GetGameLog() *gamelog.GameLog  // 获取全局日志
 }
 
-type MapEngineInterface interface {
-    CalculatePath(startPos int, steps int) (PathResultInterface, error)
+type MapEngine interface {
+    CalculatePath(startPos int, steps int) (PathResult, error)
 }
 ```
 
@@ -198,3 +265,8 @@ func (q *Queue) IsEmpty() bool
 ```bash
 go test ./internal/engine/action/... -v
 ```
+
+## 相关文档
+
+- [pkg/action/README.md](../../../pkg/action/README.md) - Action 接口层
+- [pkg/gamelog/README.md](../../../pkg/gamelog/README.md) - GameLog 系统

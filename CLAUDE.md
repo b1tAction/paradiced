@@ -12,6 +12,7 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - Event system with good/neutral/bad events influenced by luck
 - Buff/Item system with multi-phase trigger support
 - EventBus for unified event dispatch mechanism
+- GameLog for client animation playback
 
 ## Architecture
 
@@ -26,14 +27,15 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 │   │   └── item/       # Item system with phase-specific triggers
 │   ├── engine/         # Game engine (Game, Handlers)
 │   │   ├── action/     # Action system (DamageAction, HealAction, etc.)
-│   │   └── hsm/        # Hierarchical State Machine (removed old StateMachine)
+│   │   └── hsm/        # Hierarchical State Machine
 │   └── gamemap/        # Map system (Cell, MapEngine, PathResult)
 ├── pkg/
-│   ├── action/         # Action interface layer (ActionType, Action interface)
+│   ├── action/         # Action interface layer (ActionType string, Action interface)
 │   ├── event/          # EventBus system (Phase, Bus, Decision, Context)
+│   ├── gamelog/        # Unified game log system for client playback
 │   ├── protocol/       # Public interfaces (Player, Game, MapEngine, Faction)
 │   ├── rng/            # Random number engine (WeightedPool, LuckModifier)
-│   └── util/           # Utilities (Metadata)
+│   └── util/           # Utilities (Metadata with JSON serialization)
 └── doc/
     ├── internal/       # Internal package documentation
     └── background.md   # Game design document (Chinese)
@@ -43,16 +45,21 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 
 #### Protocol Layer (`pkg/protocol`)
 - **Player**: Interface for player operations (Reader/Writer/Lite variants)
-- **Game**: Interface for game state access
+- **Game**: Interface for game state access, includes GetGameLog()
 - **MapEngine**: Interface for map operations
 - **Faction**: Player faction type (青龙/朱雀/白虎/玄武)
 
 #### Action System (`pkg/action` + `internal/engine/action`)
-- **ActionType**: Enum for action types (Damage, Heal, Move, AddBuff, etc.)
+- **ActionType**: String type with snake_case naming (damage, heal, move, etc.)
 - **Action interface**: Core interface with PreTriggerPhase/PostTriggerPhase
-- **ExecutableAction**: Concrete implementations (DamageAction, HealAction, etc.)
-- **ActionContext**: Execution context with EventBus integration
-- **TurnEventLog**: Event log for client animation playback
+- **ExecutableAction**: Concrete implementations (DamageAction, HealAction, RespawnAction, FellDownAction, etc.)
+- **ActionContext**: Execution context with EventBus and global GameLog integration
+
+#### GameLog System (`pkg/gamelog`)
+- **EntryType**: Log entry types (action, state, mini_game, boss, decision)
+- **LogEntry**: Single event with util.Metadata for type-safe metadata
+- **TurnSegment**: Turn-based log grouping for client playback
+- **GameLog**: Global log manager with StartTurn/EndTurn/AddEntry methods
 
 #### EventBus System (`pkg/event`)
 - **Phase**: Trigger timing enumeration (HSM: BeforeTurn/OnLand/AfterTurn; Action: PreDamage/PreEvent/PreMove/OnBuffApplied/OnBuffRemoved)
@@ -68,9 +75,15 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **Evaluation**: 0-100 scoring system (Bad ≤40, Neutral 41-65, Good >65)
 
 #### Game Engine (`internal/engine`)
-- **Game**: Game instance managing EventBus and players
+- **Game**: Game instance managing EventBus, players, and GameLog
 - **Handlers**: Custom Buff effect handlers (strategy pattern)
-- **Action Integration**: All effects use Action system
+- **Action Integration**: All effects use Action system and record to GameLog
+
+#### HSM System (`internal/engine/hsm`)
+- **HSM**: Hierarchical State Machine with three layers
+- **Global States**: MatchInit, RoundMiniGame, RoundPrep, TurnLoop, BossBattle, GameOver
+- **Turn States**: TurnUpkeep, MainAction, TurnMoving, TurnLanded, TurnEvent, TurnEnd
+- **Interrupt States**: WaitDecision for user input
 
 #### Map System (`internal/gamemap`)
 - **MapEngine**: Linear map generation and path calculation
