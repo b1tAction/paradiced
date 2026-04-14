@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/b1tAction/Fated/internal/core/types"
-	"github.com/b1tAction/Fated/pkg/action"
 	"github.com/b1tAction/Fated/pkg/event"
 )
 
@@ -120,9 +119,9 @@ func (def *BuffDefinition) HasPhase(phase event.Phase) bool {
 // ========== Buff Registry ==========
 
 // EffectHandler is a handler function for Buff/Item/Event/Faction effects.
-// Returns an Action to execute, or nil if only modifying current action.
+// Handlers should use ctx.AddDerivedAction() to generate new actions.
 // Unified signature for all effect sources.
-type EffectHandler func(phase event.Phase, ctx *event.Context) action.Action
+type EffectHandler func(phase event.Phase, ctx *event.Context)
 
 // BuffRegistry is the registry for Buff definitions.
 type BuffRegistry struct {

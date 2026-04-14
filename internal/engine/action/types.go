@@ -589,9 +589,9 @@ func (a *RespawnAction) CanModify() bool   { return false }
 func (a *RespawnAction) Source() string    { return a.SourceID }
 func (a *RespawnAction) Target() string    { return a.TargetPlayer.UserID }
 
-// PreTriggerPhase returns PhaseAnyTime (respawn not intercepted).
+// PreTriggerPhase returns PhasePreRespawn (respawn can be intercepted by Undying等).
 func (a *RespawnAction) PreTriggerPhase() event.Phase {
-	return event.PhaseAnyTime
+	return event.PhasePreRespawn
 }
 
 // PostTriggerPhase returns PhaseAnyTime (no post-trigger for respawn).

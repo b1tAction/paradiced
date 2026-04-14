@@ -22,6 +22,7 @@ const (
 	PhasePreDamage    // ActionDamage.Execute() - Before damage application (Hidden隐匿, shields)
 	PhasePreEvent     // ActionDrawEvent.Execute() - Before event triggers (Exorcism辟邪, XuanWu)
 	PhasePreMove      // ActionMove.Execute() - Before movement (Lost迷途 reverse direction)
+	PhasePreRespawn   // ActionRespawn.Execute() - Before respawn (Undying不死 intercept)
 	PhaseOnBuffApplied  // ActionAddBuff.Execute() - After buff applied (buff entry effects, chain reactions)
 	PhaseOnBuffRemoved  // ActionRemoveBuff.Execute() - Before buff removed (buff death effects/亡语)
 
@@ -40,6 +41,7 @@ func (p Phase) String() string {
 		PhasePreDamage:     "PreDamage",
 		PhasePreEvent:      "PreEvent",
 		PhasePreMove:       "PreMove",
+		PhasePreRespawn:    "PreRespawn",
 		PhaseOnBuffApplied: "OnBuffApplied",
 		PhaseOnBuffRemoved: "OnBuffRemoved",
 		PhaseAnyTime:       "AnyTime",
@@ -69,6 +71,6 @@ func (p Phase) IsHSMPublished() bool {
 
 // IsActionPublished returns true if this Phase should be published by Action execution.
 func (p Phase) IsActionPublished() bool {
-	return p == PhasePreDamage || p == PhasePreEvent || p == PhasePreMove ||
+	return p == PhasePreDamage || p == PhasePreEvent || p == PhasePreMove || p == PhasePreRespawn ||
 		p == PhaseOnBuffApplied || p == PhaseOnBuffRemoved
 }

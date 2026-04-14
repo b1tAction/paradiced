@@ -33,10 +33,12 @@ func NewActionContext(game protocol.Game, bus *event.EventBus, mapEngine protoco
 // ExecuteAction executes an action with interception support.
 // Flow:
 // 1. PreTrigger phase - publish for interception (if not PhaseAnyTime)
-// 2. Execute the (possibly modified) action
-// 3. PostTrigger phase - publish for lifecycle events (if not PhaseAnyTime)
-// 4. Record in global game log
-// 5. Process any derived actions in queue
+// 2. Collect derived actions from handler into queue
+// 3. Execute the (possibly modified) action
+// 4. PostTrigger phase - publish for lifecycle events (if not PhaseAnyTime)
+// 5. Collect derived actions from post-trigger handler
+// 6. Record in global game log
+// 7. Process any derived actions in queue
 func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
 	// Step 1: PreTrigger phase - interception
 	prePhase := action.PreTriggerPhase()
@@ -51,17 +53,30 @@ func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
 
 		// Check if action was blocked
 		if triggerCtx.GetBoolOrDefault("action_blocked", false) {
-			return nil // Action blocked, skip execution
+			// Action blocked, but still process any derived actions from the interceptor
+			for _, derived := range triggerCtx.GetDerivedActions() {
+				if execAction, ok := derived.(ExecutableAction); ok {
+					ctx.PushDerivedAction(execAction)
+				}
+			}
+			return nil
+		}
+
+		// Step 2: Collect derived actions from PreTrigger handler
+		for _, derived := range triggerCtx.GetDerivedActions() {
+			if execAction, ok := derived.(ExecutableAction); ok {
+				ctx.PushDerivedAction(execAction)
+			}
 		}
 	}
 
-	// Step 2: Execute the action
+	// Step 3: Execute the action
 	err := action.Execute(ctx)
 	if err != nil {
 		return err
 	}
 
-	// Step 3: PostTrigger phase - lifecycle events
+	// Step 4: PostTrigger phase - lifecycle events
 	postPhase := action.PostTriggerPhase()
 	if postPhase != event.PhaseAnyTime && ctx.EventBus != nil {
 		// Create context for post-trigger
@@ -71,9 +86,16 @@ func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
 
 		// Publish for buff entry effects, death effects, chain reactions
 		ctx.EventBus.Publish(postPhase, action.Target(), triggerCtx)
+
+		// Step 5: Collect derived actions from PostTrigger handler
+		for _, derived := range triggerCtx.GetDerivedActions() {
+			if execAction, ok := derived.(ExecutableAction); ok {
+				ctx.PushDerivedAction(execAction)
+			}
+		}
 	}
 
-	// Step 4: Record in global game log
+	// Step 6: Record in global game log
 	if ctx.Game != nil {
 		gameLog := ctx.Game.GetGameLog()
 		if gameLog != nil {
@@ -81,7 +103,7 @@ func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
 		}
 	}
 
-	// Step 5: Process derived actions in queue
+	// Step 7: Process derived actions in queue
 	ctx.ProcessQueue()
 
 	return nil

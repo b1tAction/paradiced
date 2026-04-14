@@ -5,7 +5,6 @@ import (
 	"github.com/b1tAction/Fated/internal/core"
 	"github.com/b1tAction/Fated/internal/core/buff"
 	engineaction "github.com/b1tAction/Fated/internal/engine/action"
-	"github.com/b1tAction/Fated/pkg/action"
 	"github.com/b1tAction/Fated/pkg/event"
 )
 
@@ -34,12 +33,13 @@ func executeDefaultBuffAction(def *core.BuffDefinition, player *core.Player, act
 // createBuffAction creates an Action closure when Buff triggers.
 // Uses GlobalRegistry to get custom handler if available.
 // The closure expects ActionContext to be passed via event.Context (ctx.Set("action_context", ctx)).
-func createBuffAction(buffInstance *core.Buff, def *core.BuffDefinition, phase event.Phase, player *core.Player) func(ctx *event.Context) action.Action {
-	return func(ctx *event.Context) action.Action {
+// EffectHandler no longer returns Action - uses ctx.AddDerivedAction() instead.
+func createBuffAction(buffInstance *core.Buff, def *core.BuffDefinition, phase event.Phase, player *core.Player) func(ctx *event.Context) {
+	return func(ctx *event.Context) {
 		// Get Player from Context (ensure correct type)
 		p, ok := ctx.Player.(*core.Player)
 		if !ok {
-			return nil
+			return
 		}
 
 		// Get ActionContext from event.Context (set by caller before Publish)
@@ -57,32 +57,17 @@ func createBuffAction(buffInstance *core.Buff, def *core.BuffDefinition, phase e
 			if def.LPPerTurn != 0 {
 				p.ModifyLP(def.LPPerTurn)
 			}
-			return nil
+			return
 		}
 
 		// Check if has custom handler via GlobalRegistry
 		handler := buff.GetBuffHandler(buffInstance.Type)
 		if handler != nil {
-			// Call custom handler - returns Action or nil
-			derivedAction := handler(phase, ctx)
-
-			// If handler returned an Action, return it
-			if derivedAction != nil {
-				return derivedAction
-			}
-
-			// Otherwise, check for Actions set in context
-			derivedVal, hasDerived := ctx.Get("derived_action")
-			if hasDerived {
-				if act, ok := derivedVal.(action.Action); ok && act != nil {
-					return act
-				}
-			}
+			// Call custom handler - handler uses ctx.AddDerivedAction() for new Actions
+			handler(phase, ctx)
 		} else {
 			// Execute default value effect - generates Actions
 			executeDefaultBuffAction(def, p, actionCtx)
 		}
-
-		return nil
 	}
 }

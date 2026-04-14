@@ -5,6 +5,7 @@ import (
 
 	"github.com/b1tAction/Fated/internal/core"
 	"github.com/b1tAction/Fated/internal/core/buff"
+	"github.com/b1tAction/Fated/pkg/event"
 	"github.com/b1tAction/Fated/pkg/gamelog"
 )
 
@@ -570,5 +571,46 @@ func TestLogEntryMetadata(t *testing.T) {
 	endPos := entry.Metadata.GetIntOrDefault("end_pos", -1)
 	if endPos != 15 {
 		t.Errorf("end_pos should be 15, got %d", endPos)
+	}
+}
+
+// ========== DerivedActions Tests ==========
+
+func TestContextDerivedActions(t *testing.T) {
+	// Test event.Context.AddDerivedAction functionality
+	triggerCtx := event.NewContext(nil)
+
+	// Initially empty
+	if len(triggerCtx.GetDerivedActions()) != 0 {
+		t.Error("DerivedActions should be empty initially")
+	}
+
+	// Add actions
+	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	healAction := NewHealAction(player, 10, "test")
+	removeAction := NewRemoveBuffAction(player, buff.BuffTypeDivine, "test")
+
+	triggerCtx.AddDerivedAction(healAction)
+	triggerCtx.AddDerivedAction(removeAction)
+
+	// Should have 2 actions
+	if len(triggerCtx.GetDerivedActions()) != 2 {
+		t.Errorf("DerivedActions should have 2 actions, got %d", len(triggerCtx.GetDerivedActions()))
+	}
+
+	// Clear should remove all
+	triggerCtx.ClearDerivedActions()
+	if len(triggerCtx.GetDerivedActions()) != 0 {
+		t.Error("DerivedActions should be empty after Clear")
+	}
+}
+
+func TestRespawnActionPreTriggerPhase(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	action := NewRespawnAction(player, 50, "DeathRespawn")
+
+	// RespawnAction now has PhasePreRespawn for interception
+	if action.PreTriggerPhase() != event.PhasePreRespawn {
+		t.Errorf("RespawnAction PreTriggerPhase should be PhasePreRespawn, got %s", action.PreTriggerPhase())
 	}
 }

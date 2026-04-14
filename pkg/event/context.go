@@ -7,12 +7,14 @@ import (
 // Context is the execution context containing all information when a Phase triggers.
 // Note: To avoid circular dependencies, Player and GameEvent use interface{} type.
 // The concrete type is provided by the caller at runtime.
+// DerivedActions uses interface{} to avoid importing pkg/action (type assertion in ActionContext).
 type Context struct {
-	Player     interface{} `json:"player"`     // The player triggering the Phase (concrete type determined by caller)
-	GameEvent  interface{} `json:"game_event"` // Related game event (optional)
-	GameState  *GameState  `json:"game_state"` // Game state (optional)
-	Choice     int         `json:"choice"`     // User's selected option index
-	*util.Metadata          `json:"metadata"`   // Type-safe dynamic data container (replaces Data interface{})
+	Player         interface{}   `json:"player"`           // The player triggering the Phase (concrete type determined by caller)
+	GameEvent      interface{}   `json:"game_event"`       // Related game event (optional)
+	GameState      *GameState    `json:"game_state"`       // Game state (optional)
+	Choice         int           `json:"choice"`           // User's selected option index
+	DerivedActions []interface{} `json:"derived_actions"`  // Actions to execute after handler (action.Action type, collected by ActionContext)
+	*util.Metadata               `json:"metadata"`         // Type-safe dynamic data container (replaces Data interface{})
 }
 
 // GameState is a snapshot of game state (simplified, can be extended later).
@@ -68,10 +70,29 @@ func (c *Context) WithChoice(choice int) *Context {
 // Clone clones the context (used for testing or when independent copy is needed).
 func (c *Context) Clone() *Context {
 	return &Context{
-		Player:     c.Player,
-		GameEvent:  c.GameEvent,
-		GameState:  c.GameState,
-		Choice:     c.Choice,
-		Metadata:   c.Metadata.Clone(),
+		Player:         c.Player,
+		GameEvent:      c.GameEvent,
+		GameState:      c.GameState,
+		Choice:         c.Choice,
+		DerivedActions: c.DerivedActions, // Shared reference (actions are immutable)
+		Metadata:       c.Metadata.Clone(),
 	}
+}
+
+// AddDerivedAction adds an Action to be executed after the current handler completes.
+// Used by EffectHandlers to generate new actions (e.g., HealAction after intercepting Respawn).
+// The action parameter uses interface{} to avoid circular dependency with pkg/action.
+// ActionContext.ExecuteAction() performs type assertion to action.Action.
+func (c *Context) AddDerivedAction(a interface{}) {
+	c.DerivedActions = append(c.DerivedActions, a)
+}
+
+// ClearDerivedActions removes all derived actions.
+func (c *Context) ClearDerivedActions() {
+	c.DerivedActions = nil
+}
+
+// GetDerivedActions returns all derived actions (for collection by ActionContext).
+func (c *Context) GetDerivedActions() []interface{} {
+	return c.DerivedActions
 }
