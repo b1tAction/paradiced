@@ -5,6 +5,7 @@ import (
 
 	"github.com/b1tAction/fated/internal/core"
 	"github.com/b1tAction/fated/internal/engine"
+	"github.com/b1tAction/fated/pkg/rng"
 )
 
 func TestStateMatchInit(t *testing.T) {
@@ -101,16 +102,16 @@ func TestStateRoundPrep(t *testing.T) {
 
 	state.Enter(ctx)
 
-	if diceTypeFromRank(1) != "gold" {
+	if rng.RankToDiceType(1) != rng.DiceTypeGold {
 		t.Error("Rank 1 should get gold dice")
 	}
-	if diceTypeFromRank(2) != "silver" {
+	if rng.RankToDiceType(2) != rng.DiceTypeSilver {
 		t.Error("Rank 2 should get silver dice")
 	}
-	if diceTypeFromRank(3) != "copper" {
+	if rng.RankToDiceType(3) != rng.DiceTypeCopper {
 		t.Error("Rank 3 should get copper dice")
 	}
-	if diceTypeFromRank(4) != "wood" {
+	if rng.RankToDiceType(4) != rng.DiceTypeWood {
 		t.Error("Rank 4 should get wood dice")
 	}
 
@@ -119,10 +120,10 @@ func TestStateRoundPrep(t *testing.T) {
 	}
 
 	// Verify dice types set correctly
-	if ctx.GetDiceType("p1") != "gold" {
+	if ctx.GetDiceType("p1") != rng.DiceTypeGold {
 		t.Error("p1 should have gold dice")
 	}
-	if ctx.GetDiceType("p2") != "silver" {
+	if ctx.GetDiceType("p2") != rng.DiceTypeSilver {
 		t.Error("p2 should have silver dice")
 	}
 
@@ -322,19 +323,19 @@ func TestRegisterGlobalStates(t *testing.T) {
 func TestDiceTypeFromRank(t *testing.T) {
 	tests := []struct {
 		rank     int
-		expected string
+		expected rng.DiceType
 	}{
-		{1, "gold"},
-		{2, "silver"},
-		{3, "copper"},
-		{4, "wood"},
-		{5, "wood"},
+		{1, rng.DiceTypeGold},
+		{2, rng.DiceTypeSilver},
+		{3, rng.DiceTypeCopper},
+		{4, rng.DiceTypeWood},
+		{5, rng.DiceTypeWood},
 	}
 
 	for _, tt := range tests {
-		result := diceTypeFromRank(tt.rank)
+		result := rng.RankToDiceType(tt.rank)
 		if result != tt.expected {
-			t.Errorf("diceTypeFromRank(%d) = %s, want %s", tt.rank, result, tt.expected)
+			t.Errorf("RankToDiceType(%d) = %s, want %s", tt.rank, result.String(), tt.expected.String())
 		}
 	}
 }

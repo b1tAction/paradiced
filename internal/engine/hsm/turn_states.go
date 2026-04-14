@@ -9,6 +9,7 @@ import (
 	"github.com/b1tAction/fated/pkg/constants"
 	"github.com/b1tAction/fated/pkg/event"
 	"github.com/b1tAction/fated/pkg/protocol"
+	"github.com/b1tAction/fated/pkg/rng"
 )
 
 // ========== Turn States (Layer 2) ==========
@@ -233,18 +234,19 @@ func (s *MainActionState) OnUseItem(ctx *StateContext, itemID string) {
 }
 
 // defaultDiceRoll returns default dice steps based on dice type.
+// Default values for timeout auto-roll scenarios.
 func (s *MainActionState) defaultDiceRoll(ctx *StateContext) int {
 	// Get dice type from context (assigned in RoundPrep)
 	diceType := ctx.GetDiceType(ctx.Player.UserID)
 	switch diceType {
-	case "gold":
-		return 6 // Gold dice: 1-10, default to 6
-	case "silver":
-		return 4 // Silver dice: 1-7, default to 4
-	case "copper":
-		return 3 // Copper dice: 1-5, default to 3
+	case rng.DiceTypeGold:
+		return 6 // Gold dice: weighted toward high numbers
+	case rng.DiceTypeSilver:
+		return 4 // Silver dice: moderate weights
+	case rng.DiceTypeCopper:
+		return 3 // Copper dice: slight high bias
 	default:
-		return 2 // Wood dice: 1-3, default to 2
+		return 2 // Wood dice: uniform distribution
 	}
 }
 

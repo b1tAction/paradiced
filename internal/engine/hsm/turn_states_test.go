@@ -7,6 +7,7 @@ import (
 	"github.com/b1tAction/fated/internal/core"
 	"github.com/b1tAction/fated/internal/engine"
 	"github.com/b1tAction/fated/internal/gamemap"
+	"github.com/b1tAction/fated/pkg/rng"
 )
 
 // ========== TurnUpkeepState Tests ==========
@@ -213,21 +214,21 @@ func TestMainActionState_defaultDiceRoll(t *testing.T) {
 	ctx := NewStateContext().WithPlayer(player)
 
 	tests := []struct {
-		diceType string
+		diceType rng.DiceType
 		expected int
 	}{
-		{"gold", 6},
-		{"silver", 4},
-		{"copper", 3},
-		{"wood", 2},
-		{"unknown", 2},
+		{rng.DiceTypeGold, 6},
+		{rng.DiceTypeSilver, 4},
+		{rng.DiceTypeCopper, 3},
+		{rng.DiceTypeWood, 2},
+		{rng.DiceTypeNone, 2},
 	}
 
 	for _, tt := range tests {
 		ctx.SetDiceType("player1", tt.diceType)
 		result := state.defaultDiceRoll(ctx)
 		if result != tt.expected {
-			t.Errorf("defaultDiceRoll for %s should return %d, got %d", tt.diceType, tt.expected, result)
+			t.Errorf("defaultDiceRoll for %s should return %d, got %d", tt.diceType.String(), tt.expected, result)
 		}
 	}
 }

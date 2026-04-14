@@ -2,6 +2,7 @@ package hsm
 
 import (
 	"github.com/b1tAction/fated/internal/core"
+	"github.com/b1tAction/fated/pkg/rng"
 )
 
 // ========== Global States (Layer 1) ==========
@@ -137,8 +138,8 @@ func (s *RoundPrepState) Enter(ctx *StateContext) {
 			rank = playerRank
 		}
 		s.diceAssignments[player.UserID] = rank
-		// Store dice type as string for context (used by DiceManager later)
-		ctx.SetDiceType(player.UserID, diceTypeFromRank(rank))
+		// Store dice type as rng.DiceType for context
+		ctx.SetDiceType(player.UserID, rng.RankToDiceType(rank))
 	}
 
 	// Increment round counter
@@ -154,20 +155,6 @@ func (s *RoundPrepState) Update(ctx *StateContext) StateID {
 
 func (s *RoundPrepState) Exit(ctx *StateContext) {
 	s.diceAssignments = make(map[string]int)
-}
-
-// diceTypeFromRank returns dice type name based on rank.
-func diceTypeFromRank(rank int) string {
-	switch rank {
-	case 1:
-		return "gold"
-	case 2:
-		return "silver"
-	case 3:
-		return "copper"
-	default:
-		return "wood"
-	}
 }
 
 // TurnLoopState - Turn Loop State

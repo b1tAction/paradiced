@@ -7,6 +7,7 @@ import (
 	"github.com/b1tAction/fated/internal/engine"
 	"github.com/b1tAction/fated/pkg/constants"
 	"github.com/b1tAction/fated/pkg/event"
+	"github.com/b1tAction/fated/pkg/rng"
 	"github.com/b1tAction/fated/pkg/util"
 )
 
@@ -237,13 +238,15 @@ func (ctx *StateContext) GetMiniGameRank(playerID string) int {
 }
 
 // SetDiceType sets player's dice type based on ranking.
-func (ctx *StateContext) SetDiceType(playerID string, diceType string) {
-	ctx.SetString("dice_"+playerID, diceType)
+func (ctx *StateContext) SetDiceType(playerID string, diceType rng.DiceType) {
+	ctx.SetInt("dice_"+playerID, int(diceType))
 }
 
 // GetDiceType retrieves player's dice type.
-func (ctx *StateContext) GetDiceType(playerID string) string {
-	return ctx.GetStringOrDefault("dice_"+playerID, "wood")
+// Returns DiceTypeWood if player has no assigned dice.
+func (ctx *StateContext) GetDiceType(playerID string) rng.DiceType {
+	val := ctx.GetIntOrDefault("dice_"+playerID, int(rng.DiceTypeWood))
+	return rng.DiceType(val)
 }
 
 // ========== Lifecycle ==========

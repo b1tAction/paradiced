@@ -9,6 +9,7 @@ import (
 	"github.com/b1tAction/fated/internal/gamemap"
 	"github.com/b1tAction/fated/pkg/constants"
 	"github.com/b1tAction/fated/pkg/event"
+	"github.com/b1tAction/fated/pkg/rng"
 )
 
 func TestNewStateContext(t *testing.T) {
@@ -150,16 +151,16 @@ func TestStateContextMiniGameMethods(t *testing.T) {
 	}
 
 	// Test dice type
-	ctx.SetDiceType("p1", "gold")
-	ctx.SetDiceType("p2", "silver")
+	ctx.SetDiceType("p1", rng.DiceTypeGold)
+	ctx.SetDiceType("p2", rng.DiceTypeSilver)
 
-	if ctx.GetDiceType("p1") != "gold" {
+	if ctx.GetDiceType("p1") != rng.DiceTypeGold {
 		t.Error("p1 dice should be gold")
 	}
-	if ctx.GetDiceType("p2") != "silver" {
+	if ctx.GetDiceType("p2") != rng.DiceTypeSilver {
 		t.Error("p2 dice should be silver")
 	}
-	if ctx.GetDiceType("unknown") != "wood" {
+	if ctx.GetDiceType("unknown") != rng.DiceTypeWood {
 		t.Error("unknown player dice should default to wood")
 	}
 }
