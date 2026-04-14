@@ -99,41 +99,52 @@ for _, entry := range segment.Entries {
 
 ```go
 // 诅咒Buff：每回合LP-1
-func CurseHandler(phase event.Phase, ctx *event.Context) Action {
+func CurseHandler(phase event.Phase, ctx *event.Context) {
     if phase != event.PhaseBeforeTurn {
-        return nil
+        return
     }
     player := ctx.Player.(*core.Player)
-    return &ModifyLPAction{
+    ctx.AddDerivedAction(&ModifyLPAction{
         TargetPlayer: player,
         Amount:       -1,
         SourceID:     "Buff_Curse",
-    }
+    })
 }
 
 // 迷途Buff：反向移动（在PreMove时篡改）
-func LostHandler(phase event.Phase, ctx *event.Context) Action {
+func LostHandler(phase event.Phase, ctx *event.Context) {
     if phase != event.PhasePreMove {
-        return nil
+        return
     }
     action := ctx.Get("current_action")
     if moveAction, ok := action.(*MoveAction); ok {
         moveAction.Steps = -moveAction.Steps // 篡改
     }
-    return nil
 }
 
 // 隐匿Buff：免疫伤害
-func HiddenHandler(phase event.Phase, ctx *event.Context) Action {
+func HiddenHandler(phase event.Phase, ctx *event.Context) {
     if phase != event.PhasePreDamage {
-        return nil
+        return
     }
     action := ctx.Get("current_action")
     if dmgAction, ok := action.(*DamageAction); ok {
         dmgAction.Amount = 0 // 篡改：伤害归零
         dmgAction.BlockedBy = "Buff_Hidden"
     }
-    return nil
+}
+
+// 不死Buff：拦截死亡，原地复活（生成多个Action）
+func UndyingHandler(phase event.Phase, ctx *event.Context) {
+    if phase != event.PhasePreRespawn {
+        return
+    }
+    
+    ctx.SetBool("action_blocked", true) // 拦截原Respawn
+    
+    player := ctx.Player.(*core.Player)
+    ctx.AddDerivedAction(NewHealAction(player, player.MaxHP, "Buff_Undying"))
+    ctx.AddDerivedAction(NewRemoveBuffAction(player, BuffTypeUndying, "Buff_Undying"))
 }
 ```
 

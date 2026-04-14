@@ -146,7 +146,8 @@ func (g *Game) RemoveBuffFromPlayer(player, buff) {
 通过策略模式实现高度定制化的Buff效果：
 
 ```go
-// EventHandler 是定制化的Buff处理函数
+// EventHandler 是定制化的Buff处理函数（无返回值）
+// Handler 使用 ctx.AddDerivedAction() 添加衍生 Action
 type EventHandler func(phase event.Phase, ctx *event.Context)
 
 // BuffHandlers 注册表
@@ -156,10 +157,53 @@ var BuffHandlers = map[core.BuffType]EventHandler{
 }
 ```
 
+**Handler 使用示例**：
+
+```go
+// 迷途Buff：反向移动（在PreMove时篡改）
+func LostHandler(phase event.Phase, ctx *event.Context) {
+    if phase != event.PhasePreMove {
+        return
+    }
+    action := ctx.Get("current_action")
+    if moveAction, ok := action.(*MoveAction); ok {
+        moveAction.Steps = -moveAction.Steps // 篡改
+    }
+}
+
+// 隐匿Buff：免疫伤害
+func HiddenHandler(phase event.Phase, ctx *event.Context) {
+    if phase != event.PhasePreDamage {
+        return
+    }
+    action := ctx.Get("current_action")
+    if dmgAction, ok := action.(*DamageAction); ok {
+        dmgAction.Amount = 0 // 篡改：伤害归零
+        dmgAction.BlockedBy = "Buff_Hidden"
+    }
+}
+
+// 不死Buff：拦截死亡，原地复活（多个衍生Action）
+func UndyingHandler(phase event.Phase, ctx *event.Context) {
+    if phase != event.PhasePreRespawn {
+        return
+    }
+    
+    // 拦截 Respawn
+    ctx.SetBool("action_blocked", true)
+    
+    // 添加多个衍生 Action
+    player := ctx.Player.(*core.Player)
+    ctx.AddDerivedAction(NewHealAction(player, player.MaxHP, "Buff_Undying"))
+    ctx.AddDerivedAction(NewRemoveBuffAction(player, BuffTypeUndying, "Buff_Undying"))
+}
+```
+
 **优势**：
 1. **数据行为分离**：BuffDefinition保持纯数据，可序列化
 2. **万能拦截器**：通过修改ctx.Data实现各种机制
 3. **消灭特判代码**：阵营逻辑成为Buff处理器
+4. **多Action支持**：一个Handler可生成多个衍生Action
 
 ## Buff/Item与Phase对应
 
