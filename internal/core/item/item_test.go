@@ -106,15 +106,6 @@ func TestGetItemDefinition(t *testing.T) {
 	if !def.TargetOther {
 		t.Error("ReverseClock should target other")
 	}
-	if def.BuffType != constants.BuffTypeLost {
-		t.Errorf("def.BuffType = %s, expected 'lost'", def.BuffType)
-	}
-	if def.SpecialEffect != constants.SpecialGiveLost {
-		t.Errorf("def.SpecialEffect = %s, expected 'give_lost'", def.SpecialEffect)
-	}
-	if def.NeedConfirm != true {
-		t.Error("ReverseClock should need confirm")
-	}
 
 	// Test AnyDoor
 	def = GetItemDefinition(constants.ItemTypeAnyDoor)
@@ -207,7 +198,9 @@ func TestGetAllItemDefinitions(t *testing.T) {
 	}
 }
 
-func TestItemDefinitionPhase(t *testing.T) {
+// ========== ItemHandlerConfig Tests ==========
+
+func TestItemHandlerConfigPhase(t *testing.T) {
 	tests := []struct {
 		it       constants.ItemType
 		expected constants.Phase
@@ -219,18 +212,18 @@ func TestItemDefinitionPhase(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		def := GetItemDefinition(tt.it)
-		if def == nil {
-			t.Errorf("ItemType(%s) has no definition", tt.it)
+		config := GetItemHandlerConfig(tt.it)
+		if config == nil {
+			t.Errorf("ItemType(%s) has no HandlerConfig", tt.it)
 			continue
 		}
-		if def.Phase != tt.expected {
-			t.Errorf("%s Phase = %s, expected %s", tt.it, def.Phase, tt.expected)
+		if config.Phase != tt.expected {
+			t.Errorf("%s Phase = %s, expected %s", tt.it, config.Phase, tt.expected)
 		}
 	}
 }
 
-func TestItemDefinitionPriority(t *testing.T) {
+func TestItemHandlerConfigPriority(t *testing.T) {
 	tests := []struct {
 		it       constants.ItemType
 		expected int
@@ -242,49 +235,41 @@ func TestItemDefinitionPriority(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		def := GetItemDefinition(tt.it)
-		if def == nil {
-			t.Errorf("ItemType(%s) has no definition", tt.it)
+		config := GetItemHandlerConfig(tt.it)
+		if config == nil {
+			t.Errorf("ItemType(%s) has no HandlerConfig", tt.it)
 			continue
 		}
-		if def.Priority != tt.expected {
-			t.Errorf("%s Priority = %d, expected %d", tt.it, def.Priority, tt.expected)
+		if config.Priority != tt.expected {
+			t.Errorf("%s Priority = %d, expected %d", tt.it, config.Priority, tt.expected)
 		}
 	}
 }
 
-func TestItemDefinitionNeedConfirm(t *testing.T) {
-	// All items need confirmation by default
+func TestItemHandlerConfigNeedConfirm(t *testing.T) {
+	// All items need confirmation
 	for _, it := range GetAllItemTypes() {
-		def := GetItemDefinition(it)
-		if def == nil {
+		config := GetItemHandlerConfig(it)
+		if config == nil {
 			continue
 		}
-		if !def.NeedConfirm {
+		if !config.NeedConfirm {
 			t.Errorf("Item %s should need confirm", it)
 		}
 	}
 }
 
-func TestItemDefinitionSpecialEffects(t *testing.T) {
-	tests := []struct {
-		it       constants.ItemType
-		expected constants.SpecialEffect
-	}{
-		{constants.ItemTypeReverseClock, constants.SpecialGiveLost},
-		{constants.ItemTypeAnyDoor, constants.SpecialTeleport},
-		{constants.ItemTypeDiceSwap, constants.SpecialDiceSwap},
-		{constants.ItemTypeDiceUpgrade, constants.SpecialDiceUpgrade},
-	}
-
-	for _, tt := range tests {
-		def := GetItemDefinition(tt.it)
-		if def == nil {
-			t.Errorf("ItemType(%s) has no definition", tt.it)
+func TestItemHandlerConfigHasHandler(t *testing.T) {
+	// All items should have HandlerConfig now
+	for _, it := range GetAllItemTypes() {
+		config := GetItemHandlerConfig(it)
+		if config == nil {
+			t.Errorf("Item %s should have HandlerConfig", it)
 			continue
 		}
-		if def.SpecialEffect != tt.expected {
-			t.Errorf("%s SpecialEffect = %s, expected %s", tt.it, def.SpecialEffect, tt.expected)
+		// All items now have Handler
+		if config.Handler == nil {
+			t.Errorf("Item %s should have Handler", it)
 		}
 	}
 }
@@ -313,26 +298,6 @@ func TestItemDefinitionTargetTypes(t *testing.T) {
 		if def.TargetOther != tt.targetOther {
 			t.Errorf("%s: TargetOther = %v, expected %v", tt.it, def.TargetOther, tt.targetOther)
 		}
-	}
-}
-
-func TestItemDefinitionBuffType(t *testing.T) {
-	// Test BuffType granted by ReverseClock
-	def := GetItemDefinition(constants.ItemTypeReverseClock)
-	if def == nil {
-		t.Fatal("ItemTypeReverseClock should have definition")
-	}
-	if def.BuffType != constants.BuffTypeLost {
-		t.Errorf("ReverseClock BuffType = %s, expected 'lost'", def.BuffType)
-	}
-
-	// Other items don't grant Buff by default
-	def = GetItemDefinition(constants.ItemTypeAnyDoor)
-	if def == nil {
-		t.Fatal("ItemTypeAnyDoor should have definition")
-	}
-	if def.BuffType != constants.BuffTypeNone {
-		t.Errorf("AnyDoor BuffType = %s, expected 'none'", def.BuffType)
 	}
 }
 

@@ -4,6 +4,7 @@ package item
 
 import (
 	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/event"
 	"github.com/b1tAction/paradiced/pkg/id"
 )
 
@@ -48,29 +49,39 @@ func NewItemWithStringID(itemType constants.ItemType, idStr string) *Item {
 
 // ========== Item Definition ==========
 
+// ItemDefinition contains static metadata for Item display and classification.
+// TargetSelf/TargetOther/Range are usage config (not effect logic).
+// Effect logic and execution config are managed by ItemHandlerConfig.
 type ItemDefinition struct {
-	Type          constants.ItemType      `json:"type"`
-	Eval          constants.Evaluation    `json:"evaluation"`
-	EnglishName   string                  `json:"english_name"` // English identifier (for String())
-	Name          string                  `json:"name"`         // Chinese display name
-	Desc          string                  `json:"desc"`
-	TargetSelf    bool                    `json:"target_self"`
-	TargetOther   bool                    `json:"target_other"`
-	BuffType      constants.BuffType      `json:"buff_type"`
-	Range         int                     `json:"range"`
-	SpecialEffect constants.SpecialEffect `json:"special_effect"` // Special effect type
-	Phase         constants.Phase         `json:"phase"`          // Usable phase
-	Priority      int                     `json:"priority"`       // Execution priority
-	NeedConfirm   bool                    `json:"need_confirm"`   // Whether user confirmation needed
+	Type        constants.ItemType   `json:"type"`
+	Eval        constants.Evaluation `json:"evaluation"`    // Evaluation score for random draw
+	EnglishName string               `json:"english_name"`  // English identifier (snake_case)
+	Name        string               `json:"name"`          // Chinese display name
+	Desc        string               `json:"desc"`          // Description text
+	TargetSelf  bool                 `json:"target_self"`   // Can target self
+	TargetOther bool                 `json:"target_other"`  // Can target other player
+	Range       int                  `json:"range"`         // Target range (0 = any distance)
 }
+
+// ItemHandlerConfig contains effect logic and execution configuration.
+type ItemHandlerConfig struct {
+	Phase       constants.Phase    `json:"phase"`         // Usable phase
+	Priority    int                `json:"priority"`      // Execution priority
+	NeedConfirm bool               `json:"need_confirm"`  // Whether user confirmation needed
+	Handler     EffectHandler      `json:"-"`             // Effect handler function
+}
+
+// EffectHandler alias for handler.EffectHandler (unified signature).
+type EffectHandler = func(phase constants.Phase, ctx *event.Context)
 
 // ========== Item Registry ==========
 
-// ItemRegistry is the registry for Item definitions.
+// ItemRegistry is the registry for Item definitions and handler configs.
 type ItemRegistry struct {
 	defs    map[constants.ItemType]*ItemDefinition
-	strings map[constants.ItemType]string // English identifier
-	names   map[constants.ItemType]string // Chinese name
+	configs map[constants.ItemType]*ItemHandlerConfig // Handler configs
+	strings map[constants.ItemType]string             // English identifier
+	names   map[constants.ItemType]string             // Chinese name
 	evals   map[constants.ItemType]constants.Evaluation
 
 	// Category lists (auto-generated)
@@ -83,6 +94,7 @@ type ItemRegistry struct {
 func NewItemRegistry() *ItemRegistry {
 	return &ItemRegistry{
 		defs:         make(map[constants.ItemType]*ItemDefinition),
+		configs:      make(map[constants.ItemType]*ItemHandlerConfig),
 		strings:      make(map[constants.ItemType]string),
 		names:        make(map[constants.ItemType]string),
 		evals:        make(map[constants.ItemType]constants.Evaluation),
@@ -92,8 +104,8 @@ func NewItemRegistry() *ItemRegistry {
 	}
 }
 
-// RegisterItem registers an Item definition.
-func (r *ItemRegistry) RegisterItem(def *ItemDefinition) {
+// RegisterItem registers an Item definition with handler config.
+func (r *ItemRegistry) RegisterItem(def *ItemDefinition, config *ItemHandlerConfig) {
 	if def == nil || def.Type == constants.ItemTypeNone {
 		return
 	}
@@ -110,6 +122,11 @@ func (r *ItemRegistry) RegisterItem(def *ItemDefinition) {
 		r.badItems = append(r.badItems, def.Type)
 	} else {
 		r.neutralItems = append(r.neutralItems, def.Type)
+	}
+
+	// Register handler config
+	if config != nil {
+		r.configs[def.Type] = config
 	}
 }
 
@@ -143,6 +160,22 @@ func (r *ItemRegistry) GetItemEvaluation(it constants.ItemType) constants.Evalua
 		return eval
 	}
 	return constants.EvaluationNeutral
+}
+
+// GetItemHandlerConfig returns the Item's handler config (nil if none).
+func (r *ItemRegistry) GetItemHandlerConfig(it constants.ItemType) *ItemHandlerConfig {
+	if config, ok := r.configs[it]; ok {
+		return config
+	}
+	return nil
+}
+
+// GetItemPhase returns the Item's usable phase from handler config.
+func (r *ItemRegistry) GetItemPhase(it constants.ItemType) constants.Phase {
+	if config := r.configs[it]; config != nil {
+		return config.Phase
+	}
+	return constants.PhaseAnyTime
 }
 
 // GetAllItemTypes returns all registered Item types.
@@ -217,6 +250,16 @@ func GetItemTypesByCategory(category string) []constants.ItemType {
 // GetAllItemDefinitions returns all Item definitions.
 func GetAllItemDefinitions() []*ItemDefinition {
 	return GlobalItemRegistry.GetAllItemDefinitions()
+}
+
+// GetItemHandlerConfig returns the Item's handler config from GlobalItemRegistry.
+func GetItemHandlerConfig(it constants.ItemType) *ItemHandlerConfig {
+	return GlobalItemRegistry.GetItemHandlerConfig(it)
+}
+
+// GetItemPhase returns the Item's usable phase from GlobalItemRegistry.
+func GetItemPhase(it constants.ItemType) constants.Phase {
+	return GlobalItemRegistry.GetItemPhase(it)
 }
 
 // GetItemName returns the Item Chinese display name from GlobalItemRegistry.
