@@ -157,7 +157,7 @@ func handlePoisonBuff(game *Game, player *core.Player) {
 func handleRelicEvent(game *Game, player *core.Player) {
     itemType := game.Draw.DrawItem(player.LP)
     // 高LP玩家更可能抽到高Evaluation道具
-    item := core.NewItem(itemType, core.GenerateItemID())
+    item := core.NewItem(itemType) // ID auto-generated as UUID v7
     player.AddItem(item)
 }
 ```
