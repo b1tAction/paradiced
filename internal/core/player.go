@@ -4,11 +4,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/b1tAction/fated/internal/core/buff"
-	"github.com/b1tAction/fated/internal/core/item"
-	"github.com/b1tAction/fated/pkg/constants"
-	"github.com/b1tAction/fated/pkg/id"
-	"github.com/b1tAction/fated/pkg/util"
+	"github.com/b1tAction/paradiced/internal/core/buff"
+	"github.com/b1tAction/paradiced/internal/core/item"
+	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/id"
+	"github.com/b1tAction/paradiced/pkg/util"
 )
 
 // Player represents a player in the game.

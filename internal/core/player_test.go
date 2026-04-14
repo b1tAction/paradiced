@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/b1tAction/fated/pkg/id"
+	"github.com/b1tAction/paradiced/pkg/id"
 )
 
 // ========== Faction Tests ==========

@@ -2,8 +2,8 @@
 package handler
 
 import (
-	"github.com/b1tAction/fated/pkg/constants"
-	"github.com/b1tAction/fated/pkg/event"
+	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/event"
 )
 
 // EffectHandler is a unified handler function for Buff/Item/Event/Faction effects.

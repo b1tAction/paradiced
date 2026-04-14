@@ -1,6 +1,6 @@
 package protocol
 
-import "github.com/b1tAction/fated/pkg/id"
+import "github.com/b1tAction/paradiced/pkg/id"
 
 // Faction represents player's faction (Four Divine Beasts 阵营).
 // Defined in protocol to avoid circular dependency.

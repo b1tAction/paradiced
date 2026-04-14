@@ -9,7 +9,7 @@ buff 包提供 Buff 类型、定义和注册表。包级 init() 自动初始化�
 ## Direct Import
 
 ```go
-import "github.com/b1tAction/fated/internal/core/buff"
+import "github.com/b1tAction/paradiced/internal/core/buff"
 
 // 自动初始化，可直接使用
 buff.GetBuffDefinition(buff.BuffTypeFire)

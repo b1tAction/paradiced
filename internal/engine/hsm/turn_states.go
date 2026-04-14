@@ -3,13 +3,13 @@ package hsm
 import (
 	"time"
 
-	"github.com/b1tAction/fated/internal/core"
-	engineaction "github.com/b1tAction/fated/internal/engine/action"
-	"github.com/b1tAction/fated/internal/gamemap"
-	"github.com/b1tAction/fated/pkg/constants"
-	"github.com/b1tAction/fated/pkg/event"
-	"github.com/b1tAction/fated/pkg/protocol"
-	"github.com/b1tAction/fated/pkg/rng"
+	"github.com/b1tAction/paradiced/internal/core"
+	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
+	"github.com/b1tAction/paradiced/internal/gamemap"
+	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/event"
+	"github.com/b1tAction/paradiced/pkg/protocol"
+	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
 // ========== Turn States (Layer 2) ==========

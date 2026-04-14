@@ -229,7 +229,7 @@ const (
 ## 使用示例
 
 ```go
-import "github.com/b1tAction/fated/pkg/constants"
+import "github.com/b1tAction/paradiced/pkg/constants"
 
 // 检查 Buff 类型有效性
 bt := constants.BuffTypeDivine

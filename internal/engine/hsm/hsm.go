@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/b1tAction/fated/internal/core"
-	"github.com/b1tAction/fated/internal/engine"
-	"github.com/b1tAction/fated/pkg/event"
-	"github.com/b1tAction/fated/pkg/id"
+	"github.com/b1tAction/paradiced/internal/core"
+	"github.com/b1tAction/paradiced/internal/engine"
+	"github.com/b1tAction/paradiced/pkg/event"
+	"github.com/b1tAction/paradiced/pkg/id"
 )
 
 // HSM is the main Hierarchical State Machine structure.

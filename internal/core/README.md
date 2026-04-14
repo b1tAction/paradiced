@@ -10,7 +10,7 @@ core 包采用 **Direct Import** 模式，重导出所有子包类型。导入 c
 
 ```go
 // 完整游戏逻辑（自动初始化所有子包）
-import "github.com/b1tAction/fated/internal/core"
+import "github.com/b1tAction/paradiced/internal/core"
 
 // 直接使用重导出的类型
 core.BuffTypeDivine

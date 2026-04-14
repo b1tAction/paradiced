@@ -3,8 +3,8 @@ package item
 import (
 	"testing"
 
-	"github.com/b1tAction/fated/pkg/constants"
-	"github.com/b1tAction/fated/pkg/id"
+	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/id"
 )
 
 // ========== ItemType Tests ==========

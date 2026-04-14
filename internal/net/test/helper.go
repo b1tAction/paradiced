@@ -4,12 +4,12 @@ package test
 import (
 	"time"
 
-	pkgnet "github.com/b1tAction/fated/pkg/net"
-	internalnet "github.com/b1tAction/fated/internal/net"
-	"github.com/b1tAction/fated/internal/engine"
-	"github.com/b1tAction/fated/internal/engine/hsm"
-	"github.com/b1tAction/fated/pkg/id"
-	"github.com/b1tAction/fated/pkg/rng"
+	pkgnet "github.com/b1tAction/paradiced/pkg/net"
+	internalnet "github.com/b1tAction/paradiced/internal/net"
+	"github.com/b1tAction/paradiced/internal/engine"
+	"github.com/b1tAction/paradiced/internal/engine/hsm"
+	"github.com/b1tAction/paradiced/pkg/id"
+	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
 // TestHelper provides testing utilities for simulating game flow

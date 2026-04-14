@@ -1,13 +1,13 @@
 package hsm
 
 import (
-	"github.com/b1tAction/fated/internal/engine"
-	"github.com/b1tAction/fated/internal/gamemap"
-	"github.com/b1tAction/fated/pkg/constants"
-	"github.com/b1tAction/fated/pkg/event"
-	"github.com/b1tAction/fated/pkg/gamelog"
-	"github.com/b1tAction/fated/pkg/id"
-	"github.com/b1tAction/fated/pkg/protocol"
+	"github.com/b1tAction/paradiced/internal/engine"
+	"github.com/b1tAction/paradiced/internal/gamemap"
+	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/event"
+	"github.com/b1tAction/paradiced/pkg/gamelog"
+	"github.com/b1tAction/paradiced/pkg/id"
+	"github.com/b1tAction/paradiced/pkg/protocol"
 )
 
 // ========== EventBus Adapter ==========

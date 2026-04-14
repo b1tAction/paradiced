@@ -1,13 +1,13 @@
-// Package rng provides random draw engine for the Fated game.
+// Package rng provides random draw engine for the Paradiced game.
 package rng
 
 import (
 	"math/rand"
 
-	"github.com/b1tAction/fated/internal/core/buff"
-	"github.com/b1tAction/fated/internal/core/event"
-	"github.com/b1tAction/fated/internal/core/item"
-	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/paradiced/internal/core/buff"
+	"github.com/b1tAction/paradiced/internal/core/event"
+	"github.com/b1tAction/paradiced/internal/core/item"
+	"github.com/b1tAction/paradiced/pkg/constants"
 )
 
 // PoolType represents the pool category for drawing.

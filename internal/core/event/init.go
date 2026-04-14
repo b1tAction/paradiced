@@ -1,7 +1,7 @@
 package event
 
 import (
-	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/constants"
 )
 
 // GlobalEventRegistry is the global Event definition registry.

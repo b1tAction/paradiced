@@ -3,7 +3,7 @@ package hsm
 import (
 	"time"
 
-	"github.com/b1tAction/fated/pkg/event"
+	"github.com/b1tAction/paradiced/pkg/event"
 )
 
 // ========== Interrupt States (Layer 3) ==========

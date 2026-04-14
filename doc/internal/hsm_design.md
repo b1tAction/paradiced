@@ -2,7 +2,7 @@
 
 ## 概述
 
-本文档描述《命运骰子》游戏的分层状态机（HSM - Hierarchical State Machine）架构设计。该设计替代原有的 `TurnFlow` 流水线架构，解决双轨制控制问题，实现单一数据源（SSOT）。
+本文档描述《派乐代》游戏的分层状态机（HSM - Hierarchical State Machine）架构设计。该设计替代原有的 `TurnFlow` 流水线架构，解决双轨制控制问题，实现单一数据源（SSOT）。
 
 ## 设计目标
 

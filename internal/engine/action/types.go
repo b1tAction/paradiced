@@ -3,11 +3,11 @@ package action
 import (
 	"time"
 
-	"github.com/b1tAction/fated/internal/core"
-	"github.com/b1tAction/fated/internal/core/buff"
-	"github.com/b1tAction/fated/pkg/constants"
-	"github.com/b1tAction/fated/pkg/gamelog"
-	"github.com/b1tAction/fated/pkg/util"
+	"github.com/b1tAction/paradiced/internal/core"
+	"github.com/b1tAction/paradiced/internal/core/buff"
+	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/gamelog"
+	"github.com/b1tAction/paradiced/pkg/util"
 )
 
 // ========== DamageAction ==========

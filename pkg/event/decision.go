@@ -3,7 +3,7 @@ package event
 import (
 	"time"
 
-	"github.com/b1tAction/fated/pkg/id"
+	"github.com/b1tAction/paradiced/pkg/id"
 )
 
 // Option represents a decision option.

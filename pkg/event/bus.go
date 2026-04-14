@@ -4,8 +4,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/b1tAction/fated/pkg/constants"
-	"github.com/b1tAction/fated/pkg/id"
+	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/id"
 )
 
 // Subscription represents subscription information.

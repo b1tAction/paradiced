@@ -1,8 +1,8 @@
 package event
 
 import (
-	"github.com/b1tAction/fated/pkg/constants"
-	"github.com/b1tAction/fated/pkg/util"
+	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/util"
 )
 
 // Context is the execution context containing all information when a Phase triggers.

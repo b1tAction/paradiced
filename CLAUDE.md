@@ -1,6 +1,6 @@
-# Fated - Fate Dice Game Backend
+# Paradiced - Paradise Dice Game Backend
 
-《命运骰子》回合制派对游戏后端逻辑，使用 Go 语言实现，基于 Nakama 权威服务器框架架构与领域驱动设计 (DDD)。
+《派乐代》回合制派对游戏后端逻辑，使用 Go 语言实现，基于 Nakama 权威服务器框架架构与领域驱动设计 (DDD)。
 
 ## Project Overview
 

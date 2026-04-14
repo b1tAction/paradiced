@@ -129,7 +129,7 @@ m.IncrementInt("counter", 1)  // 返回新值
 ### 嵌入到结构体中
 
 ```go
-import "github.com/b1tAction/fated/pkg/util"
+import "github.com/b1tAction/paradiced/pkg/util"
 
 type Player struct {
     UserID   string

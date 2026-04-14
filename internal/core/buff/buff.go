@@ -3,9 +3,9 @@
 package buff
 
 import (
-	"github.com/b1tAction/fated/pkg/constants"
-	"github.com/b1tAction/fated/pkg/handler"
-	"github.com/b1tAction/fated/pkg/id"
+	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/handler"
+	"github.com/b1tAction/paradiced/pkg/id"
 )
 
 // ========== Buff Instance ==========

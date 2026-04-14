@@ -4,11 +4,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/b1tAction/fated/internal/core"
-	"github.com/b1tAction/fated/internal/engine"
-	"github.com/b1tAction/fated/internal/gamemap"
-	"github.com/b1tAction/fated/pkg/id"
-	"github.com/b1tAction/fated/pkg/rng"
+	"github.com/b1tAction/paradiced/internal/core"
+	"github.com/b1tAction/paradiced/internal/engine"
+	"github.com/b1tAction/paradiced/internal/gamemap"
+	"github.com/b1tAction/paradiced/pkg/id"
+	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
 // ========== TurnUpkeepState Tests ==========

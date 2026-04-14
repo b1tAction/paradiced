@@ -23,8 +23,8 @@ Builder 负责将内部数据结构转换为 `pkg/net` 协议数据：
 
 ```go
 import (
-    internalnet "github.com/b1tAction/fated/internal/net"
-    pkgnet "github.com/b1tAction/fated/pkg/net"
+    internalnet "github.com/b1tAction/paradiced/internal/net"
+    pkgnet "github.com/b1tAction/paradiced/pkg/net"
 )
 
 // 创建构建器
@@ -68,7 +68,7 @@ pkgnet.Player{
 使用 `pkg/rng.DiceManager` 进行骰子计算（权威服务器）：
 
 ```go
-import "github.com/b1tAction/fated/pkg/rng"
+import "github.com/b1tAction/paradiced/pkg/rng"
 
 // 创建骰子管理器（传入游戏 RNG）
 diceMgr := rng.NewDiceManager(game.RNG)
@@ -103,7 +103,7 @@ str := diceType.String() // "gold" - 可直接用于 Available.DiceType
 TestHelper 提供测试工具：
 
 ```go
-import "github.com/b1tAction/fated/internal/net/test"
+import "github.com/b1tAction/paradiced/internal/net/test"
 
 // 创建测试辅助
 helper := test.NewTestHelper(12345)

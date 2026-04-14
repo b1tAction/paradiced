@@ -1,9 +1,9 @@
 package buff
 
 import (
-	"github.com/b1tAction/fated/pkg/constants"
-	"github.com/b1tAction/fated/pkg/event"
-	"github.com/b1tAction/fated/pkg/protocol"
+	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/event"
+	"github.com/b1tAction/paradiced/pkg/protocol"
 )
 
 // GlobalBuffRegistry is the global Buff definition registry.

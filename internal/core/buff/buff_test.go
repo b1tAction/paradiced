@@ -3,7 +3,7 @@ package buff
 import (
 	"testing"
 
-	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/constants"
 )
 
 // ========== BuffType Tests ==========

@@ -1,8 +1,8 @@
 package protocol
 
 import (
-	"github.com/b1tAction/fated/pkg/gamelog"
-	"github.com/b1tAction/fated/pkg/id"
+	"github.com/b1tAction/paradiced/pkg/gamelog"
+	"github.com/b1tAction/paradiced/pkg/id"
 )
 
 // Game defines the interface Game engine needs to expose.

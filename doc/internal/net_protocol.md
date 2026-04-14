@@ -2,7 +2,7 @@
 
 ## 概述
 
-本文档描述 Fated 游戏客户端-服务器交互协议层的设计与实现。基于 Nakama 权威服务器架构，提供状态同步、Action同步、决策请求等核心功能。
+本文档描述 Paradiced 游戏客户端-服务器交互协议层的设计与实现。基于 Nakama 权威服务器架构，提供状态同步、Action同步、决策请求等核心功能。
 
 ## 架构分层
 
@@ -218,9 +218,9 @@ Builder 负责将内部数据结构转换为 `pkg/net` 协议数据：
 
 ```go
 import (
-    internalnet "github.com/b1tAction/fated/internal/net"
-    pkgnet "github.com/b1tAction/fated/pkg/net"
-    "github.com/b1tAction/fated/pkg/rng"
+    internalnet "github.com/b1tAction/paradiced/internal/net"
+    pkgnet "github.com/b1tAction/paradiced/pkg/net"
+    "github.com/b1tAction/paradiced/pkg/rng"
 )
 
 // 创建构建器
@@ -246,7 +246,7 @@ available := builder.BuildAvailable(player)
 使用 `pkg/rng.DiceManager` 进行骰子计算（权威服务器）：
 
 ```go
-import "github.com/b1tAction/fated/pkg/rng"
+import "github.com/b1tAction/paradiced/pkg/rng"
 
 // 创建骰子管理器（传入游戏 RNG）
 diceMgr := rng.NewDiceManager(game.RNG)

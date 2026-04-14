@@ -4,7 +4,7 @@
 
 ## 概述
 
-internal/core 是《命运骰子》游戏的核心数据模块，采用**Direct Import模式**设计，支持独立子包导入。
+internal/core 是《派乐代》游戏的核心数据模块，采用**Direct Import模式**设计，支持独立子包导入。
 
 ## 包结构
 
@@ -31,15 +31,15 @@ internal/core/
 
 ```go
 // 只需要 Buff（自动初始化）
-import "github.com/b1tAction/fated/internal/core/buff"
+import "github.com/b1tAction/paradiced/internal/core/buff"
 buff.GetBuffDefinition(buff.BuffTypeFire)
 
 // 只需要 Event（自动初始化）
-import "github.com/b1tAction/fated/internal/core/event"
+import "github.com/b1tAction/paradiced/internal/core/event"
 event.GetEventDefinition(event.EventTypeHerb)
 
 // 需要完整游戏逻辑（自动初始化所有子包）
-import "github.com/b1tAction/fated/internal/core"
+import "github.com/b1tAction/paradiced/internal/core"
 core.GetBuffDefinition(core.BuffTypeFire)
 ```
 

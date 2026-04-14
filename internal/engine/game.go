@@ -1,4 +1,4 @@
-// Package engine provides game engine logic for the Fated game.
+// Package engine provides game engine logic for the Paradiced game.
 package engine
 
 import (
@@ -6,12 +6,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/b1tAction/fated/internal/core"
-	"github.com/b1tAction/fated/pkg/constants"
-	"github.com/b1tAction/fated/pkg/event"
-	"github.com/b1tAction/fated/pkg/gamelog"
-	"github.com/b1tAction/fated/pkg/id"
-	"github.com/b1tAction/fated/pkg/rng"
+	"github.com/b1tAction/paradiced/internal/core"
+	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/event"
+	"github.com/b1tAction/paradiced/pkg/gamelog"
+	"github.com/b1tAction/paradiced/pkg/id"
+	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
 // Game is the game instance, containing EventBus and all players.

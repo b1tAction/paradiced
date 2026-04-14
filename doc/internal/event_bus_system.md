@@ -2,7 +2,7 @@
 
 ## 概述
 
-EventBus + Decision 系统是《命运骰子》游戏的统一触发机制框架，为所有Buff、道具、阵营被动提供Phase分类和用户确认支持。
+EventBus + Decision 系统是《派乐代》游戏的统一触发机制框架，为所有Buff、道具、阵营被动提供Phase分类和用户确认支持。
 
 ## 设计目标
 

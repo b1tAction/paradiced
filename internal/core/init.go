@@ -1,14 +1,14 @@
-// Package core provides core data structures for the Fated game.
+// Package core provides core data structures for the Paradiced game.
 // Importing this package automatically initializes all subpackages (buff, event, item).
 package core
 
 // Imports ensure all subpackages are initialized and types are available for re-export.
 import (
-	"github.com/b1tAction/fated/internal/core/buff"
-	"github.com/b1tAction/fated/internal/core/event"
-	"github.com/b1tAction/fated/internal/core/item"
-	"github.com/b1tAction/fated/pkg/constants"
-	"github.com/b1tAction/fated/pkg/handler"
+	"github.com/b1tAction/paradiced/internal/core/buff"
+	"github.com/b1tAction/paradiced/internal/core/event"
+	"github.com/b1tAction/paradiced/internal/core/item"
+	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/handler"
 )
 
 // Re-export types from subpackages for convenience.

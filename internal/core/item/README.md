@@ -9,7 +9,7 @@ item 包提供 ItemType、道具实例、定义和注册表。包级 init() 自�
 ## Direct Import
 
 ```go
-import "github.com/b1tAction/fated/internal/core/item"
+import "github.com/b1tAction/paradiced/internal/core/item"
 
 // 自动初始化，可直接使用
 item.GetItemDefinition(item.ItemTypeAnyDoor)

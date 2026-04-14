@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/b1tAction/fated/pkg/util"
+	"github.com/b1tAction/paradiced/pkg/util"
 )
 
 // ========== GameLog Tests ==========

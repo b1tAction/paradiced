@@ -3,15 +3,15 @@
 package net
 
 import (
-	pkgnet "github.com/b1tAction/fated/pkg/net"
-	"github.com/b1tAction/fated/internal/core"
-	"github.com/b1tAction/fated/internal/core/buff"
-	"github.com/b1tAction/fated/internal/core/item"
-	"github.com/b1tAction/fated/internal/engine"
-	"github.com/b1tAction/fated/internal/engine/hsm"
-	"github.com/b1tAction/fated/pkg/gamelog"
-	"github.com/b1tAction/fated/pkg/protocol"
-	"github.com/b1tAction/fated/pkg/rng"
+	pkgnet "github.com/b1tAction/paradiced/pkg/net"
+	"github.com/b1tAction/paradiced/internal/core"
+	"github.com/b1tAction/paradiced/internal/core/buff"
+	"github.com/b1tAction/paradiced/internal/core/item"
+	"github.com/b1tAction/paradiced/internal/engine"
+	"github.com/b1tAction/paradiced/internal/engine/hsm"
+	"github.com/b1tAction/paradiced/pkg/gamelog"
+	"github.com/b1tAction/paradiced/pkg/protocol"
+	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
 // Builder converts internal game structures to protocol sync data.

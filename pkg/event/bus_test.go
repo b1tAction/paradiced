@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/b1tAction/fated/pkg/constants"
-	"github.com/b1tAction/fated/pkg/id"
+	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/id"
 )
 
 // TestPlayer 用于测试的简单玩家结构

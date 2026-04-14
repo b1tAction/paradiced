@@ -1,4 +1,4 @@
-module github.com/b1tAction/fated
+module github.com/b1tAction/paradiced
 
 go 1.22.12
 

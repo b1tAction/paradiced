@@ -1,7 +1,7 @@
 package item
 
 import (
-	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/constants"
 )
 
 // GlobalItemRegistry is the global Item definition registry.

@@ -1,11 +1,11 @@
 package action
 
 import (
-	"github.com/b1tAction/fated/pkg/constants"
-	"github.com/b1tAction/fated/pkg/event"
-	"github.com/b1tAction/fated/pkg/gamelog"
-	"github.com/b1tAction/fated/pkg/protocol"
-	"github.com/b1tAction/fated/pkg/util"
+	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/event"
+	"github.com/b1tAction/paradiced/pkg/gamelog"
+	"github.com/b1tAction/paradiced/pkg/protocol"
+	"github.com/b1tAction/paradiced/pkg/util"
 )
 
 // ActionContext provides context for action execution.

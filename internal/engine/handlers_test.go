@@ -3,11 +3,11 @@ package engine
 import (
 	"testing"
 
-	"github.com/b1tAction/fated/internal/core"
-	engineaction "github.com/b1tAction/fated/internal/engine/action"
-	"github.com/b1tAction/fated/pkg/constants"
-	"github.com/b1tAction/fated/pkg/event"
-	"github.com/b1tAction/fated/pkg/id"
+	"github.com/b1tAction/paradiced/internal/core"
+	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
+	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/event"
+	"github.com/b1tAction/paradiced/pkg/id"
 )
 
 // ========== EventHandler Tests ==========

@@ -3,11 +3,11 @@ package engine
 import (
 	"testing"
 
-	"github.com/b1tAction/fated/internal/core"
-	"github.com/b1tAction/fated/pkg/constants"
-	"github.com/b1tAction/fated/pkg/event"
-	"github.com/b1tAction/fated/pkg/id"
-	"github.com/b1tAction/fated/pkg/rng"
+	"github.com/b1tAction/paradiced/internal/core"
+	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/event"
+	"github.com/b1tAction/paradiced/pkg/id"
+	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
 // ========== Game Creation Tests ==========

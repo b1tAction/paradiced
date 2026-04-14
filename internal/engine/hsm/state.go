@@ -3,12 +3,12 @@ package hsm
 import (
 	"time"
 
-	"github.com/b1tAction/fated/internal/core"
-	"github.com/b1tAction/fated/internal/engine"
-	"github.com/b1tAction/fated/pkg/constants"
-	"github.com/b1tAction/fated/pkg/event"
-	"github.com/b1tAction/fated/pkg/rng"
-	"github.com/b1tAction/fated/pkg/util"
+	"github.com/b1tAction/paradiced/internal/core"
+	"github.com/b1tAction/paradiced/internal/engine"
+	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/event"
+	"github.com/b1tAction/paradiced/pkg/rng"
+	"github.com/b1tAction/paradiced/pkg/util"
 )
 
 // Context key constants for commonly used state markers.
