@@ -33,6 +33,7 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 │   ├── action/         # Action interface layer (ActionType string, Action interface)
 │   ├── event/          # EventBus system (Phase, Bus, Decision, Context)
 │   ├── gamelog/        # Unified game log system for client playback
+│   ├── handler/        # Effect handler types (EffectHandler for Buff/Item/Event)
 │   ├── protocol/       # Public interfaces (Player, Game, MapEngine, Faction)
 │   ├── rng/            # Random number engine (WeightedPool, LuckModifier)
 │   └── util/           # Utilities (Metadata with JSON serialization)
@@ -62,10 +63,14 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **GameLog**: Global log manager with StartTurn/EndTurn/AddEntry methods
 
 #### EventBus System (`pkg/event`)
-- **Phase**: Trigger timing enumeration (HSM: BeforeTurn/OnLand/AfterTurn; Action: PreDamage/PreEvent/PreMove/OnBuffApplied/OnBuffRemoved)
+- **Phase**: Trigger timing enumeration (HSM: BeforeTurn/OnLand/AfterTurn; Action: PreDamage/PreEvent/PreMove/PreRespawn/OnBuffApplied/OnBuffRemoved)
 - **EventBus**: Manages Buff/Item subscriptions and triggers
 - **Decision**: User confirmation mechanism
-- **Context**: Execution context with Metadata embedding
+- **Context**: Execution context with Metadata embedding and DerivedActions
+
+#### Handler System (`pkg/handler`)
+- **EffectHandler**: Unified handler function signature for Buff/Item/Event/Faction effects
+- Handlers use ctx.AddDerivedAction() to generate multiple actions
 
 #### Core Data Structures (`internal/core`)
 - **Player**: User entity with HP/LP/Buffs/Items/Metadata (implements protocol.Player)
@@ -167,4 +172,5 @@ go test ./...
 - [doc/internal/gamemap.md](doc/internal/gamemap.md) - Map system (Chinese)
 - [pkg/protocol/README.md](pkg/protocol/README.md) - Protocol interface layer
 - [pkg/action/README.md](pkg/action/README.md) - Action interface layer
+- [pkg/handler/README.md](pkg/handler/README.md) - Effect handler types
 - [internal/engine/action/README.md](internal/engine/action/README.md) - Action implementation
