@@ -48,12 +48,16 @@ var (
 	GetBuffDefinition      = buff.GetBuffDefinition
 	GetBuffString          = buff.GetBuffString
 	GetBuffEvaluation      = buff.GetBuffEvaluation
-	GetBuffHandler         = buff.GetBuffHandler
+	GetBuffHandlerConfig   = buff.GetBuffHandlerConfig
+	GetBuffPhases          = buff.GetBuffPhases
 	HasBuffHandler         = buff.HasBuffHandler
 	GetAllBuffTypes        = buff.GetAllBuffTypes
 	GetBuffTypesByCategory = buff.GetBuffTypesByCategory
 	GetAllBuffDefinitions  = buff.GetAllBuffDefinitions
 )
+
+// BuffHandlerConfig from buff package
+type BuffHandlerConfig = buff.BuffHandlerConfig
 
 // EventType from constants package
 type EventType = constants.EventType
@@ -77,18 +81,22 @@ const (
 	EventTypeThunder     = constants.EventTypeThunder
 )
 
-// EventDefinition from event package
-type EventDefinition = event.EventDefinition
-
 // Event registry access functions from event package
 var (
 	GetEventDefinition      = event.GetEventDefinition
 	GetEventString          = event.GetEventString
 	GetEventEvaluation      = event.GetEventEvaluation
+	GetEventHandlerConfig   = event.GetEventHandlerConfig
 	GetAllEventTypes        = event.GetAllEventTypes
 	GetEventTypesByCategory = event.GetEventTypesByCategory
 	GetAllEventDefinitions  = event.GetAllEventDefinitions
 )
+
+// EventDefinition from event package
+type EventDefinition = event.EventDefinition
+
+// EventHandlerConfig from event package
+type EventHandlerConfig = event.EventHandlerConfig
 
 // ItemType from constants package
 type ItemType = constants.ItemType
@@ -111,11 +119,16 @@ var NewItem = item.NewItem
 // ItemDefinition from item package
 type ItemDefinition = item.ItemDefinition
 
+// ItemHandlerConfig from item package
+type ItemHandlerConfig = item.ItemHandlerConfig
+
 // Item registry access functions from item package
 var (
 	GetItemDefinition      = item.GetItemDefinition
 	GetItemString          = item.GetItemString
 	GetItemEvaluation      = item.GetItemEvaluation
+	GetItemHandlerConfig   = item.GetItemHandlerConfig
+	GetItemPhase           = item.GetItemPhase
 	GetAllItemTypes        = item.GetAllItemTypes
 	GetItemTypesByCategory = item.GetItemTypesByCategory
 	GetAllItemDefinitions  = item.GetAllItemDefinitions
