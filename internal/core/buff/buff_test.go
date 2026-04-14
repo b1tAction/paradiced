@@ -178,9 +178,6 @@ func TestBuffTypeGetBuffDefinition(t *testing.T) {
 	if def.Duration != 3 {
 		t.Errorf("def.Duration = %d, expected 3", def.Duration)
 	}
-	if def.LPPerTurn != -1 {
-		t.Errorf("def.LPPerTurn = %d, expected -1", def.LPPerTurn)
-	}
 
 	// Test Divine Buff
 	def = GetBuffDefinition(constants.BuffTypeDivine)
@@ -193,9 +190,6 @@ func TestBuffTypeGetBuffDefinition(t *testing.T) {
 	if def.Eval != constants.EvaluationVeryGood {
 		t.Errorf("def.Eval = %d, expected VeryGood(%d)", def.Eval, constants.EvaluationVeryGood)
 	}
-	if def.LPPerTurn != 1 {
-		t.Errorf("def.LPPerTurn = %d, expected 1", def.LPPerTurn)
-	}
 
 	// Test Hidden Buff (neutral evaluation)
 	def = GetBuffDefinition(constants.BuffTypeHidden)
@@ -204,9 +198,6 @@ func TestBuffTypeGetBuffDefinition(t *testing.T) {
 	}
 	if def.Eval != constants.EvaluationNeutral {
 		t.Errorf("def.Eval = %d, expected Neutral(%d)", def.Eval, constants.EvaluationNeutral)
-	}
-	if def.SpecialEffect != constants.SpecialImmune {
-		t.Errorf("def.SpecialEffect = %s, expected SpecialImmune", def.SpecialEffect)
 	}
 
 	// Test Fire Buff (permanent)
@@ -291,149 +282,187 @@ func TestGetAllBuffDefinitions(t *testing.T) {
 	}
 }
 
-// ========== BuffDefinition Phase Tests ==========
+// ========== BuffDefinition HandlerConfig Tests ==========
 
-func TestBuffDefinitionPhase(t *testing.T) {
-	// Test Curse Buff Phases
-	def := GetBuffDefinition(constants.BuffTypeCurse)
-	if !def.HasPhase(constants.PhaseBeforeTurn) {
+func TestBuffDefinitionHandlerConfigPhases(t *testing.T) {
+	// Test Curse Buff Phases via HandlerConfig
+	config := GetBuffHandlerConfig(constants.BuffTypeCurse)
+	if config == nil {
+		t.Fatal("Curse should have HandlerConfig")
+	}
+	if !config.HasPhase(constants.PhaseBeforeTurn) {
 		t.Errorf("Curse should have BeforeTurn phase")
 	}
-	if len(def.Phases) != 1 {
-		t.Errorf("Curse Phases count = %d, expected 1", len(def.Phases))
+	if len(config.Phases) != 1 {
+		t.Errorf("Curse Phases count = %d, expected 1", len(config.Phases))
 	}
 
 	// Test Divine Buff Phases
-	def = GetBuffDefinition(constants.BuffTypeDivine)
-	if !def.HasPhase(constants.PhaseBeforeTurn) {
+	config = GetBuffHandlerConfig(constants.BuffTypeDivine)
+	if config == nil {
+		t.Fatal("Divine should have HandlerConfig")
+	}
+	if !config.HasPhase(constants.PhaseBeforeTurn) {
 		t.Errorf("Divine should have BeforeTurn phase")
 	}
 
 	// Test Hidden Buff Phases (pre-damage immunity)
-	def = GetBuffDefinition(constants.BuffTypeHidden)
-	if !def.HasPhase(constants.PhasePreDamage) {
+	config = GetBuffHandlerConfig(constants.BuffTypeHidden)
+	if config == nil {
+		t.Fatal("Hidden should have HandlerConfig")
+	}
+	if !config.HasPhase(constants.PhasePreDamage) {
 		t.Errorf("Hidden should have PreDamage phase")
 	}
 
 	// Test Lost Buff Phases (reverse during move)
-	def = GetBuffDefinition(constants.BuffTypeLost)
-	if !def.HasPhase(constants.PhasePreMove) {
+	config = GetBuffHandlerConfig(constants.BuffTypeLost)
+	if config == nil {
+		t.Fatal("Lost should have HandlerConfig")
+	}
+	if !config.HasPhase(constants.PhasePreMove) {
 		t.Errorf("Lost should have PreMove phase")
 	}
 
 	// Test Corrupt Buff Phases (after turn)
-	def = GetBuffDefinition(constants.BuffTypeCorrupt)
-	if !def.HasPhase(constants.PhaseAfterTurn) {
+	config = GetBuffHandlerConfig(constants.BuffTypeCorrupt)
+	if config == nil {
+		t.Fatal("Corrupt should have HandlerConfig")
+	}
+	if !config.HasPhase(constants.PhaseAfterTurn) {
 		t.Errorf("Corrupt should have AfterTurn phase")
 	}
 
 	// Test Rain Buff Phases (after turn)
-	def = GetBuffDefinition(constants.BuffTypeRain)
-	if !def.HasPhase(constants.PhaseAfterTurn) {
+	config = GetBuffHandlerConfig(constants.BuffTypeRain)
+	if config == nil {
+		t.Fatal("Rain should have HandlerConfig")
+	}
+	if !config.HasPhase(constants.PhaseAfterTurn) {
 		t.Errorf("Rain should have AfterTurn phase")
 	}
 
 	// Test Exorcism Buff Phases (pre-event)
-	def = GetBuffDefinition(constants.BuffTypeExorcism)
-	if !def.HasPhase(constants.PhasePreEvent) {
+	config = GetBuffHandlerConfig(constants.BuffTypeExorcism)
+	if config == nil {
+		t.Fatal("Exorcism should have HandlerConfig")
+	}
+	if !config.HasPhase(constants.PhasePreEvent) {
 		t.Errorf("Exorcism should have PreEvent phase")
 	}
 
 	// Test Poison Buff Phases (before turn)
-	def = GetBuffDefinition(constants.BuffTypePoison)
-	if !def.HasPhase(constants.PhaseBeforeTurn) {
+	config = GetBuffHandlerConfig(constants.BuffTypePoison)
+	if config == nil {
+		t.Fatal("Poison should have HandlerConfig")
+	}
+	if !config.HasPhase(constants.PhaseBeforeTurn) {
 		t.Errorf("Poison should have BeforeTurn phase")
 	}
 
 	// Test Fire Buff Phases (before turn check)
-	def = GetBuffDefinition(constants.BuffTypeFire)
-	if !def.HasPhase(constants.PhaseBeforeTurn) {
+	config = GetBuffHandlerConfig(constants.BuffTypeFire)
+	if config == nil {
+		t.Fatal("Fire should have HandlerConfig")
+	}
+	if !config.HasPhase(constants.PhaseBeforeTurn) {
 		t.Errorf("Fire should have BeforeTurn phase")
 	}
 }
 
-func TestBuffDefinitionPriority(t *testing.T) {
+func TestBuffDefinitionHandlerConfigPriority(t *testing.T) {
 	// Test Hidden Buff priority (high priority, damage immunity)
-	def := GetBuffDefinition(constants.BuffTypeHidden)
-	if def.Priority != 100 {
-		t.Errorf("Hidden Priority = %d, expected 100 (highest)", def.Priority)
+	config := GetBuffHandlerConfig(constants.BuffTypeHidden)
+	if config == nil {
+		t.Fatal("Hidden should have HandlerConfig")
+	}
+	if config.Priority != 100 {
+		t.Errorf("Hidden Priority = %d, expected 100 (highest)", config.Priority)
 	}
 
 	// Test Lost Buff priority (high priority)
-	def = GetBuffDefinition(constants.BuffTypeLost)
-	if def.Priority != 100 {
-		t.Errorf("Lost Priority = %d, expected 100", def.Priority)
+	config = GetBuffHandlerConfig(constants.BuffTypeLost)
+	if config == nil {
+		t.Fatal("Lost should have HandlerConfig")
+	}
+	if config.Priority != 100 {
+		t.Errorf("Lost Priority = %d, expected 100", config.Priority)
 	}
 
 	// Test Exorcism Buff priority
-	def = GetBuffDefinition(constants.BuffTypeExorcism)
-	if def.Priority != 80 {
-		t.Errorf("Exorcism Priority = %d, expected 80", def.Priority)
+	config = GetBuffHandlerConfig(constants.BuffTypeExorcism)
+	if config == nil {
+		t.Fatal("Exorcism should have HandlerConfig")
+	}
+	if config.Priority != 80 {
+		t.Errorf("Exorcism Priority = %d, expected 80", config.Priority)
 	}
 
 	// Test Divine/Curse Buff priority (standard)
-	def = GetBuffDefinition(constants.BuffTypeDivine)
-	if def.Priority != 50 {
-		t.Errorf("Divine Priority = %d, expected 50", def.Priority)
+	config = GetBuffHandlerConfig(constants.BuffTypeDivine)
+	if config == nil {
+		t.Fatal("Divine should have HandlerConfig")
+	}
+	if config.Priority != 50 {
+		t.Errorf("Divine Priority = %d, expected 50", config.Priority)
 	}
 
-	def = GetBuffDefinition(constants.BuffTypeCurse)
-	if def.Priority != 50 {
-		t.Errorf("Curse Priority = %d, expected 50", def.Priority)
+	config = GetBuffHandlerConfig(constants.BuffTypeCurse)
+	if config == nil {
+		t.Fatal("Curse should have HandlerConfig")
+	}
+	if config.Priority != 50 {
+		t.Errorf("Curse Priority = %d, expected 50", config.Priority)
 	}
 
 	// Test Poison Buff priority (low priority)
-	def = GetBuffDefinition(constants.BuffTypePoison)
-	if def.Priority != 30 {
-		t.Errorf("Poison Priority = %d, expected 30 (lowest)", def.Priority)
+	config = GetBuffHandlerConfig(constants.BuffTypePoison)
+	if config == nil {
+		t.Fatal("Poison should have HandlerConfig")
+	}
+	if config.Priority != 30 {
+		t.Errorf("Poison Priority = %d, expected 30 (lowest)", config.Priority)
 	}
 }
 
-func TestBuffDefinitionNeedConfirm(t *testing.T) {
+func TestBuffDefinitionHandlerConfigNeedConfirm(t *testing.T) {
 	// All Buffs default to not needing user confirmation
 	for _, bt := range GetAllBuffTypes() {
-		def := GetBuffDefinition(bt)
-		if def == nil {
+		config := GetBuffHandlerConfig(bt)
+		if config == nil {
 			continue
 		}
 		// Buff effects auto-execute by default, no confirmation needed
-		if def.NeedConfirm {
+		if config.NeedConfirm {
 			t.Errorf("Buff %s should not need confirm by default", bt)
 		}
 	}
 }
 
-func TestBuffDefinitionSpecialEffects(t *testing.T) {
-	// Test special effect markers
-	tests := []struct {
-		bt       constants.BuffType
-		expected constants.SpecialEffect
-	}{
-		{constants.BuffTypeHidden, constants.SpecialImmune},
-		{constants.BuffTypeLost, constants.SpecialReverse},
-		{constants.BuffTypeExorcism, constants.SpecialImmunePoison},
-		{constants.BuffTypePoison, constants.SpecialBadEvent},
-		{constants.BuffTypeFire, constants.SpecialZhuQuePassive},
-	}
-
-	for _, tt := range tests {
-		def := GetBuffDefinition(tt.bt)
-		if def == nil {
-			t.Errorf("BuffType(%s) has no definition", tt.bt)
+func TestBuffHandlerConfigHasHandler(t *testing.T) {
+	// All Buffs should have HandlerConfig now
+	for _, bt := range GetAllBuffTypes() {
+		config := GetBuffHandlerConfig(bt)
+		if config == nil {
+			t.Errorf("Buff %s should have HandlerConfig", bt)
 			continue
 		}
-		if def.SpecialEffect != tt.expected {
-			t.Errorf("%s SpecialEffect = %s, expected %s", tt.bt, def.SpecialEffect, tt.expected)
+		// All Buffs now have Handler
+		if config.Handler == nil {
+			t.Errorf("Buff %s should have Handler", bt)
 		}
 	}
 }
 
 // ========== Multi Phase Support Tests ==========
 
-func TestBuffDefinitionGetPhases(t *testing.T) {
-	// Test GetPhases method returns correct Phase list
-	def := GetBuffDefinition(constants.BuffTypeCurse)
-	phases := def.GetPhases()
+func TestBuffHandlerConfigGetPhases(t *testing.T) {
+	// Test GetPhases method returns correct Phase list via HandlerConfig
+	config := GetBuffHandlerConfig(constants.BuffTypeCurse)
+	if config == nil {
+		t.Fatal("Curse should have HandlerConfig")
+	}
+	phases := config.GetPhases()
 	if len(phases) != 1 {
 		t.Errorf("Curse GetPhases count = %d, expected 1", len(phases))
 	}
@@ -442,8 +471,8 @@ func TestBuffDefinitionGetPhases(t *testing.T) {
 	}
 }
 
-func TestBuffDefinitionHasPhase(t *testing.T) {
-	// Test HasPhase method
+func TestBuffHandlerConfigHasPhase(t *testing.T) {
+	// Test HasPhase method via HandlerConfig
 	tests := []struct {
 		bt       constants.BuffType
 		phase    constants.Phase
@@ -458,12 +487,12 @@ func TestBuffDefinitionHasPhase(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		def := GetBuffDefinition(tt.bt)
-		if def == nil {
-			t.Errorf("BuffType(%s) has no definition", tt.bt)
+		config := GetBuffHandlerConfig(tt.bt)
+		if config == nil {
+			t.Errorf("BuffType(%s) has no HandlerConfig", tt.bt)
 			continue
 		}
-		result := def.HasPhase(tt.phase)
+		result := config.HasPhase(tt.phase)
 		if result != tt.expected {
 			t.Errorf("%s.HasPhase(%s) = %v, expected %v", tt.bt, tt.phase, result, tt.expected)
 		}
@@ -489,29 +518,27 @@ func TestBuffInstanceSubscriptionIDs(t *testing.T) {
 	}
 }
 
-func TestBuffDefinitionPhasesSlice(t *testing.T) {
-	// Test Phases is slice type
+func TestBuffHandlerConfigPhasesSlice(t *testing.T) {
+	// Test HandlerConfig Phases is slice type
 	for _, bt := range GetAllBuffTypes() {
-		def := GetBuffDefinition(bt)
-		if def == nil {
+		config := GetBuffHandlerConfig(bt)
+		if config == nil {
 			continue
 		}
 		// Phases should be slice, at least one element
-		if len(def.Phases) == 0 {
+		if len(config.Phases) == 0 {
 			t.Errorf("Buff %s should have at least one Phase", bt)
 		}
 	}
 }
 
 func TestHasBuffHandler(t *testing.T) {
-	// Fire buff has custom handler
-	if !HasBuffHandler(constants.BuffTypeFire) {
-		t.Error("BuffTypeFire should have custom handler")
-	}
-
-	// Curse buff has no custom handler (uses default)
-	if HasBuffHandler(constants.BuffTypeCurse) {
-		t.Error("BuffTypeCurse should not have custom handler")
+	// All Buffs now have handlers via HandlerConfig
+	for _, bt := range GetAllBuffTypes() {
+		config := GetBuffHandlerConfig(bt)
+		if config == nil || config.Handler == nil {
+			t.Errorf("Buff %s should have handler", bt)
+		}
 	}
 }
 

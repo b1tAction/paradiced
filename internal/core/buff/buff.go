@@ -41,29 +41,34 @@ func (b *Buff) TickDuration() bool {
 
 // ========== Buff Definition ==========
 
+// BuffDefinition contains only static metadata for Buff display and classification.
+// Effect logic and execution config are managed by BuffHandlerConfig.
 type BuffDefinition struct {
-	Type          constants.BuffType      `json:"type"`
-	Eval          constants.Evaluation    `json:"evaluation"`   // Evaluation score
-	EnglishName   string                  `json:"english_name"` // English identifier (snake_case)
-	Name          string                  `json:"name"`         // Chinese display name
-	Desc          string                  `json:"desc"`
-	Duration      int                     `json:"duration"`
-	HPPerTurn     int                     `json:"hp_per_turn"`
-	LPPerTurn     int                     `json:"lp_per_turn"`
-	SpecialEffect constants.SpecialEffect `json:"special_effect"` // Special effect type
-	Phases        []constants.Phase       `json:"phases"`         // Trigger phases list
-	Priority      int                     `json:"priority"`       // Execution priority
-	NeedConfirm   bool                    `json:"need_confirm"`   // Whether user confirmation needed
+	Type        constants.BuffType   `json:"type"`
+	Eval        constants.Evaluation `json:"evaluation"`    // Evaluation score for random draw
+	EnglishName string               `json:"english_name"`  // English identifier (snake_case)
+	Name        string               `json:"name"`          // Chinese display name
+	Desc        string               `json:"desc"`          // Description text
+	Duration    int                  `json:"duration"`      // Default duration
+}
+
+// BuffHandlerConfig contains effect logic and execution configuration.
+// Separated from BuffDefinition following Single Responsibility Principle.
+type BuffHandlerConfig struct {
+	Phases      []constants.Phase    `json:"phases"`        // Trigger phases list
+	Priority    int                  `json:"priority"`      // Execution priority (higher executes first)
+	NeedConfirm bool                 `json:"need_confirm"`  // Whether user confirmation needed
+	Handler     EffectHandler        `json:"-"`             // Effect handler function
 }
 
 // GetPhases returns the Buff's trigger phase list.
-func (def *BuffDefinition) GetPhases() []constants.Phase {
-	return def.Phases
+func (c *BuffHandlerConfig) GetPhases() []constants.Phase {
+	return c.Phases
 }
 
 // HasPhase checks if the Buff triggers at the specified Phase.
-func (def *BuffDefinition) HasPhase(phase constants.Phase) bool {
-	for _, p := range def.Phases {
+func (c *BuffHandlerConfig) HasPhase(phase constants.Phase) bool {
+	for _, p := range c.Phases {
 		if p == phase {
 			return true
 		}
@@ -76,10 +81,10 @@ func (def *BuffDefinition) HasPhase(phase constants.Phase) bool {
 // EffectHandler alias for handler.EffectHandler (unified signature).
 type EffectHandler = handler.EffectHandler
 
-// BuffRegistry is the registry for Buff definitions.
+// BuffRegistry is the registry for Buff definitions and handler configs.
 type BuffRegistry struct {
-	defs     map[constants.BuffType]*BuffDefinition
-	handlers map[constants.BuffType]EffectHandler
+	defs    map[constants.BuffType]*BuffDefinition
+	configs map[constants.BuffType]*BuffHandlerConfig // Handler configs
 	names    map[constants.BuffType]string // Chinese name
 
 	// Category lists (auto-generated)
@@ -92,7 +97,7 @@ type BuffRegistry struct {
 func NewBuffRegistry() *BuffRegistry {
 	return &BuffRegistry{
 		defs:         make(map[constants.BuffType]*BuffDefinition),
-		handlers:     make(map[constants.BuffType]EffectHandler),
+		configs:      make(map[constants.BuffType]*BuffHandlerConfig),
 		names:        make(map[constants.BuffType]string),
 		goodBuffs:    make([]constants.BuffType, 0),
 		badBuffs:     make([]constants.BuffType, 0),
@@ -100,8 +105,8 @@ func NewBuffRegistry() *BuffRegistry {
 	}
 }
 
-// RegisterBuff registers a Buff definition with optional handler.
-func (r *BuffRegistry) RegisterBuff(def *BuffDefinition, handler EffectHandler) {
+// RegisterBuff registers a Buff definition with handler config.
+func (r *BuffRegistry) RegisterBuff(def *BuffDefinition, config *BuffHandlerConfig) {
 	if def == nil || def.Type == constants.BuffTypeNone {
 		return
 	}
@@ -118,8 +123,9 @@ func (r *BuffRegistry) RegisterBuff(def *BuffDefinition, handler EffectHandler) 
 		r.neutralBuffs = append(r.neutralBuffs, def.Type)
 	}
 
-	if handler != nil {
-		r.handlers[def.Type] = handler
+	// Register handler config
+	if config != nil {
+		r.configs[def.Type] = config
 	}
 }
 
@@ -152,18 +158,28 @@ func (r *BuffRegistry) GetBuffEvaluation(bt constants.BuffType) constants.Evalua
 	return constants.EvaluationNeutral
 }
 
-// GetBuffHandler returns the Buff's custom handler (nil if none).
-func (r *BuffRegistry) GetBuffHandler(bt constants.BuffType) EffectHandler {
-	if handler, ok := r.handlers[bt]; ok {
-		return handler
+// GetBuffHandlerConfig returns the Buff's handler config (nil if none).
+func (r *BuffRegistry) GetBuffHandlerConfig(bt constants.BuffType) *BuffHandlerConfig {
+	if config, ok := r.configs[bt]; ok {
+		return config
 	}
 	return nil
 }
 
-// HasBuffHandler checks if Buff has a custom handler.
+// GetBuffPhases returns the Buff's trigger phases from handler config.
+func (r *BuffRegistry) GetBuffPhases(bt constants.BuffType) []constants.Phase {
+	if config := r.configs[bt]; config != nil {
+		return config.Phases
+	}
+	return nil
+}
+
+// HasBuffHandler checks if Buff has a handler config with Handler set.
 func (r *BuffRegistry) HasBuffHandler(bt constants.BuffType) bool {
-	_, ok := r.handlers[bt]
-	return ok
+	if config, ok := r.configs[bt]; ok && config.Handler != nil {
+		return true
+	}
+	return false
 }
 
 // GetAllBuffTypes returns all registered Buff types.
@@ -225,12 +241,17 @@ func GetBuffEvaluation(bt constants.BuffType) constants.Evaluation {
 	return GlobalBuffRegistry.GetBuffEvaluation(bt)
 }
 
-// GetBuffHandler returns the Buff's custom handler from GlobalBuffRegistry.
-func GetBuffHandler(bt constants.BuffType) EffectHandler {
-	return GlobalBuffRegistry.GetBuffHandler(bt)
+// GetBuffHandlerConfig returns the Buff's handler config from GlobalBuffRegistry.
+func GetBuffHandlerConfig(bt constants.BuffType) *BuffHandlerConfig {
+	return GlobalBuffRegistry.GetBuffHandlerConfig(bt)
 }
 
-// HasBuffHandler checks if Buff has a custom handler.
+// GetBuffPhases returns the Buff's trigger phases from GlobalBuffRegistry.
+func GetBuffPhases(bt constants.BuffType) []constants.Phase {
+	return GlobalBuffRegistry.GetBuffPhases(bt)
+}
+
+// HasBuffHandler checks if Buff has a handler config with Handler set.
 func HasBuffHandler(bt constants.BuffType) bool {
 	return GlobalBuffRegistry.HasBuffHandler(bt)
 }
