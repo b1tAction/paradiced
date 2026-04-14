@@ -1,9 +1,13 @@
 package action
 
 import (
+	"time"
+
 	"github.com/b1tAction/Fated/internal/core"
 	"github.com/b1tAction/Fated/internal/core/buff"
 	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/Fated/pkg/gamelog"
+	"github.com/b1tAction/Fated/pkg/util"
 )
 
 // ========== DamageAction ==========
@@ -63,16 +67,19 @@ func (a *DamageAction) Execute(ctx *ActionContext) error {
 	return a.TargetPlayer.ApplyDamage(a.Amount)
 }
 
-func (a *DamageAction) LogEntry() TurnEventLogEntry {
-	return TurnEventLogEntry{
-		Type:   "HPChange",
-		Target: a.TargetPlayer.UserID,
-		Delta:  -a.Amount,
-		Source: a.SourceID,
-		Metadata: map[string]interface{}{
-			"blocked_by": a.BlockedBy,
-			"piercing":   a.IsPiercing,
-		},
+func (a *DamageAction) LogEntry() gamelog.LogEntry {
+	metadata := util.NewMetadata()
+	metadata.SetString("blocked_by", a.BlockedBy)
+	metadata.SetBool("piercing", a.IsPiercing)
+
+	return gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       gamelog.EntryTypeAction,
+		ActionType: string(a.Type()),
+		Target:     a.TargetPlayer.UserID,
+		Delta:      -a.Amount,
+		Source:     a.SourceID,
+		Metadata:   metadata,
 	}
 }
 
@@ -118,12 +125,14 @@ func (a *HealAction) Execute(ctx *ActionContext) error {
 	return nil
 }
 
-func (a *HealAction) LogEntry() TurnEventLogEntry {
-	return TurnEventLogEntry{
-		Type:   "HPChange",
-		Target: a.TargetPlayer.UserID,
-		Delta:  a.Amount,
-		Source: a.SourceID,
+func (a *HealAction) LogEntry() gamelog.LogEntry {
+	return gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       gamelog.EntryTypeAction,
+		ActionType: string(a.Type()),
+		Target:     a.TargetPlayer.UserID,
+		Delta:      a.Amount,
+		Source:     a.SourceID,
 	}
 }
 
@@ -170,12 +179,14 @@ func (a *ModifyLPAction) Execute(ctx *ActionContext) error {
 	return nil
 }
 
-func (a *ModifyLPAction) LogEntry() TurnEventLogEntry {
-	return TurnEventLogEntry{
-		Type:   "LPChange",
-		Target: a.TargetPlayer.UserID,
-		Delta:  a.Amount,
-		Source: a.SourceID,
+func (a *ModifyLPAction) LogEntry() gamelog.LogEntry {
+	return gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       gamelog.EntryTypeAction,
+		ActionType: string(a.Type()),
+		Target:     a.TargetPlayer.UserID,
+		Delta:      a.Amount,
+		Source:     a.SourceID,
 	}
 }
 
@@ -243,17 +254,20 @@ func (a *MoveAction) Execute(ctx *ActionContext) error {
 	return nil
 }
 
-func (a *MoveAction) LogEntry() TurnEventLogEntry {
-	return TurnEventLogEntry{
-		Type:   "Move",
-		Target: a.TargetPlayer.UserID,
-		Delta:  a.Steps,
-		Source: a.SourceID,
-		Metadata: map[string]interface{}{
-			"start_pos": a.TargetPlayer.Position - a.Steps, // Approximate start
-			"end_pos":   a.TargetPos,
-			"path":      a.Path,
-		},
+func (a *MoveAction) LogEntry() gamelog.LogEntry {
+	metadata := util.NewMetadata()
+	metadata.SetInt("start_pos", a.TargetPlayer.Position-a.Steps) // Approximate start
+	metadata.SetInt("end_pos", a.TargetPos)
+	metadata.Set("path", a.Path)
+
+	return gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       gamelog.EntryTypeAction,
+		ActionType: string(a.Type()),
+		Target:     a.TargetPlayer.UserID,
+		Delta:      a.Steps,
+		Source:     a.SourceID,
+		Metadata:   metadata,
 	}
 }
 
@@ -308,15 +322,18 @@ func (a *AddBuffAction) Execute(ctx *ActionContext) error {
 	return nil
 }
 
-func (a *AddBuffAction) LogEntry() TurnEventLogEntry {
-	return TurnEventLogEntry{
-		Type:   "BuffAdd",
-		Target: a.TargetPlayer.UserID,
-		Delta:  a.Duration,
-		Source: a.SourceID,
-		Metadata: map[string]interface{}{
-			"buff_type": a.BuffType.String(),
-		},
+func (a *AddBuffAction) LogEntry() gamelog.LogEntry {
+	metadata := util.NewMetadata()
+	metadata.SetString("buff_type", a.BuffType.String())
+
+	return gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       gamelog.EntryTypeAction,
+		ActionType: string(a.Type()),
+		Target:     a.TargetPlayer.UserID,
+		Delta:      a.Duration,
+		Source:     a.SourceID,
+		Metadata:   metadata,
 	}
 }
 
@@ -358,15 +375,18 @@ func (a *RemoveBuffAction) Execute(ctx *ActionContext) error {
 	return nil
 }
 
-func (a *RemoveBuffAction) LogEntry() TurnEventLogEntry {
-	return TurnEventLogEntry{
-		Type:   "BuffRemove",
-		Target: a.TargetPlayer.UserID,
-		Delta:  0,
-		Source: a.SourceID,
-		Metadata: map[string]interface{}{
-			"buff_type": a.BuffType.String(),
-		},
+func (a *RemoveBuffAction) LogEntry() gamelog.LogEntry {
+	metadata := util.NewMetadata()
+	metadata.SetString("buff_type", a.BuffType.String())
+
+	return gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       gamelog.EntryTypeAction,
+		ActionType: string(a.Type()),
+		Target:     a.TargetPlayer.UserID,
+		Delta:      0,
+		Source:     a.SourceID,
+		Metadata:   metadata,
 	}
 }
 
@@ -409,16 +429,19 @@ func (a *TeleportAction) Execute(ctx *ActionContext) error {
 	return nil
 }
 
-func (a *TeleportAction) LogEntry() TurnEventLogEntry {
-	return TurnEventLogEntry{
-		Type:   "Teleport",
-		Target: a.TargetPlayer.UserID,
-		Delta:  a.TargetPos,
-		Source: a.SourceID,
-		Metadata: map[string]interface{}{
-			"from_pos": a.TargetPlayer.Position,
-			"to_pos":   a.TargetPos,
-		},
+func (a *TeleportAction) LogEntry() gamelog.LogEntry {
+	metadata := util.NewMetadata()
+	metadata.SetInt("from_pos", a.TargetPlayer.Position)
+	metadata.SetInt("to_pos", a.TargetPos)
+
+	return gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       gamelog.EntryTypeAction,
+		ActionType: string(a.Type()),
+		Target:     a.TargetPlayer.UserID,
+		Delta:      a.TargetPos,
+		Source:     a.SourceID,
+		Metadata:   metadata,
 	}
 }
 
@@ -472,20 +495,24 @@ func (a *StealBuffAction) Execute(ctx *ActionContext) error {
 	return nil
 }
 
-func (a *StealBuffAction) LogEntry() TurnEventLogEntry {
+func (a *StealBuffAction) LogEntry() gamelog.LogEntry {
 	buffType := ""
 	if a.StolenBuff != nil {
 		buffType = a.StolenBuff.Type.String()
 	}
-	return TurnEventLogEntry{
-		Type:   "BuffSteal",
-		Target: a.TargetPlayer.UserID,
-		Delta:  0,
-		Source: a.SourceID,
-		Metadata: map[string]interface{}{
-			"stolen_by": a.SourcePlayer.UserID,
-			"buff_type": buffType,
-		},
+
+	metadata := util.NewMetadata()
+	metadata.SetString("stolen_by", a.SourcePlayer.UserID)
+	metadata.SetString("buff_type", buffType)
+
+	return gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       gamelog.EntryTypeAction,
+		ActionType: string(a.Type()),
+		Target:     a.TargetPlayer.UserID,
+		Delta:      0,
+		Source:     a.SourceID,
+		Metadata:   metadata,
 	}
 }
 
@@ -527,11 +554,126 @@ func (a *DrawEventAction) Execute(ctx *ActionContext) error {
 	return nil
 }
 
-func (a *DrawEventAction) LogEntry() TurnEventLogEntry {
-	return TurnEventLogEntry{
-		Type:   "DrawEvent",
-		Target: a.TargetPlayer.UserID,
-		Delta:  0,
-		Source: a.SourceID,
+func (a *DrawEventAction) LogEntry() gamelog.LogEntry {
+	return gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       gamelog.EntryTypeAction,
+		ActionType: string(a.Type()),
+		Target:     a.TargetPlayer.UserID,
+		Delta:      0,
+		Source:     a.SourceID,
+	}
+}
+
+// ========== RespawnAction ==========
+
+// RespawnAction represents player respawn at checkpoint.
+// Used when player dies and needs to respawn.
+type RespawnAction struct {
+	TargetPlayer  *core.Player // Player respawning
+	CheckpointPos int          // Position to respawn at
+	SourceID      string       // Source identifier (e.g., "DeathRespawn", "FragileRespawn")
+}
+
+// NewRespawnAction creates a new RespawnAction.
+func NewRespawnAction(target *core.Player, checkpointPos int, sourceID string) *RespawnAction {
+	return &RespawnAction{
+		TargetPlayer:  target,
+		CheckpointPos: checkpointPos,
+		SourceID:      sourceID,
+	}
+}
+
+func (a *RespawnAction) Type() ActionType { return ActionRespawn }
+func (a *RespawnAction) CanModify() bool   { return false }
+func (a *RespawnAction) Source() string    { return a.SourceID }
+func (a *RespawnAction) Target() string    { return a.TargetPlayer.UserID }
+
+// PreTriggerPhase returns PhaseAnyTime (respawn not intercepted).
+func (a *RespawnAction) PreTriggerPhase() event.Phase {
+	return event.PhaseAnyTime
+}
+
+// PostTriggerPhase returns PhaseAnyTime (no post-trigger for respawn).
+func (a *RespawnAction) PostTriggerPhase() event.Phase {
+	return event.PhaseAnyTime
+}
+
+func (a *RespawnAction) Execute(ctx *ActionContext) error {
+	a.TargetPlayer.Respawn(a.CheckpointPos)
+	return nil
+}
+
+func (a *RespawnAction) LogEntry() gamelog.LogEntry {
+	metadata := util.NewMetadata()
+	metadata.SetInt("checkpoint_pos", a.CheckpointPos)
+
+	return gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       gamelog.EntryTypeAction,
+		ActionType: string(a.Type()),
+		Target:     a.TargetPlayer.UserID,
+		Delta:      0,
+		Source:     a.SourceID,
+		Metadata:   metadata,
+	}
+}
+
+// ========== FellDownAction ==========
+
+// FellDownAction represents player falling from Fragile cell.
+// Used when player lands on a broken fragile cell.
+type FellDownAction struct {
+	TargetPlayer *core.Player // Player falling
+	Position     int          // Position where player fell
+	Damage       int          // Damage amount from falling
+	SourceID     string       // Source identifier (e.g., "FragileCell")
+}
+
+// NewFellDownAction creates a new FellDownAction.
+func NewFellDownAction(target *core.Player, position int, damage int, sourceID string) *FellDownAction {
+	return &FellDownAction{
+		TargetPlayer: target,
+		Position:     position,
+		Damage:       damage,
+		SourceID:     sourceID,
+	}
+}
+
+func (a *FellDownAction) Type() ActionType { return ActionFellDown }
+func (a *FellDownAction) CanModify() bool   { return false }
+func (a *FellDownAction) Source() string    { return a.SourceID }
+func (a *FellDownAction) Target() string    { return a.TargetPlayer.UserID }
+
+// PreTriggerPhase returns PhaseAnyTime (fell down not intercepted).
+func (a *FellDownAction) PreTriggerPhase() event.Phase {
+	return event.PhaseAnyTime
+}
+
+// PostTriggerPhase returns PhaseAnyTime (no post-trigger for fell down).
+func (a *FellDownAction) PostTriggerPhase() event.Phase {
+	return event.PhaseAnyTime
+}
+
+func (a *FellDownAction) Execute(ctx *ActionContext) error {
+	// Falling damage
+	if a.Damage > 0 {
+		return a.TargetPlayer.ApplyDamage(a.Damage)
+	}
+	return nil
+}
+
+func (a *FellDownAction) LogEntry() gamelog.LogEntry {
+	metadata := util.NewMetadata()
+	metadata.SetInt("position", a.Position)
+
+	return gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       gamelog.EntryTypeAction,
+		ActionType: string(a.Type()),
+		Target:     a.TargetPlayer.UserID,
+		Delta:      -a.Damage,
+		Source:     a.SourceID,
+		Metadata:   metadata,
 	}
 }

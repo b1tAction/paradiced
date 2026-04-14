@@ -1,26 +1,29 @@
 package action
 
-import "github.com/b1tAction/Fated/pkg/action"
+import (
+	"github.com/b1tAction/Fated/pkg/action"
+	"github.com/b1tAction/Fated/pkg/gamelog"
+)
 
 // ActionType is alias to pkg/action.ActionType for convenience.
 type ActionType = action.ActionType
 
-// TurnEventLogEntry is alias to pkg/action.TurnEventLogEntry for convenience.
-type TurnEventLogEntry = action.TurnEventLogEntry
-
 // ActionType constants (imported from pkg/action)
+// Using snake_case string values directly.
 const (
-	ActionDamage     = action.ActionDamage
-	ActionHeal       = action.ActionHeal
-	ActionModifyLP   = action.ActionModifyLP
-	ActionMove       = action.ActionMove
-	ActionAddBuff    = action.ActionAddBuff
-	ActionRemoveBuff = action.ActionRemoveBuff
-	ActionRespawn    = action.ActionRespawn
-	ActionSkipTurn   = action.ActionSkipTurn
-	ActionDrawEvent  = action.ActionDrawEvent
-	ActionTeleport   = action.ActionTeleport
-	ActionStealBuff  = action.ActionStealBuff
+	ActionDamage     ActionType = action.ActionDamage
+	ActionHeal       ActionType = action.ActionHeal
+	ActionModifyLP   ActionType = action.ActionModifyLP
+	ActionMove       ActionType = action.ActionMove
+	ActionAddBuff    ActionType = action.ActionAddBuff
+	ActionRemoveBuff ActionType = action.ActionRemoveBuff
+	ActionRespawn    ActionType = action.ActionRespawn
+	ActionSkipTurn   ActionType = action.ActionSkipTurn
+	ActionDrawEvent  ActionType = action.ActionDrawEvent
+	ActionTeleport   ActionType = action.ActionTeleport
+	ActionStealBuff  ActionType = action.ActionStealBuff
+	ActionFellDown   ActionType = action.ActionFellDown
+	ActionUnknown    ActionType = action.ActionUnknown
 )
 
 // ExecutableAction extends pkg/action.Action with execution and logging capabilities.
@@ -32,6 +35,6 @@ type ExecutableAction interface {
 	// Called after interception phase completes.
 	Execute(ctx *ActionContext) error
 
-	// LogEntry generates an event log entry for client animation.
-	LogEntry() TurnEventLogEntry
+	// LogEntry generates a game log entry for client animation.
+	LogEntry() gamelog.LogEntry
 }

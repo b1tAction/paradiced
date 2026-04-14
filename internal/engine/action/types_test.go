@@ -5,6 +5,7 @@ import (
 
 	"github.com/b1tAction/Fated/internal/core"
 	"github.com/b1tAction/Fated/internal/core/buff"
+	"github.com/b1tAction/Fated/pkg/gamelog"
 )
 
 // ========== ActionType Tests ==========
@@ -14,23 +15,25 @@ func TestActionTypeString(t *testing.T) {
 		at       ActionType
 		expected string
 	}{
-		{ActionDamage, "Damage"},
-		{ActionHeal, "Heal"},
-		{ActionModifyLP, "ModifyLP"},
-		{ActionMove, "Move"},
-		{ActionAddBuff, "AddBuff"},
-		{ActionRemoveBuff, "RemoveBuff"},
-		{ActionRespawn, "Respawn"},
-		{ActionSkipTurn, "SkipTurn"},
-		{ActionDrawEvent, "DrawEvent"},
-		{ActionTeleport, "Teleport"},
-		{ActionStealBuff, "StealBuff"},
-		{ActionType(999), "Unknown"},
+		{ActionDamage, "damage"},
+		{ActionHeal, "heal"},
+		{ActionModifyLP, "modify_lp"},
+		{ActionMove, "move"},
+		{ActionAddBuff, "add_buff"},
+		{ActionRemoveBuff, "remove_buff"},
+		{ActionRespawn, "respawn"},
+		{ActionSkipTurn, "skip_turn"},
+		{ActionDrawEvent, "draw_event"},
+		{ActionTeleport, "teleport"},
+		{ActionStealBuff, "steal_buff"},
+		{ActionFellDown, "fell_down"},
+		{ActionUnknown, "unknown"},
 	}
 
 	for _, tt := range tests {
-		if tt.at.String() != tt.expected {
-			t.Errorf("ActionType(%d).String() = %s, want %s", tt.at, tt.at.String(), tt.expected)
+		// ActionType is now a string, so direct comparison
+		if string(tt.at) != tt.expected {
+			t.Errorf("ActionType(%s) = %s, want %s", tt.at, tt.at, tt.expected)
 		}
 	}
 }
@@ -107,79 +110,6 @@ func TestQueueClear(t *testing.T) {
 	}
 }
 
-// ========== TurnEventLog Tests ==========
-
-func TestTurnEventLogAddEntry(t *testing.T) {
-	log := NewTurnEventLog()
-
-	if log.Len() != 0 {
-		t.Error("New log should be empty")
-	}
-
-	entry1 := TurnEventLogEntry{
-		Type:   "HPChange",
-		Target: "p1",
-		Delta:  -10,
-		Source: "Event_Trap",
-	}
-
-	entry2 := TurnEventLogEntry{
-		Type:   "LPChange",
-		Target: "p1",
-		Delta:  1,
-		Source: "Buff_Divine",
-	}
-
-	log.AddEntry(entry1)
-	log.AddEntry(entry2)
-
-	if log.Len() != 2 {
-		t.Errorf("Log length should be 2, got %d", log.Len())
-	}
-
-	entries := log.Entries()
-	if len(entries) != 2 {
-		t.Errorf("Entries length should be 2, got %d", len(entries))
-	}
-	if entries[0].Type != "HPChange" {
-		t.Errorf("First entry type should be HPChange, got %s", entries[0].Type)
-	}
-	if entries[1].Type != "LPChange" {
-		t.Errorf("Second entry type should be LPChange, got %s", entries[1].Type)
-	}
-}
-
-func TestTurnEventLogToJSON(t *testing.T) {
-	log := NewTurnEventLog()
-	log.AddEntry(TurnEventLogEntry{
-		Type:   "Move",
-		Target: "p1",
-		Delta:  5,
-		Source: "DiceRoll",
-	})
-
-	jsonBytes, err := log.ToJSON()
-	if err != nil {
-		t.Errorf("ToJSON failed: %v", err)
-	}
-
-	// Verify JSON contains expected fields
-	jsonStr := string(jsonBytes)
-	if jsonStr == "" {
-		t.Error("JSON should not be empty")
-	}
-}
-
-func TestTurnEventLogClear(t *testing.T) {
-	log := NewTurnEventLog()
-	log.AddEntry(TurnEventLogEntry{Type: "Test", Target: "p1", Delta: 0, Source: "test"})
-	log.Clear()
-
-	if log.Len() != 0 {
-		t.Error("Clear should empty log")
-	}
-}
-
 // ========== DamageAction Tests ==========
 
 func TestDamageAction(t *testing.T) {
@@ -215,8 +145,11 @@ func TestDamageAction(t *testing.T) {
 
 	// Verify log entry
 	entry := action.LogEntry()
-	if entry.Type != "HPChange" {
-		t.Errorf("Log type should be HPChange, got %s", entry.Type)
+	if entry.Type != gamelog.EntryTypeAction {
+		t.Errorf("Log type should be action, got %s", entry.Type)
+	}
+	if entry.ActionType != "damage" {
+		t.Errorf("Log ActionType should be damage, got %s", entry.ActionType)
 	}
 	if entry.Delta != -20 {
 		t.Errorf("Log delta should be -20, got %d", entry.Delta)
@@ -347,8 +280,8 @@ func TestAddBuffAction(t *testing.T) {
 	}
 
 	entry := action.LogEntry()
-	if entry.Type != "BuffAdd" {
-		t.Errorf("Log type should be BuffAdd, got %s", entry.Type)
+	if entry.ActionType != "add_buff" {
+		t.Errorf("Log ActionType should be add_buff, got %s", entry.ActionType)
 	}
 }
 
@@ -399,8 +332,8 @@ func TestTeleportAction(t *testing.T) {
 	}
 
 	entry := action.LogEntry()
-	if entry.Type != "Teleport" {
-		t.Errorf("Log type should be Teleport, got %s", entry.Type)
+	if entry.ActionType != "teleport" {
+		t.Errorf("Log ActionType should be teleport, got %s", entry.ActionType)
 	}
 }
 
@@ -458,6 +391,76 @@ func TestStealBuffActionNoBuffs(t *testing.T) {
 	}
 }
 
+// ========== RespawnAction Tests ==========
+
+func TestRespawnAction(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	player.IsDead = true
+	player.Position = 100
+
+	action := NewRespawnAction(player, 50, "DeathRespawn")
+
+	if action.Type() != ActionRespawn {
+		t.Errorf("Type should be ActionRespawn, got %s", action.Type())
+	}
+	if action.CanModify() {
+		t.Error("RespawnAction should not be modifiable")
+	}
+	if action.CheckpointPos != 50 {
+		t.Errorf("CheckpointPos should be 50, got %d", action.CheckpointPos)
+	}
+
+	ctx := NewActionContext(nil, nil, nil)
+	action.Execute(ctx)
+
+	if player.Position != 50 {
+		t.Errorf("Position should be 50 after respawn, got %d", player.Position)
+	}
+	if player.IsDead {
+		t.Error("Player should not be dead after respawn")
+	}
+
+	entry := action.LogEntry()
+	if entry.ActionType != "respawn" {
+		t.Errorf("Log ActionType should be respawn, got %s", entry.ActionType)
+	}
+}
+
+// ========== FellDownAction Tests ==========
+
+func TestFellDownAction(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	player.HP = 10
+	player.Position = 30
+
+	action := NewFellDownAction(player, 30, 1, "FragileCell")
+
+	if action.Type() != ActionFellDown {
+		t.Errorf("Type should be ActionFellDown, got %s", action.Type())
+	}
+	if action.CanModify() {
+		t.Error("FellDownAction should not be modifiable")
+	}
+	if action.Damage != 1 {
+		t.Errorf("Damage should be 1, got %d", action.Damage)
+	}
+
+	ctx := NewActionContext(nil, nil, nil)
+	action.Execute(ctx)
+
+	if player.HP != 9 {
+		t.Errorf("HP should be 9 after falling damage, got %d", player.HP)
+	}
+
+	entry := action.LogEntry()
+	if entry.ActionType != "fell_down" {
+		t.Errorf("Log ActionType should be fell_down, got %s", entry.ActionType)
+	}
+	if entry.Delta != -1 {
+		t.Errorf("Log delta should be -1, got %d", entry.Delta)
+	}
+}
+
 // ========== ActionContext Tests ==========
 
 func TestActionContextExecuteAction(t *testing.T) {
@@ -475,11 +478,6 @@ func TestActionContextExecuteAction(t *testing.T) {
 	// Verify action was executed
 	if player.HP != 90 {
 		t.Errorf("HP should be 90, got %d", player.HP)
-	}
-
-	// Verify log was recorded
-	if ctx.EventLog.Len() != 1 {
-		t.Errorf("EventLog should have 1 entry, got %d", ctx.EventLog.Len())
 	}
 }
 
@@ -509,11 +507,6 @@ func TestActionContextProcessQueue(t *testing.T) {
 	if player.HP != 95 {
 		t.Errorf("HP should be 95, got %d", player.HP)
 	}
-
-	// EventLog should have 2 entries
-	if ctx.EventLog.Len() != 2 {
-		t.Errorf("EventLog should have 2 entries, got %d", ctx.EventLog.Len())
-	}
 }
 
 func TestActionContextClear(t *testing.T) {
@@ -521,15 +514,11 @@ func TestActionContextClear(t *testing.T) {
 	ctx := NewActionContext(nil, nil, nil)
 
 	ctx.PushDerivedAction(NewDamageAction(player, 10, "test"))
-	ctx.EventLog.AddEntry(TurnEventLogEntry{Type: "Test"})
 
 	ctx.Clear()
 
 	if !ctx.ActionQueue.IsEmpty() {
 		t.Error("Queue should be empty after Clear")
-	}
-	if ctx.EventLog.Len() != 0 {
-		t.Error("EventLog should be empty after Clear")
 	}
 }
 
@@ -552,5 +541,34 @@ func TestActionContextMetadata(t *testing.T) {
 	ctx.SetString("str_key", "value")
 	if ctx.GetStringOrDefault("str_key", "") != "value" {
 		t.Error("Metadata should store string correctly")
+	}
+}
+
+// ========== LogEntry Tests ==========
+
+func TestLogEntryMetadata(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
+	player.Position = 10
+
+	// Test MoveAction LogEntry with metadata
+	action := NewMoveAction(player, 5, "DiceRoll")
+	action.TargetPos = 15
+	action.Path = []int{10, 11, 12, 13, 14, 15}
+
+	entry := action.LogEntry()
+
+	if entry.Metadata == nil {
+		t.Fatal("Metadata should not be nil")
+	}
+
+	// Use type-safe metadata access
+	startPos := entry.Metadata.GetIntOrDefault("start_pos", -1)
+	if startPos != 5 { // 10 - 5 = 5
+		t.Errorf("start_pos should be 5, got %d", startPos)
+	}
+
+	endPos := entry.Metadata.GetIntOrDefault("end_pos", -1)
+	if endPos != 15 {
+		t.Errorf("end_pos should be 15, got %d", endPos)
 	}
 }

@@ -2,6 +2,7 @@ package action
 
 import (
 	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/Fated/pkg/gamelog"
 	"github.com/b1tAction/Fated/pkg/protocol"
 	"github.com/b1tAction/Fated/pkg/util"
 )
@@ -16,7 +17,6 @@ type ActionContext struct {
 	EventBus    *event.EventBus    // EventBus for interception (nil if no interception)
 	MapEngine   protocol.MapEngine // MapEngine for movement calculation
 	ActionQueue *Queue             // Queue for derived actions
-	EventLog    *TurnEventLog      // Log for recording events
 }
 
 // NewActionContext creates a new ActionContext with required components.
@@ -27,7 +27,6 @@ func NewActionContext(game protocol.Game, bus *event.EventBus, mapEngine protoco
 		EventBus:    bus,
 		MapEngine:   mapEngine,
 		ActionQueue: NewQueue(),
-		EventLog:    NewTurnEventLog(),
 	}
 }
 
@@ -36,7 +35,7 @@ func NewActionContext(game protocol.Game, bus *event.EventBus, mapEngine protoco
 // 1. PreTrigger phase - publish for interception (if not PhaseAnyTime)
 // 2. Execute the (possibly modified) action
 // 3. PostTrigger phase - publish for lifecycle events (if not PhaseAnyTime)
-// 4. Record in event log
+// 4. Record in global game log
 // 5. Process any derived actions in queue
 func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
 	// Step 1: PreTrigger phase - interception
@@ -74,8 +73,13 @@ func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
 		ctx.EventBus.Publish(postPhase, action.Target(), triggerCtx)
 	}
 
-	// Step 4: Record in event log
-	ctx.EventLog.AddEntry(action.LogEntry())
+	// Step 4: Record in global game log
+	if ctx.Game != nil {
+		gameLog := ctx.Game.GetGameLog()
+		if gameLog != nil {
+			gameLog.AddEntry(action.LogEntry())
+		}
+	}
 
 	// Step 5: Process derived actions in queue
 	ctx.ProcessQueue()
@@ -100,5 +104,10 @@ func (ctx *ActionContext) PushDerivedAction(action ExecutableAction) {
 // Clear resets the context for a new turn.
 func (ctx *ActionContext) Clear() {
 	ctx.ActionQueue.Clear()
-	ctx.EventLog.Clear()
+	ctx.Metadata.Clear()
+}
+
+// GetGameLog returns the global game log (helper method).
+func (ctx *ActionContext) GetGameLog() *gamelog.GameLog {
+	return ctx.Game.GetGameLog()
 }
