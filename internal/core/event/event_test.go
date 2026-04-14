@@ -102,9 +102,6 @@ func TestEventTypeGetEventDefinition(t *testing.T) {
 	if def.Eval != constants.EvaluationMildGood {
 		t.Errorf("def.Eval = %d, expected MildGood(%d)", def.Eval, constants.EvaluationMildGood)
 	}
-	if def.HPChange != 1 {
-		t.Errorf("def.HPChange = %d, expected 1", def.HPChange)
-	}
 
 	// Test bad event definition
 	def = GetEventDefinition(constants.EventTypeThunder)
@@ -117,17 +114,14 @@ func TestEventTypeGetEventDefinition(t *testing.T) {
 	if def.Eval != constants.EvaluationVeryBad {
 		t.Errorf("def.Eval = %d, expected VeryBad(%d)", def.Eval, constants.EvaluationVeryBad)
 	}
-	if def.HPChange != -999 {
-		t.Errorf("def.HPChange = %d, expected -999 (HP归零)", def.HPChange)
-	}
 
 	// Test Buff-giving event
 	def = GetEventDefinition(constants.EventTypeDivineBless)
 	if def == nil {
 		t.Fatal("EventTypeDivineBless should have definition")
 	}
-	if def.BuffType != constants.BuffTypeDivine {
-		t.Errorf("def.BuffType = %s, expected 'divine'", def.BuffType)
+	if def.Name != "受到天使眷顾" {
+		t.Errorf("def.Name = %s, expected 受到天使眷顾", def.Name)
 	}
 
 	// Test item-giving event
@@ -135,8 +129,8 @@ func TestEventTypeGetEventDefinition(t *testing.T) {
 	if def == nil {
 		t.Fatal("EventTypeRelic should have definition")
 	}
-	if def.SpecialEffect != constants.SpecialDrawItem {
-		t.Errorf("def.SpecialEffect = %s, expected 'draw_item'", def.SpecialEffect)
+	if def.Name != "捡到勇士的圣遗物" {
+		t.Errorf("def.Name = %s, expected 捡到勇士的圣遗物", def.Name)
 	}
 
 	// Test unknown event

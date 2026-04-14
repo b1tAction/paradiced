@@ -4,29 +4,38 @@ package event
 
 import (
 	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/event"
 )
+
+// EffectHandler alias for event.EffectHandler (unified signature).
+type EffectHandler = func(phase constants.Phase, ctx *event.Context)
 
 // ========== Event Definition ==========
 
+// EventDefinition contains only static metadata for Event display and classification.
+// Effect logic is managed by EventHandlerConfig.
 type EventDefinition struct {
-	Type          constants.EventType     `json:"type"`
-	Eval          constants.Evaluation    `json:"evaluation"`
-	EnglishName   string                  `json:"english_name"` // English identifier (for String())
-	Name          string                  `json:"name"`         // Chinese display name
-	Desc          string                  `json:"desc"`
-	HPChange      int                     `json:"hp_change"`
-	LPChange      int                     `json:"lp_change"`
-	BuffType      constants.BuffType      `json:"buff_type"`
-	SpecialEffect constants.SpecialEffect `json:"special_effect"` // Special effect type
+	Type        constants.EventType   `json:"type"`
+	Eval        constants.Evaluation  `json:"evaluation"`    // Evaluation score for random draw
+	EnglishName string                `json:"english_name"`  // English identifier (snake_case)
+	Name        string                `json:"name"`          // Chinese display name
+	Desc        string                `json:"desc"`          // Description text
+}
+
+// EventHandlerConfig contains effect logic for Event.
+// Events don't need Phases/Priority (triggered at OnLand/PhaseOnEvent uniformly).
+type EventHandlerConfig struct {
+	Handler EffectHandler `json:"-"` // Effect handler function
 }
 
 // ========== Event Registry ==========
 
-// EventRegistry is the registry for Event definitions.
+// EventRegistry is the registry for Event definitions and handler configs.
 type EventRegistry struct {
 	defs    map[constants.EventType]*EventDefinition
-	strings map[constants.EventType]string // English identifier
-	names   map[constants.EventType]string // Chinese name
+	configs map[constants.EventType]*EventHandlerConfig // Handler configs
+	strings map[constants.EventType]string              // English identifier
+	names   map[constants.EventType]string              // Chinese name
 	evals   map[constants.EventType]constants.Evaluation
 
 	// Category lists (auto-generated)
@@ -39,6 +48,7 @@ type EventRegistry struct {
 func NewEventRegistry() *EventRegistry {
 	return &EventRegistry{
 		defs:          make(map[constants.EventType]*EventDefinition),
+		configs:       make(map[constants.EventType]*EventHandlerConfig),
 		strings:       make(map[constants.EventType]string),
 		names:         make(map[constants.EventType]string),
 		evals:         make(map[constants.EventType]constants.Evaluation),
@@ -48,8 +58,8 @@ func NewEventRegistry() *EventRegistry {
 	}
 }
 
-// RegisterEvent registers an Event definition.
-func (r *EventRegistry) RegisterEvent(def *EventDefinition) {
+// RegisterEvent registers an Event definition with handler config.
+func (r *EventRegistry) RegisterEvent(def *EventDefinition, config *EventHandlerConfig) {
 	if def == nil || def.Type == constants.EventTypeNone {
 		return
 	}
@@ -66,6 +76,11 @@ func (r *EventRegistry) RegisterEvent(def *EventDefinition) {
 		r.badEvents = append(r.badEvents, def.Type)
 	} else {
 		r.neutralEvents = append(r.neutralEvents, def.Type)
+	}
+
+	// Register handler config
+	if config != nil {
+		r.configs[def.Type] = config
 	}
 }
 
@@ -99,6 +114,14 @@ func (r *EventRegistry) GetEventEvaluation(et constants.EventType) constants.Eva
 		return eval
 	}
 	return constants.EvaluationNeutral
+}
+
+// GetEventHandlerConfig returns the Event's handler config (nil if none).
+func (r *EventRegistry) GetEventHandlerConfig(et constants.EventType) *EventHandlerConfig {
+	if config, ok := r.configs[et]; ok {
+		return config
+	}
+	return nil
 }
 
 // GetAllEventTypes returns all registered Event types.
@@ -173,6 +196,11 @@ func GetEventTypesByCategory(category string) []constants.EventType {
 // GetAllEventDefinitions returns all Event definitions.
 func GetAllEventDefinitions() []*EventDefinition {
 	return GlobalEventRegistry.GetAllEventDefinitions()
+}
+
+// GetEventHandlerConfig returns the Event's handler config from GlobalEventRegistry.
+func GetEventHandlerConfig(et constants.EventType) *EventHandlerConfig {
+	return GlobalEventRegistry.GetEventHandlerConfig(et)
 }
 
 // GetEventName returns the Event Chinese display name from GlobalEventRegistry.
