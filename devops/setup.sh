@@ -95,7 +95,7 @@ main() {
             docker compose down
         fi
         log_info "Building and starting container (UID=$(id -u), GID=$(id -g))..."
-        UID=$(id -u) GID=$(id -g) docker compose up -d --build
+        USER_UID=$(id -u) USER_GID=$(id -g) docker compose up -d --build
         log_info "Setup complete!"
         log_info "To attach to the container, run: docker exec -it claude_backend_dev bash"
         log_info "To view logs, run: docker logs -f claude_backend_dev"
@@ -115,7 +115,7 @@ main() {
         docker compose up -d
     else
         log_info "Building and starting container (UID=$(id -u), GID=$(id -g))..."
-        UID=$(id -u) GID=$(id -g) docker compose up -d --build
+        USER_UID=$(id -u) USER_GID=$(id -g) docker compose up -d --build
     fi
 
     log_info "Setup complete!"
