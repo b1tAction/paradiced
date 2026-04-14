@@ -2,6 +2,7 @@
 package handler
 
 import (
+	"github.com/b1tAction/Fated/pkg/constants"
 	"github.com/b1tAction/Fated/pkg/event"
 )
 
@@ -17,8 +18,8 @@ import (
 //
 // Example:
 //
-//	func UndyingHandler(phase event.Phase, ctx *event.Context) {
-//	    if phase != event.PhasePreRespawn {
+//	func UndyingHandler(phase constants.Phase, ctx *event.Context) {
+//	    if phase != constants.PhasePreRespawn {
 //	        return
 //	    }
 //	    ctx.SetBool("action_blocked", true)
@@ -26,4 +27,4 @@ import (
 //	    ctx.AddDerivedAction(NewHealAction(player, player.MaxHP, "Buff_Undying"))
 //	    ctx.AddDerivedAction(NewRemoveBuffAction(player, BuffTypeUndying, "Buff_Undying"))
 //	}
-type EffectHandler func(phase event.Phase, ctx *event.Context)
+type EffectHandler func(phase constants.Phase, ctx *event.Context)

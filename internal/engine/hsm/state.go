@@ -5,6 +5,7 @@ import (
 
 	"github.com/b1tAction/Fated/internal/core"
 	"github.com/b1tAction/Fated/internal/engine"
+	"github.com/b1tAction/Fated/pkg/constants"
 	"github.com/b1tAction/Fated/pkg/event"
 	"github.com/b1tAction/Fated/pkg/util"
 )
@@ -71,7 +72,7 @@ type StateContext struct {
 	MapEngine MapEngineAdapter   // MapEngine adapter (isolates internal/gamemap)
 
 	// Phase triggering
-	Phase     event.Phase        // Current phase to trigger
+	Phase     constants.Phase        // Current phase to trigger
 	PhaseData interface{}        // Additional phase data (e.g., damage amount, dice steps)
 
 	// Decision handling
@@ -131,7 +132,7 @@ func (ctx *StateContext) WithMapEngine(engine MapEngineAdapter) *StateContext {
 // ========== Phase Setup ==========
 
 // WithPhase sets the phase and optional data.
-func (ctx *StateContext) WithPhase(phase event.Phase, data interface{}) *StateContext {
+func (ctx *StateContext) WithPhase(phase constants.Phase, data interface{}) *StateContext {
 	ctx.Phase = phase
 	ctx.PhaseData = data
 	return ctx
@@ -249,7 +250,7 @@ func (ctx *StateContext) GetDiceType(playerID string) string {
 
 // Clear resets the context to default values.
 func (ctx *StateContext) Clear() {
-	ctx.Phase = event.Phase(0)
+	ctx.Phase = ""
 	ctx.PhaseData = nil
 	ctx.Decision = nil
 	ctx.Decisions = make([]*event.Decision, 0)

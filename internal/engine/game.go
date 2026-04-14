@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/b1tAction/Fated/internal/core"
+	"github.com/b1tAction/Fated/pkg/constants"
 	"github.com/b1tAction/Fated/pkg/event"
 	"github.com/b1tAction/Fated/pkg/gamelog"
 	"github.com/b1tAction/Fated/pkg/rng"
@@ -286,14 +287,14 @@ func (g *Game) RemoveBuffFromPlayer(player *core.Player, buff *core.Buff) bool {
 // Triggers PhaseOnBuffApplied, all Buffs/Items subscribed to this Phase receive notification.
 func (g *Game) BroadcastBuffApplied(player *core.Player, buff *core.Buff) {
 	ctx := event.NewContext(player).WithData(buff)
-	g.Bus.Publish(event.PhaseOnBuffApplied, player.UserID, ctx)
+	g.Bus.Publish(constants.PhaseOnBuffApplied, player.UserID, ctx)
 }
 
 // BroadcastBuffRemoved broadcasts Buff Removed event.
 // Triggers PhaseOnBuffRemoved, all Buffs/Items subscribed to this Phase receive notification.
 func (g *Game) BroadcastBuffRemoved(player *core.Player, buff *core.Buff) {
 	ctx := event.NewContext(player).WithData(buff)
-	g.Bus.Publish(event.PhaseOnBuffRemoved, player.UserID, ctx)
+	g.Bus.Publish(constants.PhaseOnBuffRemoved, player.UserID, ctx)
 }
 
 // ========== Helper Methods ==========

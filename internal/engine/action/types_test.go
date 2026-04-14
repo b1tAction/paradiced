@@ -5,6 +5,7 @@ import (
 
 	"github.com/b1tAction/Fated/internal/core"
 	"github.com/b1tAction/Fated/internal/core/buff"
+	"github.com/b1tAction/Fated/pkg/constants"
 	"github.com/b1tAction/Fated/pkg/event"
 	"github.com/b1tAction/Fated/pkg/gamelog"
 )
@@ -255,7 +256,7 @@ func TestModifyLPAction(t *testing.T) {
 func TestAddBuffAction(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
 
-	action := NewAddBuffAction(player, buff.BuffTypeDivine, 3, "Event_DivineGift")
+	action := NewAddBuffAction(player, constants.BuffTypeDivine, 3, "Event_DivineGift")
 
 	if action.Type() != ActionAddBuff {
 		t.Errorf("Type should be ActionAddBuff, got %s", action.Type())
@@ -263,8 +264,8 @@ func TestAddBuffAction(t *testing.T) {
 	if action.CanModify() {
 		t.Error("AddBuffAction should not be modifiable")
 	}
-	if action.BuffType != buff.BuffTypeDivine {
-		t.Errorf("BuffType should be Divine, got %s", action.BuffType.String())
+	if action.BuffType != constants.BuffTypeDivine {
+		t.Errorf("BuffType should be Divine, got %s", string(action.BuffType))
 	}
 
 	ctx := NewActionContext(nil, nil, nil)
@@ -273,7 +274,7 @@ func TestAddBuffAction(t *testing.T) {
 	if len(player.ActiveBuffs) != 1 {
 		t.Errorf("Player should have 1 buff, got %d", len(player.ActiveBuffs))
 	}
-	if player.ActiveBuffs[0].Type != buff.BuffTypeDivine {
+	if player.ActiveBuffs[0].Type != constants.BuffTypeDivine {
 		t.Error("Buff type should be Divine")
 	}
 	if player.ActiveBuffs[0].Duration != 3 {
@@ -290,14 +291,14 @@ func TestAddBuffAction(t *testing.T) {
 
 func TestRemoveBuffAction(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
-	player.AddBuff(buff.NewBuff(buff.BuffTypeCurse, 2))
-	player.AddBuff(buff.NewBuff(buff.BuffTypeDivine, 3))
+	player.AddBuff(buff.NewBuff(constants.BuffTypeCurse, 2))
+	player.AddBuff(buff.NewBuff(constants.BuffTypeDivine, 3))
 
 	if len(player.ActiveBuffs) != 2 {
 		t.Error("Setup: player should have 2 buffs")
 	}
 
-	action := NewRemoveBuffAction(player, buff.BuffTypeCurse, "Manual_Remove")
+	action := NewRemoveBuffAction(player, constants.BuffTypeCurse, "Manual_Remove")
 
 	ctx := NewActionContext(nil, nil, nil)
 	action.Execute(ctx)
@@ -305,7 +306,7 @@ func TestRemoveBuffAction(t *testing.T) {
 	if len(player.ActiveBuffs) != 1 {
 		t.Errorf("Player should have 1 buff after removal, got %d", len(player.ActiveBuffs))
 	}
-	if player.ActiveBuffs[0].Type != buff.BuffTypeDivine {
+	if player.ActiveBuffs[0].Type != constants.BuffTypeDivine {
 		t.Error("Remaining buff should be Divine")
 	}
 }
@@ -343,8 +344,8 @@ func TestTeleportAction(t *testing.T) {
 func TestStealBuffAction(t *testing.T) {
 	target := core.NewPlayer(core.PlayerConfig{UserID: "target"})
 	source := core.NewPlayer(core.PlayerConfig{UserID: "source"})
-	target.AddBuff(buff.NewBuff(buff.BuffTypeCurse, 2))
-	target.AddBuff(buff.NewBuff(buff.BuffTypeDivine, 3))
+	target.AddBuff(buff.NewBuff(constants.BuffTypeCurse, 2))
+	target.AddBuff(buff.NewBuff(constants.BuffTypeDivine, 3))
 
 	action := NewStealBuffAction(target, source, "Faction_BaiHu")
 
@@ -588,7 +589,7 @@ func TestContextDerivedActions(t *testing.T) {
 	// Add actions
 	player := core.NewPlayer(core.PlayerConfig{UserID: "p1"})
 	healAction := NewHealAction(player, 10, "test")
-	removeAction := NewRemoveBuffAction(player, buff.BuffTypeDivine, "test")
+	removeAction := NewRemoveBuffAction(player, constants.BuffTypeDivine, "test")
 
 	triggerCtx.AddDerivedAction(healAction)
 	triggerCtx.AddDerivedAction(removeAction)
@@ -610,7 +611,7 @@ func TestRespawnActionPreTriggerPhase(t *testing.T) {
 	action := NewRespawnAction(player, 50, "DeathRespawn")
 
 	// RespawnAction now has PhasePreRespawn for interception
-	if action.PreTriggerPhase() != event.PhasePreRespawn {
-		t.Errorf("RespawnAction PreTriggerPhase should be PhasePreRespawn, got %s", action.PreTriggerPhase())
+	if action.PreTriggerPhase() != constants.PhasePreRespawn {
+		t.Errorf("RespawnAction PreTriggerPhase should be PhasePreRespawn, got %s", string(action.PreTriggerPhase()))
 	}
 }

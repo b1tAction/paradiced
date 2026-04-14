@@ -6,6 +6,7 @@ import (
 
 	"github.com/b1tAction/Fated/internal/core/buff"
 	"github.com/b1tAction/Fated/internal/core/item"
+	"github.com/b1tAction/Fated/pkg/constants"
 	"github.com/b1tAction/Fated/pkg/util"
 )
 
@@ -63,7 +64,7 @@ func NewPlayer(config PlayerConfig) *Player {
 
 	// ZhuQue朱雀 faction starts with Fire离火 buff
 	if config.Faction == FactionZhuQue {
-		player.AddBuff(buff.NewBuff(buff.BuffTypeFire, -1))
+		player.AddBuff(buff.NewBuff(constants.BuffTypeFire, -1))
 	}
 
 	return player
@@ -96,7 +97,7 @@ func (p *Player) ApplyDamage(amount int) error {
 	}
 
 	// Hidden隐匿 buff grants damage immunity
-	if p.HasBuff(buff.BuffTypeHidden) {
+	if p.HasBuff(constants.BuffTypeHidden) {
 		return nil
 	}
 
@@ -163,7 +164,7 @@ func (p *Player) AddBuff(buffInstance *buff.Buff) error {
 	if buffInstance == nil {
 		return errors.New("buff cannot be nil")
 	}
-	if p.HasBuff(buff.BuffTypeHidden) && !buffInstance.Type.IsPositive() {
+	if p.HasBuff(constants.BuffTypeHidden) && !buffInstance.Type.IsPositive() {
 		return nil
 	}
 	p.ActiveBuffs = append(p.ActiveBuffs, buffInstance)
@@ -171,7 +172,7 @@ func (p *Player) AddBuff(buffInstance *buff.Buff) error {
 }
 
 // RemoveBuff removes a buff of specified type.
-func (p *Player) RemoveBuff(buffType buff.BuffType) bool {
+func (p *Player) RemoveBuff(buffType constants.BuffType) bool {
 	for i, b := range p.ActiveBuffs {
 		if b.Type == buffType {
 			p.ActiveBuffs = append(p.ActiveBuffs[:i], p.ActiveBuffs[i+1:]...)
@@ -182,7 +183,7 @@ func (p *Player) RemoveBuff(buffType buff.BuffType) bool {
 }
 
 // HasBuff checks if player has a buff of specified type.
-func (p *Player) HasBuff(buffType buff.BuffType) bool {
+func (p *Player) HasBuff(buffType constants.BuffType) bool {
 	for _, b := range p.ActiveBuffs {
 		if b.Type == buffType && b.IsActive() {
 			return true
@@ -192,7 +193,7 @@ func (p *Player) HasBuff(buffType buff.BuffType) bool {
 }
 
 // GetBuff gets the buff of specified type.
-func (p *Player) GetBuff(buffType buff.BuffType) *buff.Buff {
+func (p *Player) GetBuff(buffType constants.BuffType) *buff.Buff {
 	for _, b := range p.ActiveBuffs {
 		if b.Type == buffType {
 			return b
@@ -259,7 +260,7 @@ func (p *Player) GetItem(itemID string) *item.Item {
 }
 
 // HasItem checks if player has an item of specified type.
-func (p *Player) HasItem(itemType item.ItemType) bool {
+func (p *Player) HasItem(itemType constants.ItemType) bool {
 	for _, it := range p.Inventory {
 		if it.Type == itemType {
 			return true

@@ -3,6 +3,7 @@ package hsm
 import (
 	"github.com/b1tAction/Fated/internal/engine"
 	"github.com/b1tAction/Fated/internal/gamemap"
+	"github.com/b1tAction/Fated/pkg/constants"
 	"github.com/b1tAction/Fated/pkg/event"
 	"github.com/b1tAction/Fated/pkg/gamelog"
 	"github.com/b1tAction/Fated/pkg/protocol"
@@ -15,10 +16,10 @@ import (
 // to the concrete implementation, enabling easier testing and future changes.
 type EventBusAdapter interface {
 	// Publish publishes a Phase event and returns Decisions that need user confirmation.
-	Publish(phase event.Phase, playerID string, ctx *event.Context) []*event.Decision
+	Publish(phase constants.Phase, playerID string, ctx *event.Context) []*event.Decision
 
 	// Subscribe subscribes to a Phase with a pre-bound Decision.
-	Subscribe(phase event.Phase, ownerID, sourceID, sourceType string, decision *event.Decision) string
+	Subscribe(phase constants.Phase, ownerID, sourceID, sourceType string, decision *event.Decision) string
 
 	// Unsubscribe removes a subscription by ID.
 	Unsubscribe(subID string) bool
@@ -47,12 +48,12 @@ func NewEventBusWrapper(bus *event.EventBus) EventBusAdapter {
 }
 
 // Publish publishes a Phase event.
-func (w *EventBusWrapper) Publish(phase event.Phase, playerID string, ctx *event.Context) []*event.Decision {
+func (w *EventBusWrapper) Publish(phase constants.Phase, playerID string, ctx *event.Context) []*event.Decision {
 	return w.bus.Publish(phase, playerID, ctx)
 }
 
 // Subscribe subscribes to a Phase.
-func (w *EventBusWrapper) Subscribe(phase event.Phase, ownerID, sourceID, sourceType string, decision *event.Decision) string {
+func (w *EventBusWrapper) Subscribe(phase constants.Phase, ownerID, sourceID, sourceType string, decision *event.Decision) string {
 	return w.bus.Subscribe(phase, ownerID, sourceID, sourceType, decision)
 }
 

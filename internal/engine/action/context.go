@@ -1,6 +1,7 @@
 package action
 
 import (
+	"github.com/b1tAction/Fated/pkg/constants"
 	"github.com/b1tAction/Fated/pkg/event"
 	"github.com/b1tAction/Fated/pkg/gamelog"
 	"github.com/b1tAction/Fated/pkg/protocol"
@@ -42,7 +43,7 @@ func NewActionContext(game protocol.Game, bus *event.EventBus, mapEngine protoco
 func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
 	// Step 1: PreTrigger phase - interception
 	prePhase := action.PreTriggerPhase()
-	if prePhase != event.PhaseAnyTime && ctx.EventBus != nil {
+	if prePhase != constants.PhaseAnyTime && ctx.EventBus != nil {
 		// Create context for interception
 		triggerCtx := event.NewContext(ctx.Game.GetCurrentPlayer())
 		triggerCtx.Set("current_action", action)
@@ -78,7 +79,7 @@ func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
 
 	// Step 4: PostTrigger phase - lifecycle events
 	postPhase := action.PostTriggerPhase()
-	if postPhase != event.PhaseAnyTime && ctx.EventBus != nil {
+	if postPhase != constants.PhaseAnyTime && ctx.EventBus != nil {
 		// Create context for post-trigger
 		triggerCtx := event.NewContext(ctx.Game.GetCurrentPlayer())
 		triggerCtx.Set("current_action", action)

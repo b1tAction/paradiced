@@ -434,7 +434,7 @@ func TestTurnEndState_Enter_TickBuffs(t *testing.T) {
 		t.Errorf("Player should have 1 buff remaining, got %d", len(player.ActiveBuffs))
 	}
 	if player.ActiveBuffs[0].Type != core.BuffTypeDivine {
-		t.Errorf("Remaining buff should be Divine, got %d", player.ActiveBuffs[0].Type)
+		t.Errorf("Remaining buff should be Divine, got %s", string(player.ActiveBuffs[0].Type))
 	}
 }
 

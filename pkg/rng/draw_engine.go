@@ -7,7 +7,7 @@ import (
 	"github.com/b1tAction/Fated/internal/core/buff"
 	"github.com/b1tAction/Fated/internal/core/event"
 	"github.com/b1tAction/Fated/internal/core/item"
-	"github.com/b1tAction/Fated/internal/core/types"
+	"github.com/b1tAction/Fated/pkg/constants"
 )
 
 // PoolType represents the pool category for drawing.
@@ -72,8 +72,8 @@ const (
 
 // weightedItem represents an item with its weighted probability.
 type weightedItem struct {
-	id    interface{}
-	eval  types.Evaluation
+	id     interface{}
+	eval   constants.Evaluation
 	weight float64
 }
 
@@ -112,7 +112,7 @@ func (e *DrawEngine) weightedDraw(items []weightedItem) interface{} {
 // calculateGoodWeight calculates weight for Good pool items.
 // Higher LP increases weight more for higher Evaluation items.
 // Formula: weight = baseWeight × (1 + lpFactor × LP × baseWeight)
-func calculateGoodWeight(eval types.Evaluation, lp int) float64 {
+func calculateGoodWeight(eval constants.Evaluation, lp int) float64 {
 	// Base weight from Evaluation (normalized to 0-1)
 	baseWeight := float64(eval) / 100.0
 
@@ -125,10 +125,10 @@ func calculateGoodWeight(eval types.Evaluation, lp int) float64 {
 // calculateBadWeight calculates weight for Bad pool items.
 // Higher LP increases weight more for higher Evaluation items (less bad outcomes).
 // Formula: weight = baseWeight × (1 + lpFactor × LP × baseWeight)
-func calculateBadWeight(eval types.Evaluation, lp int) float64 {
+func calculateBadWeight(eval constants.Evaluation, lp int) float64 {
 	// Base weight from Evaluation relative to Bad threshold
 	// Higher Evaluation (closer to 40) = less bad = higher weight
-	baseWeight := float64(eval) / float64(types.EvaluationBadThreshold)
+	baseWeight := float64(eval) / float64(constants.EvaluationBadThreshold)
 
 	// LP bonus scales with base weight: higher LP favors less bad outcomes
 	lpFactorTotal := lpEvalFactor * float64(lp) * baseWeight
@@ -138,7 +138,7 @@ func calculateBadWeight(eval types.Evaluation, lp int) float64 {
 
 // calculateNeutralWeight calculates weight for Neutral pool items.
 // LP has minimal effect on Neutral draws.
-func calculateNeutralWeight(eval types.Evaluation) float64 {
+func calculateNeutralWeight(eval constants.Evaluation) float64 {
 	// Simple base weight from Evaluation
 	return float64(eval) / 100.0
 }
@@ -151,7 +151,7 @@ func calculateNeutralWeight(eval types.Evaluation) float64 {
 // lp: player's luck points (0-8), affects Evaluation weight within the pool
 //
 // Returns the drawn EventType.
-func (e *DrawEngine) DrawEvent(poolType PoolType, lp int) event.EventType {
+func (e *DrawEngine) DrawEvent(poolType PoolType, lp int) constants.EventType {
 	// Clamp LP
 	if lp < lpMin {
 		lp = lpMin
@@ -194,10 +194,10 @@ func (e *DrawEngine) DrawEvent(poolType PoolType, lp int) event.EventType {
 	// Draw
 	selected := e.weightedDraw(items)
 	if selected == nil {
-		return event.EventTypeNone
+		return constants.EventTypeNone
 	}
 
-	return selected.(event.EventType)
+	return selected.(constants.EventType)
 }
 
 // ========== Buff Draw ==========
@@ -208,7 +208,7 @@ func (e *DrawEngine) DrawEvent(poolType PoolType, lp int) event.EventType {
 // lp: player's luck points (0-8), affects Evaluation weight within the pool
 //
 // Returns the drawn BuffType.
-func (e *DrawEngine) DrawBuff(poolType PoolType, lp int) buff.BuffType {
+func (e *DrawEngine) DrawBuff(poolType PoolType, lp int) constants.BuffType {
 	// Clamp LP
 	if lp < lpMin {
 		lp = lpMin
@@ -251,10 +251,10 @@ func (e *DrawEngine) DrawBuff(poolType PoolType, lp int) buff.BuffType {
 	// Draw
 	selected := e.weightedDraw(items)
 	if selected == nil {
-		return buff.BuffTypeNone
+		return constants.BuffTypeNone
 	}
 
-	return selected.(buff.BuffType)
+	return selected.(constants.BuffType)
 }
 
 // ========== Item Draw ==========
@@ -266,7 +266,7 @@ func (e *DrawEngine) DrawBuff(poolType PoolType, lp int) buff.BuffType {
 // lp: player's luck points (0-8), affects draw outcome
 //
 // Returns the drawn ItemType.
-func (e *DrawEngine) DrawItem(lp int) item.ItemType {
+func (e *DrawEngine) DrawItem(lp int) constants.ItemType {
 	// Clamp LP
 	if lp < lpMin {
 		lp = lpMin
@@ -278,7 +278,7 @@ func (e *DrawEngine) DrawItem(lp int) item.ItemType {
 	// Get all item types (all are Good)
 	itemTypes := item.GetAllItemTypes()
 	if len(itemTypes) == 0 {
-		return item.ItemTypeNone
+		return constants.ItemTypeNone
 	}
 
 	// Build weighted items with Good weight calculation
@@ -288,8 +288,8 @@ func (e *DrawEngine) DrawItem(lp int) item.ItemType {
 		weight := calculateGoodWeight(eval, lp)
 
 		items = append(items, weightedItem{
-			id:    it,
-			eval:  eval,
+			id:     it,
+			eval:   eval,
 			weight: weight,
 		})
 	}
@@ -297,10 +297,10 @@ func (e *DrawEngine) DrawItem(lp int) item.ItemType {
 	// Draw
 	selected := e.weightedDraw(items)
 	if selected == nil {
-		return item.ItemTypeNone
+		return constants.ItemTypeNone
 	}
 
-	return selected.(item.ItemType)
+	return selected.(constants.ItemType)
 }
 
 // ========== Utility Methods ==========

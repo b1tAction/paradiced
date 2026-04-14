@@ -3,68 +3,92 @@ package buff
 import (
 	"testing"
 
-	"github.com/b1tAction/Fated/internal/core/types"
-	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/Fated/pkg/constants"
 )
 
 // ========== BuffType Tests ==========
 
-func TestBuffTypeString(t *testing.T) {
-	tests := []struct {
-		bt       BuffType
-		expected string
-	}{
-		{BuffTypeNone, "Unknown"}, // None is not registered, returns Unknown
-		{BuffTypeCurse, "Curse"},
-		{BuffTypeDivine, "Divine"},
-		{BuffTypeHidden, "Hidden"},
-		{BuffType(999), "Unknown"},
+func TestBuffTypeIsValid(t *testing.T) {
+	validBuffs := []constants.BuffType{
+		constants.BuffTypeCurse, constants.BuffTypeLost, constants.BuffTypeCorrupt,
+		constants.BuffTypePoison, constants.BuffTypeHidden, constants.BuffTypeDivine,
+		constants.BuffTypeRain, constants.BuffTypeExorcism, constants.BuffTypeFire,
+	}
+	for _, bt := range validBuffs {
+		if !bt.IsValid() {
+			t.Errorf("BuffType(%s).IsValid() should be true", bt)
+		}
 	}
 
-	for _, tt := range tests {
-		result := tt.bt.String()
-		if result != tt.expected {
-			t.Errorf("BuffType(%d).String() = %s, expected %s", tt.bt, result, tt.expected)
+	invalidBuffs := []constants.BuffType{constants.BuffTypeNone, constants.BuffType(""), constants.BuffType("invalid")}
+	for _, bt := range invalidBuffs {
+		if bt.IsValid() {
+			t.Errorf("BuffType(%s).IsValid() should be false", bt)
 		}
 	}
 }
 
 func TestBuffTypeIsPositive(t *testing.T) {
-	positiveBuffs := []BuffType{BuffTypeDivine, BuffTypeHidden, BuffTypeRain, BuffTypeExorcism, BuffTypeFire}
+	positiveBuffs := []constants.BuffType{
+		constants.BuffTypeDivine, constants.BuffTypeHidden, constants.BuffTypeRain,
+		constants.BuffTypeExorcism, constants.BuffTypeFire,
+	}
 	for _, bt := range positiveBuffs {
 		if !bt.IsPositive() {
-			t.Errorf("BuffType(%d).IsPositive() should be true", bt)
+			t.Errorf("BuffType(%s).IsPositive() should be true", bt)
 		}
 	}
 
-	negativeBuffs := []BuffType{BuffTypeCurse, BuffTypeLost, BuffTypeCorrupt, BuffTypePoison}
+	negativeBuffs := []constants.BuffType{
+		constants.BuffTypeCurse, constants.BuffTypeLost, constants.BuffTypeCorrupt, constants.BuffTypePoison,
+	}
 	for _, bt := range negativeBuffs {
 		if bt.IsPositive() {
-			t.Errorf("BuffType(%d).IsPositive() should be false", bt)
+			t.Errorf("BuffType(%s).IsPositive() should be false", bt)
+		}
+	}
+}
+
+func TestBuffTypeIsNegative(t *testing.T) {
+	negativeBuffs := []constants.BuffType{
+		constants.BuffTypeCurse, constants.BuffTypeLost, constants.BuffTypeCorrupt, constants.BuffTypePoison,
+	}
+	for _, bt := range negativeBuffs {
+		if !bt.IsNegative() {
+			t.Errorf("BuffType(%s).IsNegative() should be true", bt)
+		}
+	}
+
+	positiveBuffs := []constants.BuffType{
+		constants.BuffTypeDivine, constants.BuffTypeHidden, constants.BuffTypeRain,
+	}
+	for _, bt := range positiveBuffs {
+		if bt.IsNegative() {
+			t.Errorf("BuffType(%s).IsNegative() should be false", bt)
 		}
 	}
 }
 
 func TestBuffTypeGetEvaluation(t *testing.T) {
 	tests := []struct {
-		bt       BuffType
-		expected types.Evaluation
+		bt       constants.BuffType
+		expected constants.Evaluation
 	}{
-		{BuffTypeCurse, types.EvaluationBad},
-		{BuffTypeLost, types.EvaluationMildBad},
-		{BuffTypeCorrupt, types.EvaluationBad},
-		{BuffTypePoison, types.EvaluationVeryBad},
-		{BuffTypeDivine, types.EvaluationVeryGood},
-		{BuffTypeHidden, types.EvaluationNeutral},
-		{BuffTypeRain, types.EvaluationGood},
-		{BuffTypeExorcism, types.EvaluationMildGood},
-		{BuffTypeFire, types.EvaluationGood},
+		{constants.BuffTypeCurse, constants.EvaluationBad},
+		{constants.BuffTypeLost, constants.EvaluationMildBad},
+		{constants.BuffTypeCorrupt, constants.EvaluationBad},
+		{constants.BuffTypePoison, constants.EvaluationVeryBad},
+		{constants.BuffTypeDivine, constants.EvaluationVeryGood},
+		{constants.BuffTypeHidden, constants.EvaluationNeutral},
+		{constants.BuffTypeRain, constants.EvaluationGood},
+		{constants.BuffTypeExorcism, constants.EvaluationMildGood},
+		{constants.BuffTypeFire, constants.EvaluationGood},
 	}
 
 	for _, tt := range tests {
 		result := GetBuffEvaluation(tt.bt)
 		if result != tt.expected {
-			t.Errorf("GetBuffEvaluation(%s) = %d, expected %d", tt.bt.String(), result, tt.expected)
+			t.Errorf("GetBuffEvaluation(%s) = %d, expected %d", tt.bt, result, tt.expected)
 		}
 	}
 }
@@ -72,9 +96,9 @@ func TestBuffTypeGetEvaluation(t *testing.T) {
 // ========== Buff Instance Tests ==========
 
 func TestNewBuff(t *testing.T) {
-	b := NewBuff(BuffTypeCurse, 3)
-	if b.Type != BuffTypeCurse {
-		t.Errorf("buff.Type = %d, expected Curse", b.Type)
+	b := NewBuff(constants.BuffTypeCurse, 3)
+	if b.Type != constants.BuffTypeCurse {
+		t.Errorf("buff.Type = %s, expected Curse", b.Type)
 	}
 	if b.Duration != 3 {
 		t.Errorf("buff.Duration = %d, expected 3", b.Duration)
@@ -86,25 +110,25 @@ func TestNewBuff(t *testing.T) {
 
 func TestBuffIsActive(t *testing.T) {
 	// With duration
-	b1 := NewBuff(BuffTypeCurse, 3)
+	b1 := NewBuff(constants.BuffTypeCurse, 3)
 	if !b1.IsActive() {
 		t.Error("buff with duration > 0 should be active")
 	}
 
 	// No duration
-	b2 := NewBuff(BuffTypeCurse, 0)
+	b2 := NewBuff(constants.BuffTypeCurse, 0)
 	if b2.IsActive() {
 		t.Error("buff with duration = 0 should not be active")
 	}
 
 	// Permanent buff (-1)
-	b3 := NewBuff(BuffTypeFire, -1)
+	b3 := NewBuff(constants.BuffTypeFire, -1)
 	if !b3.IsActive() {
 		t.Error("permanent buff (duration=-1) should be active")
 	}
 
 	// With charge
-	b4 := NewBuff(BuffTypeFire, 0)
+	b4 := NewBuff(constants.BuffTypeFire, 0)
 	b4.Charge = 1
 	if !b4.IsActive() {
 		t.Error("buff with charge > 0 should be active")
@@ -112,7 +136,7 @@ func TestBuffIsActive(t *testing.T) {
 }
 
 func TestBuffTickDuration(t *testing.T) {
-	b := NewBuff(BuffTypeCurse, 3)
+	b := NewBuff(constants.BuffTypeCurse, 3)
 
 	// First tick
 	if !b.TickDuration() {
@@ -130,7 +154,7 @@ func TestBuffTickDuration(t *testing.T) {
 	}
 
 	// Permanent buff doesn't decrease
-	permanentBuff := NewBuff(BuffTypeFire, -1)
+	permanentBuff := NewBuff(constants.BuffTypeFire, -1)
 	permanentBuff.TickDuration()
 	if permanentBuff.Duration != -1 {
 		t.Errorf("permanent buff duration should remain -1, got %d", permanentBuff.Duration)
@@ -141,15 +165,15 @@ func TestBuffTickDuration(t *testing.T) {
 
 func TestBuffTypeGetBuffDefinition(t *testing.T) {
 	// Test Curse Buff
-	def := GetBuffDefinition(BuffTypeCurse)
+	def := GetBuffDefinition(constants.BuffTypeCurse)
 	if def == nil {
 		t.Fatal("BuffTypeCurse should have definition")
 	}
 	if def.Name != "诅咒" {
 		t.Errorf("def.Name = %s, expected 诅咒", def.Name)
 	}
-	if def.Eval != types.EvaluationBad {
-		t.Errorf("def.Eval = %d, expected Bad(%d)", def.Eval, types.EvaluationBad)
+	if def.Eval != constants.EvaluationBad {
+		t.Errorf("def.Eval = %d, expected Bad(%d)", def.Eval, constants.EvaluationBad)
 	}
 	if def.Duration != 3 {
 		t.Errorf("def.Duration = %d, expected 3", def.Duration)
@@ -159,34 +183,34 @@ func TestBuffTypeGetBuffDefinition(t *testing.T) {
 	}
 
 	// Test Divine Buff
-	def = GetBuffDefinition(BuffTypeDivine)
+	def = GetBuffDefinition(constants.BuffTypeDivine)
 	if def == nil {
 		t.Fatal("BuffTypeDivine should have definition")
 	}
 	if def.Name != "神眷" {
 		t.Errorf("def.Name = %s, expected 神眷", def.Name)
 	}
-	if def.Eval != types.EvaluationVeryGood {
-		t.Errorf("def.Eval = %d, expected VeryGood(%d)", def.Eval, types.EvaluationVeryGood)
+	if def.Eval != constants.EvaluationVeryGood {
+		t.Errorf("def.Eval = %d, expected VeryGood(%d)", def.Eval, constants.EvaluationVeryGood)
 	}
 	if def.LPPerTurn != 1 {
 		t.Errorf("def.LPPerTurn = %d, expected 1", def.LPPerTurn)
 	}
 
 	// Test Hidden Buff (neutral evaluation)
-	def = GetBuffDefinition(BuffTypeHidden)
+	def = GetBuffDefinition(constants.BuffTypeHidden)
 	if def == nil {
 		t.Fatal("BuffTypeHidden should have definition")
 	}
-	if def.Eval != types.EvaluationNeutral {
-		t.Errorf("def.Eval = %d, expected Neutral(%d)", def.Eval, types.EvaluationNeutral)
+	if def.Eval != constants.EvaluationNeutral {
+		t.Errorf("def.Eval = %d, expected Neutral(%d)", def.Eval, constants.EvaluationNeutral)
 	}
-	if def.SpecialEffect != types.SpecialImmune {
-		t.Errorf("def.SpecialEffect = %d, expected SpecialImmune", def.SpecialEffect)
+	if def.SpecialEffect != constants.SpecialImmune {
+		t.Errorf("def.SpecialEffect = %s, expected SpecialImmune", def.SpecialEffect)
 	}
 
 	// Test Fire Buff (permanent)
-	def = GetBuffDefinition(BuffTypeFire)
+	def = GetBuffDefinition(constants.BuffTypeFire)
 	if def == nil {
 		t.Fatal("BuffTypeFire should have definition")
 	}
@@ -195,7 +219,7 @@ func TestBuffTypeGetBuffDefinition(t *testing.T) {
 	}
 
 	// Test unknown Buff
-	def = GetBuffDefinition(BuffType(999))
+	def = GetBuffDefinition(constants.BuffType("invalid"))
 	if def != nil {
 		t.Error("unknown BuffType should return nil definition")
 	}
@@ -212,13 +236,13 @@ func TestGlobalBuffRegistryBuffTypes(t *testing.T) {
 
 func TestGetBuffTypesByEvaluationRange(t *testing.T) {
 	// Get bad buffs (0~40)
-	badBuffs := GlobalBuffRegistry.GetBuffTypesByEvaluationRange(types.EvaluationMin, types.EvaluationBadThreshold)
+	badBuffs := GlobalBuffRegistry.GetBuffTypesByEvaluationRange(constants.EvaluationMin, constants.EvaluationBadThreshold)
 	if len(badBuffs) != 4 {
 		t.Errorf("bad buffs count = %d, expected 4", len(badBuffs))
 	}
 
 	// Get good buffs (66~100)
-	goodBuffs := GlobalBuffRegistry.GetBuffTypesByEvaluationRange(66, types.EvaluationMax)
+	goodBuffs := GlobalBuffRegistry.GetBuffTypesByEvaluationRange(66, constants.EvaluationMax)
 	if len(goodBuffs) != 4 {
 		t.Errorf("good buffs count = %d, expected 4", len(goodBuffs))
 	}
@@ -271,8 +295,8 @@ func TestGetAllBuffDefinitions(t *testing.T) {
 
 func TestBuffDefinitionPhase(t *testing.T) {
 	// Test Curse Buff Phases
-	def := GetBuffDefinition(BuffTypeCurse)
-	if !def.HasPhase(event.PhaseBeforeTurn) {
+	def := GetBuffDefinition(constants.BuffTypeCurse)
+	if !def.HasPhase(constants.PhaseBeforeTurn) {
 		t.Errorf("Curse should have BeforeTurn phase")
 	}
 	if len(def.Phases) != 1 {
@@ -280,86 +304,86 @@ func TestBuffDefinitionPhase(t *testing.T) {
 	}
 
 	// Test Divine Buff Phases
-	def = GetBuffDefinition(BuffTypeDivine)
-	if !def.HasPhase(event.PhaseBeforeTurn) {
+	def = GetBuffDefinition(constants.BuffTypeDivine)
+	if !def.HasPhase(constants.PhaseBeforeTurn) {
 		t.Errorf("Divine should have BeforeTurn phase")
 	}
 
 	// Test Hidden Buff Phases (pre-damage immunity)
-	def = GetBuffDefinition(BuffTypeHidden)
-	if !def.HasPhase(event.PhasePreDamage) {
+	def = GetBuffDefinition(constants.BuffTypeHidden)
+	if !def.HasPhase(constants.PhasePreDamage) {
 		t.Errorf("Hidden should have PreDamage phase")
 	}
 
 	// Test Lost Buff Phases (reverse during move)
-	def = GetBuffDefinition(BuffTypeLost)
-	if !def.HasPhase(event.PhasePreMove) {
+	def = GetBuffDefinition(constants.BuffTypeLost)
+	if !def.HasPhase(constants.PhasePreMove) {
 		t.Errorf("Lost should have PreMove phase")
 	}
 
 	// Test Corrupt Buff Phases (after turn)
-	def = GetBuffDefinition(BuffTypeCorrupt)
-	if !def.HasPhase(event.PhaseAfterTurn) {
+	def = GetBuffDefinition(constants.BuffTypeCorrupt)
+	if !def.HasPhase(constants.PhaseAfterTurn) {
 		t.Errorf("Corrupt should have AfterTurn phase")
 	}
 
 	// Test Rain Buff Phases (after turn)
-	def = GetBuffDefinition(BuffTypeRain)
-	if !def.HasPhase(event.PhaseAfterTurn) {
+	def = GetBuffDefinition(constants.BuffTypeRain)
+	if !def.HasPhase(constants.PhaseAfterTurn) {
 		t.Errorf("Rain should have AfterTurn phase")
 	}
 
 	// Test Exorcism Buff Phases (pre-event)
-	def = GetBuffDefinition(BuffTypeExorcism)
-	if !def.HasPhase(event.PhasePreEvent) {
+	def = GetBuffDefinition(constants.BuffTypeExorcism)
+	if !def.HasPhase(constants.PhasePreEvent) {
 		t.Errorf("Exorcism should have PreEvent phase")
 	}
 
 	// Test Poison Buff Phases (before turn)
-	def = GetBuffDefinition(BuffTypePoison)
-	if !def.HasPhase(event.PhaseBeforeTurn) {
+	def = GetBuffDefinition(constants.BuffTypePoison)
+	if !def.HasPhase(constants.PhaseBeforeTurn) {
 		t.Errorf("Poison should have BeforeTurn phase")
 	}
 
 	// Test Fire Buff Phases (before turn check)
-	def = GetBuffDefinition(BuffTypeFire)
-	if !def.HasPhase(event.PhaseBeforeTurn) {
+	def = GetBuffDefinition(constants.BuffTypeFire)
+	if !def.HasPhase(constants.PhaseBeforeTurn) {
 		t.Errorf("Fire should have BeforeTurn phase")
 	}
 }
 
 func TestBuffDefinitionPriority(t *testing.T) {
 	// Test Hidden Buff priority (high priority, damage immunity)
-	def := GetBuffDefinition(BuffTypeHidden)
+	def := GetBuffDefinition(constants.BuffTypeHidden)
 	if def.Priority != 100 {
 		t.Errorf("Hidden Priority = %d, expected 100 (highest)", def.Priority)
 	}
 
 	// Test Lost Buff priority (high priority)
-	def = GetBuffDefinition(BuffTypeLost)
+	def = GetBuffDefinition(constants.BuffTypeLost)
 	if def.Priority != 100 {
 		t.Errorf("Lost Priority = %d, expected 100", def.Priority)
 	}
 
 	// Test Exorcism Buff priority
-	def = GetBuffDefinition(BuffTypeExorcism)
+	def = GetBuffDefinition(constants.BuffTypeExorcism)
 	if def.Priority != 80 {
 		t.Errorf("Exorcism Priority = %d, expected 80", def.Priority)
 	}
 
 	// Test Divine/Curse Buff priority (standard)
-	def = GetBuffDefinition(BuffTypeDivine)
+	def = GetBuffDefinition(constants.BuffTypeDivine)
 	if def.Priority != 50 {
 		t.Errorf("Divine Priority = %d, expected 50", def.Priority)
 	}
 
-	def = GetBuffDefinition(BuffTypeCurse)
+	def = GetBuffDefinition(constants.BuffTypeCurse)
 	if def.Priority != 50 {
 		t.Errorf("Curse Priority = %d, expected 50", def.Priority)
 	}
 
 	// Test Poison Buff priority (low priority)
-	def = GetBuffDefinition(BuffTypePoison)
+	def = GetBuffDefinition(constants.BuffTypePoison)
 	if def.Priority != 30 {
 		t.Errorf("Poison Priority = %d, expected 30 (lowest)", def.Priority)
 	}
@@ -374,7 +398,7 @@ func TestBuffDefinitionNeedConfirm(t *testing.T) {
 		}
 		// Buff effects auto-execute by default, no confirmation needed
 		if def.NeedConfirm {
-			t.Errorf("Buff %s should not need confirm by default", bt.String())
+			t.Errorf("Buff %s should not need confirm by default", bt)
 		}
 	}
 }
@@ -382,24 +406,24 @@ func TestBuffDefinitionNeedConfirm(t *testing.T) {
 func TestBuffDefinitionSpecialEffects(t *testing.T) {
 	// Test special effect markers
 	tests := []struct {
-		bt       BuffType
-		expected types.SpecialEffect
+		bt       constants.BuffType
+		expected constants.SpecialEffect
 	}{
-		{BuffTypeHidden, types.SpecialImmune},
-		{BuffTypeLost, types.SpecialReverse},
-		{BuffTypeExorcism, types.SpecialImmunePoison},
-		{BuffTypePoison, types.SpecialBadEvent},
-		{BuffTypeFire, types.SpecialZhuQuePassive},
+		{constants.BuffTypeHidden, constants.SpecialImmune},
+		{constants.BuffTypeLost, constants.SpecialReverse},
+		{constants.BuffTypeExorcism, constants.SpecialImmunePoison},
+		{constants.BuffTypePoison, constants.SpecialBadEvent},
+		{constants.BuffTypeFire, constants.SpecialZhuQuePassive},
 	}
 
 	for _, tt := range tests {
 		def := GetBuffDefinition(tt.bt)
 		if def == nil {
-			t.Errorf("BuffType(%s) has no definition", tt.bt.String())
+			t.Errorf("BuffType(%s) has no definition", tt.bt)
 			continue
 		}
 		if def.SpecialEffect != tt.expected {
-			t.Errorf("%s SpecialEffect = %d, expected %d", tt.bt.String(), def.SpecialEffect, tt.expected)
+			t.Errorf("%s SpecialEffect = %s, expected %s", tt.bt, def.SpecialEffect, tt.expected)
 		}
 	}
 }
@@ -408,48 +432,47 @@ func TestBuffDefinitionSpecialEffects(t *testing.T) {
 
 func TestBuffDefinitionGetPhases(t *testing.T) {
 	// Test GetPhases method returns correct Phase list
-	def := GetBuffDefinition(BuffTypeCurse)
+	def := GetBuffDefinition(constants.BuffTypeCurse)
 	phases := def.GetPhases()
 	if len(phases) != 1 {
 		t.Errorf("Curse GetPhases count = %d, expected 1", len(phases))
 	}
-	if phases[0] != event.PhaseBeforeTurn {
-		t.Errorf("Curse GetPhases[0] = %s, expected BeforeTurn", phases[0].String())
+	if phases[0] != constants.PhaseBeforeTurn {
+		t.Errorf("Curse GetPhases[0] = %s, expected BeforeTurn", phases[0])
 	}
 }
 
 func TestBuffDefinitionHasPhase(t *testing.T) {
 	// Test HasPhase method
 	tests := []struct {
-		bt       BuffType
-		phase    event.Phase
+		bt       constants.BuffType
+		phase    constants.Phase
 		expected bool
 	}{
-		{BuffTypeCurse, event.PhaseBeforeTurn, true},
-		{BuffTypeCurse, event.PhaseAfterTurn, false},
-		{BuffTypeHidden, event.PhasePreDamage, true},
-		{BuffTypeHidden, event.PhaseBeforeTurn, false},
-		{BuffTypeLost, event.PhasePreMove, true},
-		{BuffTypeLost, event.PhaseOnLand, false},
+		{constants.BuffTypeCurse, constants.PhaseBeforeTurn, true},
+		{constants.BuffTypeCurse, constants.PhaseAfterTurn, false},
+		{constants.BuffTypeHidden, constants.PhasePreDamage, true},
+		{constants.BuffTypeHidden, constants.PhaseBeforeTurn, false},
+		{constants.BuffTypeLost, constants.PhasePreMove, true},
+		{constants.BuffTypeLost, constants.PhaseOnLand, false},
 	}
 
 	for _, tt := range tests {
 		def := GetBuffDefinition(tt.bt)
 		if def == nil {
-			t.Errorf("BuffType(%s) has no definition", tt.bt.String())
+			t.Errorf("BuffType(%s) has no definition", tt.bt)
 			continue
 		}
 		result := def.HasPhase(tt.phase)
 		if result != tt.expected {
-			t.Errorf("%s.HasPhase(%s) = %v, expected %v",
-				tt.bt.String(), tt.phase.String(), result, tt.expected)
+			t.Errorf("%s.HasPhase(%s) = %v, expected %v", tt.bt, tt.phase, result, tt.expected)
 		}
 	}
 }
 
 func TestBuffInstanceSubscriptionIDs(t *testing.T) {
 	// Test Buff instance SubscriptionIDs slice
-	b := NewBuff(BuffTypeCurse, 3)
+	b := NewBuff(constants.BuffTypeCurse, 3)
 
 	// Initially should be empty slice
 	if b.SubscriptionIDs == nil {
@@ -475,19 +498,52 @@ func TestBuffDefinitionPhasesSlice(t *testing.T) {
 		}
 		// Phases should be slice, at least one element
 		if len(def.Phases) == 0 {
-			t.Errorf("Buff %s should have at least one Phase", bt.String())
+			t.Errorf("Buff %s should have at least one Phase", bt)
 		}
 	}
 }
 
 func TestHasBuffHandler(t *testing.T) {
 	// Fire buff has custom handler
-	if !HasBuffHandler(BuffTypeFire) {
+	if !HasBuffHandler(constants.BuffTypeFire) {
 		t.Error("BuffTypeFire should have custom handler")
 	}
 
 	// Curse buff has no custom handler (uses default)
-	if HasBuffHandler(BuffTypeCurse) {
+	if HasBuffHandler(constants.BuffTypeCurse) {
 		t.Error("BuffTypeCurse should not have custom handler")
+	}
+}
+
+func TestGetBuffName(t *testing.T) {
+	tests := []struct {
+		bt       constants.BuffType
+		expected string
+	}{
+		{constants.BuffTypeCurse, "诅咒"},
+		{constants.BuffTypeDivine, "神眷"},
+		{constants.BuffTypeHidden, "隐匿"},
+		{constants.BuffTypeLost, "迷途"},
+		{constants.BuffTypeRain, "甘霖"},
+		{constants.BuffTypeExorcism, "辟邪"},
+		{constants.BuffTypeFire, "离火"},
+		{constants.BuffTypeCorrupt, "腐化"},
+		{constants.BuffTypePoison, "毒瘴"},
+		{constants.BuffType("invalid"), "未知"},
+	}
+
+	for _, tt := range tests {
+		result := GetBuffName(tt.bt)
+		if result != tt.expected {
+			t.Errorf("GetBuffName(%s) = %s, expected %s", tt.bt, result, tt.expected)
+		}
+	}
+}
+
+func TestGetBuffString(t *testing.T) {
+	// GetBuffString now returns the string directly (BuffType is already string)
+	result := GetBuffString(constants.BuffTypeCurse)
+	if result != "curse" {
+		t.Errorf("GetBuffString(Curse) = %s, expected 'curse'", result)
 	}
 }

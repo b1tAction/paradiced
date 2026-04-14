@@ -3,66 +3,44 @@ package item
 import (
 	"testing"
 
-	"github.com/b1tAction/Fated/internal/core/buff"
-	"github.com/b1tAction/Fated/internal/core/types"
-	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/Fated/pkg/constants"
 )
 
 // ========== ItemType Tests ==========
 
-func TestItemTypeString(t *testing.T) {
-	tests := []struct {
-		it       ItemType
-		expected string
-	}{
-		{ItemTypeReverseClock, "ReverseClock"},
-		{ItemTypeAnyDoor, "AnyDoor"},
-		{ItemTypeDiceSwap, "DiceSwap"},
-		{ItemTypeDiceUpgrade, "DiceUpgrade"},
-		{ItemType(999), "Unknown"},
-	}
-
-	for _, tt := range tests {
-		result := tt.it.String()
-		if result != tt.expected {
-			t.Errorf("ItemType(%d).String() = %s, expected %s", tt.it, result, tt.expected)
-		}
-	}
-}
-
 func TestItemTypeIsValid(t *testing.T) {
-	validItems := []ItemType{
-		ItemTypeReverseClock, ItemTypeAnyDoor, ItemTypeDiceSwap, ItemTypeDiceUpgrade,
+	validItems := []constants.ItemType{
+		constants.ItemTypeReverseClock, constants.ItemTypeAnyDoor, constants.ItemTypeDiceSwap, constants.ItemTypeDiceUpgrade,
 	}
 	for _, it := range validItems {
 		if !it.IsValid() {
-			t.Errorf("ItemType(%d).IsValid() should be true", it)
+			t.Errorf("ItemType(%s).IsValid() should be true", it)
 		}
 	}
 
-	invalidItems := []ItemType{ItemTypeNone, ItemType(100)}
+	invalidItems := []constants.ItemType{constants.ItemTypeNone, constants.ItemType(""), constants.ItemType("invalid")}
 	for _, it := range invalidItems {
 		if it.IsValid() {
-			t.Errorf("ItemType(%d).IsValid() should be false", it)
+			t.Errorf("ItemType(%s).IsValid() should be false", it)
 		}
 	}
 }
 
 func TestItemTypeGetEvaluation(t *testing.T) {
 	tests := []struct {
-		it       ItemType
-		expected types.Evaluation
+		it       constants.ItemType
+		expected constants.Evaluation
 	}{
-		{ItemTypeReverseClock, types.EvaluationGood},
-		{ItemTypeAnyDoor, types.EvaluationNeutral},
-		{ItemTypeDiceSwap, types.EvaluationNeutral},
-		{ItemTypeDiceUpgrade, types.EvaluationGood},
+		{constants.ItemTypeReverseClock, constants.EvaluationGood},
+		{constants.ItemTypeAnyDoor, constants.EvaluationNeutral},
+		{constants.ItemTypeDiceSwap, constants.EvaluationNeutral},
+		{constants.ItemTypeDiceUpgrade, constants.EvaluationGood},
 	}
 
 	for _, tt := range tests {
 		result := GetItemEvaluation(tt.it)
 		if result != tt.expected {
-			t.Errorf("GetItemEvaluation(%s) = %d, expected %d", tt.it.String(), result, tt.expected)
+			t.Errorf("GetItemEvaluation(%s) = %d, expected %d", tt.it, result, tt.expected)
 		}
 	}
 }
@@ -70,9 +48,9 @@ func TestItemTypeGetEvaluation(t *testing.T) {
 // ========== Item Instance Tests ==========
 
 func TestNewItem(t *testing.T) {
-	it := NewItem(ItemTypeReverseClock, "test-id-001")
-	if it.Type != ItemTypeReverseClock {
-		t.Errorf("item.Type = %d, expected ReverseClock", it.Type)
+	it := NewItem(constants.ItemTypeReverseClock, "test-id-001")
+	if it.Type != constants.ItemTypeReverseClock {
+		t.Errorf("item.Type = %s, expected ReverseClock", it.Type)
 	}
 	if it.ID != "test-id-001" {
 		t.Errorf("item.ID = %s, expected test-id-001", it.ID)
@@ -101,15 +79,15 @@ func TestGenerateItemID(t *testing.T) {
 
 func TestGetItemDefinition(t *testing.T) {
 	// Test ReverseClock
-	def := GetItemDefinition(ItemTypeReverseClock)
+	def := GetItemDefinition(constants.ItemTypeReverseClock)
 	if def == nil {
 		t.Fatal("ItemTypeReverseClock should have definition")
 	}
 	if def.Name != "反方向的钟" {
 		t.Errorf("def.Name = %s, expected 反方向的钟", def.Name)
 	}
-	if def.Eval != types.EvaluationGood {
-		t.Errorf("def.Eval = %d, expected Good(%d)", def.Eval, types.EvaluationGood)
+	if def.Eval != constants.EvaluationGood {
+		t.Errorf("def.Eval = %d, expected Good(%d)", def.Eval, constants.EvaluationGood)
 	}
 	if def.TargetSelf {
 		t.Error("ReverseClock should not target self")
@@ -117,18 +95,18 @@ func TestGetItemDefinition(t *testing.T) {
 	if !def.TargetOther {
 		t.Error("ReverseClock should target other")
 	}
-	if def.BuffType != buff.BuffTypeLost {
-		t.Errorf("def.BuffType = %d, expected Lost", def.BuffType)
+	if def.BuffType != constants.BuffTypeLost {
+		t.Errorf("def.BuffType = %s, expected 'lost'", def.BuffType)
 	}
-	if def.SpecialEffect != types.SpecialGiveLost {
-		t.Errorf("def.SpecialEffect = %d, expected SpecialGiveLost", def.SpecialEffect)
+	if def.SpecialEffect != constants.SpecialGiveLost {
+		t.Errorf("def.SpecialEffect = %s, expected 'give_lost'", def.SpecialEffect)
 	}
 	if def.NeedConfirm != true {
 		t.Error("ReverseClock should need confirm")
 	}
 
 	// Test AnyDoor
-	def = GetItemDefinition(ItemTypeAnyDoor)
+	def = GetItemDefinition(constants.ItemTypeAnyDoor)
 	if def == nil {
 		t.Fatal("ItemTypeAnyDoor should have definition")
 	}
@@ -140,7 +118,7 @@ func TestGetItemDefinition(t *testing.T) {
 	}
 
 	// Test DiceUpgrade
-	def = GetItemDefinition(ItemTypeDiceUpgrade)
+	def = GetItemDefinition(constants.ItemTypeDiceUpgrade)
 	if def == nil {
 		t.Fatal("ItemTypeDiceUpgrade should have definition")
 	}
@@ -152,7 +130,7 @@ func TestGetItemDefinition(t *testing.T) {
 	}
 
 	// Test unknown Item
-	def = GetItemDefinition(ItemType(999))
+	def = GetItemDefinition(constants.ItemType("invalid"))
 	if def != nil {
 		t.Error("unknown ItemType should return nil definition")
 	}
@@ -220,46 +198,46 @@ func TestGetAllItemDefinitions(t *testing.T) {
 
 func TestItemDefinitionPhase(t *testing.T) {
 	tests := []struct {
-		it       ItemType
-		expected event.Phase
+		it       constants.ItemType
+		expected constants.Phase
 	}{
-		{ItemTypeReverseClock, event.PhaseAnyTime},
-		{ItemTypeAnyDoor, event.PhaseOnLand},
-		{ItemTypeDiceSwap, event.PhaseAnyTime},
-		{ItemTypeDiceUpgrade, event.PhaseBeforeTurn},
+		{constants.ItemTypeReverseClock, constants.PhaseAnyTime},
+		{constants.ItemTypeAnyDoor, constants.PhaseOnLand},
+		{constants.ItemTypeDiceSwap, constants.PhaseAnyTime},
+		{constants.ItemTypeDiceUpgrade, constants.PhaseBeforeTurn},
 	}
 
 	for _, tt := range tests {
 		def := GetItemDefinition(tt.it)
 		if def == nil {
-			t.Errorf("ItemType(%s) has no definition", tt.it.String())
+			t.Errorf("ItemType(%s) has no definition", tt.it)
 			continue
 		}
 		if def.Phase != tt.expected {
-			t.Errorf("%s Phase = %s, expected %s", tt.it.String(), def.Phase.String(), tt.expected.String())
+			t.Errorf("%s Phase = %s, expected %s", tt.it, def.Phase, tt.expected)
 		}
 	}
 }
 
 func TestItemDefinitionPriority(t *testing.T) {
 	tests := []struct {
-		it       ItemType
+		it       constants.ItemType
 		expected int
 	}{
-		{ItemTypeReverseClock, 50},
-		{ItemTypeAnyDoor, 60},
-		{ItemTypeDiceSwap, 40},
-		{ItemTypeDiceUpgrade, 70},
+		{constants.ItemTypeReverseClock, 50},
+		{constants.ItemTypeAnyDoor, 60},
+		{constants.ItemTypeDiceSwap, 40},
+		{constants.ItemTypeDiceUpgrade, 70},
 	}
 
 	for _, tt := range tests {
 		def := GetItemDefinition(tt.it)
 		if def == nil {
-			t.Errorf("ItemType(%s) has no definition", tt.it.String())
+			t.Errorf("ItemType(%s) has no definition", tt.it)
 			continue
 		}
 		if def.Priority != tt.expected {
-			t.Errorf("%s Priority = %d, expected %d", tt.it.String(), def.Priority, tt.expected)
+			t.Errorf("%s Priority = %d, expected %d", tt.it, def.Priority, tt.expected)
 		}
 	}
 }
@@ -272,77 +250,117 @@ func TestItemDefinitionNeedConfirm(t *testing.T) {
 			continue
 		}
 		if !def.NeedConfirm {
-			t.Errorf("Item %s should need confirm", it.String())
+			t.Errorf("Item %s should need confirm", it)
 		}
 	}
 }
 
 func TestItemDefinitionSpecialEffects(t *testing.T) {
 	tests := []struct {
-		it       ItemType
-		expected types.SpecialEffect
+		it       constants.ItemType
+		expected constants.SpecialEffect
 	}{
-		{ItemTypeReverseClock, types.SpecialGiveLost},
-		{ItemTypeAnyDoor, types.SpecialTeleport},
-		{ItemTypeDiceSwap, types.SpecialDiceSwap},
-		{ItemTypeDiceUpgrade, types.SpecialDiceUpgrade},
+		{constants.ItemTypeReverseClock, constants.SpecialGiveLost},
+		{constants.ItemTypeAnyDoor, constants.SpecialTeleport},
+		{constants.ItemTypeDiceSwap, constants.SpecialDiceSwap},
+		{constants.ItemTypeDiceUpgrade, constants.SpecialDiceUpgrade},
 	}
 
 	for _, tt := range tests {
 		def := GetItemDefinition(tt.it)
 		if def == nil {
-			t.Errorf("ItemType(%s) has no definition", tt.it.String())
+			t.Errorf("ItemType(%s) has no definition", tt.it)
 			continue
 		}
 		if def.SpecialEffect != tt.expected {
-			t.Errorf("%s SpecialEffect = %d, expected %d", tt.it.String(), def.SpecialEffect, tt.expected)
+			t.Errorf("%s SpecialEffect = %s, expected %s", tt.it, def.SpecialEffect, tt.expected)
 		}
 	}
 }
 
 func TestItemDefinitionTargetTypes(t *testing.T) {
 	tests := []struct {
-		it          ItemType
+		it          constants.ItemType
 		targetSelf  bool
 		targetOther bool
 	}{
-		{ItemTypeReverseClock, false, true},
-		{ItemTypeAnyDoor, false, true},
-		{ItemTypeDiceSwap, false, true},
-		{ItemTypeDiceUpgrade, true, false},
+		{constants.ItemTypeReverseClock, false, true},
+		{constants.ItemTypeAnyDoor, false, true},
+		{constants.ItemTypeDiceSwap, false, true},
+		{constants.ItemTypeDiceUpgrade, true, false},
 	}
 
 	for _, tt := range tests {
 		def := GetItemDefinition(tt.it)
 		if def == nil {
-			t.Errorf("ItemType(%s) has no definition", tt.it.String())
+			t.Errorf("ItemType(%s) has no definition", tt.it)
 			continue
 		}
 		if def.TargetSelf != tt.targetSelf {
-			t.Errorf("%s: TargetSelf = %v, expected %v", tt.it.String(), def.TargetSelf, tt.targetSelf)
+			t.Errorf("%s: TargetSelf = %v, expected %v", tt.it, def.TargetSelf, tt.targetSelf)
 		}
 		if def.TargetOther != tt.targetOther {
-			t.Errorf("%s: TargetOther = %v, expected %v", tt.it.String(), def.TargetOther, tt.targetOther)
+			t.Errorf("%s: TargetOther = %v, expected %v", tt.it, def.TargetOther, tt.targetOther)
 		}
 	}
 }
 
 func TestItemDefinitionBuffType(t *testing.T) {
 	// Test BuffType granted by ReverseClock
-	def := GetItemDefinition(ItemTypeReverseClock)
+	def := GetItemDefinition(constants.ItemTypeReverseClock)
 	if def == nil {
 		t.Fatal("ItemTypeReverseClock should have definition")
 	}
-	if def.BuffType != buff.BuffTypeLost {
-		t.Errorf("ReverseClock BuffType = %d, expected Lost", def.BuffType)
+	if def.BuffType != constants.BuffTypeLost {
+		t.Errorf("ReverseClock BuffType = %s, expected 'lost'", def.BuffType)
 	}
 
 	// Other items don't grant Buff by default
-	def = GetItemDefinition(ItemTypeAnyDoor)
+	def = GetItemDefinition(constants.ItemTypeAnyDoor)
 	if def == nil {
 		t.Fatal("ItemTypeAnyDoor should have definition")
 	}
-	if def.BuffType != buff.BuffTypeNone {
-		t.Errorf("AnyDoor BuffType = %d, expected None", def.BuffType)
+	if def.BuffType != constants.BuffTypeNone {
+		t.Errorf("AnyDoor BuffType = %s, expected 'none'", def.BuffType)
+	}
+}
+
+func TestGetItemString(t *testing.T) {
+	tests := []struct {
+		it       constants.ItemType
+		expected string
+	}{
+		{constants.ItemTypeReverseClock, "ReverseClock"},
+		{constants.ItemTypeAnyDoor, "AnyDoor"},
+		{constants.ItemTypeDiceSwap, "DiceSwap"},
+		{constants.ItemTypeDiceUpgrade, "DiceUpgrade"},
+		{constants.ItemType("invalid"), "Unknown"},
+	}
+
+	for _, tt := range tests {
+		result := GetItemString(tt.it)
+		if result != tt.expected {
+			t.Errorf("GetItemString(%s) = %s, expected %s", tt.it, result, tt.expected)
+		}
+	}
+}
+
+func TestGetItemName(t *testing.T) {
+	tests := []struct {
+		it       constants.ItemType
+		expected string
+	}{
+		{constants.ItemTypeReverseClock, "反方向的钟"},
+		{constants.ItemTypeAnyDoor, "任意门"},
+		{constants.ItemTypeDiceSwap, "骰子交换"},
+		{constants.ItemTypeDiceUpgrade, "骰子升级卡"},
+		{constants.ItemType("invalid"), "未知"},
+	}
+
+	for _, tt := range tests {
+		result := GetItemName(tt.it)
+		if result != tt.expected {
+			t.Errorf("GetItemName(%s) = %s, expected %s", tt.it, result, tt.expected)
+		}
 	}
 }

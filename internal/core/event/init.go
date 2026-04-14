@@ -1,8 +1,7 @@
 package event
 
 import (
-	"github.com/b1tAction/Fated/internal/core/buff"
-	"github.com/b1tAction/Fated/internal/core/types"
+	"github.com/b1tAction/Fated/pkg/constants"
 )
 
 // GlobalEventRegistry is the global Event definition registry.
@@ -20,8 +19,8 @@ func registerAllEvents() {
 	// ========== Good Events (Evaluation > 65) ==========
 
 	GlobalEventRegistry.RegisterEvent(&EventDefinition{
-		Type:        EventTypeHerb,
-		Eval:        types.EvaluationMildGood,
+		Type:        constants.EventTypeHerb,
+		Eval:        constants.EvaluationMildGood,
 		EnglishName: "Herb",
 		Name:        "采集到草药",
 		Desc:        "在路边发现了草药，恢复了体力",
@@ -29,8 +28,8 @@ func registerAllEvents() {
 	})
 
 	GlobalEventRegistry.RegisterEvent(&EventDefinition{
-		Type:        EventTypeMilkTea,
-		Eval:        types.EvaluationGood,
+		Type:        constants.EventTypeMilkTea,
+		Eval:        constants.EvaluationGood,
 		EnglishName: "MilkTea",
 		Name:        "捡到奶茶",
 		Desc:        "捡到了一杯奶茶，一口就吃到了猪猪欸",
@@ -38,57 +37,57 @@ func registerAllEvents() {
 	})
 
 	GlobalEventRegistry.RegisterEvent(&EventDefinition{
-		Type:          EventTypeRelic,
-		Eval:          types.EvaluationVeryGood,
+		Type:          constants.EventTypeRelic,
+		Eval:          constants.EvaluationVeryGood,
 		EnglishName:   "Relic",
 		Name:          "捡到勇士的圣遗物",
 		Desc:          "发现了古老圣遗物，获得一次道具抽奖机会",
-		SpecialEffect: types.SpecialDrawItem,
+		SpecialEffect: constants.SpecialDrawItem,
 	})
 
 	GlobalEventRegistry.RegisterEvent(&EventDefinition{
-		Type:        EventTypeDivineBless,
-		Eval:        types.EvaluationExcellent,
+		Type:        constants.EventTypeDivineBless,
+		Eval:        constants.EvaluationExcellent,
 		EnglishName: "DivineBless",
 		Name:        "受到天使眷顾",
 		Desc:        "天使的祝福降临，获得神眷Buff",
-		BuffType:    buff.BuffTypeDivine,
+		BuffType:    constants.BuffTypeDivine,
 	})
 
 	// ========== Neutral Events (Evaluation 41~65) ==========
 
 	GlobalEventRegistry.RegisterEvent(&EventDefinition{
-		Type:          EventTypeExchange,
-		Eval:          types.EvaluationNeutral,
+		Type:          constants.EventTypeExchange,
+		Eval:          constants.EvaluationNeutral,
 		EnglishName:   "Exchange",
 		Name:          "交换",
 		Desc:          "命运之手将你与另一位玩家交换位置",
-		SpecialEffect: types.SpecialSwapPosition,
+		SpecialEffect: constants.SpecialSwapPosition,
 	})
 
 	GlobalEventRegistry.RegisterEvent(&EventDefinition{
-		Type:        EventTypeHiddenBuff,
-		Eval:        types.EvaluationGood,
+		Type:        constants.EventTypeHiddenBuff,
+		Eval:        constants.EvaluationGood,
 		EnglishName: "HiddenBuff",
 		Name:        "麻了",
 		Desc:        "身体麻木，获得隐匿Buff",
-		BuffType:    buff.BuffTypeHidden,
+		BuffType:    constants.BuffTypeHidden,
 	})
 
 	GlobalEventRegistry.RegisterEvent(&EventDefinition{
-		Type:          EventTypeTasteTest,
-		Eval:          types.EvaluationMixed,
+		Type:          constants.EventTypeTasteTest,
+		Eval:          constants.EvaluationMixed,
 		EnglishName:   "TasteTest",
 		Name:          "这是什么？尝一口",
 		Desc:          "发现神秘物质，尝试后获得随机效果",
-		SpecialEffect: types.SpecialRandomBuff,
+		SpecialEffect: constants.SpecialRandomBuff,
 	})
 
 	// ========== Bad Events (Evaluation ≤ 40) ==========
 
 	GlobalEventRegistry.RegisterEvent(&EventDefinition{
-		Type:        EventTypeMosquito,
-		Eval:        types.EvaluationMildBad,
+		Type:        constants.EventTypeMosquito,
+		Eval:        constants.EvaluationMildBad,
 		EnglishName: "Mosquito",
 		Name:        "被蚊虫叮咬",
 		Desc:        "丛林中的蚊虫叮咬了你",
@@ -96,8 +95,8 @@ func registerAllEvents() {
 	})
 
 	GlobalEventRegistry.RegisterEvent(&EventDefinition{
-		Type:        EventTypeGhostHit,
-		Eval:        types.EvaluationMildBad,
+		Type:        constants.EventTypeGhostHit,
+		Eval:        constants.EvaluationMildBad,
 		EnglishName: "GhostHit",
 		Name:        "偶遇孤魂野鬼",
 		Desc:        "被野鬼打了一闷棍",
@@ -105,8 +104,8 @@ func registerAllEvents() {
 	})
 
 	GlobalEventRegistry.RegisterEvent(&EventDefinition{
-		Type:        EventTypeDogPoop,
-		Eval:        types.EvaluationMildBad,
+		Type:        constants.EventTypeDogPoop,
+		Eval:        constants.EvaluationMildBad,
 		EnglishName: "DogPoop",
 		Name:        "踩到了狗屎",
 		Desc:        "运气糟糕的一天",
@@ -114,35 +113,35 @@ func registerAllEvents() {
 	})
 
 	GlobalEventRegistry.RegisterEvent(&EventDefinition{
-		Type:          EventTypeThief,
-		Eval:          types.EvaluationBad,
+		Type:          constants.EventTypeThief,
+		Eval:          constants.EvaluationBad,
 		EnglishName:   "Thief",
 		Name:          "啊？！贼",
 		Desc:          "遭遇盗贼，随机丢失一个道具",
-		SpecialEffect: types.SpecialLoseItem,
+		SpecialEffect: constants.SpecialLoseItem,
 	})
 
 	GlobalEventRegistry.RegisterEvent(&EventDefinition{
-		Type:        EventTypeCurseBuddha,
-		Eval:        types.EvaluationBad,
+		Type:        constants.EventTypeCurseBuddha,
+		Eval:        constants.EvaluationBad,
 		EnglishName: "CurseBuddha",
 		Name:        "虔诚拜三拜",
 		Desc:        "拜路边的野佛，获得诅咒Buff",
-		BuffType:    buff.BuffTypeCurse,
+		BuffType:    constants.BuffTypeCurse,
 	})
 
 	GlobalEventRegistry.RegisterEvent(&EventDefinition{
-		Type:        EventTypeLostWay,
-		Eval:        types.EvaluationMildBad,
+		Type:        constants.EventTypeLostWay,
+		Eval:        constants.EvaluationMildBad,
 		EnglishName: "LostWay",
 		Name:        "迷途",
 		Desc:        "迷失方向，获得迷途Buff",
-		BuffType:    buff.BuffTypeLost,
+		BuffType:    constants.BuffTypeLost,
 	})
 
 	GlobalEventRegistry.RegisterEvent(&EventDefinition{
-		Type:        EventTypeThunder,
-		Eval:        types.EvaluationVeryBad,
+		Type:        constants.EventTypeThunder,
+		Eval:        constants.EvaluationVeryBad,
 		EnglishName: "Thunder",
 		Name:        "雷劫",
 		Desc:        "天雷降临，HP归零",

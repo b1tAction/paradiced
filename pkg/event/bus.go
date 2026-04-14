@@ -5,6 +5,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/b1tAction/Fated/pkg/constants"
 )
 
 // newID generates a unique ID (package internal).
@@ -14,19 +16,19 @@ func newID() string {
 
 // Subscription represents subscription information.
 type Subscription struct {
-	ID         string    `json:"id"`          // Subscription ID, used for unsubscribe
-	OwnerID    string    `json:"owner_id"`    // Player ID
-	SourceID   string    `json:"source_id"`   // Buff/Item ID
-	SourceType string    `json:"source_type"` // Source type "buff" / "item"
-	Priority   int       `json:"priority"`    // Execution priority (higher executes first)
-	Decision   *Decision `json:"decision"`    // Pre-bound Decision
-	Phase      Phase     `json:"phase"`       // Subscribed Phase
+	ID         string          `json:"id"`          // Subscription ID, used for unsubscribe
+	OwnerID    string          `json:"owner_id"`    // Player ID
+	SourceID   string          `json:"source_id"`   // Buff/Item ID
+	SourceType string          `json:"source_type"` // Source type "buff" / "item"
+	Priority   int             `json:"priority"`    // Execution priority (higher executes first)
+	Decision   *Decision       `json:"decision"`    // Pre-bound Decision
+	Phase      constants.Phase `json:"phase"`       // Subscribed Phase
 }
 
 // EventBus is the event bus.
 // Each game instance has one EventBus, managing Buff/Item subscriptions and triggers.
 type EventBus struct {
-	subscriptions map[Phase][]*Subscription
+	subscriptions map[constants.Phase][]*Subscription
 	mutex         sync.RWMutex
 	GameID        string `json:"game_id"` // Owning game instance ID
 }
@@ -34,14 +36,14 @@ type EventBus struct {
 // NewEventBus creates a new event bus.
 func NewEventBus(gameID string) *EventBus {
 	return &EventBus{
-		subscriptions: make(map[Phase][]*Subscription),
+		subscriptions: make(map[constants.Phase][]*Subscription),
 		GameID:        gameID,
 	}
 }
 
 // Subscribe subscribes to a Phase.
 // Returns subscription ID for unsubscribing.
-func (bus *EventBus) Subscribe(phase Phase, ownerID, sourceID, sourceType string, decision *Decision) string {
+func (bus *EventBus) Subscribe(phase constants.Phase, ownerID, sourceID, sourceType string, decision *Decision) string {
 	bus.mutex.Lock()
 	defer bus.mutex.Unlock()
 
@@ -120,7 +122,7 @@ func (bus *EventBus) UnsubscribeByOwner(ownerID string) int {
 
 // Publish publishes a Phase event.
 // Returns list of Decisions that need user confirmation.
-func (bus *EventBus) Publish(phase Phase, ownerID string, ctx *Context) []*Decision {
+func (bus *EventBus) Publish(phase constants.Phase, ownerID string, ctx *Context) []*Decision {
 	bus.mutex.RLock()
 	subs := bus.subscriptions[phase]
 	bus.mutex.RUnlock()
@@ -154,7 +156,7 @@ func (bus *EventBus) Publish(phase Phase, ownerID string, ctx *Context) []*Decis
 }
 
 // GetSubscriptions returns all subscriptions for a Phase (for debugging).
-func (bus *EventBus) GetSubscriptions(phase Phase) []*Subscription {
+func (bus *EventBus) GetSubscriptions(phase constants.Phase) []*Subscription {
 	bus.mutex.RLock()
 	defer bus.mutex.RUnlock()
 	return bus.subscriptions[phase]
@@ -175,5 +177,5 @@ func (bus *EventBus) GetSubscriptionCount() int {
 func (bus *EventBus) Clear() {
 	bus.mutex.Lock()
 	defer bus.mutex.Unlock()
-	bus.subscriptions = make(map[Phase][]*Subscription)
+	bus.subscriptions = make(map[constants.Phase][]*Subscription)
 }

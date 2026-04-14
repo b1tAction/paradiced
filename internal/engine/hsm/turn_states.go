@@ -4,8 +4,9 @@ import (
 	"time"
 
 	"github.com/b1tAction/Fated/internal/core"
-	"github.com/b1tAction/Fated/internal/gamemap"
+		"github.com/b1tAction/Fated/internal/gamemap"
 	engineaction "github.com/b1tAction/Fated/internal/engine/action"
+	"github.com/b1tAction/Fated/pkg/constants"
 	"github.com/b1tAction/Fated/pkg/event"
 	"github.com/b1tAction/Fated/pkg/protocol"
 )
@@ -97,7 +98,7 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 	triggerCtx.Set("current_player", player)
 
 	// Publish PhaseBeforeTurn to trigger Buff effects
-	s.decisions = ctx.Bus.Publish(event.PhaseBeforeTurn, player.UserID, triggerCtx)
+	s.decisions = ctx.Bus.Publish(constants.PhaseBeforeTurn, player.UserID, triggerCtx)
 
 	// Step 4: Execute any derived Actions from handlers
 	s.actionCtx.ProcessQueue()
@@ -225,7 +226,7 @@ func (s *MainActionState) OnUseItem(ctx *StateContext, itemID string) {
 	triggerCtx.Set("item_id", itemID)
 	triggerCtx.Set("action_context", s.actionCtx)
 
-	ctx.Bus.Publish(event.PhaseItemUsed, player.UserID, triggerCtx)
+	ctx.Bus.Publish(constants.PhaseItemUsed, player.UserID, triggerCtx)
 
 	// Process derived actions
 	s.actionCtx.ProcessQueue()
@@ -424,7 +425,7 @@ func (s *TurnLandedState) Enter(ctx *StateContext) {
 	triggerCtx.Set("cell_type", s.cellType)
 	triggerCtx.Set("position", player.Position)
 
-	s.decisions = ctx.Bus.Publish(event.PhaseOnLand, player.UserID, triggerCtx)
+	s.decisions = ctx.Bus.Publish(constants.PhaseOnLand, player.UserID, triggerCtx)
 
 	// Process derived actions
 	s.actionCtx.ProcessQueue()
@@ -570,7 +571,7 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 	triggerCtx := event.NewContext(player)
 	triggerCtx.Set("action_context", s.actionCtx)
 
-	decisions := ctx.Bus.Publish(event.PhaseAfterTurn, player.UserID, triggerCtx)
+	decisions := ctx.Bus.Publish(constants.PhaseAfterTurn, player.UserID, triggerCtx)
 
 	// Process derived actions (甘霖/腐化 effects)
 	s.actionCtx.ProcessQueue()

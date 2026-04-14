@@ -1,6 +1,7 @@
 package event
 
 import (
+	"github.com/b1tAction/Fated/pkg/constants"
 	"github.com/b1tAction/Fated/pkg/util"
 )
 
@@ -19,10 +20,10 @@ type Context struct {
 
 // GameState is a snapshot of game state (simplified, can be extended later).
 type GameState struct {
-	Round        int           `json:"round"`         // Current round
-	Turn         int           `json:"turn"`          // Current turn
-	CurrentPhase Phase         `json:"current_phase"` // Current Phase
-	AllPlayers   []interface{} `json:"all_players"`   // All players
+	Round        int               `json:"round"`         // Current round
+	Turn         int               `json:"turn"`          // Current turn
+	CurrentPhase constants.Phase   `json:"current_phase"` // Current Phase
+	AllPlayers   []interface{}     `json:"all_players"`   // All players
 }
 
 // NewContext creates a new context.

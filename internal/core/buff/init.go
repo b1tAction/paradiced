@@ -1,7 +1,7 @@
 package buff
 
 import (
-	"github.com/b1tAction/Fated/internal/core/types"
+	"github.com/b1tAction/Fated/pkg/constants"
 	"github.com/b1tAction/Fated/pkg/event"
 	"github.com/b1tAction/Fated/pkg/protocol"
 )
@@ -21,114 +21,114 @@ func registerAllBuffs() {
 	// ========== Negative Buffs ==========
 
 	GlobalBuffRegistry.RegisterBuff(&BuffDefinition{
-		Type:        BuffTypeCurse,
-		Eval:        types.EvaluationBad,
+		Type:        constants.BuffTypeCurse,
+		Eval:        constants.EvaluationBad,
 		EnglishName: "Curse",
 		Name:        "诅咒",
 		Desc:        "接下来3回合LP-1",
 		Duration:    3,
 		LPPerTurn:   -1,
-		Phases:      []event.Phase{event.PhaseBeforeTurn},
+		Phases:      []constants.Phase{constants.PhaseBeforeTurn},
 		Priority:    50,
 	}, nil)
 
 	GlobalBuffRegistry.RegisterBuff(&BuffDefinition{
-		Type:          BuffTypeLost,
-		Eval:          types.EvaluationMildBad,
+		Type:          constants.BuffTypeLost,
+		Eval:          constants.EvaluationMildBad,
 		EnglishName:   "Lost",
 		Name:          "迷途",
 		Desc:          "下1回合朝反方向移动",
 		Duration:      1,
-		SpecialEffect: types.SpecialReverse,
-		Phases:        []event.Phase{event.PhasePreMove},
+		SpecialEffect: constants.SpecialReverse,
+		Phases:        []constants.Phase{constants.PhasePreMove},
 		Priority:      100,
 	}, nil)
 
 	GlobalBuffRegistry.RegisterBuff(&BuffDefinition{
-		Type:        BuffTypeCorrupt,
-		Eval:        types.EvaluationBad,
+		Type:        constants.BuffTypeCorrupt,
+		Eval:        constants.EvaluationBad,
 		EnglishName: "Corrupt",
 		Name:        "腐化",
 		Desc:        "接下来4回合每2回合HP-1",
 		Duration:    4,
 		HPPerTurn:   -1,
-		Phases:      []event.Phase{event.PhaseAfterTurn},
+		Phases:      []constants.Phase{constants.PhaseAfterTurn},
 		Priority:    50,
 	}, nil)
 
 	GlobalBuffRegistry.RegisterBuff(&BuffDefinition{
-		Type:          BuffTypePoison,
-		Eval:          types.EvaluationVeryBad,
+		Type:          constants.BuffTypePoison,
+		Eval:          constants.EvaluationVeryBad,
 		EnglishName:   "Poison",
 		Name:          "毒瘴",
 		Desc:          "接下来3回合每回合受一次恶性随机事件影响",
 		Duration:      3,
-		SpecialEffect: types.SpecialBadEvent,
-		Phases:        []event.Phase{event.PhaseBeforeTurn},
+		SpecialEffect: constants.SpecialBadEvent,
+		Phases:        []constants.Phase{constants.PhaseBeforeTurn},
 		Priority:      30,
 	}, nil)
 
 	// ========== Neutral Buff ==========
 
 	GlobalBuffRegistry.RegisterBuff(&BuffDefinition{
-		Type:          BuffTypeHidden,
-		Eval:          types.EvaluationNeutral,
+		Type:          constants.BuffTypeHidden,
+		Eval:          constants.EvaluationNeutral,
 		EnglishName:   "Hidden",
 		Name:          "隐匿",
 		Desc:          "接下来3回合免疫任意事件、BUFF或道具的影响",
 		Duration:      3,
-		SpecialEffect: types.SpecialImmune,
-		Phases:        []event.Phase{event.PhasePreDamage},
+		SpecialEffect: constants.SpecialImmune,
+		Phases:        []constants.Phase{constants.PhasePreDamage},
 		Priority:      100,
 	}, nil)
 
 	// ========== Positive Buffs ==========
 
 	GlobalBuffRegistry.RegisterBuff(&BuffDefinition{
-		Type:        BuffTypeDivine,
-		Eval:        types.EvaluationVeryGood,
+		Type:        constants.BuffTypeDivine,
+		Eval:        constants.EvaluationVeryGood,
 		EnglishName: "Divine",
 		Name:        "神眷",
 		Desc:        "接下来3回合LP+1",
 		Duration:    3,
 		LPPerTurn:   1,
-		Phases:      []event.Phase{event.PhaseBeforeTurn},
+		Phases:      []constants.Phase{constants.PhaseBeforeTurn},
 		Priority:    50,
 	}, nil)
 
 	GlobalBuffRegistry.RegisterBuff(&BuffDefinition{
-		Type:        BuffTypeRain,
-		Eval:        types.EvaluationGood,
+		Type:        constants.BuffTypeRain,
+		Eval:        constants.EvaluationGood,
 		EnglishName: "Rain",
 		Name:        "甘霖",
 		Desc:        "接下来4回合每2回合HP+1",
 		Duration:    4,
 		HPPerTurn:   1,
-		Phases:      []event.Phase{event.PhaseAfterTurn},
+		Phases:      []constants.Phase{constants.PhaseAfterTurn},
 		Priority:    50,
 	}, nil)
 
 	GlobalBuffRegistry.RegisterBuff(&BuffDefinition{
-		Type:          BuffTypeExorcism,
-		Eval:          types.EvaluationMildGood,
+		Type:          constants.BuffTypeExorcism,
+		Eval:          constants.EvaluationMildGood,
 		EnglishName:   "Exorcism",
 		Name:          "辟邪",
 		Desc:          "接下来5回合无视毒瘴buff",
 		Duration:      5,
-		SpecialEffect: types.SpecialImmunePoison,
-		Phases:        []event.Phase{event.PhasePreEvent},
+		SpecialEffect: constants.SpecialImmunePoison,
+		Phases:        []constants.Phase{constants.PhasePreEvent},
 		Priority:      80,
 	}, nil)
 
 	GlobalBuffRegistry.RegisterBuff(&BuffDefinition{
-		Type:          BuffTypeFire,
-		Eval:          types.EvaluationGood,
+		Type:          constants.BuffTypeFire,
+		Eval:          constants.EvaluationGood,
 		EnglishName:   "Fire",
 		Name:          "离火",
 		Desc:          "朱雀阵营增益，每4回合LP+1",
 		Duration:      -1,
-		SpecialEffect: types.SpecialZhuQuePassive,
-		Phases:        []event.Phase{event.PhaseBeforeTurn},
+		SpecialEffect: constants.SpecialZhuQuePassive,
+		Phases:        []constants.Phase{constants.PhaseBeforeTurn},
 		Priority:      10,
 	}, handleZhuQueFire)
 }
@@ -138,7 +138,7 @@ func registerAllBuffs() {
 // handleZhuQueFire is the custom handler for ZhuQue Fire buff.
 // Effect: LP+1 every 4 turns.
 // Uses direct Player interface modification.
-func handleZhuQueFire(phase event.Phase, ctx *event.Context) {
+func handleZhuQueFire(phase constants.Phase, ctx *event.Context) {
 	// Get Player interface from Context
 	player, ok := ctx.Player.(protocol.PlayerLite)
 	if !ok {
@@ -146,7 +146,7 @@ func handleZhuQueFire(phase event.Phase, ctx *event.Context) {
 	}
 
 	// Only execute in BeforeTurn Phase
-	if phase != event.PhaseBeforeTurn {
+	if phase != constants.PhaseBeforeTurn {
 		return
 	}
 

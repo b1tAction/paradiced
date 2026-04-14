@@ -5,6 +5,7 @@ import (
 
 	"github.com/b1tAction/Fated/internal/core"
 	engineaction "github.com/b1tAction/Fated/internal/engine/action"
+	"github.com/b1tAction/Fated/pkg/constants"
 	"github.com/b1tAction/Fated/pkg/event"
 )
 
@@ -60,7 +61,7 @@ func TestFireBuffHandlerBehavior(t *testing.T) {
 	ctx := event.NewContext(player)
 
 	// Execute handler (BeforeTurn Phase)
-	handler(event.PhaseBeforeTurn, ctx)
+	handler(constants.PhaseBeforeTurn, ctx)
 
 	// First execution, counter should be 1, LP unchanged
 	if player.GetFireCounter() != 1 {
@@ -72,7 +73,7 @@ func TestFireBuffHandlerBehavior(t *testing.T) {
 
 	// Execute 3 more times (reach 4 triggers)
 	for i := 0; i < 3; i++ {
-		handler(event.PhaseBeforeTurn, ctx)
+		handler(constants.PhaseBeforeTurn, ctx)
 	}
 
 	// After 4 times, LP should +1, counter reset
@@ -96,7 +97,7 @@ func TestFireBuffHandlerNonBeforeTurnPhase(t *testing.T) {
 	handler := core.GetBuffHandler(core.BuffTypeFire)
 
 	// Execute in other Phase should be ineffective
-	handler(event.PhaseAfterTurn, ctx)
+	handler(constants.PhaseAfterTurn, ctx)
 	if player.GetFireCounter() != 0 {
 		t.Errorf("FireCounter should be 0 when not BeforeTurn phase")
 	}

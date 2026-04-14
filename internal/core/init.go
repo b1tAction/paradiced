@@ -7,69 +7,28 @@ import (
 	"github.com/b1tAction/Fated/internal/core/buff"
 	"github.com/b1tAction/Fated/internal/core/event"
 	"github.com/b1tAction/Fated/internal/core/item"
-	"github.com/b1tAction/Fated/internal/core/types"
+	"github.com/b1tAction/Fated/pkg/constants"
 	"github.com/b1tAction/Fated/pkg/handler"
 )
 
 // Re-export types from subpackages for convenience.
 // This allows users to import core and access all types directly.
 
-// Evaluation type from types package
-type Evaluation = types.Evaluation
+// BuffType from constants package
+type BuffType = constants.BuffType
 
-// Evaluation constants from types package
+// BuffType constants from constants package
 const (
-	EvaluationMin             = types.EvaluationMin
-	EvaluationMax             = types.EvaluationMax
-	EvaluationBadThreshold    = types.EvaluationBadThreshold
-	EvaluationNeutralThreshold = types.EvaluationNeutralThreshold
-	EvaluationVeryBad         = types.EvaluationVeryBad
-	EvaluationBad             = types.EvaluationBad
-	EvaluationMildBad         = types.EvaluationMildBad
-	EvaluationNeutral         = types.EvaluationNeutral
-	EvaluationMixed           = types.EvaluationMixed
-	EvaluationMildGood        = types.EvaluationMildGood
-	EvaluationGood            = types.EvaluationGood
-	EvaluationVeryGood        = types.EvaluationVeryGood
-	EvaluationExcellent       = types.EvaluationExcellent
-)
-
-// SpecialEffect type from types package
-type SpecialEffect = types.SpecialEffect
-
-// SpecialEffect constants from types package
-const (
-	SpecialNone          = types.SpecialNone
-	SpecialImmune        = types.SpecialImmune
-	SpecialReverse       = types.SpecialReverse
-	SpecialImmunePoison  = types.SpecialImmunePoison
-	SpecialBadEvent      = types.SpecialBadEvent
-	SpecialZhuQuePassive = types.SpecialZhuQuePassive
-	SpecialTeleport      = types.SpecialTeleport
-	SpecialDiceSwap      = types.SpecialDiceSwap
-	SpecialDiceUpgrade   = types.SpecialDiceUpgrade
-	SpecialGiveLost      = types.SpecialGiveLost
-	SpecialDrawItem      = types.SpecialDrawItem
-	SpecialLoseItem      = types.SpecialLoseItem
-	SpecialSwapPosition  = types.SpecialSwapPosition
-	SpecialRandomBuff    = types.SpecialRandomBuff
-)
-
-// BuffType from buff package
-type BuffType = buff.BuffType
-
-// BuffType constants from buff package
-const (
-	BuffTypeNone     = buff.BuffTypeNone
-	BuffTypeCurse    = buff.BuffTypeCurse
-	BuffTypeLost     = buff.BuffTypeLost
-	BuffTypeCorrupt  = buff.BuffTypeCorrupt
-	BuffTypePoison   = buff.BuffTypePoison
-	BuffTypeHidden   = buff.BuffTypeHidden
-	BuffTypeDivine   = buff.BuffTypeDivine
-	BuffTypeRain     = buff.BuffTypeRain
-	BuffTypeExorcism = buff.BuffTypeExorcism
-	BuffTypeFire     = buff.BuffTypeFire
+	BuffTypeNone     = constants.BuffTypeNone
+	BuffTypeCurse    = constants.BuffTypeCurse
+	BuffTypeLost     = constants.BuffTypeLost
+	BuffTypeCorrupt  = constants.BuffTypeCorrupt
+	BuffTypePoison   = constants.BuffTypePoison
+	BuffTypeHidden   = constants.BuffTypeHidden
+	BuffTypeDivine   = constants.BuffTypeDivine
+	BuffTypeRain     = constants.BuffTypeRain
+	BuffTypeExorcism = constants.BuffTypeExorcism
+	BuffTypeFire     = constants.BuffTypeFire
 )
 
 // Buff from buff package
@@ -86,36 +45,36 @@ type EffectHandler = handler.EffectHandler
 
 // Buff registry access functions from buff package
 var (
-	GetBuffDefinition    = buff.GetBuffDefinition
-	GetBuffString        = buff.GetBuffString
-	GetBuffEvaluation    = buff.GetBuffEvaluation
-	GetBuffHandler       = buff.GetBuffHandler
-	HasBuffHandler       = buff.HasBuffHandler
-	GetAllBuffTypes      = buff.GetAllBuffTypes
-	GetBuffTypesByCategory = buff.GetBuffTypesByCategory
-	GetAllBuffDefinitions = buff.GetAllBuffDefinitions
+	GetBuffDefinition       = buff.GetBuffDefinition
+	GetBuffString           = buff.GetBuffString
+	GetBuffEvaluation       = buff.GetBuffEvaluation
+	GetBuffHandler          = buff.GetBuffHandler
+	HasBuffHandler          = buff.HasBuffHandler
+	GetAllBuffTypes         = buff.GetAllBuffTypes
+	GetBuffTypesByCategory  = buff.GetBuffTypesByCategory
+	GetAllBuffDefinitions   = buff.GetAllBuffDefinitions
 )
 
-// EventType from event package
-type EventType = event.EventType
+// EventType from constants package
+type EventType = constants.EventType
 
-// EventType constants from event package
+// EventType constants from constants package
 const (
-	EventTypeNone        = event.EventTypeNone
-	EventTypeHerb        = event.EventTypeHerb
-	EventTypeMilkTea     = event.EventTypeMilkTea
-	EventTypeRelic       = event.EventTypeRelic
-	EventTypeDivineBless = event.EventTypeDivineBless
-	EventTypeExchange    = event.EventTypeExchange
-	EventTypeHiddenBuff  = event.EventTypeHiddenBuff
-	EventTypeTasteTest   = event.EventTypeTasteTest
-	EventTypeMosquito    = event.EventTypeMosquito
-	EventTypeGhostHit    = event.EventTypeGhostHit
-	EventTypeDogPoop     = event.EventTypeDogPoop
-	EventTypeThief       = event.EventTypeThief
-	EventTypeCurseBuddha = event.EventTypeCurseBuddha
-	EventTypeLostWay     = event.EventTypeLostWay
-	EventTypeThunder     = event.EventTypeThunder
+	EventTypeNone        = constants.EventTypeNone
+	EventTypeHerb        = constants.EventTypeHerb
+	EventTypeMilkTea     = constants.EventTypeMilkTea
+	EventTypeRelic       = constants.EventTypeRelic
+	EventTypeDivineBless = constants.EventTypeDivineBless
+	EventTypeExchange    = constants.EventTypeExchange
+	EventTypeHiddenBuff  = constants.EventTypeHiddenBuff
+	EventTypeTasteTest   = constants.EventTypeTasteTest
+	EventTypeMosquito    = constants.EventTypeMosquito
+	EventTypeGhostHit    = constants.EventTypeGhostHit
+	EventTypeDogPoop     = constants.EventTypeDogPoop
+	EventTypeThief       = constants.EventTypeThief
+	EventTypeCurseBuddha = constants.EventTypeCurseBuddha
+	EventTypeLostWay     = constants.EventTypeLostWay
+	EventTypeThunder     = constants.EventTypeThunder
 )
 
 // EventDefinition from event package
@@ -123,24 +82,24 @@ type EventDefinition = event.EventDefinition
 
 // Event registry access functions from event package
 var (
-	GetEventDefinition    = event.GetEventDefinition
-	GetEventString        = event.GetEventString
-	GetEventEvaluation    = event.GetEventEvaluation
-	GetAllEventTypes      = event.GetAllEventTypes
+	GetEventDefinition      = event.GetEventDefinition
+	GetEventString          = event.GetEventString
+	GetEventEvaluation      = event.GetEventEvaluation
+	GetAllEventTypes        = event.GetAllEventTypes
 	GetEventTypesByCategory = event.GetEventTypesByCategory
-	GetAllEventDefinitions = event.GetAllEventDefinitions
+	GetAllEventDefinitions  = event.GetAllEventDefinitions
 )
 
-// ItemType from item package
-type ItemType = item.ItemType
+// ItemType from constants package
+type ItemType = constants.ItemType
 
-// ItemType constants from item package
+// ItemType constants from constants package
 const (
-	ItemTypeNone        = item.ItemTypeNone
-	ItemTypeReverseClock = item.ItemTypeReverseClock
-	ItemTypeAnyDoor     = item.ItemTypeAnyDoor
-	ItemTypeDiceSwap    = item.ItemTypeDiceSwap
-	ItemTypeDiceUpgrade = item.ItemTypeDiceUpgrade
+	ItemTypeNone        = constants.ItemTypeNone
+	ItemTypeReverseClock = constants.ItemTypeReverseClock
+	ItemTypeAnyDoor     = constants.ItemTypeAnyDoor
+	ItemTypeDiceSwap    = constants.ItemTypeDiceSwap
+	ItemTypeDiceUpgrade = constants.ItemTypeDiceUpgrade
 )
 
 // Item from item package
@@ -154,13 +113,13 @@ type ItemDefinition = item.ItemDefinition
 
 // Item registry access functions from item package
 var (
-	GetItemDefinition    = item.GetItemDefinition
-	GetItemString        = item.GetItemString
-	GetItemEvaluation    = item.GetItemEvaluation
-	GetAllItemTypes      = item.GetAllItemTypes
+	GetItemDefinition      = item.GetItemDefinition
+	GetItemString          = item.GetItemString
+	GetItemEvaluation      = item.GetItemEvaluation
+	GetAllItemTypes        = item.GetAllItemTypes
 	GetItemTypesByCategory = item.GetItemTypesByCategory
-	GetAllItemDefinitions = item.GetAllItemDefinitions
-	GenerateItemID       = item.GenerateItemID
+	GetAllItemDefinitions  = item.GetAllItemDefinitions
+	GenerateItemID         = item.GenerateItemID
 )
 
 // GlobalBuffRegistry from buff package (for advanced use)
@@ -180,16 +139,16 @@ type CombinedRegistry struct{}
 var GlobalRegistry = &CombinedRegistry{}
 
 // GetBuffTypesByEvaluationRange delegates to BuffRegistry.
-func (r *CombinedRegistry) GetBuffTypesByEvaluationRange(minEval, maxEval Evaluation) []BuffType {
+func (r *CombinedRegistry) GetBuffTypesByEvaluationRange(minEval, maxEval constants.Evaluation) []constants.BuffType {
 	return GlobalBuffRegistry.GetBuffTypesByEvaluationRange(minEval, maxEval)
 }
 
 // GetEventTypesByEvaluationRange delegates to EventRegistry.
-func (r *CombinedRegistry) GetEventTypesByEvaluationRange(minEval, maxEval Evaluation) []EventType {
+func (r *CombinedRegistry) GetEventTypesByEvaluationRange(minEval, maxEval constants.Evaluation) []constants.EventType {
 	return GlobalEventRegistry.GetEventTypesByEvaluationRange(minEval, maxEval)
 }
 
 // GetItemTypesByEvaluationRange delegates to ItemRegistry.
-func (r *CombinedRegistry) GetItemTypesByEvaluationRange(minEval, maxEval Evaluation) []ItemType {
+func (r *CombinedRegistry) GetItemTypesByEvaluationRange(minEval, maxEval constants.Evaluation) []constants.ItemType {
 	return GlobalItemRegistry.GetItemTypesByEvaluationRange(minEval, maxEval)
 }

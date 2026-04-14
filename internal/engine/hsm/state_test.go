@@ -7,6 +7,7 @@ import (
 	"github.com/b1tAction/Fated/internal/core"
 	"github.com/b1tAction/Fated/internal/engine"
 	"github.com/b1tAction/Fated/internal/gamemap"
+	"github.com/b1tAction/Fated/pkg/constants"
 	"github.com/b1tAction/Fated/pkg/event"
 )
 
@@ -42,8 +43,8 @@ func TestStateContextWithMethods(t *testing.T) {
 	}
 
 	// Test WithPhase
-	ctx = ctx.WithPhase(event.PhaseBeforeTurn, 10)
-	if ctx.Phase != event.PhaseBeforeTurn {
+	ctx = ctx.WithPhase(constants.PhaseBeforeTurn, 10)
+	if ctx.Phase != constants.PhaseBeforeTurn {
 		t.Error("Phase not set correctly")
 	}
 	if ctx.PhaseData != 10 {
@@ -218,10 +219,10 @@ func TestStateContextWithMapEngine(t *testing.T) {
 
 type mockEventBusAdapter struct{}
 
-func (m *mockEventBusAdapter) Publish(phase event.Phase, playerID string, ctx *event.Context) []*event.Decision {
+func (m *mockEventBusAdapter) Publish(phase constants.Phase, playerID string, ctx *event.Context) []*event.Decision {
 	return nil
 }
-func (m *mockEventBusAdapter) Subscribe(phase event.Phase, ownerID, sourceID, sourceType string, decision *event.Decision) string {
+func (m *mockEventBusAdapter) Subscribe(phase constants.Phase, ownerID, sourceID, sourceType string, decision *event.Decision) string {
 	return ""
 }
 func (m *mockEventBusAdapter) Unsubscribe(subID string) bool { return false }

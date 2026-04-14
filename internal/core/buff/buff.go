@@ -6,65 +6,21 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/b1tAction/Fated/internal/core/types"
-	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/Fated/pkg/constants"
 	"github.com/b1tAction/Fated/pkg/handler"
 )
-
-// ========== Buff Type Definitions ==========
-
-type BuffType int
-
-const (
-	BuffTypeNone BuffType = iota
-	// Negative Buffs
-	BuffTypeCurse    // Curse诅咒
-	BuffTypeLost     // Lost迷途
-	BuffTypeCorrupt  // Corrupt腐化
-	BuffTypePoison   // Poison毒瘴
-	// Neutral Buff
-	BuffTypeHidden   // Hidden隐匿
-	// Positive Buffs
-	BuffTypeDivine   // Divine神眷
-	BuffTypeRain     // Rain甘霖
-	BuffTypeExorcism // Exorcism辟邪
-	BuffTypeFire     // Fire离火
-)
-
-// IsValid checks if the Buff type is valid.
-func (bt BuffType) IsValid() bool {
-	return bt > BuffTypeNone && bt <= BuffTypeFire
-}
-
-// String returns the Buff type name from GlobalBuffRegistry.
-func (bt BuffType) String() string {
-	return GlobalBuffRegistry.GetBuffString(bt)
-}
-
-// IsPositive checks if the Buff is positive (based on effect, not evaluation).
-// Hidden is neutral evaluation but positive effect (immunity).
-func (bt BuffType) IsPositive() bool {
-	// Positive buffs: Divine, Hidden, Rain, Exorcism, Fire
-	positiveBuffs := []BuffType{BuffTypeDivine, BuffTypeHidden, BuffTypeRain, BuffTypeExorcism, BuffTypeFire}
-	for _, pos := range positiveBuffs {
-		if bt == pos {
-			return true
-		}
-	}
-	return false
-}
 
 // ========== Buff Instance ==========
 
 type Buff struct {
-	Type            BuffType `json:"type"`
-	ID              string   `json:"id"`               // Buff instance ID
-	Duration        int      `json:"duration"`
-	Charge          int      `json:"charge"`
-	SubscriptionIDs []string `json:"subscription_ids"` // EventBus subscription IDs (managed by engine package)
+	Type            constants.BuffType `json:"type"`
+	ID              string             `json:"id"`               // Buff instance ID
+	Duration        int                `json:"duration"`
+	Charge          int                `json:"charge"`
+	SubscriptionIDs []string           `json:"subscription_ids"` // EventBus subscription IDs
 }
 
-func NewBuff(buffType BuffType, duration int) *Buff {
+func NewBuff(buffType constants.BuffType, duration int) *Buff {
 	return &Buff{
 		Type:            buffType,
 		ID:              fmt.Sprintf("buff-%d", time.Now().UnixNano()),
@@ -88,27 +44,27 @@ func (b *Buff) TickDuration() bool {
 // ========== Buff Definition ==========
 
 type BuffDefinition struct {
-	Type          BuffType             `json:"type"`
-	Eval          types.Evaluation     `json:"evaluation"`     // Evaluation score
-	EnglishName   string               `json:"english_name"`   // English identifier (for String())
-	Name          string               `json:"name"`           // Chinese display name
-	Desc          string               `json:"desc"`
-	Duration      int                  `json:"duration"`
-	HPPerTurn     int                  `json:"hp_per_turn"`
-	LPPerTurn     int                  `json:"lp_per_turn"`
-	SpecialEffect types.SpecialEffect  `json:"special_effect"` // Special effect type
-	Phases        []event.Phase        `json:"phases"`         // Trigger phases list
-	Priority      int                  `json:"priority"`       // Execution priority
-	NeedConfirm   bool                 `json:"need_confirm"`   // Whether user confirmation needed
+	Type          constants.BuffType          `json:"type"`
+	Eval          constants.Evaluation        `json:"evaluation"`     // Evaluation score
+	EnglishName   string                      `json:"english_name"`   // English identifier (snake_case)
+	Name          string                      `json:"name"`           // Chinese display name
+	Desc          string                      `json:"desc"`
+	Duration      int                         `json:"duration"`
+	HPPerTurn     int                         `json:"hp_per_turn"`
+	LPPerTurn     int                         `json:"lp_per_turn"`
+	SpecialEffect constants.SpecialEffect     `json:"special_effect"` // Special effect type
+	Phases        []constants.Phase           `json:"phases"`         // Trigger phases list
+	Priority      int                         `json:"priority"`       // Execution priority
+	NeedConfirm   bool                        `json:"need_confirm"`   // Whether user confirmation needed
 }
 
 // GetPhases returns the Buff's trigger phase list.
-func (def *BuffDefinition) GetPhases() []event.Phase {
+func (def *BuffDefinition) GetPhases() []constants.Phase {
 	return def.Phases
 }
 
 // HasPhase checks if the Buff triggers at the specified Phase.
-func (def *BuffDefinition) HasPhase(phase event.Phase) bool {
+func (def *BuffDefinition) HasPhase(phase constants.Phase) bool {
 	for _, p := range def.Phases {
 		if p == phase {
 			return true
@@ -124,42 +80,36 @@ type EffectHandler = handler.EffectHandler
 
 // BuffRegistry is the registry for Buff definitions.
 type BuffRegistry struct {
-	defs     map[BuffType]*BuffDefinition
-	handlers map[BuffType]EffectHandler
-	strings  map[BuffType]string // English identifier
-	names    map[BuffType]string // Chinese name
-	evals    map[BuffType]types.Evaluation
+	defs     map[constants.BuffType]*BuffDefinition
+	handlers map[constants.BuffType]EffectHandler
+	names    map[constants.BuffType]string // Chinese name
 
 	// Category lists (auto-generated)
-	goodBuffs    []BuffType
-	badBuffs     []BuffType
-	neutralBuffs []BuffType
+	goodBuffs    []constants.BuffType
+	badBuffs     []constants.BuffType
+	neutralBuffs []constants.BuffType
 }
 
 // NewBuffRegistry creates a new Buff registry.
 func NewBuffRegistry() *BuffRegistry {
 	return &BuffRegistry{
-		defs:         make(map[BuffType]*BuffDefinition),
-		handlers:     make(map[BuffType]EffectHandler),
-		strings:      make(map[BuffType]string),
-		names:        make(map[BuffType]string),
-		evals:        make(map[BuffType]types.Evaluation),
-		goodBuffs:    make([]BuffType, 0),
-		badBuffs:     make([]BuffType, 0),
-		neutralBuffs: make([]BuffType, 0),
+		defs:         make(map[constants.BuffType]*BuffDefinition),
+		handlers:     make(map[constants.BuffType]EffectHandler),
+		names:        make(map[constants.BuffType]string),
+		goodBuffs:    make([]constants.BuffType, 0),
+		badBuffs:     make([]constants.BuffType, 0),
+		neutralBuffs: make([]constants.BuffType, 0),
 	}
 }
 
 // RegisterBuff registers a Buff definition with optional handler.
 func (r *BuffRegistry) RegisterBuff(def *BuffDefinition, handler EffectHandler) {
-	if def == nil || def.Type == BuffTypeNone {
+	if def == nil || def.Type == constants.BuffTypeNone {
 		return
 	}
 
 	r.defs[def.Type] = def
-	r.strings[def.Type] = def.EnglishName
 	r.names[def.Type] = def.Name
-	r.evals[def.Type] = def.Eval
 
 	// Auto-classify by Evaluation
 	if def.Eval.IsGood() {
@@ -176,23 +126,20 @@ func (r *BuffRegistry) RegisterBuff(def *BuffDefinition, handler EffectHandler) 
 }
 
 // GetBuffDefinition returns the Buff definition by type.
-func (r *BuffRegistry) GetBuffDefinition(bt BuffType) *BuffDefinition {
+func (r *BuffRegistry) GetBuffDefinition(bt constants.BuffType) *BuffDefinition {
 	if def, ok := r.defs[bt]; ok {
 		return def
 	}
 	return nil
 }
 
-// GetBuffString returns the Buff English identifier.
-func (r *BuffRegistry) GetBuffString(bt BuffType) string {
-	if name, ok := r.strings[bt]; ok {
-		return name
-	}
-	return "Unknown"
+// GetBuffString returns the Buff type as string (snake_case).
+func (r *BuffRegistry) GetBuffString(bt constants.BuffType) string {
+	return string(bt) // BuffType is already string with snake_case
 }
 
 // GetBuffName returns the Buff Chinese display name.
-func (r *BuffRegistry) GetBuffName(bt BuffType) string {
+func (r *BuffRegistry) GetBuffName(bt constants.BuffType) string {
 	if name, ok := r.names[bt]; ok {
 		return name
 	}
@@ -200,15 +147,15 @@ func (r *BuffRegistry) GetBuffName(bt BuffType) string {
 }
 
 // GetBuffEvaluation returns the Buff evaluation score.
-func (r *BuffRegistry) GetBuffEvaluation(bt BuffType) types.Evaluation {
-	if eval, ok := r.evals[bt]; ok {
-		return eval
+func (r *BuffRegistry) GetBuffEvaluation(bt constants.BuffType) constants.Evaluation {
+	if def, ok := r.defs[bt]; ok {
+		return def.Eval
 	}
-	return types.EvaluationNeutral
+	return constants.EvaluationNeutral
 }
 
 // GetBuffHandler returns the Buff's custom handler (nil if none).
-func (r *BuffRegistry) GetBuffHandler(bt BuffType) EffectHandler {
+func (r *BuffRegistry) GetBuffHandler(bt constants.BuffType) EffectHandler {
 	if handler, ok := r.handlers[bt]; ok {
 		return handler
 	}
@@ -216,14 +163,14 @@ func (r *BuffRegistry) GetBuffHandler(bt BuffType) EffectHandler {
 }
 
 // HasBuffHandler checks if Buff has a custom handler.
-func (r *BuffRegistry) HasBuffHandler(bt BuffType) bool {
+func (r *BuffRegistry) HasBuffHandler(bt constants.BuffType) bool {
 	_, ok := r.handlers[bt]
 	return ok
 }
 
 // GetAllBuffTypes returns all registered Buff types.
-func (r *BuffRegistry) GetAllBuffTypes() []BuffType {
-	result := make([]BuffType, 0, len(r.defs))
+func (r *BuffRegistry) GetAllBuffTypes() []constants.BuffType {
+	result := make([]constants.BuffType, 0, len(r.defs))
 	for bt := range r.defs {
 		result = append(result, bt)
 	}
@@ -231,7 +178,7 @@ func (r *BuffRegistry) GetAllBuffTypes() []BuffType {
 }
 
 // GetBuffTypesByCategory returns Buff types by category.
-func (r *BuffRegistry) GetBuffTypesByCategory(category string) []BuffType {
+func (r *BuffRegistry) GetBuffTypesByCategory(category string) []constants.BuffType {
 	switch category {
 	case "Good":
 		return r.goodBuffs
@@ -253,10 +200,10 @@ func (r *BuffRegistry) GetAllBuffDefinitions() []*BuffDefinition {
 }
 
 // GetBuffTypesByEvaluationRange returns Buffs within the specified Evaluation range.
-func (r *BuffRegistry) GetBuffTypesByEvaluationRange(minEval, maxEval types.Evaluation) []BuffType {
-	var result []BuffType
-	for bt, eval := range r.evals {
-		if eval >= minEval && eval <= maxEval {
+func (r *BuffRegistry) GetBuffTypesByEvaluationRange(minEval, maxEval constants.Evaluation) []constants.BuffType {
+	var result []constants.BuffType
+	for bt, def := range r.defs {
+		if def.Eval >= minEval && def.Eval <= maxEval {
 			result = append(result, bt)
 		}
 	}
@@ -266,41 +213,46 @@ func (r *BuffRegistry) GetBuffTypesByEvaluationRange(minEval, maxEval types.Eval
 // ========== Global Registry Access Functions ==========
 
 // GetBuffDefinition returns the Buff definition from GlobalBuffRegistry.
-func GetBuffDefinition(bt BuffType) *BuffDefinition {
+func GetBuffDefinition(bt constants.BuffType) *BuffDefinition {
 	return GlobalBuffRegistry.GetBuffDefinition(bt)
 }
 
 // GetBuffString returns the Buff name string from GlobalBuffRegistry.
-func GetBuffString(bt BuffType) string {
+func GetBuffString(bt constants.BuffType) string {
 	return GlobalBuffRegistry.GetBuffString(bt)
 }
 
 // GetBuffEvaluation returns the Buff evaluation score from GlobalBuffRegistry.
-func GetBuffEvaluation(bt BuffType) types.Evaluation {
+func GetBuffEvaluation(bt constants.BuffType) constants.Evaluation {
 	return GlobalBuffRegistry.GetBuffEvaluation(bt)
 }
 
 // GetBuffHandler returns the Buff's custom handler from GlobalBuffRegistry.
-func GetBuffHandler(bt BuffType) EffectHandler {
+func GetBuffHandler(bt constants.BuffType) EffectHandler {
 	return GlobalBuffRegistry.GetBuffHandler(bt)
 }
 
 // HasBuffHandler checks if Buff has a custom handler.
-func HasBuffHandler(bt BuffType) bool {
+func HasBuffHandler(bt constants.BuffType) bool {
 	return GlobalBuffRegistry.HasBuffHandler(bt)
 }
 
 // GetAllBuffTypes returns all registered Buff types.
-func GetAllBuffTypes() []BuffType {
+func GetAllBuffTypes() []constants.BuffType {
 	return GlobalBuffRegistry.GetAllBuffTypes()
 }
 
 // GetBuffTypesByCategory returns Buff types by category.
-func GetBuffTypesByCategory(category string) []BuffType {
+func GetBuffTypesByCategory(category string) []constants.BuffType {
 	return GlobalBuffRegistry.GetBuffTypesByCategory(category)
 }
 
 // GetAllBuffDefinitions returns all Buff definitions.
 func GetAllBuffDefinitions() []*BuffDefinition {
 	return GlobalBuffRegistry.GetAllBuffDefinitions()
+}
+
+// GetBuffName returns the Buff Chinese display name from GlobalBuffRegistry.
+func GetBuffName(bt constants.BuffType) string {
+	return GlobalBuffRegistry.GetBuffName(bt)
 }

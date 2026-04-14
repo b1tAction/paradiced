@@ -9,6 +9,7 @@ import (
 	engineaction "github.com/b1tAction/Fated/internal/engine/action"
 	"github.com/b1tAction/Fated/internal/engine"
 	"github.com/b1tAction/Fated/internal/gamemap"
+	"github.com/b1tAction/Fated/pkg/constants"
 	"github.com/b1tAction/Fated/pkg/event"
 	"github.com/b1tAction/Fated/pkg/gamelog"
 )
@@ -68,7 +69,7 @@ func TestTurnFlow_BuffEffect_GameLog(t *testing.T) {
 	game.AddPlayer(player)
 
 	// Add Divine buff (神眷: LP+1 each turn)
-	divineBuff := buff.NewBuff(buff.BuffTypeDivine, 3)
+	divineBuff := buff.NewBuff(constants.BuffTypeDivine, 3)
 	player.AddBuff(divineBuff)
 
 	// Subscribe buff to EventBus
@@ -87,7 +88,7 @@ func TestTurnFlow_BuffEffect_GameLog(t *testing.T) {
 	triggerCtx.Set("action_context", actionCtx)
 
 	// Publish PhaseBeforeTurn
-	game.Bus.Publish(event.PhaseBeforeTurn, player.UserID, triggerCtx)
+	game.Bus.Publish(constants.PhaseBeforeTurn, player.UserID, triggerCtx)
 
 	// Process any derived actions
 	actionCtx.ProcessQueue()
@@ -240,7 +241,7 @@ func TestTurnFlow_CompleteTurn(t *testing.T) {
 	game.AddPlayer(player)
 
 	// Add Divine buff
-	divineBuff := buff.NewBuff(buff.BuffTypeDivine, 3)
+	divineBuff := buff.NewBuff(constants.BuffTypeDivine, 3)
 	player.AddBuff(divineBuff)
 	game.SubscribeBuff(player, divineBuff)
 
@@ -258,7 +259,7 @@ func TestTurnFlow_CompleteTurn(t *testing.T) {
 
 	triggerCtx := event.NewContext(player)
 	triggerCtx.Set("action_context", actionCtx)
-	game.Bus.Publish(event.PhaseBeforeTurn, player.UserID, triggerCtx)
+	game.Bus.Publish(constants.PhaseBeforeTurn, player.UserID, triggerCtx)
 	actionCtx.ProcessQueue()
 
 	// === Step 3: Simulate Movement ===
@@ -389,8 +390,8 @@ func TestTurnFlow_Interrupt_Respawn(t *testing.T) {
 	respawnAction := engineaction.NewRespawnAction(player, checkpoint, "DeathRespawn")
 
 	// Verify PreTriggerPhase is PhasePreRespawn
-	if respawnAction.PreTriggerPhase() != event.PhasePreRespawn {
-		t.Errorf("RespawnAction PreTriggerPhase should be PhasePreRespawn, got %s", respawnAction.PreTriggerPhase())
+	if respawnAction.PreTriggerPhase() != constants.PhasePreRespawn {
+		t.Errorf("RespawnAction PreTriggerPhase should be PhasePreRespawn, got %s", string(respawnAction.PreTriggerPhase()))
 	}
 
 	actionCtx.ExecuteAction(respawnAction)

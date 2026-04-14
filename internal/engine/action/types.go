@@ -5,7 +5,7 @@ import (
 
 	"github.com/b1tAction/Fated/internal/core"
 	"github.com/b1tAction/Fated/internal/core/buff"
-	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/Fated/pkg/constants"
 	"github.com/b1tAction/Fated/pkg/gamelog"
 	"github.com/b1tAction/Fated/pkg/util"
 )
@@ -48,16 +48,16 @@ func (a *DamageAction) Source() string    { return a.SourceID }
 func (a *DamageAction) Target() string    { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhasePreDamage for interception by shields/隐匿.
-func (a *DamageAction) PreTriggerPhase() event.Phase {
+func (a *DamageAction) PreTriggerPhase() constants.Phase {
 	if a.IsPiercing {
-		return event.PhaseAnyTime // Piercing damage cannot be intercepted
+		return constants.PhaseAnyTime // Piercing damage cannot be intercepted
 	}
-	return event.PhasePreDamage
+	return constants.PhasePreDamage
 }
 
 // PostTriggerPhase returns PhaseAnyTime (no post-trigger for damage).
-func (a *DamageAction) PostTriggerPhase() event.Phase {
-	return event.PhaseAnyTime
+func (a *DamageAction) PostTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
 }
 
 func (a *DamageAction) Execute(ctx *ActionContext) error {
@@ -108,13 +108,13 @@ func (a *HealAction) Source() string    { return a.SourceID }
 func (a *HealAction) Target() string    { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhaseAnyTime (healing typically not intercepted).
-func (a *HealAction) PreTriggerPhase() event.Phase {
-	return event.PhaseAnyTime
+func (a *HealAction) PreTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
 }
 
 // PostTriggerPhase returns PhaseAnyTime (no post-trigger for healing).
-func (a *HealAction) PostTriggerPhase() event.Phase {
-	return event.PhaseAnyTime
+func (a *HealAction) PostTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
 }
 
 func (a *HealAction) Execute(ctx *ActionContext) error {
@@ -161,13 +161,13 @@ func (a *ModifyLPAction) Source() string    { return a.SourceID }
 func (a *ModifyLPAction) Target() string    { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhaseAnyTime (LP changes cannot be intercepted).
-func (a *ModifyLPAction) PreTriggerPhase() event.Phase {
-	return event.PhaseAnyTime
+func (a *ModifyLPAction) PreTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
 }
 
 // PostTriggerPhase returns PhaseAnyTime (no post-trigger for LP).
-func (a *ModifyLPAction) PostTriggerPhase() event.Phase {
-	return event.PhaseAnyTime
+func (a *ModifyLPAction) PostTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
 }
 
 func (a *ModifyLPAction) Execute(ctx *ActionContext) error {
@@ -219,13 +219,13 @@ func (a *MoveAction) Source() string    { return a.SourceID }
 func (a *MoveAction) Target() string    { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhasePreMove for interception by 迷途.
-func (a *MoveAction) PreTriggerPhase() event.Phase {
-	return event.PhasePreMove
+func (a *MoveAction) PreTriggerPhase() constants.Phase {
+	return constants.PhasePreMove
 }
 
 // PostTriggerPhase returns PhaseAnyTime (no post-trigger for movement).
-func (a *MoveAction) PostTriggerPhase() event.Phase {
-	return event.PhaseAnyTime
+func (a *MoveAction) PostTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
 }
 
 func (a *MoveAction) Execute(ctx *ActionContext) error {
@@ -286,13 +286,13 @@ func (a *MoveAction) Overtook(player *core.Player) bool {
 // AddBuffAction represents adding a Buff to player.
 type AddBuffAction struct {
 	TargetPlayer *core.Player  // Player receiving Buff
-	BuffType     buff.BuffType // Type of Buff to add
+	BuffType     constants.BuffType // Type of Buff to add
 	Duration     int           // Buff duration in turns
 	SourceID     string        // Source identifier
 }
 
 // NewAddBuffAction creates a new AddBuffAction.
-func NewAddBuffAction(target *core.Player, buffType buff.BuffType, duration int, sourceID string) *AddBuffAction {
+func NewAddBuffAction(target *core.Player, buffType constants.BuffType, duration int, sourceID string) *AddBuffAction {
 	return &AddBuffAction{
 		TargetPlayer: target,
 		BuffType:     buffType,
@@ -307,13 +307,13 @@ func (a *AddBuffAction) Source() string    { return a.SourceID }
 func (a *AddBuffAction) Target() string    { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhaseAnyTime (buff addition not intercepted).
-func (a *AddBuffAction) PreTriggerPhase() event.Phase {
-	return event.PhaseAnyTime
+func (a *AddBuffAction) PreTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
 }
 
 // PostTriggerPhase returns PhaseOnBuffApplied for entry effects/chain reactions.
-func (a *AddBuffAction) PostTriggerPhase() event.Phase {
-	return event.PhaseOnBuffApplied
+func (a *AddBuffAction) PostTriggerPhase() constants.Phase {
+	return constants.PhaseOnBuffApplied
 }
 
 func (a *AddBuffAction) Execute(ctx *ActionContext) error {
@@ -324,7 +324,7 @@ func (a *AddBuffAction) Execute(ctx *ActionContext) error {
 
 func (a *AddBuffAction) LogEntry() gamelog.LogEntry {
 	metadata := util.NewMetadata()
-	metadata.SetString("buff_type", a.BuffType.String())
+	metadata.SetString("buff_type", string(a.BuffType))
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
@@ -342,12 +342,12 @@ func (a *AddBuffAction) LogEntry() gamelog.LogEntry {
 // RemoveBuffAction represents removing a Buff from player.
 type RemoveBuffAction struct {
 	TargetPlayer *core.Player  // Player losing Buff
-	BuffType     buff.BuffType // Type of Buff to remove
+	BuffType     constants.BuffType // Type of Buff to remove
 	SourceID     string        // Source identifier
 }
 
 // NewRemoveBuffAction creates a new RemoveBuffAction.
-func NewRemoveBuffAction(target *core.Player, buffType buff.BuffType, sourceID string) *RemoveBuffAction {
+func NewRemoveBuffAction(target *core.Player, buffType constants.BuffType, sourceID string) *RemoveBuffAction {
 	return &RemoveBuffAction{
 		TargetPlayer: target,
 		BuffType:     buffType,
@@ -361,13 +361,13 @@ func (a *RemoveBuffAction) Source() string    { return a.SourceID }
 func (a *RemoveBuffAction) Target() string    { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhaseOnBuffRemoved for death effects/亡语.
-func (a *RemoveBuffAction) PreTriggerPhase() event.Phase {
-	return event.PhaseOnBuffRemoved
+func (a *RemoveBuffAction) PreTriggerPhase() constants.Phase {
+	return constants.PhaseOnBuffRemoved
 }
 
 // PostTriggerPhase returns PhaseAnyTime (no post-trigger after removal).
-func (a *RemoveBuffAction) PostTriggerPhase() event.Phase {
-	return event.PhaseAnyTime
+func (a *RemoveBuffAction) PostTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
 }
 
 func (a *RemoveBuffAction) Execute(ctx *ActionContext) error {
@@ -377,7 +377,7 @@ func (a *RemoveBuffAction) Execute(ctx *ActionContext) error {
 
 func (a *RemoveBuffAction) LogEntry() gamelog.LogEntry {
 	metadata := util.NewMetadata()
-	metadata.SetString("buff_type", a.BuffType.String())
+	metadata.SetString("buff_type", string(a.BuffType))
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
@@ -415,13 +415,13 @@ func (a *TeleportAction) Source() string    { return a.SourceID }
 func (a *TeleportAction) Target() string    { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhaseAnyTime (teleport not intercepted).
-func (a *TeleportAction) PreTriggerPhase() event.Phase {
-	return event.PhaseAnyTime
+func (a *TeleportAction) PreTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
 }
 
 // PostTriggerPhase returns PhaseAnyTime (no post-trigger for teleport).
-func (a *TeleportAction) PostTriggerPhase() event.Phase {
-	return event.PhaseAnyTime
+func (a *TeleportAction) PostTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
 }
 
 func (a *TeleportAction) Execute(ctx *ActionContext) error {
@@ -471,13 +471,13 @@ func (a *StealBuffAction) Source() string    { return a.SourceID }
 func (a *StealBuffAction) Target() string    { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhaseAnyTime (steal not intercepted).
-func (a *StealBuffAction) PreTriggerPhase() event.Phase {
-	return event.PhaseAnyTime
+func (a *StealBuffAction) PreTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
 }
 
 // PostTriggerPhase returns PhaseAnyTime (no post-trigger for steal).
-func (a *StealBuffAction) PostTriggerPhase() event.Phase {
-	return event.PhaseAnyTime
+func (a *StealBuffAction) PostTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
 }
 
 func (a *StealBuffAction) Execute(ctx *ActionContext) error {
@@ -498,7 +498,7 @@ func (a *StealBuffAction) Execute(ctx *ActionContext) error {
 func (a *StealBuffAction) LogEntry() gamelog.LogEntry {
 	buffType := ""
 	if a.StolenBuff != nil {
-		buffType = a.StolenBuff.Type.String()
+		buffType = string(a.StolenBuff.Type)
 	}
 
 	metadata := util.NewMetadata()
@@ -539,13 +539,13 @@ func (a *DrawEventAction) Source() string    { return a.SourceID }
 func (a *DrawEventAction) Target() string    { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhasePreEvent for interception by 辟邪/玄武.
-func (a *DrawEventAction) PreTriggerPhase() event.Phase {
-	return event.PhasePreEvent
+func (a *DrawEventAction) PreTriggerPhase() constants.Phase {
+	return constants.PhasePreEvent
 }
 
 // PostTriggerPhase returns PhaseAnyTime (no post-trigger for draw).
-func (a *DrawEventAction) PostTriggerPhase() event.Phase {
-	return event.PhaseAnyTime
+func (a *DrawEventAction) PostTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
 }
 
 func (a *DrawEventAction) Execute(ctx *ActionContext) error {
@@ -590,13 +590,13 @@ func (a *RespawnAction) Source() string    { return a.SourceID }
 func (a *RespawnAction) Target() string    { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhasePreRespawn (respawn can be intercepted by Undying等).
-func (a *RespawnAction) PreTriggerPhase() event.Phase {
-	return event.PhasePreRespawn
+func (a *RespawnAction) PreTriggerPhase() constants.Phase {
+	return constants.PhasePreRespawn
 }
 
 // PostTriggerPhase returns PhaseAnyTime (no post-trigger for respawn).
-func (a *RespawnAction) PostTriggerPhase() event.Phase {
-	return event.PhaseAnyTime
+func (a *RespawnAction) PostTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
 }
 
 func (a *RespawnAction) Execute(ctx *ActionContext) error {
@@ -646,13 +646,13 @@ func (a *FellDownAction) Source() string    { return a.SourceID }
 func (a *FellDownAction) Target() string    { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhaseAnyTime (fell down not intercepted).
-func (a *FellDownAction) PreTriggerPhase() event.Phase {
-	return event.PhaseAnyTime
+func (a *FellDownAction) PreTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
 }
 
 // PostTriggerPhase returns PhaseAnyTime (no post-trigger for fell down).
-func (a *FellDownAction) PostTriggerPhase() event.Phase {
-	return event.PhaseAnyTime
+func (a *FellDownAction) PostTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
 }
 
 func (a *FellDownAction) Execute(ctx *ActionContext) error {

@@ -6,44 +6,20 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/b1tAction/Fated/internal/core/buff"
-	"github.com/b1tAction/Fated/internal/core/types"
-	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/Fated/pkg/constants"
 )
-
-// ========== Item Type Definitions ==========
-
-type ItemType int
-
-const (
-	ItemTypeNone ItemType = iota
-	ItemTypeReverseClock // ReverseClock反方向的钟
-	ItemTypeAnyDoor      // AnyDoor任意门
-	ItemTypeDiceSwap     // DiceSwap骰子交换
-	ItemTypeDiceUpgrade  // DiceUpgrade骰子升级卡
-)
-
-// IsValid checks if the Item type is valid.
-func (it ItemType) IsValid() bool {
-	return it > ItemTypeNone && it <= ItemTypeDiceUpgrade
-}
-
-// String returns the Item type name from GlobalItemRegistry.
-func (it ItemType) String() string {
-	return GlobalItemRegistry.GetItemString(it)
-}
 
 // ========== Item Instance ==========
 
 type Item struct {
-	Type           ItemType `json:"type"`
-	ID             string   `json:"id"`
-	Usable         bool     `json:"usable"`
-	TargetID       string   `json:"target_id"`
-	SubscriptionID string   `json:"subscription_id"` // EventBus subscription ID (managed by engine package)
+	Type           constants.ItemType `json:"type"`
+	ID             string             `json:"id"`
+	Usable         bool               `json:"usable"`
+	TargetID       string             `json:"target_id"`
+	SubscriptionID string             `json:"subscription_id"` // EventBus subscription ID (managed by engine package)
 }
 
-func NewItem(itemType ItemType, id string) *Item {
+func NewItem(itemType constants.ItemType, id string) *Item {
 	return &Item{
 		Type:   itemType,
 		ID:     id,
@@ -54,52 +30,52 @@ func NewItem(itemType ItemType, id string) *Item {
 // ========== Item Definition ==========
 
 type ItemDefinition struct {
-	Type          ItemType             `json:"type"`
-	Eval          types.Evaluation     `json:"evaluation"`
-	EnglishName   string               `json:"english_name"` // English identifier (for String())
-	Name          string               `json:"name"`         // Chinese display name
-	Desc          string               `json:"desc"`
-	TargetSelf    bool                 `json:"target_self"`
-	TargetOther   bool                 `json:"target_other"`
-	BuffType      buff.BuffType        `json:"buff_type"`
-	Range         int                  `json:"range"`
-	SpecialEffect types.SpecialEffect  `json:"special_effect"` // Special effect type
-	Phase         event.Phase          `json:"phase"`          // Usable phase
-	Priority      int                  `json:"priority"`       // Execution priority
-	NeedConfirm   bool                 `json:"need_confirm"`   // Whether user confirmation needed
+	Type          constants.ItemType        `json:"type"`
+	Eval          constants.Evaluation      `json:"evaluation"`
+	EnglishName   string                    `json:"english_name"` // English identifier (for String())
+	Name          string                    `json:"name"`         // Chinese display name
+	Desc          string                    `json:"desc"`
+	TargetSelf    bool                      `json:"target_self"`
+	TargetOther   bool                      `json:"target_other"`
+	BuffType      constants.BuffType        `json:"buff_type"`
+	Range         int                       `json:"range"`
+	SpecialEffect constants.SpecialEffect   `json:"special_effect"` // Special effect type
+	Phase         constants.Phase           `json:"phase"`          // Usable phase
+	Priority      int                       `json:"priority"`       // Execution priority
+	NeedConfirm   bool                      `json:"need_confirm"`   // Whether user confirmation needed
 }
 
 // ========== Item Registry ==========
 
 // ItemRegistry is the registry for Item definitions.
 type ItemRegistry struct {
-	defs    map[ItemType]*ItemDefinition
-	strings map[ItemType]string // English identifier
-	names   map[ItemType]string // Chinese name
-	evals   map[ItemType]types.Evaluation
+	defs    map[constants.ItemType]*ItemDefinition
+	strings map[constants.ItemType]string // English identifier
+	names   map[constants.ItemType]string // Chinese name
+	evals   map[constants.ItemType]constants.Evaluation
 
 	// Category lists (auto-generated)
-	goodItems    []ItemType
-	neutralItems []ItemType
-	badItems     []ItemType
+	goodItems    []constants.ItemType
+	neutralItems []constants.ItemType
+	badItems     []constants.ItemType
 }
 
 // NewItemRegistry creates a new Item registry.
 func NewItemRegistry() *ItemRegistry {
 	return &ItemRegistry{
-		defs:         make(map[ItemType]*ItemDefinition),
-		strings:      make(map[ItemType]string),
-		names:        make(map[ItemType]string),
-		evals:        make(map[ItemType]types.Evaluation),
-		goodItems:    make([]ItemType, 0),
-		neutralItems: make([]ItemType, 0),
-		badItems:     make([]ItemType, 0),
+		defs:         make(map[constants.ItemType]*ItemDefinition),
+		strings:      make(map[constants.ItemType]string),
+		names:        make(map[constants.ItemType]string),
+		evals:        make(map[constants.ItemType]constants.Evaluation),
+		goodItems:    make([]constants.ItemType, 0),
+		neutralItems: make([]constants.ItemType, 0),
+		badItems:     make([]constants.ItemType, 0),
 	}
 }
 
 // RegisterItem registers an Item definition.
 func (r *ItemRegistry) RegisterItem(def *ItemDefinition) {
-	if def == nil || def.Type == ItemTypeNone {
+	if def == nil || def.Type == constants.ItemTypeNone {
 		return
 	}
 
@@ -119,7 +95,7 @@ func (r *ItemRegistry) RegisterItem(def *ItemDefinition) {
 }
 
 // GetItemDefinition returns the Item definition by type.
-func (r *ItemRegistry) GetItemDefinition(it ItemType) *ItemDefinition {
+func (r *ItemRegistry) GetItemDefinition(it constants.ItemType) *ItemDefinition {
 	if def, ok := r.defs[it]; ok {
 		return def
 	}
@@ -127,7 +103,7 @@ func (r *ItemRegistry) GetItemDefinition(it ItemType) *ItemDefinition {
 }
 
 // GetItemString returns the Item English identifier.
-func (r *ItemRegistry) GetItemString(it ItemType) string {
+func (r *ItemRegistry) GetItemString(it constants.ItemType) string {
 	if name, ok := r.strings[it]; ok {
 		return name
 	}
@@ -135,7 +111,7 @@ func (r *ItemRegistry) GetItemString(it ItemType) string {
 }
 
 // GetItemName returns the Item Chinese display name.
-func (r *ItemRegistry) GetItemName(it ItemType) string {
+func (r *ItemRegistry) GetItemName(it constants.ItemType) string {
 	if name, ok := r.names[it]; ok {
 		return name
 	}
@@ -143,16 +119,16 @@ func (r *ItemRegistry) GetItemName(it ItemType) string {
 }
 
 // GetItemEvaluation returns the Item evaluation score.
-func (r *ItemRegistry) GetItemEvaluation(it ItemType) types.Evaluation {
+func (r *ItemRegistry) GetItemEvaluation(it constants.ItemType) constants.Evaluation {
 	if eval, ok := r.evals[it]; ok {
 		return eval
 	}
-	return types.EvaluationNeutral
+	return constants.EvaluationNeutral
 }
 
 // GetAllItemTypes returns all registered Item types.
-func (r *ItemRegistry) GetAllItemTypes() []ItemType {
-	result := make([]ItemType, 0, len(r.defs))
+func (r *ItemRegistry) GetAllItemTypes() []constants.ItemType {
+	result := make([]constants.ItemType, 0, len(r.defs))
 	for it := range r.defs {
 		result = append(result, it)
 	}
@@ -160,7 +136,7 @@ func (r *ItemRegistry) GetAllItemTypes() []ItemType {
 }
 
 // GetItemTypesByCategory returns Item types by category.
-func (r *ItemRegistry) GetItemTypesByCategory(category string) []ItemType {
+func (r *ItemRegistry) GetItemTypesByCategory(category string) []constants.ItemType {
 	switch category {
 	case "Good":
 		return r.goodItems
@@ -182,8 +158,8 @@ func (r *ItemRegistry) GetAllItemDefinitions() []*ItemDefinition {
 }
 
 // GetItemTypesByEvaluationRange returns Items within the specified Evaluation range.
-func (r *ItemRegistry) GetItemTypesByEvaluationRange(minEval, maxEval types.Evaluation) []ItemType {
-	var result []ItemType
+func (r *ItemRegistry) GetItemTypesByEvaluationRange(minEval, maxEval constants.Evaluation) []constants.ItemType {
+	var result []constants.ItemType
 	for it, eval := range r.evals {
 		if eval >= minEval && eval <= maxEval {
 			result = append(result, it)
@@ -195,33 +171,38 @@ func (r *ItemRegistry) GetItemTypesByEvaluationRange(minEval, maxEval types.Eval
 // ========== Global Registry Access Functions ==========
 
 // GetItemDefinition returns the Item definition from GlobalItemRegistry.
-func GetItemDefinition(it ItemType) *ItemDefinition {
+func GetItemDefinition(it constants.ItemType) *ItemDefinition {
 	return GlobalItemRegistry.GetItemDefinition(it)
 }
 
 // GetItemString returns the Item name string from GlobalItemRegistry.
-func GetItemString(it ItemType) string {
+func GetItemString(it constants.ItemType) string {
 	return GlobalItemRegistry.GetItemString(it)
 }
 
 // GetItemEvaluation returns the Item evaluation score from GlobalItemRegistry.
-func GetItemEvaluation(it ItemType) types.Evaluation {
+func GetItemEvaluation(it constants.ItemType) constants.Evaluation {
 	return GlobalItemRegistry.GetItemEvaluation(it)
 }
 
 // GetAllItemTypes returns all registered Item types.
-func GetAllItemTypes() []ItemType {
+func GetAllItemTypes() []constants.ItemType {
 	return GlobalItemRegistry.GetAllItemTypes()
 }
 
 // GetItemTypesByCategory returns Item types by category.
-func GetItemTypesByCategory(category string) []ItemType {
+func GetItemTypesByCategory(category string) []constants.ItemType {
 	return GlobalItemRegistry.GetItemTypesByCategory(category)
 }
 
 // GetAllItemDefinitions returns all Item definitions.
 func GetAllItemDefinitions() []*ItemDefinition {
 	return GlobalItemRegistry.GetAllItemDefinitions()
+}
+
+// GetItemName returns the Item Chinese display name from GlobalItemRegistry.
+func GetItemName(it constants.ItemType) string {
+	return GlobalItemRegistry.GetItemName(it)
 }
 
 // GenerateItemID generates an Item ID (for engine package use).

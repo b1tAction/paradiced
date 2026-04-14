@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/b1tAction/Fated/internal/core"
+	"github.com/b1tAction/Fated/pkg/constants"
 	"github.com/b1tAction/Fated/pkg/event"
 	"github.com/b1tAction/Fated/pkg/rng"
 )
@@ -53,7 +54,7 @@ func TestNewGameWithSeed(t *testing.T) {
 	et2 := game2.Draw.DrawEvent(rng.PoolTypeGood, 4)
 
 	if et1 != et2 {
-		t.Errorf("Same seed should produce same draw: %d vs %d", et1, et2)
+		t.Errorf("Same seed should produce same draw: %s vs %s", string(et1), string(et2))
 	}
 }
 
@@ -349,7 +350,7 @@ func TestGameSubscribeAnyTimeItem(t *testing.T) {
 
 	// AnyTime 道具不需要订阅（主动触发）
 	def := core.GetItemDefinition(core.ItemTypeReverseClock)
-	if def.Phase == event.PhaseAnyTime {
+	if def.Phase == constants.PhaseAnyTime {
 		if item.SubscriptionID != "" {
 			t.Error("AnyTime Item should not have SubscriptionID")
 		}
@@ -552,7 +553,7 @@ func TestGameBroadcastBuffApplied(t *testing.T) {
 			buffTypeCheck = buff.Type
 		}},
 	})
-	game.Bus.Subscribe(event.PhaseOnBuffApplied, player.UserID, "test-listener", "test", d)
+	game.Bus.Subscribe(constants.PhaseOnBuffApplied, player.UserID, "test-listener", "test", d)
 
 	// 广播 Applied 事件
 	buff := core.NewBuff(core.BuffTypeCurse, 3)
@@ -587,7 +588,7 @@ func TestGameBroadcastBuffRemoved(t *testing.T) {
 			buffTypeCheck = buff.Type
 		}},
 	})
-	game.Bus.Subscribe(event.PhaseOnBuffRemoved, player.UserID, "test-listener", "test", d)
+	game.Bus.Subscribe(constants.PhaseOnBuffRemoved, player.UserID, "test-listener", "test", d)
 
 	// 广播 Removed 事件
 	buff := core.NewBuff(core.BuffTypeDivine, 3)

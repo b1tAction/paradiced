@@ -5,6 +5,7 @@ import (
 	"github.com/b1tAction/Fated/internal/core"
 	"github.com/b1tAction/Fated/internal/core/buff"
 	engineaction "github.com/b1tAction/Fated/internal/engine/action"
+	"github.com/b1tAction/Fated/pkg/constants"
 	"github.com/b1tAction/Fated/pkg/event"
 )
 
@@ -34,7 +35,7 @@ func executeDefaultBuffAction(def *core.BuffDefinition, player *core.Player, act
 // Uses GlobalRegistry to get custom handler if available.
 // The closure expects ActionContext to be passed via event.Context (ctx.Set("action_context", ctx)).
 // EffectHandler no longer returns Action - uses ctx.AddDerivedAction() instead.
-func createBuffAction(buffInstance *core.Buff, def *core.BuffDefinition, phase event.Phase, player *core.Player) func(ctx *event.Context) {
+func createBuffAction(buffInstance *core.Buff, def *core.BuffDefinition, phase constants.Phase, player *core.Player) func(ctx *event.Context) {
 	return func(ctx *event.Context) {
 		// Get Player from Context (ensure correct type)
 		p, ok := ctx.Player.(*core.Player)

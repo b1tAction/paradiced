@@ -3,6 +3,8 @@ package event
 import (
 	"testing"
 	"time"
+
+	"github.com/b1tAction/Fated/pkg/constants"
 )
 
 // TestPlayer 用于测试的简单玩家结构
@@ -12,66 +14,64 @@ type TestPlayer struct {
 
 // ========== Phase Tests ==========
 
-func TestPhaseString(t *testing.T) {
-	tests := []struct {
-		phase    Phase
-		expected string
-	}{
-		{PhaseBeforeTurn, "BeforeTurn"},
-		{PhasePreMove, "PreMove"},
-		{PhaseOnLand, "OnLand"},
-		{PhasePreEvent, "PreEvent"},
-		{PhasePreDamage, "PreDamage"},
-		{PhaseAfterTurn, "AfterTurn"},
-		{PhaseAnyTime, "AnyTime"},
-		{PhaseOnBuffApplied, "OnBuffApplied"},
-		{PhaseOnBuffRemoved, "OnBuffRemoved"},
-		{Phase(999), "Unknown"},
-	}
-
-	for _, tt := range tests {
-		result := tt.phase.String()
-		if result != tt.expected {
-			t.Errorf("Phase(%d).String() = %s, expected %s", tt.phase, result, tt.expected)
-		}
-	}
-}
-
 func TestPhaseIsValid(t *testing.T) {
-	validPhases := []Phase{
-		PhaseBeforeTurn, PhasePreMove, PhaseOnLand, PhasePreEvent,
-		PhasePreDamage, PhaseAfterTurn, PhaseAnyTime,
-		PhaseOnBuffApplied, PhaseOnBuffRemoved,
+	validPhases := []constants.Phase{
+		constants.PhaseBeforeTurn, constants.PhasePreMove, constants.PhaseOnLand, constants.PhasePreEvent,
+		constants.PhasePreDamage, constants.PhaseAfterTurn, constants.PhaseAnyTime,
+		constants.PhaseOnBuffApplied, constants.PhaseOnBuffRemoved,
 	}
 	for _, p := range validPhases {
 		if !p.IsValid() {
-			t.Errorf("Phase(%d).IsValid() should be true", p)
+			t.Errorf("Phase(%s).IsValid() should be true", p)
 		}
 	}
 
-	invalidPhases := []Phase{Phase(-1), Phase(100)}
+	invalidPhases := []constants.Phase{constants.Phase(""), constants.Phase("invalid")}
 	for _, p := range invalidPhases {
 		if p.IsValid() {
-			t.Errorf("Phase(%d).IsValid() should be false", p)
+			t.Errorf("Phase(%s).IsValid() should be false", p)
 		}
 	}
 }
 
 func TestPhaseNeedsSubscription(t *testing.T) {
 	// AnyTime 不需要订阅（主动触发）
-	if PhaseAnyTime.NeedsSubscription() {
+	if constants.PhaseAnyTime.NeedsSubscription() {
 		t.Error("PhaseAnyTime should not need subscription")
 	}
 
 	// 其他 Phase 需要订阅（包括新的生命周期事件）
-	needsSub := []Phase{
-		PhaseBeforeTurn, PhasePreMove, PhaseOnLand, PhasePreEvent,
-		PhasePreDamage, PhaseAfterTurn,
-		PhaseOnBuffApplied, PhaseOnBuffRemoved,
+	needsSub := []constants.Phase{
+		constants.PhaseBeforeTurn, constants.PhasePreMove, constants.PhaseOnLand, constants.PhasePreEvent,
+		constants.PhasePreDamage, constants.PhaseAfterTurn,
+		constants.PhaseOnBuffApplied, constants.PhaseOnBuffRemoved,
 	}
 	for _, p := range needsSub {
 		if !p.NeedsSubscription() {
-			t.Errorf("Phase(%s) should need subscription", p.String())
+			t.Errorf("Phase(%s) should need subscription", p)
+		}
+	}
+}
+
+func TestPhaseIsHSMPublished(t *testing.T) {
+	hsmPhases := []constants.Phase{
+		constants.PhaseBeforeTurn, constants.PhaseOnLand, constants.PhaseAfterTurn,
+	}
+	for _, p := range hsmPhases {
+		if !p.IsHSMPublished() {
+			t.Errorf("Phase(%s) should be HSM published", p)
+		}
+	}
+}
+
+func TestPhaseIsActionPublished(t *testing.T) {
+	actionPhases := []constants.Phase{
+		constants.PhasePreDamage, constants.PhasePreEvent, constants.PhasePreMove,
+		constants.PhasePreRespawn, constants.PhaseOnBuffApplied, constants.PhaseOnBuffRemoved,
+	}
+	for _, p := range actionPhases {
+		if !p.IsActionPublished() {
+			t.Errorf("Phase(%s) should be Action published", p)
 		}
 	}
 }
@@ -242,7 +242,7 @@ func TestEventBusSubscribe(t *testing.T) {
 	bus := NewEventBus("game-001")
 	d := NewDecision("test", []Option{{ID: "yes", Label: "是"}})
 
-	subID := bus.Subscribe(PhasePreDamage, "player-001", "buff-001", "buff", d)
+	subID := bus.Subscribe(constants.PhasePreDamage, "player-001", "buff-001", "buff", d)
 	if subID == "" {
 		t.Error("Subscribe should return subscription ID")
 	}
@@ -251,7 +251,7 @@ func TestEventBusSubscribe(t *testing.T) {
 		t.Errorf("Subscription count = %d, expected 1", bus.GetSubscriptionCount())
 	}
 
-	subs := bus.GetSubscriptions(PhasePreDamage)
+	subs := bus.GetSubscriptions(constants.PhasePreDamage)
 	if len(subs) != 1 {
 		t.Errorf("PreDamage subscriptions = %d, expected 1", len(subs))
 	}
@@ -264,7 +264,7 @@ func TestEventBusUnsubscribe(t *testing.T) {
 	bus := NewEventBus("game-001")
 	d := NewDecision("test", []Option{})
 
-	subID := bus.Subscribe(PhasePreDamage, "player-001", "buff-001", "buff", d)
+	subID := bus.Subscribe(constants.PhasePreDamage, "player-001", "buff-001", "buff", d)
 
 	// 取消订阅
 	ok := bus.Unsubscribe(subID)
@@ -287,9 +287,9 @@ func TestEventBusUnsubscribeBySource(t *testing.T) {
 	bus := NewEventBus("game-001")
 	d := NewDecision("test", []Option{})
 
-	bus.Subscribe(PhasePreDamage, "player-001", "buff-001", "buff", d)
-	bus.Subscribe(PhasePreEvent, "player-001", "buff-001", "buff", d)
-	bus.Subscribe(PhasePreDamage, "player-002", "buff-002", "buff", d)
+	bus.Subscribe(constants.PhasePreDamage, "player-001", "buff-001", "buff", d)
+	bus.Subscribe(constants.PhasePreEvent, "player-001", "buff-001", "buff", d)
+	bus.Subscribe(constants.PhasePreDamage, "player-002", "buff-002", "buff", d)
 
 	// 移除buff-001的所有订阅
 	count := bus.UnsubscribeBySource("buff-001")
@@ -306,9 +306,9 @@ func TestEventBusUnsubscribeByOwner(t *testing.T) {
 	bus := NewEventBus("game-001")
 	d := NewDecision("test", []Option{})
 
-	bus.Subscribe(PhasePreDamage, "player-001", "buff-001", "buff", d)
-	bus.Subscribe(PhasePreEvent, "player-001", "buff-002", "buff", d)
-	bus.Subscribe(PhasePreDamage, "player-002", "buff-003", "buff", d)
+	bus.Subscribe(constants.PhasePreDamage, "player-001", "buff-001", "buff", d)
+	bus.Subscribe(constants.PhasePreEvent, "player-001", "buff-002", "buff", d)
+	bus.Subscribe(constants.PhasePreDamage, "player-002", "buff-003", "buff", d)
 
 	// 移除player-001的所有订阅
 	count := bus.UnsubscribeByOwner("player-001")
@@ -335,12 +335,12 @@ func TestEventBusPublish(t *testing.T) {
 	})
 	d2.WithPriority(50) // 低优先级
 
-	bus.Subscribe(PhasePreDamage, "player-001", "buff-001", "buff", d1)
-	bus.Subscribe(PhasePreDamage, "player-001", "item-001", "item", d2)
+	bus.Subscribe(constants.PhasePreDamage, "player-001", "buff-001", "buff", d1)
+	bus.Subscribe(constants.PhasePreDamage, "player-001", "item-001", "item", d2)
 
 	// 发布
 	ctx := NewContext(nil)
-	decisions := bus.Publish(PhasePreDamage, "player-001", ctx)
+	decisions := bus.Publish(constants.PhasePreDamage, "player-001", ctx)
 
 	// 只返回需要确认的Decision
 	if len(decisions) != 1 {
@@ -361,11 +361,11 @@ func TestEventBusPublishPriorityOrder(t *testing.T) {
 	d2 := NewDecision("低优先级", []Option{{ID: "b", Label: "B"}})
 	d2.WithPriority(50)
 
-	bus.Subscribe(PhasePreEvent, "player-001", "buff-001", "buff", d1)
-	bus.Subscribe(PhasePreEvent, "player-001", "buff-002", "buff", d2)
+	bus.Subscribe(constants.PhasePreEvent, "player-001", "buff-001", "buff", d1)
+	bus.Subscribe(constants.PhasePreEvent, "player-001", "buff-002", "buff", d2)
 
 	ctx := NewContext(nil)
-	decisions := bus.Publish(PhasePreEvent, "player-001", ctx)
+	decisions := bus.Publish(constants.PhasePreEvent, "player-001", ctx)
 
 	if len(decisions) != 2 {
 		t.Errorf("Decisions count = %d, expected 2", len(decisions))
@@ -384,11 +384,11 @@ func TestEventBusPublishFilterOwner(t *testing.T) {
 	bus := NewEventBus("game-001")
 	d := NewDecision("test", []Option{{ID: "ok", Label: "OK"}})
 
-	bus.Subscribe(PhasePreDamage, "player-001", "buff-001", "buff", d)
-	bus.Subscribe(PhasePreDamage, "player-002", "buff-002", "buff", d)
+	bus.Subscribe(constants.PhasePreDamage, "player-001", "buff-001", "buff", d)
+	bus.Subscribe(constants.PhasePreDamage, "player-002", "buff-002", "buff", d)
 
 	ctx := NewContext(nil)
-	decisions := bus.Publish(PhasePreDamage, "player-001", ctx)
+	decisions := bus.Publish(constants.PhasePreDamage, "player-001", ctx)
 
 	// 只返回player-001的Decision
 	if len(decisions) != 1 {
@@ -400,8 +400,8 @@ func TestEventBusClear(t *testing.T) {
 	bus := NewEventBus("game-001")
 	d := NewDecision("test", []Option{})
 
-	bus.Subscribe(PhasePreDamage, "player-001", "buff-001", "buff", d)
-	bus.Subscribe(PhasePreEvent, "player-002", "buff-002", "buff", d)
+	bus.Subscribe(constants.PhasePreDamage, "player-001", "buff-001", "buff", d)
+	bus.Subscribe(constants.PhasePreEvent, "player-002", "buff-002", "buff", d)
 
 	bus.Clear()
 
@@ -492,5 +492,25 @@ func TestContextClone(t *testing.T) {
 	}
 	if cloned.GetIntOrDefault("damage", 0) != 50 {
 		t.Errorf("cloned damage = %d, expected 50", cloned.GetIntOrDefault("damage", 0))
+	}
+}
+
+func TestContextDerivedActions(t *testing.T) {
+	ctx := NewContext(nil)
+
+	// Add derived actions
+	ctx.AddDerivedAction("action1")
+	ctx.AddDerivedAction("action2")
+
+	// Get derived actions
+	actions := ctx.GetDerivedActions()
+	if len(actions) != 2 {
+		t.Errorf("DerivedActions count = %d, expected 2", len(actions))
+	}
+
+	// Clear derived actions
+	ctx.ClearDerivedActions()
+	if len(ctx.GetDerivedActions()) != 0 {
+		t.Error("DerivedActions should be empty after clear")
 	}
 }

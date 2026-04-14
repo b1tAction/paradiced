@@ -1,7 +1,7 @@
 package action
 
 import (
-	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/Fated/pkg/constants"
 	"github.com/b1tAction/Fated/pkg/gamelog"
 )
 
@@ -62,12 +62,12 @@ type Action interface {
 	// PreTriggerPhase returns the Phase to publish BEFORE action execution.
 	// Used for interception (e.g., PhasePreDamage for shields/隐匿).
 	// Returns PhaseAnyTime if no pre-trigger needed.
-	PreTriggerPhase() event.Phase
+	PreTriggerPhase() constants.Phase
 
 	// PostTriggerPhase returns the Phase to publish AFTER action execution.
 	// Used for lifecycle events (e.g., PhaseOnBuffApplied for buff entry effects).
 	// Returns PhaseAnyTime if no post-trigger needed.
-	PostTriggerPhase() event.Phase
+	PostTriggerPhase() constants.Phase
 }
 
 // LogEntry is the interface for actions that generate game log entries.
