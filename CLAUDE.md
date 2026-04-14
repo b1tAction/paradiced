@@ -20,8 +20,7 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 
 ```
 ├── internal/
-│   ├── core/           # Core data structures (Player, Buff, Item, Event, Faction)
-│   │   ├── types/      # Shared basic types (Evaluation, SpecialEffect)
+│   ├── core/           # Core data structures (Player, Buff, Item, Event)
 │   │   ├── buff/       # Buff system with multi-phase support
 │   │   ├── event/      # Event system with evaluation scores
 │   │   └── item/       # Item system with phase-specific triggers
@@ -31,7 +30,8 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 │   └── gamemap/        # Map system (Cell, MapEngine, PathResult)
 ├── pkg/
 │   ├── action/         # Action interface layer (ActionType string, Action interface)
-│   ├── event/          # EventBus system (Phase, Bus, Decision, Context)
+│   ├── constants/      # Unified enum types (BuffType, EventType, ItemType, Phase, etc.)
+│   ├── event/          # EventBus system (Bus, Decision, Context)
 │   ├── gamelog/        # Unified game log system for client playback
 │   ├── handler/        # Effect handler types (EffectHandler for Buff/Item/Event)
 │   ├── protocol/       # Public interfaces (Player, Game, MapEngine, Faction)
@@ -44,7 +44,19 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 
 ### Key Components
 
-#### Protocol Layer (`pkg/protocol`)
+#### Constants Layer (`pkg/constants`)
+- **BuffType**: Buff identifiers with IsPositive/IsNegative classification
+- **EventType**: Event identifiers for random events
+- **ItemType**: Item identifiers for consumables
+- **Phase**: Trigger timing (HSM: BeforeTurn/OnLand/AfterTurn; Action: PreDamage/PreEvent/PreMove/PreRespawn/OnBuffApplied/OnBuffRemoved)
+- **Faction**: Player faction type (青龙/朱雀/白虎/玄武)
+- **CellType**: Map cell type (Normal, Fragile, Fog, Checkpoint, Boss)
+- **StateID**: HSM state identifier (Global/Turn/Interrupt layers)
+- **EntryType**: GameLog entry type (action, state, mini_game, boss, decision)
+- **ActionSource**: Action source identifier (Buff/Item/Event/Faction/System)
+- **SpecialEffect**: Special effect types for Buffs/Items/Events
+- **Evaluation**: 0-100 scoring system (Bad ≤40, Neutral 41-65, Good >65)
+- All enums use string type with snake_case values for JSON compatibility
 - **Player**: Interface for player operations (Reader/Writer/Lite variants)
 - **Game**: Interface for game state access, includes GetGameLog()
 - **MapEngine**: Interface for map operations
@@ -57,13 +69,13 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **ActionContext**: Execution context with EventBus and global GameLog integration
 
 #### GameLog System (`pkg/gamelog`)
-- **EntryType**: Log entry types (action, state, mini_game, boss, decision)
+- **EntryType**: Alias to constants.EntryType - log entry types (action, state, mini_game, boss, decision)
 - **LogEntry**: Single event with util.Metadata for type-safe metadata
 - **TurnSegment**: Turn-based log grouping for client playback
 - **GameLog**: Global log manager with StartTurn/EndTurn/AddEntry methods
 
 #### EventBus System (`pkg/event`)
-- **Phase**: Trigger timing enumeration (HSM: BeforeTurn/OnLand/AfterTurn; Action: PreDamage/PreEvent/PreMove/PreRespawn/OnBuffApplied/OnBuffRemoved)
+- **Phase**: Alias to constants.Phase - trigger timing enumeration
 - **EventBus**: Manages Buff/Item subscriptions and triggers
 - **Decision**: User confirmation mechanism
 - **Context**: Execution context with Metadata embedding and DerivedActions
@@ -74,10 +86,9 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 
 #### Core Data Structures (`internal/core`)
 - **Player**: User entity with HP/LP/Buffs/Items/Metadata (implements protocol.Player)
-- **Buff**: Status effects with multi-phase support
-- **Item**: Consumable items with phase-specific triggers
-- **Event**: Random events with evaluation scores
-- **Evaluation**: 0-100 scoring system (Bad ≤40, Neutral 41-65, Good >65)
+- **Buff**: Status effects with multi-phase support (uses constants.BuffType)
+- **Item**: Consumable items with phase-specific triggers (uses constants.ItemType)
+- **Event**: Random events with evaluation scores (uses constants.EventType, constants.Evaluation)
 
 #### Game Engine (`internal/engine`)
 - **Game**: Game instance managing EventBus, players, and GameLog
@@ -92,7 +103,7 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 
 #### Map System (`internal/gamemap`)
 - **MapEngine**: Linear map generation and path calculation
-- **CellType**: Normal, Fragile, Fog, Checkpoint, Boss
+- **CellType**: Alias to constants.CellType - Normal, Fragile, Fog, Checkpoint, Boss
 - **PathResult**: Movement calculation with Fragile/Fog handling
 
 #### RNG Engine (`pkg/rng`)
@@ -170,6 +181,7 @@ go test ./...
 - [doc/internal/rng_engine.md](doc/internal/rng_engine.md) - RNG engine (Chinese)
 - [doc/internal/metadata.md](doc/internal/metadata.md) - Metadata utility (Chinese)
 - [doc/internal/gamemap.md](doc/internal/gamemap.md) - Map system (Chinese)
+- [pkg/constants/README.md](pkg/constants/README.md) - Unified enum types
 - [pkg/protocol/README.md](pkg/protocol/README.md) - Protocol interface layer
 - [pkg/action/README.md](pkg/action/README.md) - Action interface layer
 - [pkg/handler/README.md](pkg/handler/README.md) - Effect handler types
