@@ -58,7 +58,6 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **StateID**: HSM state identifier (Global/Turn/Interrupt layers)
 - **EntryType**: GameLog entry type (action, state, mini_game, boss, decision)
 - **ActionSource**: Action source identifier (Buff/Item/Event/Faction/System)
-- **SpecialEffect**: Special effect types for Buffs/Items/Events
 - **Evaluation**: 0-100 scoring system (Bad ≤40, Neutral 41-65, Good >65)
 - All enums use string type with snake_case values for JSON compatibility
 - **Player**: Interface for player operations (Reader/Writer/Lite variants)

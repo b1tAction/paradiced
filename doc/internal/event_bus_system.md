@@ -17,12 +17,17 @@ EventBus + Decision 系统是《派乐代》游戏的统一触发机制框架，
 ## 文件结构
 
 ```
+pkg/constants/
+├── phase.go          # Phase枚举定义（触发时机）
+
 pkg/event/
-├── phase.go          # Phase枚举定义（9种触发时机）
 ├── bus.go            # EventBus结构和方法
 ├── decision.go       # Decision和Option结构
 ├── context.go        # Context结构
 ├── bus_test.go       # 单元测试
+
+pkg/handler/
+├── handler.go        # EffectHandler统一签名
 
 pkg/gamelog/
 ├── entry.go          # EntryType枚举、LogEntry结构（使用util.Metadata）
@@ -34,15 +39,24 @@ pkg/action/
 ├── action.go         # ActionType（string类型，snake_case命名）、Action接口
 
 internal/core/
-├── evaluation.go     # 评分系统（0-100）
-├── faction.go        # 阵营定义（四神兽）
-├── buff.go           # Buff系统（类型/定义/注册表，支持多Phase）
-├── item.go           # Item系统（类型/定义/注册表）
-├── event.go          # Event系统（类型/定义/注册表）
+├── buff/
+│   ├── buff.go       # Buff系统（Definition + HandlerConfig + Registry）
+│   ├── init.go       # init() + registerAllBuffs() + handlers
+│   ├── buff_test.go  # 单元测试
+├── event/
+│   ├── event.go      # Event系统（Definition + HandlerConfig + Registry）
+│   ├── init.go       # init() + registerAllEvents() + handlers
+│   ├── event_test.go # 单元测试
+├── item/
+│   ├── item.go       # Item系统（Definition + HandlerConfig + Registry）
+│   ├── init.go       # init() + registerAllItems() + handlers
+│   ├── item_test.go  # 单元测试
 ├── player.go         # Player结构（HP/LP/Buffs/Items）
+├── init.go           # 统一入口（重导出）
 
 internal/engine/
 ├── game.go           # Game实例（EventBus/玩家管理/订阅，ApplyBuffToPlayer/RemoveBuffFromPlayer，GameLog）
+├── handlers.go       # Action创建辅助函数
 ├── action/           # Action系统实现（DamageAction、HealAction、RespawnAction等）
 │   ├── action.go     # ExecutableAction接口
 │   ├── types.go      # 具体Action类型实现
@@ -51,34 +65,35 @@ internal/engine/
 ├── hsm/              # 分层状态机（状态转换、Phase触发）
 │   ├── hsm.go        # HSM主结构（状态转换日志记录）
 │   ├── turn_states.go # 回合状态（StartTurn/EndTurn、RespawnAction/FellDownAction）
-├── handlers.go       # EventHandler策略注册表
 ```
 
 ## Phase枚举
 
 **设计原则：谁产生时机，谁发布Phase**
 
+Phase 定义在 `pkg/constants/phase.go`，使用 string 类型：
+
 ```go
-type Phase int
+type Phase string  // snake_case values for JSON compatibility
 
 const (
     // ========== HSM发布的Phase（状态时机） ==========
     // 这些Phase由HSM状态机Enter()方法发布
-    PhaseBeforeTurn  Phase = iota  // TurnUpkeep.Enter() - 回合开始前（神眷/诅咒 LP±1, 离火每4回合）
-    PhaseOnLand                    // TurnLanded.Enter() - 落地后（落地事件、格子效果）
-    PhaseAfterTurn                 // TurnEnd.Enter() - 回合结束后（甘霖/腐化 HP±1, TickDuration）
+    PhaseBeforeTurn  Phase = "before_turn"  // TurnUpkeep.Enter() - 回合开始前（神眷/诅咒 LP±1, 离火每4回合）
+    PhaseOnLand      Phase = "on_land"      // TurnLanded.Enter() - 落地后（落地事件、格子效果）
+    PhaseAfterTurn   Phase = "after_turn"   // TurnEnd.Enter() - 回合结束后（甘霖/腐化 HP±1, TickDuration）
 
     // ========== Action发布的Phase（动作时机） ==========
     // 这些Phase由ActionContext.ExecuteAction()发布
-    PhasePreDamage    // DamageAction.Execute() - 伤害应用前（隐匿、护盾拦截）
-    PhasePreEvent     // DrawEventAction.Execute() - 事件触发前（辟邪、玄武）
-    PhasePreMove      // MoveAction.Execute() - 移动前（迷途反向）
-    PhaseOnBuffApplied  // AddBuffAction.Execute() - Buff添加后（入场效果、连锁反应）
-    PhaseOnBuffRemoved  // RemoveBuffAction.Execute() - Buff移除前（亡语）
+    PhasePreDamage     Phase = "pre_damage"     // DamageAction.Execute() - 伤害应用前（隐匿、护盾拦截）
+    PhasePreEvent      Phase = "pre_event"      // DrawEventAction.Execute() - 事件触发前（辟邪、玄武）
+    PhasePreMove       Phase = "pre_move"       // MoveAction.Execute() - 移动前（迷途反向）
+    PhaseOnBuffApplied Phase = "on_buff_applied" // AddBuffAction.Execute() - Buff添加后（入场效果、连锁反应）
+    PhaseOnBuffRemoved Phase = "on_buff_removed" // RemoveBuffAction.Execute() - Buff移除前（亡语）
 
     // ========== 特殊Phase ==========
-    PhaseAnyTime   // 任何时候可用（道具主动使用）- 玩家手动触发
-    PhaseItemUsed  // 道具主动使用时触发 - game.UseItem()
+    PhaseAnyTime  Phase = "any_time"  // 任何时候可用（道具主动使用）- 玩家手动触发
+    PhaseItemUsed Phase = "item_used" // 道具主动使用时触发 - game.UseItem()
 )
 ```
 
@@ -97,22 +112,50 @@ const (
 
 ## 多Phase支持
 
-BuffDefinition 现在支持多Phase触发：
+Buff 采用 **Definition + HandlerConfig 分离架构**，支持多Phase触发：
+
 ```go
+// BuffDefinition 只包含静态元数据（可序列化）
 type BuffDefinition struct {
     Type        BuffType
-    Phases      []event.Phase  // 支持多Phase触发
-    Priority    int
-    NeedConfirm bool
-    // ...
+    Eval        constants.Evaluation  // 评估分数
+    EnglishName string                // 英文名（snake_case）
+    Name        string                // 中文显示名
+    Desc        string                // 描述
+    Duration    int                   // 默认持续时间
 }
+
+// BuffHandlerConfig 包含执行配置和效果处理函数
+type BuffHandlerConfig struct {
+    Phases      []constants.Phase     // 支持多Phase触发
+    Priority    int                   // 执行优先级
+    NeedConfirm bool                  // 是否需要用户确认
+    Handler     EffectHandler         // 效果处理函数
+}
+```
+
+注册示例：
+```go
+GlobalBuffRegistry.RegisterBuff(&BuffDefinition{
+    Type:        constants.BuffTypeFire,
+    Eval:        constants.EvaluationGood,
+    EnglishName: "Fire",
+    Name:        "离火",
+    Desc:        "朱雀阵营增益，每4回合LP+1",
+    Duration:    -1,
+}, &BuffHandlerConfig{
+    Phases:      []constants.Phase{constants.PhaseBeforeTurn},
+    Priority:    10,
+    NeedConfirm: false,
+    Handler:     handleZhuQueFire,
+})
 ```
 
 Buff 实例存储多个订阅ID：
 ```go
 type Buff struct {
     Type            BuffType
-    SubscriptionIDs []id.SubscriptionID  // 多订阅ID（类型安全）
+    SubscriptionIDs []string  // 多订阅ID（UUID字符串）
     // ...
 }
 ```
@@ -141,90 +184,100 @@ func (g *Game) RemoveBuffFromPlayer(player, buff) {
 - Applied：订阅发生在广播之前，Buff可以听到自己的Applied事件
 - Removed：广播发生在取消订阅之前，Buff可以听到自己的removed事件
 
-## EventHandler策略模式
+## EffectHandler策略模式
 
-通过策略模式实现高度定制化的Buff效果：
+通过策略模式实现高度定制化的Buff效果。Handler 在 BuffHandlerConfig 中注册：
 
 ```go
-// EventHandler 是定制化的Buff处理函数（无返回值）
-// Handler 使用 ctx.AddDerivedAction() 添加衍生 Action
-type EventHandler func(phase event.Phase, ctx *event.Context)
+// EffectHandler 是统一的效果处理函数签名
+// Handler 使用 ctx.SetInt/SetBool/SetString 信号意图，engine层通过Action执行
+type EffectHandler func(phase constants.Phase, ctx *event.Context)
 
-// BuffHandlers 注册表
-var BuffHandlers = map[core.BuffType]EventHandler{
-    core.BuffTypeFire: handleZhuQueFire,  // 朱雀离火：每4回合LP+1
-    // 更多处理器...
-}
+// 注册示例：离火 Buff
+GlobalBuffRegistry.RegisterBuff(&BuffDefinition{...}, &BuffHandlerConfig{
+    Phases:      []constants.Phase{constants.PhaseBeforeTurn},
+    Priority:    10,
+    NeedConfirm: false,
+    Handler:     handleZhuQueFire,  // 朱雀离火：每4回合LP+1
+})
 ```
 
 **Handler 使用示例**：
 
 ```go
-// 迷途Buff：反向移动（在PreMove时篡改）
-func LostHandler(phase event.Phase, ctx *event.Context) {
-    if phase != event.PhasePreMove {
+// 迷途Buff：反向移动（在PreMove时信号）
+func handleLostReverse(phase constants.Phase, ctx *event.Context) {
+    if phase != constants.PhasePreMove {
         return
     }
-    action := ctx.Get("current_action")
-    if moveAction, ok := action.(*MoveAction); ok {
-        moveAction.Steps = -moveAction.Steps // 篡改
-    }
+    // 信号反向移动意图（engine层执行）
+    ctx.SetBool("reverse_movement", true)
 }
 
-// 隐匿Buff：免疫伤害
-func HiddenHandler(phase event.Phase, ctx *event.Context) {
-    if phase != event.PhasePreDamage {
+// 隐匿Buff：免疫伤害（在PreDamage时拦截）
+func handleHiddenImmune(phase constants.Phase, ctx *event.Context) {
+    if phase != constants.PhasePreDamage {
         return
     }
-    action := ctx.Get("current_action")
-    if dmgAction, ok := action.(*DamageAction); ok {
-        dmgAction.Amount = 0 // 篡改：伤害归零
-        dmgAction.BlockedBy = "Buff_Hidden"
-    }
-}
-
-// 不死Buff：拦截死亡，原地复活（多个衍生Action）
-func UndyingHandler(phase event.Phase, ctx *event.Context) {
-    if phase != event.PhasePreRespawn {
-        return
-    }
-    
-    // 拦截 Respawn
+    // 阻断伤害 Action
     ctx.SetBool("action_blocked", true)
-    
-    // 添加多个衍生 Action
-    player := ctx.Player.(*core.Player)
-    ctx.AddDerivedAction(NewHealAction(player, player.MaxHP, "Buff_Undying"))
-    ctx.AddDerivedAction(NewRemoveBuffAction(player, BuffTypeUndying, "Buff_Undying"))
+    ctx.SetString("blocked_by", "Buff_Hidden")
+}
+
+// 神眷Buff：每回合LP+1
+func handleDivineBuff(phase constants.Phase, ctx *event.Context) {
+    if phase != constants.PhaseBeforeTurn {
+        return
+    }
+    // 直接修改 LP（无需 Action）
+    player, ok := ctx.Player.(protocol.PlayerLite)
+    if ok {
+        player.ModifyLP(1)
+    }
+}
+
+// 离火Buff：朱雀被动，每4回合LP+1
+func handleZhuQueFire(phase constants.Phase, ctx *event.Context) {
+    player, ok := ctx.Player.(protocol.PlayerLite)
+    if !ok {
+        return
+    }
+    newCount := player.IncrementFireCounter()
+    if newCount >= 4 {
+        player.ModifyLP(1)
+        player.SetFireCounter(0)
+    }
 }
 ```
 
 **优势**：
-1. **数据行为分离**：BuffDefinition保持纯数据，可序列化
-2. **万能拦截器**：通过修改ctx.Data实现各种机制
-3. **消灭特判代码**：阵营逻辑成为Buff处理器
-4. **多Action支持**：一个Handler可生成多个衍生Action
+1. **单一职责原则**：Definition 只负责静态元数据，HandlerConfig 负责执行配置和效果逻辑
+2. **数据可序列化**：Definition 只有基础字段，可直接 JSON 序列化
+3. **消灭特判代码**：阵营逻辑成为 Buff 处理器
+4. **统一签名**：所有 Buff/Item/Event 使用相同的 EffectHandler 签名
 
 ## Buff/Item与Phase对应
 
-| Buff | Phases | NeedConfirm | 说明 |
-|------|--------|-------------|------|
-| 神眷 | [BeforeTurn] | false | 自动LP+1 |
-| 诅咒 | [BeforeTurn] | false | 自动LP-1 |
-| 迷途 | [PreMove] | false | 自动反向 |
-| 隐匿 | [PreDamage] | false | 自动免疫（高优先级） |
-| 辟邪 | [PreEvent] | false | 自动免疫毒瘴 |
-| 甘霖 | [AfterTurn] | false | 每2回合HP+1 |
-| 腐化 | [AfterTurn] | false | 每2回合HP-1 |
-| 毒瘴 | [BeforeTurn] | false | 每回合恶性事件 |
-| 离火 | [BeforeTurn] | false | 每4回合LP+1（定制处理器） |
+表格中 Phases/Priority/NeedConfirm 来自 HandlerConfig：
 
-| Item | Phase | NeedConfirm | 说明 |
-|------|-------|-------------|------|
-| 反方向的钟 | AnyTime | true | 主动使用，需确认目标 |
-| 任意门 | ItemUsed | true | 落地后使用，需确认目标 |
-| 骰子交换 | AnyTime | true | 主动使用，需确认目标 |
-| 骰子升级卡 | BeforeTurn | true | 回合开始前，需确认 |
+| Buff | Phases | Priority | NeedConfirm | 说明 |
+|------|--------|----------|-------------|------|
+| 神眷 | [BeforeTurn] | 50 | false | 自动LP+1 |
+| 诅咒 | [BeforeTurn] | 50 | false | 自动LP-1 |
+| 迷途 | [PreMove] | 100 | false | 自动反向 |
+| 隐匿 | [PreDamage] | 100 | false | 自动免疫（高优先级） |
+| 辟邪 | [PreEvent] | 80 | false | 自动免疫毒瘴 |
+| 甘霖 | [AfterTurn] | 50 | false | 每2回合HP+1 |
+| 腐化 | [AfterTurn] | 50 | false | 每2回合HP-1 |
+| 毒瘴 | [BeforeTurn] | 30 | false | 每回合恶性事件 |
+| 离火 | [BeforeTurn] | 10 | false | 每4回合LP+1（定制处理器） |
+
+| Item | Phase | Priority | NeedConfirm | 说明 |
+|------|-------|----------|-------------|------|
+| 反方向的钟 | AnyTime | 50 | true | 主动使用，需确认目标 |
+| 任意门 | OnLand | 60 | true | 落地后使用，需确认目标 |
+| 骰子交换 | AnyTime | 40 | true | 主动使用，需确认目标 |
+| 骰子升级卡 | BeforeTurn | 70 | true | 回合开始前，需确认 |
 
 ## 测试覆盖
 
