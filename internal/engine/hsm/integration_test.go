@@ -4,14 +4,14 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/b1tAction/Fated/internal/core"
-	"github.com/b1tAction/Fated/internal/core/buff"
-	engineaction "github.com/b1tAction/Fated/internal/engine/action"
-	"github.com/b1tAction/Fated/internal/engine"
-	"github.com/b1tAction/Fated/internal/gamemap"
-	"github.com/b1tAction/Fated/pkg/constants"
-	"github.com/b1tAction/Fated/pkg/event"
-	"github.com/b1tAction/Fated/pkg/gamelog"
+	"github.com/b1tAction/fated/internal/core"
+	"github.com/b1tAction/fated/internal/core/buff"
+	"github.com/b1tAction/fated/internal/engine"
+	engineaction "github.com/b1tAction/fated/internal/engine/action"
+	"github.com/b1tAction/fated/internal/gamemap"
+	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/event"
+	"github.com/b1tAction/fated/pkg/gamelog"
 )
 
 // ========== Integration Tests: Turn Flow with GameLog ==========

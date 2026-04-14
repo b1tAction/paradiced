@@ -4,11 +4,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/b1tAction/Fated/internal/core"
-	"github.com/b1tAction/Fated/internal/engine"
-	"github.com/b1tAction/Fated/internal/gamemap"
-	"github.com/b1tAction/Fated/pkg/constants"
-	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/fated/internal/core"
+	"github.com/b1tAction/fated/internal/engine"
+	"github.com/b1tAction/fated/internal/gamemap"
+	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/event"
 )
 
 func TestNewStateContext(t *testing.T) {
@@ -225,22 +225,22 @@ func (m *mockEventBusAdapter) Publish(phase constants.Phase, playerID string, ct
 func (m *mockEventBusAdapter) Subscribe(phase constants.Phase, ownerID, sourceID, sourceType string, decision *event.Decision) string {
 	return ""
 }
-func (m *mockEventBusAdapter) Unsubscribe(subID string) bool { return false }
+func (m *mockEventBusAdapter) Unsubscribe(subID string) bool           { return false }
 func (m *mockEventBusAdapter) UnsubscribeBySource(sourceID string) int { return 0 }
-func (m *mockEventBusAdapter) UnsubscribeByOwner(ownerID string) int { return 0 }
-func (m *mockEventBusAdapter) GetSubscriptionCount() int { return 0 }
-func (m *mockEventBusAdapter) Clear() {}
+func (m *mockEventBusAdapter) UnsubscribeByOwner(ownerID string) int   { return 0 }
+func (m *mockEventBusAdapter) GetSubscriptionCount() int               { return 0 }
+func (m *mockEventBusAdapter) Clear()                                  {}
 
 type mockMapEngineAdapter struct {
 	length int
 }
 
-func (m *mockMapEngineAdapter) GetLength() int { return m.length }
+func (m *mockMapEngineAdapter) GetLength() int                            { return m.length }
 func (m *mockMapEngineAdapter) GetCell(pos int) (*gamemap.MapCell, error) { return nil, nil }
 func (m *mockMapEngineAdapter) CalculatePath(startPos int, steps int) (*gamemap.PathResult, error) {
 	return nil, nil
 }
-func (m *mockMapEngineAdapter) GetLastCheckpoint(pos int) int { return 0 }
+func (m *mockMapEngineAdapter) GetLastCheckpoint(pos int) int                        { return 0 }
 func (m *mockMapEngineAdapter) SetCellType(pos int, cellType gamemap.CellType) error { return nil }
-func (m *mockMapEngineAdapter) ActivateFog(pos int) error { return nil }
-func (m *mockMapEngineAdapter) IsFogActivated(pos int) bool { return false }
+func (m *mockMapEngineAdapter) ActivateFog(pos int) error                            { return nil }
+func (m *mockMapEngineAdapter) IsFogActivated(pos int) bool                          { return false }

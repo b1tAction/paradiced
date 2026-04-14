@@ -1,6 +1,6 @@
 package protocol
 
-import "github.com/b1tAction/Fated/pkg/gamelog"
+import "github.com/b1tAction/fated/pkg/gamelog"
 
 // Game defines the interface Game engine needs to expose.
 // Used by ActionContext to access game state and players.

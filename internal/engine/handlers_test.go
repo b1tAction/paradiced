@@ -3,10 +3,10 @@ package engine
 import (
 	"testing"
 
-	"github.com/b1tAction/Fated/internal/core"
-	engineaction "github.com/b1tAction/Fated/internal/engine/action"
-	"github.com/b1tAction/Fated/pkg/constants"
-	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/fated/internal/core"
+	engineaction "github.com/b1tAction/fated/internal/engine/action"
+	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/event"
 )
 
 // ========== EventHandler Tests ==========

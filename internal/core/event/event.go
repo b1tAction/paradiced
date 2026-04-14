@@ -3,21 +3,21 @@
 package event
 
 import (
-	"github.com/b1tAction/Fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/constants"
 )
 
 // ========== Event Definition ==========
 
 type EventDefinition struct {
-	Type          constants.EventType       `json:"type"`
-	Eval          constants.Evaluation      `json:"evaluation"`
-	EnglishName   string                    `json:"english_name"` // English identifier (for String())
-	Name          string                    `json:"name"`         // Chinese display name
-	Desc          string                    `json:"desc"`
-	HPChange      int                       `json:"hp_change"`
-	LPChange      int                       `json:"lp_change"`
-	BuffType      constants.BuffType        `json:"buff_type"`
-	SpecialEffect constants.SpecialEffect   `json:"special_effect"` // Special effect type
+	Type          constants.EventType     `json:"type"`
+	Eval          constants.Evaluation    `json:"evaluation"`
+	EnglishName   string                  `json:"english_name"` // English identifier (for String())
+	Name          string                  `json:"name"`         // Chinese display name
+	Desc          string                  `json:"desc"`
+	HPChange      int                     `json:"hp_change"`
+	LPChange      int                     `json:"lp_change"`
+	BuffType      constants.BuffType      `json:"buff_type"`
+	SpecialEffect constants.SpecialEffect `json:"special_effect"` // Special effect type
 }
 
 // ========== Event Registry ==========

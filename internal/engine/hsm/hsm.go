@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/b1tAction/Fated/internal/core"
-	"github.com/b1tAction/Fated/internal/engine"
-	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/fated/internal/core"
+	"github.com/b1tAction/fated/internal/engine"
+	"github.com/b1tAction/fated/pkg/event"
 )
 
 // HSM is the main Hierarchical State Machine structure.
@@ -18,30 +18,30 @@ type HSM struct {
 	globalStateID StateID
 
 	// ========== Layer 2: Turn State ==========
-	turnState     State
-	turnStateID   StateID
-	turnPlayer    *core.Player // Current player in turn (direct type)
+	turnState   State
+	turnStateID StateID
+	turnPlayer  *core.Player // Current player in turn (direct type)
 
 	// ========== Layer 3: Interrupt Stack ==========
-	stack         *StateStack
-	waitingState  State            // Current WaitDecision state (if active)
-	decision      *event.Decision  // Current pending decision
+	stack        *StateStack
+	waitingState State           // Current WaitDecision state (if active)
+	decision     *event.Decision // Current pending decision
 
 	// ========== State Registry ==========
-	states       map[StateID]State // All registered states
-	factory      StateFactory      // State factory for creating instances
+	states  map[StateID]State // All registered states
+	factory StateFactory      // State factory for creating instances
 
 	// ========== Game Reference - direct type ==========
-	game         *engine.Game      // Game instance (direct access)
-	bus          EventBusAdapter   // EventBus adapter
+	game *engine.Game    // Game instance (direct access)
+	bus  EventBusAdapter // EventBus adapter
 
 	// ========== Timing ==========
-	lastUpdate   time.Time         // Last update timestamp
-	stateEnterTime time.Time       // Time when current state was entered
+	lastUpdate     time.Time // Last update timestamp
+	stateEnterTime time.Time // Time when current state was entered
 
 	// ========== Flow Control ==========
-	running      bool              // HSM is running
-	paused       bool              // HSM is paused (e.g., waiting for decision)
+	running bool // HSM is running
+	paused  bool // HSM is paused (e.g., waiting for decision)
 }
 
 // NewHSM creates a new HSM instance.

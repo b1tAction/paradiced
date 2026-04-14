@@ -1,6 +1,6 @@
 package core
 
-import "github.com/b1tAction/Fated/pkg/protocol"
+import "github.com/b1tAction/fated/pkg/protocol"
 
 // Faction represents player faction (Four Divine Beasts).
 // Type alias to protocol.Faction - single source of definition.

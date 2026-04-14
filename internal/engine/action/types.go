@@ -3,11 +3,11 @@ package action
 import (
 	"time"
 
-	"github.com/b1tAction/Fated/internal/core"
-	"github.com/b1tAction/Fated/internal/core/buff"
-	"github.com/b1tAction/Fated/pkg/constants"
-	"github.com/b1tAction/Fated/pkg/gamelog"
-	"github.com/b1tAction/Fated/pkg/util"
+	"github.com/b1tAction/fated/internal/core"
+	"github.com/b1tAction/fated/internal/core/buff"
+	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/gamelog"
+	"github.com/b1tAction/fated/pkg/util"
 )
 
 // ========== DamageAction ==========
@@ -43,9 +43,9 @@ func NewPiercingDamageAction(target *core.Player, amount int, sourceID string) *
 }
 
 func (a *DamageAction) Type() ActionType { return ActionDamage }
-func (a *DamageAction) CanModify() bool   { return !a.IsPiercing && a.Amount > 0 }
-func (a *DamageAction) Source() string    { return a.SourceID }
-func (a *DamageAction) Target() string    { return a.TargetPlayer.UserID }
+func (a *DamageAction) CanModify() bool  { return !a.IsPiercing && a.Amount > 0 }
+func (a *DamageAction) Source() string   { return a.SourceID }
+func (a *DamageAction) Target() string   { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhasePreDamage for interception by shields/隐匿.
 func (a *DamageAction) PreTriggerPhase() constants.Phase {
@@ -103,9 +103,9 @@ func NewHealAction(target *core.Player, amount int, sourceID string) *HealAction
 }
 
 func (a *HealAction) Type() ActionType { return ActionHeal }
-func (a *HealAction) CanModify() bool   { return a.Amount > 0 }
-func (a *HealAction) Source() string    { return a.SourceID }
-func (a *HealAction) Target() string    { return a.TargetPlayer.UserID }
+func (a *HealAction) CanModify() bool  { return a.Amount > 0 }
+func (a *HealAction) Source() string   { return a.SourceID }
+func (a *HealAction) Target() string   { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhaseAnyTime (healing typically not intercepted).
 func (a *HealAction) PreTriggerPhase() constants.Phase {
@@ -156,9 +156,9 @@ func NewModifyLPAction(target *core.Player, amount int, sourceID string) *Modify
 }
 
 func (a *ModifyLPAction) Type() ActionType { return ActionModifyLP }
-func (a *ModifyLPAction) CanModify() bool   { return false } // LP changes cannot be intercepted
-func (a *ModifyLPAction) Source() string    { return a.SourceID }
-func (a *ModifyLPAction) Target() string    { return a.TargetPlayer.UserID }
+func (a *ModifyLPAction) CanModify() bool  { return false } // LP changes cannot be intercepted
+func (a *ModifyLPAction) Source() string   { return a.SourceID }
+func (a *ModifyLPAction) Target() string   { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhaseAnyTime (LP changes cannot be intercepted).
 func (a *ModifyLPAction) PreTriggerPhase() constants.Phase {
@@ -195,11 +195,11 @@ func (a *ModifyLPAction) LogEntry() gamelog.LogEntry {
 // MoveAction represents player movement on map.
 // Can be intercepted by 迷途 Buff to reverse direction.
 type MoveAction struct {
-	TargetPlayer *core.Player // Player moving
-	Steps        int          // Movement steps (can be negative for reverse)
-	SourceID     string       // Source identifier (usually "DiceRoll")
-	TargetPos    int          // Final position after movement (set by path calculation)
-	Path         []int        // Calculated path (cells visited during movement)
+	TargetPlayer *core.Player   // Player moving
+	Steps        int            // Movement steps (can be negative for reverse)
+	SourceID     string         // Source identifier (usually "DiceRoll")
+	TargetPos    int            // Final position after movement (set by path calculation)
+	Path         []int          // Calculated path (cells visited during movement)
 	Overtaken    []*core.Player // Players overtaken during movement (for 白虎劫运)
 }
 
@@ -214,9 +214,9 @@ func NewMoveAction(target *core.Player, steps int, sourceID string) *MoveAction 
 }
 
 func (a *MoveAction) Type() ActionType { return ActionMove }
-func (a *MoveAction) CanModify() bool   { return a.Steps != 0 }
-func (a *MoveAction) Source() string    { return a.SourceID }
-func (a *MoveAction) Target() string    { return a.TargetPlayer.UserID }
+func (a *MoveAction) CanModify() bool  { return a.Steps != 0 }
+func (a *MoveAction) Source() string   { return a.SourceID }
+func (a *MoveAction) Target() string   { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhasePreMove for interception by 迷途.
 func (a *MoveAction) PreTriggerPhase() constants.Phase {
@@ -285,10 +285,10 @@ func (a *MoveAction) Overtook(player *core.Player) bool {
 
 // AddBuffAction represents adding a Buff to player.
 type AddBuffAction struct {
-	TargetPlayer *core.Player  // Player receiving Buff
+	TargetPlayer *core.Player       // Player receiving Buff
 	BuffType     constants.BuffType // Type of Buff to add
-	Duration     int           // Buff duration in turns
-	SourceID     string        // Source identifier
+	Duration     int                // Buff duration in turns
+	SourceID     string             // Source identifier
 }
 
 // NewAddBuffAction creates a new AddBuffAction.
@@ -302,9 +302,9 @@ func NewAddBuffAction(target *core.Player, buffType constants.BuffType, duration
 }
 
 func (a *AddBuffAction) Type() ActionType { return ActionAddBuff }
-func (a *AddBuffAction) CanModify() bool   { return false } // Buff addition cannot be intercepted
-func (a *AddBuffAction) Source() string    { return a.SourceID }
-func (a *AddBuffAction) Target() string    { return a.TargetPlayer.UserID }
+func (a *AddBuffAction) CanModify() bool  { return false } // Buff addition cannot be intercepted
+func (a *AddBuffAction) Source() string   { return a.SourceID }
+func (a *AddBuffAction) Target() string   { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhaseAnyTime (buff addition not intercepted).
 func (a *AddBuffAction) PreTriggerPhase() constants.Phase {
@@ -341,9 +341,9 @@ func (a *AddBuffAction) LogEntry() gamelog.LogEntry {
 
 // RemoveBuffAction represents removing a Buff from player.
 type RemoveBuffAction struct {
-	TargetPlayer *core.Player  // Player losing Buff
+	TargetPlayer *core.Player       // Player losing Buff
 	BuffType     constants.BuffType // Type of Buff to remove
-	SourceID     string        // Source identifier
+	SourceID     string             // Source identifier
 }
 
 // NewRemoveBuffAction creates a new RemoveBuffAction.
@@ -356,9 +356,9 @@ func NewRemoveBuffAction(target *core.Player, buffType constants.BuffType, sourc
 }
 
 func (a *RemoveBuffAction) Type() ActionType { return ActionRemoveBuff }
-func (a *RemoveBuffAction) CanModify() bool   { return false }
-func (a *RemoveBuffAction) Source() string    { return a.SourceID }
-func (a *RemoveBuffAction) Target() string    { return a.TargetPlayer.UserID }
+func (a *RemoveBuffAction) CanModify() bool  { return false }
+func (a *RemoveBuffAction) Source() string   { return a.SourceID }
+func (a *RemoveBuffAction) Target() string   { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhaseOnBuffRemoved for death effects/亡语.
 func (a *RemoveBuffAction) PreTriggerPhase() constants.Phase {
@@ -410,9 +410,9 @@ func NewTeleportAction(target *core.Player, targetPos int, sourceID string) *Tel
 }
 
 func (a *TeleportAction) Type() ActionType { return ActionTeleport }
-func (a *TeleportAction) CanModify() bool   { return false }
-func (a *TeleportAction) Source() string    { return a.SourceID }
-func (a *TeleportAction) Target() string    { return a.TargetPlayer.UserID }
+func (a *TeleportAction) CanModify() bool  { return false }
+func (a *TeleportAction) Source() string   { return a.SourceID }
+func (a *TeleportAction) Target() string   { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhaseAnyTime (teleport not intercepted).
 func (a *TeleportAction) PreTriggerPhase() constants.Phase {
@@ -466,9 +466,9 @@ func NewStealBuffAction(target, source *core.Player, sourceID string) *StealBuff
 }
 
 func (a *StealBuffAction) Type() ActionType { return ActionStealBuff }
-func (a *StealBuffAction) CanModify() bool   { return false }
-func (a *StealBuffAction) Source() string    { return a.SourceID }
-func (a *StealBuffAction) Target() string    { return a.TargetPlayer.UserID }
+func (a *StealBuffAction) CanModify() bool  { return false }
+func (a *StealBuffAction) Source() string   { return a.SourceID }
+func (a *StealBuffAction) Target() string   { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhaseAnyTime (steal not intercepted).
 func (a *StealBuffAction) PreTriggerPhase() constants.Phase {
@@ -534,9 +534,9 @@ func NewDrawEventAction(target *core.Player, sourceID string) *DrawEventAction {
 }
 
 func (a *DrawEventAction) Type() ActionType { return ActionDrawEvent }
-func (a *DrawEventAction) CanModify() bool   { return true }
-func (a *DrawEventAction) Source() string    { return a.SourceID }
-func (a *DrawEventAction) Target() string    { return a.TargetPlayer.UserID }
+func (a *DrawEventAction) CanModify() bool  { return true }
+func (a *DrawEventAction) Source() string   { return a.SourceID }
+func (a *DrawEventAction) Target() string   { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhasePreEvent for interception by 辟邪/玄武.
 func (a *DrawEventAction) PreTriggerPhase() constants.Phase {
@@ -585,9 +585,9 @@ func NewRespawnAction(target *core.Player, checkpointPos int, sourceID string) *
 }
 
 func (a *RespawnAction) Type() ActionType { return ActionRespawn }
-func (a *RespawnAction) CanModify() bool   { return false }
-func (a *RespawnAction) Source() string    { return a.SourceID }
-func (a *RespawnAction) Target() string    { return a.TargetPlayer.UserID }
+func (a *RespawnAction) CanModify() bool  { return false }
+func (a *RespawnAction) Source() string   { return a.SourceID }
+func (a *RespawnAction) Target() string   { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhasePreRespawn (respawn can be intercepted by Undying等).
 func (a *RespawnAction) PreTriggerPhase() constants.Phase {
@@ -641,9 +641,9 @@ func NewFellDownAction(target *core.Player, position int, damage int, sourceID s
 }
 
 func (a *FellDownAction) Type() ActionType { return ActionFellDown }
-func (a *FellDownAction) CanModify() bool   { return false }
-func (a *FellDownAction) Source() string    { return a.SourceID }
-func (a *FellDownAction) Target() string    { return a.TargetPlayer.UserID }
+func (a *FellDownAction) CanModify() bool  { return false }
+func (a *FellDownAction) Source() string   { return a.SourceID }
+func (a *FellDownAction) Target() string   { return a.TargetPlayer.UserID }
 
 // PreTriggerPhase returns PhaseAnyTime (fell down not intercepted).
 func (a *FellDownAction) PreTriggerPhase() constants.Phase {

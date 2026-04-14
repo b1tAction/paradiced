@@ -1,8 +1,8 @@
 package action
 
 import (
-	"github.com/b1tAction/Fated/pkg/action"
-	"github.com/b1tAction/Fated/pkg/gamelog"
+	"github.com/b1tAction/fated/pkg/action"
+	"github.com/b1tAction/fated/pkg/gamelog"
 )
 
 // ActionType is alias to pkg/action.ActionType for convenience.

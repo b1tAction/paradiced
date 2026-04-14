@@ -3,11 +3,11 @@ package action
 import (
 	"testing"
 
-	"github.com/b1tAction/Fated/internal/core"
-	"github.com/b1tAction/Fated/internal/core/buff"
-	"github.com/b1tAction/Fated/pkg/constants"
-	"github.com/b1tAction/Fated/pkg/event"
-	"github.com/b1tAction/Fated/pkg/gamelog"
+	"github.com/b1tAction/fated/internal/core"
+	"github.com/b1tAction/fated/internal/core/buff"
+	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/event"
+	"github.com/b1tAction/fated/pkg/gamelog"
 )
 
 // ========== ActionType Tests ==========

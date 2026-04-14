@@ -4,11 +4,11 @@ package core
 
 // Imports ensure all subpackages are initialized and types are available for re-export.
 import (
-	"github.com/b1tAction/Fated/internal/core/buff"
-	"github.com/b1tAction/Fated/internal/core/event"
-	"github.com/b1tAction/Fated/internal/core/item"
-	"github.com/b1tAction/Fated/pkg/constants"
-	"github.com/b1tAction/Fated/pkg/handler"
+	"github.com/b1tAction/fated/internal/core/buff"
+	"github.com/b1tAction/fated/internal/core/event"
+	"github.com/b1tAction/fated/internal/core/item"
+	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/handler"
 )
 
 // Re-export types from subpackages for convenience.
@@ -45,14 +45,14 @@ type EffectHandler = handler.EffectHandler
 
 // Buff registry access functions from buff package
 var (
-	GetBuffDefinition       = buff.GetBuffDefinition
-	GetBuffString           = buff.GetBuffString
-	GetBuffEvaluation       = buff.GetBuffEvaluation
-	GetBuffHandler          = buff.GetBuffHandler
-	HasBuffHandler          = buff.HasBuffHandler
-	GetAllBuffTypes         = buff.GetAllBuffTypes
-	GetBuffTypesByCategory  = buff.GetBuffTypesByCategory
-	GetAllBuffDefinitions   = buff.GetAllBuffDefinitions
+	GetBuffDefinition      = buff.GetBuffDefinition
+	GetBuffString          = buff.GetBuffString
+	GetBuffEvaluation      = buff.GetBuffEvaluation
+	GetBuffHandler         = buff.GetBuffHandler
+	HasBuffHandler         = buff.HasBuffHandler
+	GetAllBuffTypes        = buff.GetAllBuffTypes
+	GetBuffTypesByCategory = buff.GetBuffTypesByCategory
+	GetAllBuffDefinitions  = buff.GetAllBuffDefinitions
 )
 
 // EventType from constants package
@@ -95,11 +95,11 @@ type ItemType = constants.ItemType
 
 // ItemType constants from constants package
 const (
-	ItemTypeNone        = constants.ItemTypeNone
+	ItemTypeNone         = constants.ItemTypeNone
 	ItemTypeReverseClock = constants.ItemTypeReverseClock
-	ItemTypeAnyDoor     = constants.ItemTypeAnyDoor
-	ItemTypeDiceSwap    = constants.ItemTypeDiceSwap
-	ItemTypeDiceUpgrade = constants.ItemTypeDiceUpgrade
+	ItemTypeAnyDoor      = constants.ItemTypeAnyDoor
+	ItemTypeDiceSwap     = constants.ItemTypeDiceSwap
+	ItemTypeDiceUpgrade  = constants.ItemTypeDiceUpgrade
 )
 
 // Item from item package

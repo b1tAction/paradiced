@@ -9,7 +9,7 @@ event 包提供 EventType、定义和注册表。包级 init() 自动初始化�
 ## Direct Import
 
 ```go
-import "github.com/b1tAction/Fated/internal/core/event"
+import "github.com/b1tAction/fated/internal/core/event"
 
 // 自动初始化，可直接使用
 event.GetEventDefinition(event.EventTypeHerb)

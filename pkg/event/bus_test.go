@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/b1tAction/Fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/constants"
 )
 
 // TestPlayer 用于测试的简单玩家结构

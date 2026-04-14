@@ -3,34 +3,34 @@ package hsm
 import (
 	"time"
 
-	"github.com/b1tAction/Fated/internal/core"
-	"github.com/b1tAction/Fated/internal/engine"
-	"github.com/b1tAction/Fated/pkg/constants"
-	"github.com/b1tAction/Fated/pkg/event"
-	"github.com/b1tAction/Fated/pkg/util"
+	"github.com/b1tAction/fated/internal/core"
+	"github.com/b1tAction/fated/internal/engine"
+	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/event"
+	"github.com/b1tAction/fated/pkg/util"
 )
 
 // Context key constants for commonly used state markers.
 // These keys are stored in the embedded Metadata for type-safe access.
 const (
-	KeySkipTurn     = "skip_turn"          // Mark to skip remaining turn
-	KeyFellDown     = "fell_down"          // Mark for Fragile cell fall
-	KeyReachedEnd   = "reached_end"        // Mark for reaching Boss cell
-	KeyDiceSteps    = "dice_steps"         // Dice roll result for movement
-	KeyTargetPos    = "target_pos"         // Target position after movement
-	KeyDamage       = "damage"             // Damage amount
-	KeyMiniGameRank = "mini_game_rank"     // Mini-game ranking result prefix (used as "result_{playerID}")
-	KeyDiceType     = "dice_type"          // Dice type prefix (used as "dice_{playerID}")
+	KeySkipTurn     = "skip_turn"           // Mark to skip remaining turn
+	KeyFellDown     = "fell_down"           // Mark for Fragile cell fall
+	KeyReachedEnd   = "reached_end"         // Mark for reaching Boss cell
+	KeyDiceSteps    = "dice_steps"          // Dice roll result for movement
+	KeyTargetPos    = "target_pos"          // Target position after movement
+	KeyDamage       = "damage"              // Damage amount
+	KeyMiniGameRank = "mini_game_rank"      // Mini-game ranking result prefix (used as "result_{playerID}")
+	KeyDiceType     = "dice_type"           // Dice type prefix (used as "dice_{playerID}")
 	KeyBossTrigger  = "boss_trigger_player" // Player who triggered boss battle
-	KeyWinner       = "winner_id"          // Winner player ID
+	KeyWinner       = "winner_id"           // Winner player ID
 
 	// State flow markers
-	KeyInitialized        = "initialized"         // Match initialized flag
-	KeyMiniGameStarted    = "mini_game_started"   // Mini-game phase started
-	KeyWaitingForResults  = "waiting_for_results" // Waiting for mini-game results
-	KeyTurnLoopActive     = "turn_loop_active"    // Turn loop active flag
-	KeyBossBattleActive   = "boss_battle_active"  // Boss battle active flag
-	KeyGameOver           = "game_over"           // Game over flag
+	KeyInitialized       = "initialized"         // Match initialized flag
+	KeyMiniGameStarted   = "mini_game_started"   // Mini-game phase started
+	KeyWaitingForResults = "waiting_for_results" // Waiting for mini-game results
+	KeyTurnLoopActive    = "turn_loop_active"    // Turn loop active flag
+	KeyBossBattleActive  = "boss_battle_active"  // Boss battle active flag
+	KeyGameOver          = "game_over"           // Game over flag
 )
 
 // State defines the interface for all states in the HSM.
@@ -64,31 +64,31 @@ type StateContext struct {
 	*util.Metadata
 
 	// Core references - direct types for domain objects
-	Game      *engine.Game       // Game instance (direct access)
-	Player    *core.Player       // Current player (direct access, used in Layer 2 states)
+	Game   *engine.Game // Game instance (direct access)
+	Player *core.Player // Current player (direct access, used in Layer 2 states)
 
 	// Adapter interfaces - for cross-package isolation
-	Bus       EventBusAdapter    // EventBus adapter (isolates pkg/event)
-	MapEngine MapEngineAdapter   // MapEngine adapter (isolates internal/gamemap)
+	Bus       EventBusAdapter  // EventBus adapter (isolates pkg/event)
+	MapEngine MapEngineAdapter // MapEngine adapter (isolates internal/gamemap)
 
 	// Phase triggering
-	Phase     constants.Phase        // Current phase to trigger
-	PhaseData interface{}        // Additional phase data (e.g., damage amount, dice steps)
+	Phase     constants.Phase // Current phase to trigger
+	PhaseData interface{}     // Additional phase data (e.g., damage amount, dice steps)
 
 	// Decision handling
-	Decision  *event.Decision    // Pending decision requiring user input
-	Decisions []*event.Decision  // List of pending decisions
+	Decision  *event.Decision   // Pending decision requiring user input
+	Decisions []*event.Decision // List of pending decisions
 
 	// Timing
-	Timeout   time.Duration      // Timeout duration for waiting states
-	StartTime time.Time          // State entry time
+	Timeout   time.Duration // Timeout duration for waiting states
+	StartTime time.Time     // State entry time
 
 	// Stack reference (Layer 3)
-	Stack     *StateStack        // Reference to interrupt stack
+	Stack *StateStack // Reference to interrupt stack
 
 	// Execution result
-	Success   bool               // Whether state execution succeeded
-	Error     error              // Error if state execution failed
+	Success bool  // Whether state execution succeeded
+	Error   error // Error if state execution failed
 }
 
 // NewStateContext creates a new StateContext with default values.

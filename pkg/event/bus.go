@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/b1tAction/Fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/constants"
 )
 
 // newID generates a unique ID (package internal).

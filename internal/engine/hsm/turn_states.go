@@ -3,12 +3,12 @@ package hsm
 import (
 	"time"
 
-	"github.com/b1tAction/Fated/internal/core"
-		"github.com/b1tAction/Fated/internal/gamemap"
-	engineaction "github.com/b1tAction/Fated/internal/engine/action"
-	"github.com/b1tAction/Fated/pkg/constants"
-	"github.com/b1tAction/Fated/pkg/event"
-	"github.com/b1tAction/Fated/pkg/protocol"
+	"github.com/b1tAction/fated/internal/core"
+	engineaction "github.com/b1tAction/fated/internal/engine/action"
+	"github.com/b1tAction/fated/internal/gamemap"
+	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/event"
+	"github.com/b1tAction/fated/pkg/protocol"
 )
 
 // ========== Turn States (Layer 2) ==========
@@ -37,10 +37,10 @@ func (s *BaseTurnState) CanTransitionTo(target StateID) bool {
 // Checks SkipTurn/IsDead, triggers BeforeTurn phase effects.
 type TurnUpkeepState struct {
 	BaseTurnState
-	skipTurn    bool
-	isDead      bool
-	decisions   []*event.Decision
-	actionCtx   *engineaction.ActionContext
+	skipTurn  bool
+	isDead    bool
+	decisions []*event.Decision
+	actionCtx *engineaction.ActionContext
 }
 
 // NewTurnUpkeepState creates a new TurnUpkeep state.
@@ -254,10 +254,10 @@ func (s *MainActionState) defaultDiceRoll(ctx *StateContext) int {
 // Uses Action system for MoveAction execution.
 type TurnMovingState struct {
 	BaseTurnState
-	pathResult  PathResultData
-	fellDown    bool
-	reachedEnd  bool
-	actionCtx   *engineaction.ActionContext
+	pathResult PathResultData
+	fellDown   bool
+	reachedEnd bool
+	actionCtx  *engineaction.ActionContext
 }
 
 // PathResultData stores path calculation results.
@@ -383,9 +383,9 @@ func (s *TurnMovingState) Exit(ctx *StateContext) {
 // TurnLandedState handles landing effects and PhaseOnLand trigger.
 type TurnLandedState struct {
 	BaseTurnState
-	cellType    CellType
-	decisions   []*event.Decision
-	actionCtx   *engineaction.ActionContext
+	cellType  CellType
+	decisions []*event.Decision
+	actionCtx *engineaction.ActionContext
 }
 
 // NewTurnLandedState creates a new TurnLanded state.
@@ -464,10 +464,10 @@ func (s *TurnLandedState) Exit(ctx *StateContext) {
 // Triggers PhasePreEvent for immunity checks.
 type TurnEventState struct {
 	BaseTurnState
-	eventDrawn    bool
-	eventBlocked  bool
-	decisions     []*event.Decision
-	actionCtx     *engineaction.ActionContext
+	eventDrawn   bool
+	eventBlocked bool
+	decisions    []*event.Decision
+	actionCtx    *engineaction.ActionContext
 }
 
 // NewTurnEventState creates a new TurnEvent state.
@@ -542,7 +542,7 @@ func (s *TurnEventState) Exit(ctx *StateContext) {
 // Ticks Buff durations, checks death, handles faction charging.
 type TurnEndState struct {
 	BaseTurnState
-	actionCtx     *engineaction.ActionContext
+	actionCtx *engineaction.ActionContext
 }
 
 // NewTurnEndState creates a new TurnEnd state.

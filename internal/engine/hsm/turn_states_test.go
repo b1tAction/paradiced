@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/b1tAction/Fated/internal/core"
-	"github.com/b1tAction/Fated/internal/engine"
-	"github.com/b1tAction/Fated/internal/gamemap"
+	"github.com/b1tAction/fated/internal/core"
+	"github.com/b1tAction/fated/internal/engine"
+	"github.com/b1tAction/fated/internal/gamemap"
 )
 
 // ========== TurnUpkeepState Tests ==========
@@ -441,7 +441,7 @@ func TestTurnEndState_Enter_TickBuffs(t *testing.T) {
 func TestTurnEndState_Enter_FactionCharging(t *testing.T) {
 	game := engine.NewGame("test", 0)
 	player := core.NewPlayer(core.PlayerConfig{
-		UserID: "player1",
+		UserID:  "player1",
 		Faction: core.FactionQingLong,
 	})
 	game.AddPlayer(player)

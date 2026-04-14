@@ -4,8 +4,8 @@ package gamelog
 import (
 	"time"
 
-	"github.com/b1tAction/Fated/pkg/constants"
-	"github.com/b1tAction/Fated/pkg/util"
+	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/util"
 )
 
 // EntryType identifies the type of log entry.

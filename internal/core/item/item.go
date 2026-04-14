@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/b1tAction/Fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/constants"
 )
 
 // ========== Item Instance ==========
@@ -30,19 +30,19 @@ func NewItem(itemType constants.ItemType, id string) *Item {
 // ========== Item Definition ==========
 
 type ItemDefinition struct {
-	Type          constants.ItemType        `json:"type"`
-	Eval          constants.Evaluation      `json:"evaluation"`
-	EnglishName   string                    `json:"english_name"` // English identifier (for String())
-	Name          string                    `json:"name"`         // Chinese display name
-	Desc          string                    `json:"desc"`
-	TargetSelf    bool                      `json:"target_self"`
-	TargetOther   bool                      `json:"target_other"`
-	BuffType      constants.BuffType        `json:"buff_type"`
-	Range         int                       `json:"range"`
-	SpecialEffect constants.SpecialEffect   `json:"special_effect"` // Special effect type
-	Phase         constants.Phase           `json:"phase"`          // Usable phase
-	Priority      int                       `json:"priority"`       // Execution priority
-	NeedConfirm   bool                      `json:"need_confirm"`   // Whether user confirmation needed
+	Type          constants.ItemType      `json:"type"`
+	Eval          constants.Evaluation    `json:"evaluation"`
+	EnglishName   string                  `json:"english_name"` // English identifier (for String())
+	Name          string                  `json:"name"`         // Chinese display name
+	Desc          string                  `json:"desc"`
+	TargetSelf    bool                    `json:"target_self"`
+	TargetOther   bool                    `json:"target_other"`
+	BuffType      constants.BuffType      `json:"buff_type"`
+	Range         int                     `json:"range"`
+	SpecialEffect constants.SpecialEffect `json:"special_effect"` // Special effect type
+	Phase         constants.Phase         `json:"phase"`          // Usable phase
+	Priority      int                     `json:"priority"`       // Execution priority
+	NeedConfirm   bool                    `json:"need_confirm"`   // Whether user confirmation needed
 }
 
 // ========== Item Registry ==========

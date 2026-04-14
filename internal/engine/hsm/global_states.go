@@ -1,7 +1,7 @@
 package hsm
 
 import (
-	"github.com/b1tAction/Fated/internal/core"
+	"github.com/b1tAction/fated/internal/core"
 )
 
 // ========== Global States (Layer 1) ==========
@@ -183,7 +183,7 @@ type TurnLoopState struct {
 // NewTurnLoopState creates a new TurnLoop state.
 func NewTurnLoopState() *TurnLoopState {
 	return &TurnLoopState{
-		BaseGlobalState:   BaseGlobalState{id: StateTurnLoop},
+		BaseGlobalState:    BaseGlobalState{id: StateTurnLoop},
 		currentPlayerIndex: 0,
 		turnsCompleted:     0,
 		reachedEnd:         false,

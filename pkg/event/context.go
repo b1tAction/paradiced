@@ -1,8 +1,8 @@
 package event
 
 import (
-	"github.com/b1tAction/Fated/pkg/constants"
-	"github.com/b1tAction/Fated/pkg/util"
+	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/util"
 )
 
 // Context is the execution context containing all information when a Phase triggers.
@@ -10,20 +10,20 @@ import (
 // The concrete type is provided by the caller at runtime.
 // DerivedActions uses interface{} to avoid importing pkg/action (type assertion in ActionContext).
 type Context struct {
-	Player         interface{}   `json:"player"`           // The player triggering the Phase (concrete type determined by caller)
-	GameEvent      interface{}   `json:"game_event"`       // Related game event (optional)
-	GameState      *GameState    `json:"game_state"`       // Game state (optional)
-	Choice         int           `json:"choice"`           // User's selected option index
-	DerivedActions []interface{} `json:"derived_actions"`  // Actions to execute after handler (action.Action type, collected by ActionContext)
-	*util.Metadata               `json:"metadata"`         // Type-safe dynamic data container (replaces Data interface{})
+	Player         interface{}       `json:"player"`          // The player triggering the Phase (concrete type determined by caller)
+	GameEvent      interface{}       `json:"game_event"`      // Related game event (optional)
+	GameState      *GameState        `json:"game_state"`      // Game state (optional)
+	Choice         int               `json:"choice"`          // User's selected option index
+	DerivedActions []interface{}     `json:"derived_actions"` // Actions to execute after handler (action.Action type, collected by ActionContext)
+	*util.Metadata `json:"metadata"` // Type-safe dynamic data container (replaces Data interface{})
 }
 
 // GameState is a snapshot of game state (simplified, can be extended later).
 type GameState struct {
-	Round        int               `json:"round"`         // Current round
-	Turn         int               `json:"turn"`          // Current turn
-	CurrentPhase constants.Phase   `json:"current_phase"` // Current Phase
-	AllPlayers   []interface{}     `json:"all_players"`   // All players
+	Round        int             `json:"round"`         // Current round
+	Turn         int             `json:"turn"`          // Current turn
+	CurrentPhase constants.Phase `json:"current_phase"` // Current Phase
+	AllPlayers   []interface{}   `json:"all_players"`   // All players
 }
 
 // NewContext creates a new context.

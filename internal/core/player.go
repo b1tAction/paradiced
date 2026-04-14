@@ -4,24 +4,24 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/b1tAction/Fated/internal/core/buff"
-	"github.com/b1tAction/Fated/internal/core/item"
-	"github.com/b1tAction/Fated/pkg/constants"
-	"github.com/b1tAction/Fated/pkg/util"
+	"github.com/b1tAction/fated/internal/core/buff"
+	"github.com/b1tAction/fated/internal/core/item"
+	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/util"
 )
 
 // Player represents a player in the game.
 type Player struct {
-	UserID      string     `json:"user_id"`      // Player UUID
-	Faction     Faction    `json:"faction"`      // Faction (阵营)
-	Position    int        `json:"position"`     // Current position
-	HP          int        `json:"hp"`           // Health points
-	LP          int        `json:"lp"`           // Luck points (affects random events)
-	Inventory   []*item.Item `json:"inventory"`    // Item inventory
-	ActiveBuffs []*buff.Buff `json:"active_buffs"` // Active buffs
-	IsDead      bool       `json:"is_dead"`      // Whether player is dead
-	SkipTurn    bool       `json:"skip_turn"`    // Whether player skips turn
-	*util.Metadata          `json:"metadata"`     // Type-safe dynamic data container
+	UserID         string            `json:"user_id"`      // Player UUID
+	Faction        Faction           `json:"faction"`      // Faction (阵营)
+	Position       int               `json:"position"`     // Current position
+	HP             int               `json:"hp"`           // Health points
+	LP             int               `json:"lp"`           // Luck points (affects random events)
+	Inventory      []*item.Item      `json:"inventory"`    // Item inventory
+	ActiveBuffs    []*buff.Buff      `json:"active_buffs"` // Active buffs
+	IsDead         bool              `json:"is_dead"`      // Whether player is dead
+	SkipTurn       bool              `json:"skip_turn"`    // Whether player skips turn
+	*util.Metadata `json:"metadata"` // Type-safe dynamic data container
 }
 
 // PlayerConfig represents player configuration.

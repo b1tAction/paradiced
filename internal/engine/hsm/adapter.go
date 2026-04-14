@@ -1,12 +1,12 @@
 package hsm
 
 import (
-	"github.com/b1tAction/Fated/internal/engine"
-	"github.com/b1tAction/Fated/internal/gamemap"
-	"github.com/b1tAction/Fated/pkg/constants"
-	"github.com/b1tAction/Fated/pkg/event"
-	"github.com/b1tAction/Fated/pkg/gamelog"
-	"github.com/b1tAction/Fated/pkg/protocol"
+	"github.com/b1tAction/fated/internal/engine"
+	"github.com/b1tAction/fated/internal/gamemap"
+	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/event"
+	"github.com/b1tAction/fated/pkg/gamelog"
+	"github.com/b1tAction/fated/pkg/protocol"
 )
 
 // ========== EventBus Adapter ==========

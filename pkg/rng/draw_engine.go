@@ -4,10 +4,10 @@ package rng
 import (
 	"math/rand"
 
-	"github.com/b1tAction/Fated/internal/core/buff"
-	"github.com/b1tAction/Fated/internal/core/event"
-	"github.com/b1tAction/Fated/internal/core/item"
-	"github.com/b1tAction/Fated/pkg/constants"
+	"github.com/b1tAction/fated/internal/core/buff"
+	"github.com/b1tAction/fated/internal/core/event"
+	"github.com/b1tAction/fated/internal/core/item"
+	"github.com/b1tAction/fated/pkg/constants"
 )
 
 // PoolType represents the pool category for drawing.

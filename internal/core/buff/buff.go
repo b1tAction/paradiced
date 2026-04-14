@@ -6,15 +6,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/b1tAction/Fated/pkg/constants"
-	"github.com/b1tAction/Fated/pkg/handler"
+	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/handler"
 )
 
 // ========== Buff Instance ==========
 
 type Buff struct {
 	Type            constants.BuffType `json:"type"`
-	ID              string             `json:"id"`               // Buff instance ID
+	ID              string             `json:"id"` // Buff instance ID
 	Duration        int                `json:"duration"`
 	Charge          int                `json:"charge"`
 	SubscriptionIDs []string           `json:"subscription_ids"` // EventBus subscription IDs
@@ -44,18 +44,18 @@ func (b *Buff) TickDuration() bool {
 // ========== Buff Definition ==========
 
 type BuffDefinition struct {
-	Type          constants.BuffType          `json:"type"`
-	Eval          constants.Evaluation        `json:"evaluation"`     // Evaluation score
-	EnglishName   string                      `json:"english_name"`   // English identifier (snake_case)
-	Name          string                      `json:"name"`           // Chinese display name
-	Desc          string                      `json:"desc"`
-	Duration      int                         `json:"duration"`
-	HPPerTurn     int                         `json:"hp_per_turn"`
-	LPPerTurn     int                         `json:"lp_per_turn"`
-	SpecialEffect constants.SpecialEffect     `json:"special_effect"` // Special effect type
-	Phases        []constants.Phase           `json:"phases"`         // Trigger phases list
-	Priority      int                         `json:"priority"`       // Execution priority
-	NeedConfirm   bool                        `json:"need_confirm"`   // Whether user confirmation needed
+	Type          constants.BuffType      `json:"type"`
+	Eval          constants.Evaluation    `json:"evaluation"`   // Evaluation score
+	EnglishName   string                  `json:"english_name"` // English identifier (snake_case)
+	Name          string                  `json:"name"`         // Chinese display name
+	Desc          string                  `json:"desc"`
+	Duration      int                     `json:"duration"`
+	HPPerTurn     int                     `json:"hp_per_turn"`
+	LPPerTurn     int                     `json:"lp_per_turn"`
+	SpecialEffect constants.SpecialEffect `json:"special_effect"` // Special effect type
+	Phases        []constants.Phase       `json:"phases"`         // Trigger phases list
+	Priority      int                     `json:"priority"`       // Execution priority
+	NeedConfirm   bool                    `json:"need_confirm"`   // Whether user confirmation needed
 }
 
 // GetPhases returns the Buff's trigger phase list.

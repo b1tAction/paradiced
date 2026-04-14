@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/b1tAction/Fated/internal/core"
-	"github.com/b1tAction/Fated/internal/engine"
-	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/fated/internal/core"
+	"github.com/b1tAction/fated/internal/engine"
+	"github.com/b1tAction/fated/pkg/event"
 )
 
 // ========== WaitDecisionState Tests ==========

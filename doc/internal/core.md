@@ -31,15 +31,15 @@ internal/core/
 
 ```go
 // 只需要 Buff（自动初始化）
-import "github.com/b1tAction/Fated/internal/core/buff"
+import "github.com/b1tAction/fated/internal/core/buff"
 buff.GetBuffDefinition(buff.BuffTypeFire)
 
 // 只需要 Event（自动初始化）
-import "github.com/b1tAction/Fated/internal/core/event"
+import "github.com/b1tAction/fated/internal/core/event"
 event.GetEventDefinition(event.EventTypeHerb)
 
 // 需要完整游戏逻辑（自动初始化所有子包）
-import "github.com/b1tAction/Fated/internal/core"
+import "github.com/b1tAction/fated/internal/core"
 core.GetBuffDefinition(core.BuffTypeFire)
 ```
 

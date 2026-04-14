@@ -1,8 +1,8 @@
 package action
 
 import (
-	"github.com/b1tAction/Fated/pkg/constants"
-	"github.com/b1tAction/Fated/pkg/gamelog"
+	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/gamelog"
 )
 
 // ActionType identifies the type of action using snake_case string naming.

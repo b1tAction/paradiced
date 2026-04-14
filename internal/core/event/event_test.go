@@ -3,7 +3,7 @@ package event
 import (
 	"testing"
 
-	"github.com/b1tAction/Fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/constants"
 )
 
 // ========== EventType Tests ==========

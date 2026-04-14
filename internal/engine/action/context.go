@@ -1,11 +1,11 @@
 package action
 
 import (
-	"github.com/b1tAction/Fated/pkg/constants"
-	"github.com/b1tAction/Fated/pkg/event"
-	"github.com/b1tAction/Fated/pkg/gamelog"
-	"github.com/b1tAction/Fated/pkg/protocol"
-	"github.com/b1tAction/Fated/pkg/util"
+	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/event"
+	"github.com/b1tAction/fated/pkg/gamelog"
+	"github.com/b1tAction/fated/pkg/protocol"
+	"github.com/b1tAction/fated/pkg/util"
 )
 
 // ActionContext provides context for action execution.

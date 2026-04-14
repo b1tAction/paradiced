@@ -3,8 +3,8 @@ package hsm
 import (
 	"testing"
 
-	"github.com/b1tAction/Fated/internal/core"
-	"github.com/b1tAction/Fated/internal/engine"
+	"github.com/b1tAction/fated/internal/core"
+	"github.com/b1tAction/fated/internal/engine"
 )
 
 func TestStateMatchInit(t *testing.T) {

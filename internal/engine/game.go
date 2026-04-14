@@ -6,21 +6,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/b1tAction/Fated/internal/core"
-	"github.com/b1tAction/Fated/pkg/constants"
-	"github.com/b1tAction/Fated/pkg/event"
-	"github.com/b1tAction/Fated/pkg/gamelog"
-	"github.com/b1tAction/Fated/pkg/rng"
+	"github.com/b1tAction/fated/internal/core"
+	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/event"
+	"github.com/b1tAction/fated/pkg/gamelog"
+	"github.com/b1tAction/fated/pkg/rng"
 )
 
 // Game is the game instance, containing EventBus and all players.
 type Game struct {
-	ID      string          `json:"id"`
-	Bus     *event.EventBus `json:"bus"`
-	Players []*core.Player  `json:"players"`
-	State   *GameState      `json:"state"`
-	RNG     *rand.Rand      `json:"-"` // Game unique random source
-	Draw    *rng.DrawEngine `json:"-"` // Draw engine for random draws
+	ID      string           `json:"id"`
+	Bus     *event.EventBus  `json:"bus"`
+	Players []*core.Player   `json:"players"`
+	State   *GameState       `json:"state"`
+	RNG     *rand.Rand       `json:"-"`   // Game unique random source
+	Draw    *rng.DrawEngine  `json:"-"`   // Draw engine for random draws
 	Log     *gamelog.GameLog `json:"log"` // Global game log for playback
 	mutex   sync.RWMutex
 }

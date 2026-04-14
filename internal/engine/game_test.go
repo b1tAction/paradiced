@@ -3,10 +3,10 @@ package engine
 import (
 	"testing"
 
-	"github.com/b1tAction/Fated/internal/core"
-	"github.com/b1tAction/Fated/pkg/constants"
-	"github.com/b1tAction/Fated/pkg/event"
-	"github.com/b1tAction/Fated/pkg/rng"
+	"github.com/b1tAction/fated/internal/core"
+	"github.com/b1tAction/fated/pkg/constants"
+	"github.com/b1tAction/fated/pkg/event"
+	"github.com/b1tAction/fated/pkg/rng"
 )
 
 // ========== Game Creation Tests ==========
@@ -387,9 +387,9 @@ func TestGameMultipleBuffSubscriptions(t *testing.T) {
 	game.AddPlayer(player)
 
 	// 添加多个 Buff
-	buff1 := core.NewBuff(core.BuffTypeCurse, 3)     // BeforeTurn
-	buff2 := core.NewBuff(core.BuffTypeDivine, 3)    // BeforeTurn
-	buff3 := core.NewBuff(core.BuffTypeHidden, 3)    // PreDamage
+	buff1 := core.NewBuff(core.BuffTypeCurse, 3)  // BeforeTurn
+	buff2 := core.NewBuff(core.BuffTypeDivine, 3) // BeforeTurn
+	buff3 := core.NewBuff(core.BuffTypeHidden, 3) // PreDamage
 
 	player.AddBuff(buff1)
 	player.AddBuff(buff2)
