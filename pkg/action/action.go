@@ -1,65 +1,42 @@
 package action
 
-import "github.com/b1tAction/Fated/pkg/event"
+import (
+	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/Fated/pkg/gamelog"
+)
 
-// ActionType identifies the type of action.
+// ActionType identifies the type of action using snake_case string naming.
 // All game effects (Buff/Item/Event/Faction) generate Actions with specific types.
-type ActionType int
+type ActionType string
 
 const (
 	// ActionDamage represents HP reduction (can be intercepted by shields).
-	ActionDamage ActionType = iota
+	ActionDamage ActionType = "damage"
 	// ActionHeal represents HP restoration.
-	ActionHeal
+	ActionHeal ActionType = "heal"
 	// ActionModifyLP represents Luck Point modification (+1 or -1).
-	ActionModifyLP
+	ActionModifyLP ActionType = "modify_lp"
 	// ActionMove represents player movement on map (can be intercepted by 迷途).
-	ActionMove
+	ActionMove ActionType = "move"
 	// ActionAddBuff represents adding a Buff to player.
-	ActionAddBuff
+	ActionAddBuff ActionType = "add_buff"
 	// ActionRemoveBuff represents removing a Buff from player.
-	ActionRemoveBuff
+	ActionRemoveBuff ActionType = "remove_buff"
 	// ActionRespawn represents player respawn at checkpoint.
-	ActionRespawn
+	ActionRespawn ActionType = "respawn"
 	// ActionSkipTurn represents skipping current turn.
-	ActionSkipTurn
+	ActionSkipTurn ActionType = "skip_turn"
 	// ActionDrawEvent represents drawing a random event.
-	ActionDrawEvent
+	ActionDrawEvent ActionType = "draw_event"
 	// ActionTeleport represents instant teleport to specific position.
-	ActionTeleport
+	ActionTeleport ActionType = "teleport"
 	// ActionStealBuff represents stealing a Buff from another player.
-	ActionStealBuff
+	ActionStealBuff ActionType = "steal_buff"
+	// ActionFellDown represents player falling from Fragile cell.
+	ActionFellDown ActionType = "fell_down"
+	// ActionUnknown represents an unknown action type.
+	ActionUnknown ActionType = "unknown"
 )
-
-// String returns the action type name.
-func (at ActionType) String() string {
-	switch at {
-	case ActionDamage:
-		return "Damage"
-	case ActionHeal:
-		return "Heal"
-	case ActionModifyLP:
-		return "ModifyLP"
-	case ActionMove:
-		return "Move"
-	case ActionAddBuff:
-		return "AddBuff"
-	case ActionRemoveBuff:
-		return "RemoveBuff"
-	case ActionRespawn:
-		return "Respawn"
-	case ActionSkipTurn:
-		return "SkipTurn"
-	case ActionDrawEvent:
-		return "DrawEvent"
-	case ActionTeleport:
-		return "Teleport"
-	case ActionStealBuff:
-		return "StealBuff"
-	default:
-		return "Unknown"
-	}
-}
 
 // Action is the standard payload for all game effects.
 // Buffs/Items/Events generate Actions instead of directly modifying data.
@@ -93,24 +70,10 @@ type Action interface {
 	PostTriggerPhase() event.Phase
 }
 
-// LogEntry is the interface for actions that generate event log entries.
+// LogEntry is the interface for actions that generate game log entries.
 // Implemented by concrete action types in internal/engine/action.
+// Returns gamelog.LogEntry for unified game playback.
 type LogEntry interface {
-	// LogEntry generates an event log entry for client animation.
-	LogEntry() TurnEventLogEntry
-}
-
-// TurnEventLogEntry represents a single event for client animation playback.
-// Each entry corresponds to one Action execution result.
-type TurnEventLogEntry struct {
-	// Type is the event type name ("HPChange", "LPChange", "Move", "BuffAdd", etc.)
-	Type string `json:"type"`
-	// Target is the player ID affected by this event
-	Target string `json:"target"`
-	// Delta is the change amount (negative for damage/LP loss, positive for heal/LP gain)
-	Delta int `json:"delta"`
-	// Source is the source identifier (Buff ID, Item ID, Event ID)
-	Source string `json:"source"`
-	// Metadata contains additional data (path for Move, buffType for AddBuff, etc.)
-	Metadata interface{} `json:"metadata,omitempty"`
+	// LogEntry generates a game log entry for client animation.
+	LogEntry() gamelog.LogEntry
 }
