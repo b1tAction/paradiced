@@ -17,5 +17,10 @@ const (
 
 // IsValid checks if ItemType is valid.
 func (it ItemType) IsValid() bool {
-	return it != ItemTypeNone && it != ""
+	switch it {
+	case ItemTypeReverseClock, ItemTypeAnyDoor, ItemTypeDiceSwap, ItemTypeDiceUpgrade:
+		return true
+	default:
+		return false
+	}
 }

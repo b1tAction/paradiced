@@ -31,5 +31,13 @@ const (
 
 // IsValid checks if EventType is valid.
 func (et EventType) IsValid() bool {
-	return et != EventTypeNone && et != ""
+	switch et {
+	case EventTypeHerb, EventTypeMilkTea, EventTypeRelic, EventTypeDivineBless,
+		EventTypeExchange, EventTypeHiddenBuff, EventTypeTasteTest,
+		EventTypeMosquito, EventTypeGhostHit, EventTypeDogPoop,
+		EventTypeThief, EventTypeCurseBuddha, EventTypeLostWay, EventTypeThunder:
+		return true
+	default:
+		return false
+	}
 }

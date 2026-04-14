@@ -26,7 +26,13 @@ const (
 
 // IsValid checks if BuffType is valid.
 func (bt BuffType) IsValid() bool {
-	return bt != BuffTypeNone && bt != ""
+	switch bt {
+	case BuffTypeCurse, BuffTypeLost, BuffTypeCorrupt, BuffTypePoison,
+		BuffTypeHidden, BuffTypeDivine, BuffTypeRain, BuffTypeExorcism, BuffTypeFire:
+		return true
+	default:
+		return false
+	}
 }
 
 // IsPositive checks if the Buff is positive (based on effect, not evaluation).
