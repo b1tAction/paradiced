@@ -64,6 +64,19 @@ func NewMetadata() *Metadata
 | `SetString(key, value) *Metadata` | 设置字符串值 |
 | `Set(key, value) *Metadata` | 设置任意类型值 |
 
+### JSON 序列化支持
+
+| 方法 | 描述 |
+|--------|-------------|
+| `MarshalJSON() ([]byte, error)` | JSON 序列化，输出 `map[string]interface{}` 格式 |
+| `UnmarshalJSON(data []byte) error` | JSON 反序列化，自动重建内部 map |
+| `FromMap(m map[string]interface{}) *Metadata` | 从 map 创建 Metadata（用于反序列化辅助） |
+
+**JSON 序列化特性**：
+- 序列化后所有数值会转换为 JSON 的 `float64` 格式
+- `GetIntOrDefault` 已处理此情况，自动将 `float64` 转回 `int`
+- 支持嵌套结构（如 LogEntry.Metadata 字段）
+
 ### 辅助方法
 
 | 方法 | 描述 |
@@ -158,6 +171,51 @@ func (p *Player) IncrementFireCounter() int {
 }
 ```
 
+### JSON 序列化示例
+
+```go
+// 序列化
+m := util.NewMetadata()
+m.SetInt("hp", 100)
+m.SetString("name", "player1")
+m.SetBool("active", true)
+
+jsonBytes, err := m.MarshalJSON()
+// 输出: {"hp":100,"name":"player1","active":true}
+
+// 反序列化
+m2 := util.NewMetadata()
+err = m2.UnmarshalJSON(jsonBytes)
+hp := m2.GetIntOrDefault("hp", 0)  // 100（自动处理 float64→int 转换）
+```
+
+### LogEntry 中的 Metadata 使用
+
+```go
+// LogEntry 使用 Metadata 存储扩展信息
+entry := gamelog.LogEntry{
+    Timestamp: time.Now(),
+    Type:      gamelog.EntryTypeAction,
+    ActionType: "damage",
+    Target:    "player1",
+    Delta:     -20,
+    Metadata:  util.NewMetadata(),  // 类型安全的元数据
+}
+
+// 设置元数据
+entry.Metadata.SetString("blocked_by", "Buff_Hidden")
+entry.Metadata.SetBool("piercing", false)
+
+// 序列化整个 LogEntry（Metadata 自动序列化）
+jsonEntry, _ := json.Marshal(entry)
+// 输出: {"timestamp":"...", "type":"action", "action_type":"damage", ...}
+
+// 反序列化时 Metadata 自动重建
+var parsedEntry gamelog.LogEntry
+json.Unmarshal(jsonEntry, &parsedEntry)
+blockedBy := parsedEntry.Metadata.GetStringOrDefault("blocked_by", "")
+```
+
 ---
 
 ## 数据迁移
@@ -205,7 +263,8 @@ func (p *Player) IncrementFireCounter() int {
 - Clone 独立性测试
 - IncrementInt/DecrementInt 测试
 - Merge 测试
-- 式调用测试
+- 链式调用测试
+- JSON 序列化/反序列化测试
 
 ---
 

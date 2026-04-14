@@ -49,11 +49,11 @@
 internal/engine/hsm/
 ├── state.go           # State接口和StateContext定义
 ├── state_id.go        # StateID三层枚举
-├── adapter.go         # EventBusAdapter、MapEngineAdapter、GameWrapper
-├── hsm.go             # HSM主结构、OnRollDice/OnUseItem处理、HSMSnapshot
+├── adapter.go         # EventBusAdapter、MapEngineAdapter、GameWrapper（含GetGameLog()）
+├── hsm.go             # HSM主结构、OnRollDice/OnUseItem处理、HSMSnapshot、状态转换日志记录
 ├── state_stack.go     # StateStack入栈出栈
 ├── global_states.go   # Layer 1全局状态实现 (已完成)
-├── turn_states.go     # Layer 2回合状态实现 (已完成)
+├── turn_states.go     # Layer 2回合状态实现 (已完成，含GameLog集成)
 ├── interrupt_states.go # Layer 3中断状态实现 (已完成)
 ├── README.md          # HSM包文档
 ├── global_states_test.go # Layer 1测试
@@ -334,11 +334,14 @@ S_GAME_OVER (对局结束)
 ```
 S_TURN_UPKEEP (回合准备)
 ├── Enter()
-│   ├── 检查 IsDead → Respawn(checkpoint)
+│   ├── 开始回合日志分段
+│   │   └── ctx.Game.Log.StartTurn(round, turn, player.UserID)
+│   ├── 检查 IsDead → RespawnAction（通过Action系统）
+│   │   └── actionCtx.ExecuteAction(NewRespawnAction(player, checkpoint, "DeathRespawn"))
 │   ├── 检查 SkipTurn → 清除标志，跳转 S_TURN_END
 │   ├── 触发 PhaseBeforeTurn
-│   │   ├── 神眷 Buff: LP+1
-│   │   ├── 诅咒 Buff: LP-1
+│   │   ├── 神眷 Buff: LP+1（通过ModifyLPAction）
+│   │   ├── 诅咒 Buff: LP-1（通过ModifyLPAction）
 │   │   ├── 毒瘴 Buff: 标记触发恶性事件
 │   │   ├── 离火 Buff: 每4回合 LP+1 (朱雀被动)
 │   └── 处理决策队列 → Push S_WAIT_DECISION (如有)
@@ -376,19 +379,23 @@ S_TURN_MOVING (移动结算)
 │   │   ├── Action发布 PhasePreMove（PreTrigger阶段）
 │   │   │   ├── 迷途 Buff订阅PhasePreMove，篡改Steps为负数
 │   │   ├── 执行 Execute() → 调用 MapEngine.CalculatePath(position, diceSteps)
+│   │   ├── 自动记录到 GameLog（MoveAction.LogEntry()）
 │   │   ├── 检查迷途 Buff → 修正移动方向（已通过Phase篡改）
 ├── 路径处理
 │   ├── Fragile 处理
 │   │   ├── 首次经过 → 标记已碎
-│   │   ├── 落点在未碎 Fragile → FellDown=true, HP-1
-│   │   └── 坠落 → 强制转移 S_TURN_END
+│   │   ├── 落点在未碎 Fragile → FellDownAction
+│   │   │   └── actionCtx.ExecuteAction(NewFellDownAction(player, pos, 1, "FragileCell"))
+│   │   │   └── 自动记录到 GameLog
+│   │   │   └── 坠落 → 强制转移 S_TURN_END
 │   ├── Fog 处理
 │   │   ├── 首位经过 → 激活迷雾区域
 │   │   │   ├── 区域内玩家获得 Poison Buff
 │   │   │   └── 后续经过 → 投骰子获得 Exorcism Buff
 │   ├── 反超处理
 │   │   ├── 经过其他玩家 → 触发白虎被动 [劫运]
-│   │   │   ├── 偷取对方随机 Buff
+│   │   │   ├── StealBuffAction（自动记录到 GameLog）
+│   │   │   └── 偷取对方随机 Buff
 │   ├── 捷径处理
 │   │   ├── 经过传送阵 → 向前传送
 ├── 转移
@@ -431,20 +438,22 @@ S_TURN_EVENT (事件结算)
 S_TURN_END (回合收尾)
 ├── Enter()
 │   ├── 触发 PhaseAfterTurn
-│   │   ├── 甘霖 Buff: 每2回合 HP+1
-│   │   ├── 腐化 Buff: 每2回合 HP-1
+│   │   ├── 甘霖 Buff: 每2回合 HP+1（通过HealAction）
+│   │   ├── 腐化 Buff: 每2回合 HP-1（通过DamageAction）
 │   ├── TickBuffs()
 │   │   ├── Duration -= 1
-│   │   ├── Duration == 0 → 移除 Buff
+│   │   ├── Duration == 0 → 移除 Buff（RemoveBuffAction）
 │   │   ├── 触发 PhaseOnBuffRemoved (移除时广播)
 │   ├── 检查 IsDead
-│   │   ├── 死亡 → Respawn(checkpoint)
+│   │   ├── 死亡 → RespawnAction（自动记录到 GameLog）
 │   ├── 阵营充能计数
 │   │   ├── 青龙: IncrementChargeCount (每回合+1, max=1)
 │   │   ├── 玄武: IncrementChargeCount (每回合+1, max=1)
 │   ├── 朱雀 FireCounter 处理
 │   │   ├── FireCounter += 1
 │   │   ├── FireCounter == 4 → LP+1, FireCounter=0
+│   ├── 结束回合日志分段
+│   │   └── ctx.Game.Log.EndTurn()
 ├── 转移
 │   └── 返回父状态 S_TURN_LOOP → NextTurn()
 ```
@@ -482,7 +491,12 @@ S_WAIT_DECISION (等待决策)
 ```
 S_TURN_MOVING
 ├── 计算路径 → PathResult.FellDown == true
-├── 应用伤害 → player.ApplyDamage(1)
+├── FellDownAction（通过Action系统执行）
+│   ├── actionCtx.ExecuteAction(NewFellDownAction(player, pos, 1, "FragileCell"))
+│   ├── 自动记录到 GameLog
+│   │   ├── ActionType: "fell_down"
+│   │   ├── Delta: -1
+│   │   ├── Metadata: {"position": pos}
 ├── 强制转移 → S_TURN_END (跳过 Landed/Event)
 └── 状态标记 → player.Metadata.Set("fell_down", true)
 ```
@@ -517,9 +531,14 @@ S_TURN_MOVING
 任意状态
 ├── player.HP <= 0
 ├── player.IsDead = true
-├── S_TURN_END.Enter()
+├── S_TURN_END.Enter() 或 S_TURN_UPKEEP.Enter()
 │   ├── checkpoint = MapEngine.GetLastCheckpoint(position)
-│   ├── player.Respawn(checkpoint)
+│   ├── RespawnAction（通过Action系统）
+│   │   ├── actionCtx.ExecuteAction(NewRespawnAction(player, checkpoint, "DeathRespawn"))
+│   │   ├── 自动记录到 GameLog
+│   │   │   ├── ActionType: "respawn"
+│   │   │   ├── Target: player.UserID
+│   │   │   ├── Metadata: {"checkpoint_pos": checkpoint}
 │   ├── HP 恢复默认值
 │   ├── Position 设置为检查点
 │   ├── IsDead = false
@@ -538,6 +557,7 @@ type HSMStateSnapshot struct {
     CurrentDecision  *DecisionInfo // 当前决策（若有）
     GameState        *GameState    // 游戏数据
     PlayerSnapshots  []*PlayerSnapshot // 所有玩家状态
+    GameLogSnapshot  []byte        // GameLog JSON 快照（用于回放恢复）
 }
 
 type DecisionInfo struct {
@@ -561,7 +581,12 @@ type DecisionInfo struct {
 ├── 若有中断栈
 │   ├── 恢复 InterruptStack
 │   ├── 恢复当前 Decision
+├── 恢复 GameLog（从 JSON 快照）
+│   ├── 解析 GameLogSnapshot
+│   ├── 恢复 segments 和 current
 ├── 下发 StateSync(Full) 消息
+│   ├── 包含完整 GameLog JSON
+│   ├── Client 可播放历史动画
 └── 客户端恢复 UI 状态
 ```
 
@@ -578,6 +603,56 @@ func (s *StateTurnUpkeep) Enter(ctx *StateContext) {
         // 入栈中断状态
         ctx.Stack.Push(s, ctx)
         ctx.HSM.TransitionTo(S_WAIT_DECISION, decisions)
+    }
+}
+```
+
+### GameLog 集成
+
+```go
+// HSM 状态转换日志记录
+func (hsm *HSM) TransitionTo(targetID StateID, ctx *StateContext) error {
+    fromID := hsm.GetCurrentStateID()
+    
+    // 记录状态转换到全局日志
+    if hsm.game.Log != nil {
+        hsm.game.Log.LogStateTransition(fromID.String(), targetID.String(), getPlayerID(hsm.turnPlayer))
+    }
+    
+    // ... 状态转换逻辑 ...
+}
+
+// 回合开始时启动日志分段
+func (s *StateTurnUpkeep) Enter(ctx *StateContext) {
+    ctx.Game.Log.StartTurn(ctx.Game.State.Round, ctx.Game.State.Turn, ctx.Player.UserID)
+    // ...
+}
+
+// 回合结束时关闭日志分段
+func (s *StateTurnEnd) Enter(ctx *StateContext) {
+    // ...
+    ctx.Game.Log.EndTurn()
+}
+```
+
+### Action 系统集成
+
+```go
+// 所有游戏效果通过 Action 系统执行
+func (s *StateTurnUpkeep) Enter(ctx *StateContext) {
+    // 使用 RespawnAction
+    if ctx.Player.IsDead {
+        checkpoint := ctx.MapEngine.GetLastCheckpoint(ctx.Player.Position)
+        respawnAction := engineaction.NewRespawnAction(ctx.Player, checkpoint, "DeathRespawn")
+        s.actionCtx.ExecuteAction(respawnAction)
+    }
+}
+
+func (s *StateTurnMoving) Enter(ctx *StateContext) {
+    // 使用 FellDownAction
+    if s.fellDown {
+        fellDownAction := engineaction.NewFellDownAction(ctx.Player, ctx.Player.Position, 1, "FragileCell")
+        s.actionCtx.ExecuteAction(fellDownAction)
     }
 }
 ```
@@ -655,6 +730,66 @@ func (s *StateTurnEvent) Enter(ctx *StateContext) {
 - 死亡复活
 - Boss 战触发
 - 断线重连
+
+---
+
+## GameLog 系统说明
+
+### 设计原则
+
+所有游戏效果通过 Action 系统执行，自动记录到全局 GameLog：
+
+1. **单一日志源** - Game 持有唯一的 GameLog 实例
+2. **分段存储** - 按 Round/Turn 分段，便于 Client 按回合回放
+3. **Action 集成** - 所有游戏效果通过 Action 系统，自动生成日志
+4. **类型安全元数据** - LogEntry.Metadata 使用 util.Metadata
+
+### HSM 状态与 GameLog 交互
+
+| HSM 状态 | GameLog 操作 | 说明 |
+|---------|-------------|------|
+| TurnUpkeep.Enter() | StartTurn() | 开始新回合日志分段 |
+| TurnEnd.Enter() | EndTurn() | 结束回合日志分段 |
+| HSM.TransitionTo() | LogStateTransition() | 记录状态转换 |
+
+### Action 类型与日志记录
+
+| Action 类型 | ActionType | 日志字段 |
+|------------|-----------|---------|
+| DamageAction | "damage" | Delta=-Amount, Metadata(blocked_by, piercing) |
+| HealAction | "heal" | Delta=Amount |
+| ModifyLPAction | "modify_lp" | Delta=Amount |
+| MoveAction | "move" | Delta=Steps, Metadata(start_pos, end_pos, path) |
+| AddBuffAction | "add_buff" | Metadata(buff_type, duration) |
+| RemoveBuffAction | "remove_buff" | Metadata(buff_type) |
+| RespawnAction | "respawn" | Metadata(checkpoint_pos) |
+| FellDownAction | "fell_down" | Delta=-Damage, Metadata(position) |
+| TeleportAction | "teleport" | Metadata(target_pos) |
+| StealBuffAction | "steal_buff" | Metadata(stolen_buff_type) |
+
+### Client 回放支持
+
+Client 可通过 GameLog JSON 播放完整游戏动画：
+
+```json
+{
+  "segments": [
+    {
+      "round": 1,
+      "turn": 0,
+      "player_id": "player1",
+      "entries": [
+        {"type": "state", "metadata": {"from": "MatchInit", "to": "TurnLoop"}},
+        {"type": "action", "action_type": "modify_lp", "delta": 1, "source": "Buff_Divine"},
+        {"type": "action", "action_type": "respawn", "target": "player1", "metadata": {"checkpoint_pos": 50}},
+        {"type": "action", "action_type": "move", "delta": 5, "metadata": {"path": [0,1,2,3,4,5]}},
+        {"type": "action", "action_type": "fell_down", "delta": -1, "metadata": {"position": 5}},
+        {"type": "state", "metadata": {"from": "TurnMoving", "to": "TurnEnd"}}
+      ]
+    }
+  ]
+}
+```
 
 ## 文件结构规划
 

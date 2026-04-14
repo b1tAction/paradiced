@@ -24,6 +24,15 @@ pkg/event/
 ├── context.go        # Context结构
 ├── bus_test.go       # 单元测试
 
+pkg/gamelog/
+├── entry.go          # EntryType枚举、LogEntry结构（使用util.Metadata）
+├── segment.go        # TurnSegment回合分段
+├── log.go            # GameLog全局日志管理器
+├── log_test.go       # 单元测试
+
+pkg/action/
+├── action.go         # ActionType（string类型，snake_case命名）、Action接口
+
 internal/core/
 ├── evaluation.go     # 评分系统（0-100）
 ├── faction.go        # 阵营定义（四神兽）
@@ -33,8 +42,15 @@ internal/core/
 ├── player.go         # Player结构（HP/LP/Buffs/Items）
 
 internal/engine/
-├── game.go           # Game实例（EventBus/玩家管理/订阅，ApplyBuffToPlayer/RemoveBuffFromPlayer）
-├── state_machine.go  # StateMachine（Phase触发/决策等待）
+├── game.go           # Game实例（EventBus/玩家管理/订阅，ApplyBuffToPlayer/RemoveBuffFromPlayer，GameLog）
+├── action/           # Action系统实现（DamageAction、HealAction、RespawnAction等）
+│   ├── action.go     # ExecutableAction接口
+│   ├── types.go      # 具体Action类型实现
+│   ├── context.go    # ActionContext（与全局GameLog集成）
+│   ├── queue.go      # 衍生动作队列
+├── hsm/              # 分层状态机（状态转换、Phase触发）
+│   ├── hsm.go        # HSM主结构（状态转换日志记录）
+│   ├── turn_states.go # 回合状态（StartTurn/EndTurn、RespawnAction/FellDownAction）
 ├── handlers.go       # EventHandler策略注册表
 ```
 
@@ -182,3 +198,113 @@ internal/engine: 91.8% statements
 3. **Buff联动**：监听OnBuffApplied/Removed实现联动效果
 4. **UI集成**：Decision Prompt格式规范
 5. **超时处理**：客户端无响应时自动执行默认选项
+
+---
+
+## GameLog 系统集成
+
+### 统一日志记录
+
+所有游戏效果通过 Action 系统执行，自动记录到全局 GameLog：
+
+```go
+// ActionContext.ExecuteAction() 流程
+func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
+    // 1. PreTrigger阶段 - 发布Phase供拦截
+    if action.PreTriggerPhase() != PhaseAnyTime {
+        ctx.EventBus.Publish(action.PreTriggerPhase(), action.Target(), ctx)
+    }
+    
+    // 2. 执行 Action
+    action.Execute(ctx)
+    
+    // 3. PostTrigger阶段 - 发布Phase供生命周期事件
+    if action.PostTriggerPhase() != PhaseAnyTime {
+        ctx.EventBus.Publish(action.PostTriggerPhase(), action.Target(), ctx)
+    }
+    
+    // 4. 记录到全局日志
+    if ctx.Game != nil {
+        ctx.Game.GetGameLog().AddEntry(action.LogEntry())
+    }
+    
+    return nil
+}
+```
+
+### ActionType 命名规范
+
+ActionType 使用 `string` 类型，采用 `snake_case` 命名，便于 JSON 序列化：
+
+```go
+const (
+    ActionDamage     ActionType = "damage"      // 伤害
+    ActionHeal       ActionType = "heal"        // 治疗
+    ActionModifyLP   ActionType = "modify_lp"   // LP修改
+    ActionMove       ActionType = "move"        // 移动
+    ActionAddBuff    ActionType = "add_buff"    // 添加Buff
+    ActionRemoveBuff ActionType = "remove_buff" // 移除Buff
+    ActionRespawn    ActionType = "respawn"     // 重生
+    ActionSkipTurn   ActionType = "skip_turn"   // 跳过回合
+    ActionDrawEvent  ActionType = "draw_event"  // 抽取事件
+    ActionTeleport   ActionType = "teleport"    // 传送
+    ActionStealBuff  ActionType = "steal_buff"  // 偷取Buff
+    ActionFellDown   ActionType = "fell_down"   // Fragile坠落
+)
+```
+
+### HSM 状态转换日志
+
+HSM 状态转换自动记录到 GameLog：
+
+```go
+// HSM.TransitionTo() 流程
+func (hsm *HSM) TransitionTo(targetID StateID, ctx *StateContext) error {
+    fromID := hsm.GetCurrentStateID()
+    
+    // 记录状态转换日志
+    if hsm.game.Log != nil {
+        hsm.game.Log.LogStateTransition(fromID.String(), targetID.String(), getPlayerID(hsm.turnPlayer))
+    }
+    
+    // ... 状态转换逻辑 ...
+}
+```
+
+### 回合日志分段
+
+HSM 在回合开始/结束时管理日志分段：
+
+```go
+// TurnUpkeepState.Enter() - 开始回合日志
+func (s *TurnUpkeepState) Enter(ctx *StateContext) {
+    ctx.Game.Log.StartTurn(ctx.Game.State.Round, ctx.Game.State.Turn, player.UserID)
+    // ...
+}
+
+// TurnEndState.Enter() - 结束回合日志
+func (s *TurnEndState) Enter(ctx *StateContext) {
+    // ...
+    ctx.Game.Log.EndTurn()
+}
+```
+
+### JSON 输出格式
+
+```json
+{
+  "segments": [
+    {
+      "round": 1,
+      "turn": 0,
+      "player_id": "player1",
+      "entries": [
+        {"type": "action", "action_type": "modify_lp", "delta": 1, "source": "Buff_Divine"},
+        {"type": "action", "action_type": "move", "target": "player1", "delta": 5},
+        {"type": "action", "action_type": "fell_down", "target": "player1", "delta": -1},
+        {"type": "state", "metadata": {"from": "TurnMoving", "to": "TurnEnd"}}
+      ]
+    }
+  ]
+}
+```
