@@ -246,8 +246,8 @@ func TestGameSubscribeBuff(t *testing.T) {
 	game.SubscribeBuff(player, buff)
 
 	// 验证订阅已创建
-	def := core.GetBuffDefinition(core.BuffTypeCurse)
-	for _, phase := range def.GetPhases() {
+	config := core.GetBuffHandlerConfig(core.BuffTypeCurse)
+	for _, phase := range config.GetPhases() {
 		if phase.NeedsSubscription() {
 			if game.Bus.GetSubscriptionCount() != 1 {
 				t.Errorf("Subscription count = %d, expected 1", game.Bus.GetSubscriptionCount())
@@ -270,8 +270,8 @@ func TestGameSubscribePassiveBuff(t *testing.T) {
 	game.SubscribeBuff(player, buff)
 
 	// 离火现在需要订阅 BeforeTurn（每4回合检查）
-	def := core.GetBuffDefinition(core.BuffTypeFire)
-	for _, phase := range def.GetPhases() {
+	config := core.GetBuffHandlerConfig(core.BuffTypeFire)
+	for _, phase := range config.GetPhases() {
 		if phase.NeedsSubscription() {
 			if len(buff.SubscriptionIDs) == 0 {
 				t.Error("Fire Buff should have SubscriptionIDs (BeforeTurn)")
@@ -320,8 +320,8 @@ func TestGameSubscribeBuffByPlayerAdd(t *testing.T) {
 	}
 
 	// 离火现在使用 BeforeTurn，需要订阅
-	def := core.GetBuffDefinition(core.BuffTypeFire)
-	for _, phase := range def.GetPhases() {
+	config := core.GetBuffHandlerConfig(core.BuffTypeFire)
+	for _, phase := range config.GetPhases() {
 		if phase.NeedsSubscription() {
 			// BeforeTurn 需要订阅
 			if game.Bus.GetSubscriptionCount() != 1 {
@@ -344,8 +344,8 @@ func TestGameSubscribeItem(t *testing.T) {
 	game.SubscribeItem(player, item)
 
 	// 验证订阅已创建
-	def := core.GetItemDefinition(core.ItemTypeDiceUpgrade)
-	if def.Phase.NeedsSubscription() {
+	config := core.GetItemHandlerConfig(core.ItemTypeDiceUpgrade)
+	if config.Phase.NeedsSubscription() {
 		if game.Bus.GetSubscriptionCount() != 1 {
 			t.Errorf("Subscription count = %d, expected 1", game.Bus.GetSubscriptionCount())
 		}
@@ -366,8 +366,8 @@ func TestGameSubscribeAnyTimeItem(t *testing.T) {
 	game.SubscribeItem(player, item)
 
 	// AnyTime 道具不需要订阅（主动触发）
-	def := core.GetItemDefinition(core.ItemTypeReverseClock)
-	if def.Phase == constants.PhaseAnyTime {
+	config := core.GetItemHandlerConfig(core.ItemTypeReverseClock)
+	if config.Phase == constants.PhaseAnyTime {
 		if item.SubscriptionID != "" {
 			t.Error("AnyTime Item should not have SubscriptionID")
 		}
@@ -452,8 +452,9 @@ func TestGameCreateBuffDecision(t *testing.T) {
 	game := NewGame(id.NewGameID(), 0)
 	buff := core.NewBuff(core.BuffTypeCurse, 3)
 	def := core.GetBuffDefinition(core.BuffTypeCurse)
+	config := core.GetBuffHandlerConfig(core.BuffTypeCurse)
 
-	decision := game.createBuffDecision(buff, def)
+	decision := game.createBuffDecision(buff, def, config)
 
 	if decision == nil {
 		t.Fatal("createBuffDecision should not return nil")
@@ -471,8 +472,9 @@ func TestGameCreateItemDecision(t *testing.T) {
 	game := NewGame(id.NewGameID(), 0)
 	item := core.NewItem(core.ItemTypeDiceUpgrade)
 	def := core.GetItemDefinition(core.ItemTypeDiceUpgrade)
+	config := core.GetItemHandlerConfig(core.ItemTypeDiceUpgrade)
 
-	decision := game.createItemDecision(item, def)
+	decision := game.createItemDecision(item, def, config)
 
 	if decision == nil {
 		t.Fatal("createItemDecision should not return nil")

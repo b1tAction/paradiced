@@ -4,47 +4,78 @@ import (
 	"testing"
 
 	"github.com/b1tAction/paradiced/internal/core"
-	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/event"
 	"github.com/b1tAction/paradiced/pkg/id"
 )
 
-// ========== EventHandler Tests ==========
+// ========== BuffHandler Tests ==========
 
-func TestHasBuffHandler(t *testing.T) {
-	// Fire has custom handler
-	if !core.HasBuffHandler(core.BuffTypeFire) {
-		t.Error("BuffTypeFire should have custom handler")
-	}
-
-	// Curse has no custom handler (uses default)
-	if core.HasBuffHandler(core.BuffTypeCurse) {
-		t.Error("BuffTypeCurse should not have custom handler")
-	}
-
-	// Hidden has no custom handler
-	if core.HasBuffHandler(core.BuffTypeHidden) {
-		t.Error("BuffTypeHidden should not have custom handler")
+func TestAllBuffsHaveHandlerConfig(t *testing.T) {
+	// All Buffs should have HandlerConfig registered
+	allBuffs := core.GetAllBuffTypes()
+	for _, bt := range allBuffs {
+		config := core.GetBuffHandlerConfig(bt)
+		if config == nil {
+			t.Errorf("BuffType(%s) should have HandlerConfig", bt)
+		}
 	}
 }
 
-func TestGetBuffHandler(t *testing.T) {
-	// Get Fire handler
-	handler := core.GetBuffHandler(core.BuffTypeFire)
-	if handler == nil {
-		t.Error("GetBuffHandler(Fire) should return handler")
-	}
-
-	// Get Curse handler (none)
-	handler = core.GetBuffHandler(core.BuffTypeCurse)
-	if handler != nil {
-		t.Error("GetBuffHandler(Curse) should return nil")
+func TestAllBuffsHaveHandler(t *testing.T) {
+	// All Buffs should have Handler set
+	allBuffs := core.GetAllBuffTypes()
+	for _, bt := range allBuffs {
+		if !core.HasBuffHandler(bt) {
+			t.Errorf("BuffType(%s) should have Handler", bt)
+		}
 	}
 }
+
+func TestBuffHandlerConfigPhases(t *testing.T) {
+	tests := []struct {
+		buffType    constants.BuffType
+		phase       constants.Phase
+		hasPhase    bool
+		priority    int
+		needConfirm bool
+	}{
+		{constants.BuffTypeFire, constants.PhaseBeforeTurn, true, 10, false},
+		{constants.BuffTypeCurse, constants.PhaseBeforeTurn, true, 50, false},
+		{constants.BuffTypeDivine, constants.PhaseBeforeTurn, true, 50, false},
+		{constants.BuffTypeLost, constants.PhasePreMove, true, 100, false},
+		{constants.BuffTypeHidden, constants.PhasePreDamage, true, 100, false},
+		{constants.BuffTypeRain, constants.PhaseAfterTurn, true, 50, false},
+		{constants.BuffTypeCorrupt, constants.PhaseAfterTurn, true, 50, false},
+		{constants.BuffTypeExorcism, constants.PhasePreEvent, true, 80, false},
+		{constants.BuffTypePoison, constants.PhaseBeforeTurn, true, 30, false},
+	}
+
+	for _, tt := range tests {
+		config := core.GetBuffHandlerConfig(tt.buffType)
+		if config == nil {
+			t.Errorf("BuffType(%s) has no HandlerConfig", tt.buffType)
+			continue
+		}
+
+		if config.HasPhase(tt.phase) != tt.hasPhase {
+			t.Errorf("%s.HasPhase(%s) = %v, expected %v", tt.buffType, tt.phase, config.HasPhase(tt.phase), tt.hasPhase)
+		}
+
+		if config.Priority != tt.priority {
+			t.Errorf("%s.Priority = %d, expected %d", tt.buffType, config.Priority, tt.priority)
+		}
+
+		if config.NeedConfirm != tt.needConfirm {
+			t.Errorf("%s.NeedConfirm = %v, expected %v", tt.buffType, config.NeedConfirm, tt.needConfirm)
+		}
+	}
+}
+
+// ========== Fire Buff Handler Tests ==========
 
 func TestFireBuffHandlerBehavior(t *testing.T) {
-	// Test Fire buff handler behavior via GetBuffHandler
+	// Test Fire buff handler behavior
 	player := core.NewPlayer(core.PlayerConfig{
 		ID:      id.NewPlayerID(),
 		Faction: core.FactionZhuQue,
@@ -52,10 +83,14 @@ func TestFireBuffHandlerBehavior(t *testing.T) {
 	})
 	initialLP := player.LP
 
-	// Get Fire handler
-	handler := core.GetBuffHandler(core.BuffTypeFire)
+	// Get Fire handler config
+	config := core.GetBuffHandlerConfig(constants.BuffTypeFire)
+	if config == nil {
+		t.Fatal("Fire should have HandlerConfig")
+	}
+	handler := config.Handler
 	if handler == nil {
-		t.Fatal("Fire handler should not be nil")
+		t.Fatal("Fire should have Handler")
 	}
 
 	// Create context
@@ -95,7 +130,8 @@ func TestFireBuffHandlerNonBeforeTurnPhase(t *testing.T) {
 	})
 	ctx := event.NewContext(player)
 
-	handler := core.GetBuffHandler(core.BuffTypeFire)
+	config := core.GetBuffHandlerConfig(constants.BuffTypeFire)
+	handler := config.Handler
 
 	// Execute in other Phase should be ineffective
 	handler(constants.PhaseAfterTurn, ctx)
@@ -107,127 +143,301 @@ func TestFireBuffHandlerNonBeforeTurnPhase(t *testing.T) {
 	}
 }
 
-func TestExecuteDefaultBuffAction(t *testing.T) {
-	// Test default handler HP/LP modification using Action system
-	tests := []struct {
-		name       string
-		buffType   core.BuffType
-		initHP     int
-		initLP     int
-		expectedHP int
-		expectedLP int
-	}{
-		{
-			name:       "Curse LP-1",
-			buffType:   core.BuffTypeCurse,
-			initHP:     6,
-			initLP:     5,
-			expectedHP: 6,
-			expectedLP: 4,
-		},
-		{
-			name:       "Divine LP+1",
-			buffType:   core.BuffTypeDivine,
-			initHP:     6,
-			initLP:     5,
-			expectedHP: 6,
-			expectedLP: 6,
-		},
-		{
-			name:       "Rain HP+1",
-			buffType:   core.BuffTypeRain,
-			initHP:     6,
-			initLP:     5,
-			expectedHP: 7,
-			expectedLP: 5,
-		},
-		{
-			name:       "Corrupt HP-1",
-			buffType:   core.BuffTypeCorrupt,
-			initHP:     6,
-			initLP:     5,
-			expectedHP: 5,
-			expectedLP: 5,
-		},
+// ========== Curse Buff Handler Tests ==========
+
+func TestCurseBuffHandlerBehavior(t *testing.T) {
+	// Test Curse buff LP-1 effect
+	player := core.NewPlayer(core.PlayerConfig{
+		ID:    id.NewPlayerID(),
+		MaxLP: 5,
+	})
+	player.LP = 5
+
+	config := core.GetBuffHandlerConfig(constants.BuffTypeCurse)
+	if config == nil {
+		t.Fatal("Curse should have HandlerConfig")
+	}
+	handler := config.Handler
+	if handler == nil {
+		t.Fatal("Curse should have Handler")
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			player := core.NewPlayer(core.PlayerConfig{
-				ID:    id.NewPlayerID(),
-				MaxHP: tt.initHP,
-				MaxLP: tt.initLP,
-			})
-			player.HP = tt.initHP
-			player.LP = tt.initLP
+	ctx := event.NewContext(player)
 
-			def := core.GetBuffDefinition(tt.buffType)
+	// Execute handler
+	handler(constants.PhaseBeforeTurn, ctx)
 
-			// Create ActionContext
-			actionCtx := engineaction.NewActionContext(nil, nil, nil)
-			executeDefaultBuffAction(def, player, actionCtx)
-
-			// Process the queue to execute actions
-			actionCtx.ProcessQueue()
-
-			if player.HP != tt.expectedHP {
-				t.Errorf("HP = %d, expected %d", player.HP, tt.expectedHP)
-			}
-			if player.LP != tt.expectedLP {
-				t.Errorf("LP = %d, expected %d", player.LP, tt.expectedLP)
-			}
-		})
+	// LP should be 4 after handler execution
+	if player.LP != 4 {
+		t.Errorf("LP = %d, expected 4 (LP-1)", player.LP)
 	}
 }
 
-func TestExecuteDefaultBuffActionWithHPDamage(t *testing.T) {
-	// Test HPPerTurn negative calling ApplyDamage
+// ========== Divine Buff Handler Tests ==========
+
+func TestDivineBuffHandlerBehavior(t *testing.T) {
+	// Test Divine buff LP+1 effect
 	player := core.NewPlayer(core.PlayerConfig{
 		ID:    id.NewPlayerID(),
-		MaxHP: 6,
+		MaxLP: 5,
 	})
-	player.HP = 6
+	player.LP = 3
 
-	// Create a local definition for testing (don't modify global registry)
-	def := &core.BuffDefinition{
-		Type:      core.BuffTypeCorrupt,
-		HPPerTurn: -2, // Damage 2 HP per turn
+	config := core.GetBuffHandlerConfig(constants.BuffTypeDivine)
+	if config == nil {
+		t.Fatal("Divine should have HandlerConfig")
+	}
+	handler := config.Handler
+	if handler == nil {
+		t.Fatal("Divine should have Handler")
 	}
 
-	// Create ActionContext
-	actionCtx := engineaction.NewActionContext(nil, nil, nil)
-	executeDefaultBuffAction(def, player, actionCtx)
+	ctx := event.NewContext(player)
 
-	// Process the queue to execute actions
-	actionCtx.ProcessQueue()
+	// Execute handler
+	handler(constants.PhaseBeforeTurn, ctx)
 
-	if player.HP != 4 {
-		t.Errorf("HP = %d, expected 4 (damage 2 HP)", player.HP)
+	// LP should be 4 after handler execution
+	if player.LP != 4 {
+		t.Errorf("LP = %d, expected 4 (LP+1)", player.LP)
 	}
 }
 
-func TestExecuteDefaultBuffActionWithHealing(t *testing.T) {
-	// Test HPPerTurn positive calling Heal
+// ========== Rain Buff Handler Tests ==========
+
+func TestRainBuffHandlerBehavior(t *testing.T) {
+	// Test Rain buff HP+1 every 2 turns effect
 	player := core.NewPlayer(core.PlayerConfig{
 		ID:    id.NewPlayerID(),
-		MaxHP: 6,
+		MaxHP: 10,
 	})
 	player.HP = 6
 
-	// Create a local definition for testing (don't modify global registry)
-	def := &core.BuffDefinition{
-		Type:      core.BuffTypeRain,
-		HPPerTurn: 2, // Heal 2 HP per turn
+	config := core.GetBuffHandlerConfig(constants.BuffTypeRain)
+	if config == nil {
+		t.Fatal("Rain should have HandlerConfig")
+	}
+	handler := config.Handler
+	if handler == nil {
+		t.Fatal("Rain should have Handler")
 	}
 
-	// Create ActionContext
-	actionCtx := engineaction.NewActionContext(nil, nil, nil)
-	executeDefaultBuffAction(def, player, actionCtx)
+	ctx := event.NewContext(player)
 
-	// Process the queue to execute actions
-	actionCtx.ProcessQueue()
+	// First execution - counter 1, no HP change
+	handler(constants.PhaseAfterTurn, ctx)
+	counter, _ := ctx.GetInt("buff_turn_counter")
+	if counter != 1 {
+		t.Errorf("counter = %d, expected 1", counter)
+	}
+	// HP change is signaled via context, not applied directly
+	hpChange, err := ctx.GetInt("hp_change")
+	if err == nil {
+		t.Errorf("hp_change should not be set on first turn, got %d", hpChange)
+	}
 
-	if player.HP != 8 {
-		t.Errorf("HP = %d, expected 8 (heal 2 HP)", player.HP)
+	// Second execution - counter reaches 2, HP+1
+	handler(constants.PhaseAfterTurn, ctx)
+	hpChange, err = ctx.GetInt("hp_change")
+	if err != nil {
+		t.Error("hp_change should be set on second turn")
+	}
+	if hpChange != 1 {
+		t.Errorf("hp_change = %d, expected 1", hpChange)
+	}
+}
+
+// ========== Corrupt Buff Handler Tests ==========
+
+func TestCorruptBuffHandlerBehavior(t *testing.T) {
+	// Test Corrupt buff HP-1 every 2 turns effect
+	player := core.NewPlayer(core.PlayerConfig{
+		ID:    id.NewPlayerID(),
+		MaxHP: 10,
+	})
+	player.HP = 6
+
+	config := core.GetBuffHandlerConfig(constants.BuffTypeCorrupt)
+	if config == nil {
+		t.Fatal("Corrupt should have HandlerConfig")
+	}
+	handler := config.Handler
+	if handler == nil {
+		t.Fatal("Corrupt should have Handler")
+	}
+
+	ctx := event.NewContext(player)
+
+	// First execution - counter 1, no HP change
+	handler(constants.PhaseAfterTurn, ctx)
+	hpChange, err := ctx.GetInt("hp_change")
+	if err == nil {
+		t.Errorf("hp_change should not be set on first turn, got %d", hpChange)
+	}
+
+	// Second execution - counter reaches 2, HP-1 signaled
+	handler(constants.PhaseAfterTurn, ctx)
+	hpChange, err = ctx.GetInt("hp_change")
+	if err != nil {
+		t.Error("hp_change should be set on second turn")
+	}
+	if hpChange != -1 {
+		t.Errorf("hp_change = %d, expected -1", hpChange)
+	}
+}
+
+// ========== Lost Buff Handler Tests ==========
+
+func TestLostBuffHandlerBehavior(t *testing.T) {
+	// Test Lost buff reverse movement effect
+	player := core.NewPlayer(core.PlayerConfig{
+		ID: id.NewPlayerID(),
+	})
+
+	config := core.GetBuffHandlerConfig(constants.BuffTypeLost)
+	if config == nil {
+		t.Fatal("Lost should have HandlerConfig")
+	}
+	handler := config.Handler
+	if handler == nil {
+		t.Fatal("Lost should have Handler")
+	}
+
+	ctx := event.NewContext(player)
+
+	// Execute handler
+	handler(constants.PhasePreMove, ctx)
+
+	// Should signal reverse movement
+	reverse, err := ctx.GetBool("reverse_movement")
+	if err != nil {
+		t.Error("reverse_movement should be set")
+	}
+	if !reverse {
+		t.Error("reverse_movement should be true")
+	}
+}
+
+func TestLostBuffHandlerOtherPhase(t *testing.T) {
+	// Lost only triggers in PreMove phase
+	player := core.NewPlayer(core.PlayerConfig{
+		ID: id.NewPlayerID(),
+	})
+
+	config := core.GetBuffHandlerConfig(constants.BuffTypeLost)
+	handler := config.Handler
+
+	ctx := event.NewContext(player)
+
+	// Execute in BeforeTurn phase - should not trigger
+	handler(constants.PhaseBeforeTurn, ctx)
+
+	_, err := ctx.GetBool("reverse_movement")
+	if err == nil {
+		t.Error("reverse_movement should not be set in BeforeTurn phase")
+	}
+}
+
+// ========== Hidden Buff Handler Tests ==========
+
+func TestHiddenBuffHandlerBehavior(t *testing.T) {
+	// Test Hidden buff immunity effect
+	player := core.NewPlayer(core.PlayerConfig{
+		ID: id.NewPlayerID(),
+	})
+
+	config := core.GetBuffHandlerConfig(constants.BuffTypeHidden)
+	if config == nil {
+		t.Fatal("Hidden should have HandlerConfig")
+	}
+	handler := config.Handler
+	if handler == nil {
+		t.Fatal("Hidden should have Handler")
+	}
+
+	ctx := event.NewContext(player)
+
+	// Execute handler
+	handler(constants.PhasePreDamage, ctx)
+
+	// Should signal action blocked
+ blocked, err := ctx.GetBool("action_blocked")
+	if err != nil {
+		t.Error("action_blocked should be set")
+	}
+	if !blocked {
+		t.Error("action_blocked should be true")
+	}
+
+ blockedBy, err := ctx.GetString("blocked_by")
+	if err != nil {
+		t.Error("blocked_by should be set")
+	}
+	if blockedBy != "Buff_Hidden" {
+		t.Errorf("blocked_by = %s, expected Buff_Hidden", blockedBy)
+	}
+}
+
+// ========== Exorcism Buff Handler Tests ==========
+
+func TestExorcismBuffHandlerBehavior(t *testing.T) {
+	// Test Exorcism buff poison immunity effect
+	player := core.NewPlayer(core.PlayerConfig{
+		ID: id.NewPlayerID(),
+	})
+
+	config := core.GetBuffHandlerConfig(constants.BuffTypeExorcism)
+	if config == nil {
+		t.Fatal("Exorcism should have HandlerConfig")
+	}
+	handler := config.Handler
+	if handler == nil {
+		t.Fatal("Exorcism should have Handler")
+	}
+
+	ctx := event.NewContext(player)
+
+	// Execute handler
+	handler(constants.PhasePreEvent, ctx)
+
+	// Should signal block poison effect
+ blocked, err := ctx.GetBool("block_poison_effect")
+	if err != nil {
+		t.Error("block_poison_effect should be set")
+	}
+	if !blocked {
+		t.Error("block_poison_effect should be true")
+	}
+}
+
+// ========== Poison Buff Handler Tests ==========
+
+func TestPoisonBuffHandlerBehavior(t *testing.T) {
+	// Test Poison buff bad event effect
+	player := core.NewPlayer(core.PlayerConfig{
+		ID: id.NewPlayerID(),
+	})
+
+	config := core.GetBuffHandlerConfig(constants.BuffTypePoison)
+	if config == nil {
+		t.Fatal("Poison should have HandlerConfig")
+	}
+	handler := config.Handler
+	if handler == nil {
+		t.Fatal("Poison should have Handler")
+	}
+
+	ctx := event.NewContext(player)
+
+	// Execute handler
+	handler(constants.PhaseBeforeTurn, ctx)
+
+	// Should signal draw bad event
+ drawBad, err := ctx.GetBool("draw_bad_event")
+	if err != nil {
+		t.Error("draw_bad_event should be set")
+	}
+	if !drawBad {
+		t.Error("draw_bad_event should be true")
 	}
 }

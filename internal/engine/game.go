@@ -137,34 +137,35 @@ func (g *Game) subscribePlayerEffects(player *core.Player) {
 	}
 }
 
-// createBuffDecision creates a Decision for Buff.
-func (g *Game) createBuffDecision(buff *core.Buff, def *core.BuffDefinition) *event.Decision {
-	if def.NeedConfirm {
-		return event.NewDecision(def.Desc, []event.Option{
+// createBuffDecision creates a Decision for Buff using handler config.
+func (g *Game) createBuffDecision(buff *core.Buff, def *core.BuffDefinition, config *core.BuffHandlerConfig) *event.Decision {
+	desc := def.Desc
+	if config.NeedConfirm {
+		return event.NewDecision(desc, []event.Option{
 			{ID: "apply", Label: "应用效果"},
-		})
+		}).WithPriority(config.Priority)
 	}
-	return event.NewAutoDecision(def.Desc, []event.Option{
+	return event.NewAutoDecision(desc, []event.Option{
 		{ID: "apply", Label: "自动执行"},
-	})
+	}).WithPriority(config.Priority)
 }
 
-// createItemDecision creates a Decision for Item.
-func (g *Game) createItemDecision(item *core.Item, def *core.ItemDefinition) *event.Decision {
-	if def.NeedConfirm {
-		return event.NewDecision(def.Desc, []event.Option{
+// createItemDecision creates a Decision for Item using handler config.
+func (g *Game) createItemDecision(item *core.Item, def *core.ItemDefinition, config *core.ItemHandlerConfig) *event.Decision {
+	desc := def.Desc
+	if config.NeedConfirm {
+		return event.NewDecision(desc, []event.Option{
 			{ID: "use", Label: "使用"},
 			{ID: "skip", Label: "跳过"},
-		})
+		}).WithPriority(config.Priority)
 	}
-	return event.NewAutoDecision(def.Desc, []event.Option{
+	return event.NewAutoDecision(desc, []event.Option{
 		{ID: "use", Label: "自动执行"},
-	})
+	}).WithPriority(config.Priority)
 }
 
 // SubscribeBuff subscribes when player gets a new Buff.
-// Supports multi-phase subscription: iterates def.Phases to create subscription for each Phase.
-// Note: If Buff already has subscriptions (SubscriptionIDs not empty), won't subscribe again.
+// Uses BuffHandlerConfig for Phases/Priority/NeedConfirm.
 func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
 	// Prevent duplicate subscriptions
 	if len(buff.SubscriptionIDs) > 0 {
@@ -172,7 +173,8 @@ func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
 	}
 
 	def := core.GetBuffDefinition(buff.Type)
-	if def == nil {
+	config := core.GetBuffHandlerConfig(buff.Type)
+	if def == nil || config == nil {
 		return
 	}
 
@@ -180,21 +182,21 @@ func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
 	buff.SubscriptionIDs = make([]string, 0)
 
 	// Create subscription for each Phase
-	for _, phase := range def.GetPhases() {
+	for _, phase := range config.GetPhases() {
 		if !phase.NeedsSubscription() {
 			continue
 		}
 
 		// Create closure Action (using handlers.go createBuffAction)
-		buffAction := createBuffAction(buff, def, phase, player)
+		buffAction := createBuffAction(buff, def, config, phase, player)
 
-		// Wrap to match event.Option.Action signature (discards return value)
+		// Wrap to match event.Option.Action signature
 		action := func(ctx *event.Context) {
-			buffAction(ctx) // Actions are pushed to queue via ActionContext
+			buffAction(ctx)
 		}
 
-		// Create Decision
-		decision := g.createBuffDecisionWithAction(buff, def, action)
+		// Create Decision with Priority from config
+		decision := g.createBuffDecisionWithAction(buff, def, config, action)
 
 		// Register with EventBus
 		subID := g.Bus.Subscribe(phase, player.ID, buff.ID.UUID(), "buff", decision)
@@ -202,16 +204,17 @@ func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
 	}
 }
 
-// createBuffDecisionWithAction creates a Buff Decision with Action.
-func (g *Game) createBuffDecisionWithAction(buff *core.Buff, def *core.BuffDefinition, action func(ctx *event.Context)) *event.Decision {
-	if def.NeedConfirm {
-		return event.NewDecision(def.Desc, []event.Option{
+// createBuffDecisionWithAction creates a Buff Decision with Action using handler config.
+func (g *Game) createBuffDecisionWithAction(buff *core.Buff, def *core.BuffDefinition, config *core.BuffHandlerConfig, action func(ctx *event.Context)) *event.Decision {
+	desc := def.Desc
+	if config.NeedConfirm {
+		return event.NewDecision(desc, []event.Option{
 			{ID: "apply", Label: "应用效果", Action: action},
-		})
+		}).WithPriority(config.Priority)
 	}
-	return event.NewAutoDecision(def.Desc, []event.Option{
+	return event.NewAutoDecision(desc, []event.Option{
 		{ID: "apply", Label: "自动执行", Action: action},
-	})
+	}).WithPriority(config.Priority)
 }
 
 // UnsubscribeBuff unsubscribes when Buff is removed.
@@ -227,16 +230,37 @@ func (g *Game) UnsubscribeBuff(buff *core.Buff) {
 }
 
 // SubscribeItem subscribes when player gets a new Item.
+// Uses ItemHandlerConfig for Phase/Priority/NeedConfirm.
 func (g *Game) SubscribeItem(player *core.Player, item *core.Item) {
 	def := core.GetItemDefinition(item.Type)
-	if def == nil {
+	config := core.GetItemHandlerConfig(item.Type)
+	if def == nil || config == nil {
 		return
 	}
-	if def.Phase.NeedsSubscription() {
-		decision := g.createItemDecision(item, def)
-		subID := g.Bus.Subscribe(def.Phase, player.ID, item.ID.UUID(), "item", decision)
+	if config.Phase.NeedsSubscription() {
+		// Create Item action closure
+		itemAction := createItemAction(item, def, config, player)
+		action := func(ctx *event.Context) {
+			itemAction(ctx)
+		}
+		decision := g.createItemDecisionWithAction(item, def, config, action)
+		subID := g.Bus.Subscribe(config.Phase, player.ID, item.ID.UUID(), "item", decision)
 		item.SubscriptionID = subID.UUID()
 	}
+}
+
+// createItemDecisionWithAction creates an Item Decision with Action using handler config.
+func (g *Game) createItemDecisionWithAction(item *core.Item, def *core.ItemDefinition, config *core.ItemHandlerConfig, action func(ctx *event.Context)) *event.Decision {
+	desc := def.Desc
+	if config.NeedConfirm {
+		return event.NewDecision(desc, []event.Option{
+			{ID: "use", Label: "使用", Action: action},
+			{ID: "skip", Label: "跳过"},
+		}).WithPriority(config.Priority)
+	}
+	return event.NewAutoDecision(desc, []event.Option{
+		{ID: "use", Label: "自动执行", Action: action},
+	}).WithPriority(config.Priority)
 }
 
 // UnsubscribeItem unsubscribes when Item is removed.

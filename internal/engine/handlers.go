@@ -3,72 +3,95 @@ package engine
 
 import (
 	"github.com/b1tAction/paradiced/internal/core"
-	"github.com/b1tAction/paradiced/internal/core/buff"
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/event"
 )
 
-// ========== Default Handler ==========
-
-// executeDefaultBuffAction executes default Buff value effects.
-// Used for Buffs without custom handlers, generates Actions based on HPPerTurn/LPPerTurn.
-func executeDefaultBuffAction(def *core.BuffDefinition, player *core.Player, actionCtx *engineaction.ActionContext) {
-	// Generate HP modification Action
-	if def.HPPerTurn != 0 {
-		if def.HPPerTurn > 0 {
-			actionCtx.PushDerivedAction(engineaction.NewHealAction(player, def.HPPerTurn, "Buff_"+def.EnglishName))
-		} else {
-			actionCtx.PushDerivedAction(engineaction.NewDamageAction(player, -def.HPPerTurn, "Buff_"+def.EnglishName))
-		}
-	}
-
-	// Generate LP modification Action
-	if def.LPPerTurn != 0 {
-		actionCtx.PushDerivedAction(engineaction.NewModifyLPAction(player, def.LPPerTurn, "Buff_"+def.EnglishName))
-	}
-}
-
 // ========== Buff Action Creation ==========
 
 // createBuffAction creates an Action closure when Buff triggers.
-// Uses GlobalRegistry to get custom handler if available.
-// The closure expects ActionContext to be passed via event.Context (ctx.Set("action_context", ctx)).
-// EffectHandler no longer returns Action - uses ctx.AddDerivedAction() instead.
-func createBuffAction(buffInstance *core.Buff, def *core.BuffDefinition, phase constants.Phase, player *core.Player) func(ctx *event.Context) {
+// Uses BuffHandlerConfig.Handler for effect execution.
+func createBuffAction(buffInstance *core.Buff, def *core.BuffDefinition, config *core.BuffHandlerConfig, phase constants.Phase, player *core.Player) func(ctx *event.Context) {
 	return func(ctx *event.Context) {
-		// Get Player from Context (ensure correct type)
-		p, ok := ctx.Player.(*core.Player)
-		if !ok {
-			return
-		}
-
 		// Get ActionContext from event.Context (set by caller before Publish)
 		actionCtxVal, ok := ctx.Get("action_context")
 		actionCtx, ok2 := actionCtxVal.(*engineaction.ActionContext)
 		if !ok || !ok2 || actionCtx == nil {
-			// No ActionContext available - use old direct modification approach
-			if def.HPPerTurn != 0 {
-				if def.HPPerTurn > 0 {
-					p.Heal(def.HPPerTurn)
-				} else {
-					p.ApplyDamage(-def.HPPerTurn)
-				}
-			}
-			if def.LPPerTurn != 0 {
-				p.ModifyLP(def.LPPerTurn)
+			// No ActionContext available - execute Handler directly
+			if config.Handler != nil {
+				config.Handler(phase, ctx)
 			}
 			return
 		}
 
-		// Check if has custom handler via GlobalRegistry
-		handler := buff.GetBuffHandler(buffInstance.Type)
-		if handler != nil {
-			// Call custom handler - handler uses ctx.AddDerivedAction() for new Actions
-			handler(phase, ctx)
-		} else {
-			// Execute default value effect - generates Actions
-			executeDefaultBuffAction(def, p, actionCtx)
+		// Execute Handler - Handler uses ctx.AddDerivedAction() for new Actions
+		if config.Handler != nil {
+			config.Handler(phase, ctx)
 		}
 	}
+}
+
+// ========== Item Action Creation ==========
+
+// createItemAction creates an Action closure when Item triggers.
+// Uses ItemHandlerConfig.Handler for effect execution.
+func createItemAction(itemInstance *core.Item, def *core.ItemDefinition, config *core.ItemHandlerConfig, player *core.Player) func(ctx *event.Context) {
+	return func(ctx *event.Context) {
+		// Get ActionContext from event.Context
+		actionCtxVal, ok := ctx.Get("action_context")
+		actionCtx, ok2 := actionCtxVal.(*engineaction.ActionContext)
+		if !ok || !ok2 || actionCtx == nil {
+			// No ActionContext - execute Handler directly
+			if config.Handler != nil {
+				config.Handler(constants.PhaseItemUsed, ctx)
+			}
+			return
+		}
+
+		// Execute Handler
+		if config.Handler != nil {
+			config.Handler(constants.PhaseItemUsed, ctx)
+		}
+	}
+}
+
+// ========== Helper Action Creation Functions ==========
+
+// These functions are used by Handlers to create Actions.
+// They are called from Handler implementations via ActionContext.
+
+// NewHealAction creates a HealAction.
+func NewHealAction(target *core.Player, amount int, source string) *engineaction.HealAction {
+	return engineaction.NewHealAction(target, amount, source)
+}
+
+// NewDamageAction creates a DamageAction.
+func NewDamageAction(target *core.Player, amount int, source string) *engineaction.DamageAction {
+	return engineaction.NewDamageAction(target, amount, source)
+}
+
+// NewModifyLPAction creates a ModifyLPAction.
+func NewModifyLPAction(target *core.Player, amount int, source string) *engineaction.ModifyLPAction {
+	return engineaction.NewModifyLPAction(target, amount, source)
+}
+
+// NewAddBuffAction creates an AddBuffAction.
+func NewAddBuffAction(target *core.Player, buffType constants.BuffType, duration int, source string) *engineaction.AddBuffAction {
+	return engineaction.NewAddBuffAction(target, buffType, duration, source)
+}
+
+// NewRemoveBuffAction creates a RemoveBuffAction.
+func NewRemoveBuffAction(target *core.Player, buffType constants.BuffType, source string) *engineaction.RemoveBuffAction {
+	return engineaction.NewRemoveBuffAction(target, buffType, source)
+}
+
+// NewMoveAction creates a MoveAction.
+func NewMoveAction(target *core.Player, steps int, source string) *engineaction.MoveAction {
+	return engineaction.NewMoveAction(target, steps, source)
+}
+
+// NewTeleportAction creates a TeleportAction.
+func NewTeleportAction(target *core.Player, position int, source string) *engineaction.TeleportAction {
+	return engineaction.NewTeleportAction(target, position, source)
 }
