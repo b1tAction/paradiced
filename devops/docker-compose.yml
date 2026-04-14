@@ -1,11 +1,15 @@
 services:
   claude-dev:
-    build: .
+    build:
+      context: .
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
     container_name: claude_backend_dev
     volumes:
       - ..:/app # pass the whole proj to the claude
       - ../.claude:/home/claude/.claude
-      - ~/.ssh:/root/.ssh:ro
+      - ~/.ssh:/home/claude/.ssh:ro
       - ./run-claude.sh:/usr/local/bin/run-claude:rwx
       - ./prepare.sh:/usr/local/bin/prepare.sh:rwx
     command: bash /usr/local/bin/prepare.sh

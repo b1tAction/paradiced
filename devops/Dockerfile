@@ -14,7 +14,7 @@ RUN groupadd -g ${GID} claude && \
     echo "claude ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 RUN mkdir -p /app /go/pkg && \
-    chown -R claude:claude /app /go
+    chown -R claude:claude /app /go /home/claude
 
 USER claude
 WORKDIR /app
