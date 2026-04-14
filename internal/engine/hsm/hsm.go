@@ -144,6 +144,18 @@ func (hsm *HSM) GetBus() EventBusAdapter {
 	return hsm.bus
 }
 
+// GetCurrentStateID returns the currently active state ID.
+// Returns the interrupt state if active, otherwise turn state, otherwise global state.
+func (hsm *HSM) GetCurrentStateID() StateID {
+	if hsm.paused && hsm.waitingState != nil {
+		return hsm.waitingState.ID()
+	}
+	if hsm.turnState != nil {
+		return hsm.turnStateID
+	}
+	return hsm.globalStateID
+}
+
 // GetStack returns the interrupt state stack.
 func (hsm *HSM) GetStack() *StateStack {
 	return hsm.stack
@@ -166,6 +178,16 @@ func (hsm *HSM) TransitionTo(targetID StateID, ctx *StateContext) error {
 	target := hsm.GetState(targetID)
 	if target == nil {
 		return errors.New("state not found: " + targetID.String())
+	}
+
+	// Log state transition
+	if hsm.game != nil && hsm.game.Log != nil {
+		fromID := hsm.GetCurrentStateID()
+		playerID := ""
+		if hsm.turnPlayer != nil {
+			playerID = hsm.turnPlayer.UserID
+		}
+		hsm.game.Log.LogStateTransition(fromID.String(), targetID.String(), playerID)
 	}
 
 	// Determine layer and handle transition

@@ -60,11 +60,24 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 		return
 	}
 
-	// Step 1: Check IsDead -> Respawn at checkpoint
+	// Start turn log segment
+	if ctx.Game != nil && ctx.Game.Log != nil {
+		ctx.Game.Log.StartTurn(ctx.Game.State.Round, ctx.Game.State.Turn, player.UserID)
+	}
+
+	// Create ActionContext for executing Actions
+	s.actionCtx = engineaction.NewActionContext(
+		NewGameWrapper(ctx.Game),
+		ctx.Game.Bus,
+		NewProtocolMapEngineWrapper(ctx.MapEngine),
+	)
+
+	// Step 1: Check IsDead -> Respawn at checkpoint using RespawnAction
 	if player.IsDead {
 		if ctx.MapEngine != nil {
 			checkpoint := ctx.MapEngine.GetLastCheckpoint(player.Position)
-			player.Respawn(checkpoint)
+			respawnAction := engineaction.NewRespawnAction(player, checkpoint, "DeathRespawn")
+			s.actionCtx.ExecuteAction(respawnAction)
 		}
 		s.isDead = true
 	}
@@ -77,14 +90,7 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 		return // Skip all BeforeTurn effects
 	}
 
-	// Step 3: Create ActionContext for executing Actions
-	s.actionCtx = engineaction.NewActionContext(
-		NewGameWrapper(ctx.Game),
-		ctx.Game.Bus,
-		NewProtocolMapEngineWrapper(ctx.MapEngine),
-	)
-
-	// Step 4: Trigger PhaseBeforeTurn
+	// Step 3: Trigger PhaseBeforeTurn
 	// HSM publishes this phase - Buff handlers respond and may return Actions
 	triggerCtx := event.NewContext(player)
 	triggerCtx.Set("action_context", s.actionCtx)
@@ -93,10 +99,10 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 	// Publish PhaseBeforeTurn to trigger Buff effects
 	s.decisions = ctx.Bus.Publish(event.PhaseBeforeTurn, player.UserID, triggerCtx)
 
-	// Step 5: Execute any derived Actions from handlers
+	// Step 4: Execute any derived Actions from handlers
 	s.actionCtx.ProcessQueue()
 
-	// Step 6: Check if any decisions need user input
+	// Step 5: Check if any decisions need user input
 	if len(s.decisions) > 0 {
 		// Will be handled in Update - push WaitDecision if needed
 		ctx.Decisions = s.decisions
@@ -341,13 +347,13 @@ func (s *TurnMovingState) Enter(ctx *StateContext) {
 }
 
 func (s *TurnMovingState) Update(ctx *StateContext) StateID {
-	// Check if fell down -> skip to TurnEnd
+	// Check if fell down -> skip to TurnEnd, use FellDownAction
 	if s.fellDown {
 		ctx.SetFellDown(true)
-		// Damage from falling
+		// Use FellDownAction for falling
 		if s.actionCtx != nil {
-			damageAction := engineaction.NewDamageAction(ctx.Player, 1, "Fragile_Fall")
-			s.actionCtx.ExecuteAction(damageAction)
+			fellDownAction := engineaction.NewFellDownAction(ctx.Player, ctx.Player.Position, 1, "FragileCell")
+			s.actionCtx.ExecuteAction(fellDownAction)
 		}
 		return StateTurnEnd
 	}
@@ -577,11 +583,12 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 		ctx.Game.UnsubscribeBuff(expired)
 	}
 
-	// Check IsDead after AfterTurn effects
+	// Check IsDead after AfterTurn effects - use RespawnAction
 	if player.IsDead {
 		if ctx.MapEngine != nil {
 			checkpoint := ctx.MapEngine.GetLastCheckpoint(player.Position)
-			player.Respawn(checkpoint)
+			respawnAction := engineaction.NewRespawnAction(player, checkpoint, "AfterTurnRespawn")
+			s.actionCtx.ExecuteAction(respawnAction)
 		}
 	}
 
@@ -591,6 +598,11 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 	// Handle decisions if any
 	if len(decisions) > 0 {
 		ctx.Decisions = decisions
+	}
+
+	// End turn log segment
+	if ctx.Game != nil && ctx.Game.Log != nil {
+		ctx.Game.Log.EndTurn()
 	}
 }
 

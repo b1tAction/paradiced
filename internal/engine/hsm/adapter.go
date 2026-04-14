@@ -4,6 +4,7 @@ import (
 	"github.com/b1tAction/Fated/internal/engine"
 	"github.com/b1tAction/Fated/internal/gamemap"
 	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/Fated/pkg/gamelog"
 	"github.com/b1tAction/Fated/pkg/protocol"
 )
 
@@ -111,6 +112,11 @@ func (w *GameWrapper) GetPlayers() []interface{} {
 		result[i] = p
 	}
 	return result
+}
+
+// GetGameLog returns the global game log.
+func (w *GameWrapper) GetGameLog() *gamelog.GameLog {
+	return w.game.GetGameLog()
 }
 
 // ========== MapEngine Adapter ==========

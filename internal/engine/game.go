@@ -8,6 +8,7 @@ import (
 
 	"github.com/b1tAction/Fated/internal/core"
 	"github.com/b1tAction/Fated/pkg/event"
+	"github.com/b1tAction/Fated/pkg/gamelog"
 	"github.com/b1tAction/Fated/pkg/rng"
 )
 
@@ -19,6 +20,7 @@ type Game struct {
 	State   *GameState      `json:"state"`
 	RNG     *rand.Rand      `json:"-"` // Game unique random source
 	Draw    *rng.DrawEngine `json:"-"` // Draw engine for random draws
+	Log     *gamelog.GameLog `json:"log"` // Global game log for playback
 	mutex   sync.RWMutex
 }
 
@@ -40,12 +42,13 @@ func NewGame(gameID string, seed int64) *Game {
 	rngInst := rand.New(rand.NewSource(rngSource))
 
 	return &Game{
-		ID:    gameID,
-		Bus:   event.NewEventBus(gameID),
+		ID:      gameID,
+		Bus:     event.NewEventBus(gameID),
 		Players: make([]*core.Player, 0),
-		State: &GameState{Round: 1, Turn: 0, CurrentPhase: "init", Waiting: false},
-		RNG:   rngInst,
-		Draw:  rng.NewDrawEngine(rngInst),
+		State:   &GameState{Round: 1, Turn: 0, CurrentPhase: "init", Waiting: false},
+		RNG:     rngInst,
+		Draw:    rng.NewDrawEngine(rngInst),
+		Log:     gamelog.NewGameLog(),
 	}
 }
 
@@ -101,6 +104,12 @@ func (g *Game) GetPlayers() []*core.Player {
 	g.mutex.RLock()
 	defer g.mutex.RUnlock()
 	return g.Players
+}
+
+// GetGameLog returns the global game log for playback.
+// Implements protocol.Game interface.
+func (g *Game) GetGameLog() *gamelog.GameLog {
+	return g.Log
 }
 
 // NextTurn advances to next player's turn.
