@@ -1,12 +1,14 @@
 package util
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 )
 
 // Metadata is a dynamic attribute bag for type-safe key-value storage.
 // It can be embedded anonymously to give any struct type-safe access methods.
+// Supports JSON serialization via MarshalJSON/UnmarshalJSON methods.
 type Metadata struct {
 	values map[string]interface{}
 }
@@ -45,9 +47,19 @@ func (m *Metadata) GetInt(key string) (int, error) {
 
 // GetIntOrDefault retrieves an integer value, returns default if key doesn't exist or type mismatch.
 // This method is useful when you want to gracefully handle missing keys.
+// Also handles float64 values (from JSON unmarshal) by converting to int.
 func (m *Metadata) GetIntOrDefault(key string, defaultValue int) int {
-	if val, ok := m.values[key].(int); ok {
-		return val
+	val, ok := m.values[key]
+	if !ok {
+		return defaultValue
+	}
+	// Direct int type
+	if i, ok := val.(int); ok {
+		return i
+	}
+	// JSON unmarshal converts numbers to float64, handle this case
+	if f, ok := val.(float64); ok {
+		return int(f)
 	}
 	return defaultValue
 }
@@ -212,6 +224,39 @@ func (m *Metadata) ToMap() map[string]interface{} {
 		result[k] = v
 	}
 	return result
+}
+
+// ToJSON returns the values map for JSON serialization.
+// This method is called by json.Marshal when Metadata needs to be serialized.
+func (m *Metadata) ToJSON() map[string]interface{} {
+	return m.values
+}
+
+// FromMap creates a Metadata from an existing map.
+// Useful for deserialization from JSON.
+func FromMap(values map[string]interface{}) *Metadata {
+	if values == nil {
+		return NewMetadata()
+	}
+	return &Metadata{values: values}
+}
+
+// MarshalJSON implements json.Marshaler interface.
+// Serializes the internal values map directly.
+func (m *Metadata) MarshalJSON() ([]byte, error) {
+	if m.values == nil {
+		return json.Marshal(nil)
+	}
+	return json.Marshal(m.values)
+}
+
+// UnmarshalJSON implements json.Unmarshaler interface.
+// Deserializes JSON into the internal values map.
+func (m *Metadata) UnmarshalJSON(data []byte) error {
+	if m.values == nil {
+		m.values = make(map[string]interface{})
+	}
+	return json.Unmarshal(data, &m.values)
 }
 
 // Common errors
