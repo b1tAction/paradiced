@@ -8,6 +8,7 @@ import (
 	"github.com/b1tAction/Fated/internal/core/event"
 	"github.com/b1tAction/Fated/internal/core/item"
 	"github.com/b1tAction/Fated/internal/core/types"
+	"github.com/b1tAction/Fated/pkg/handler"
 )
 
 // Re-export types from subpackages for convenience.
@@ -80,8 +81,8 @@ var NewBuff = buff.NewBuff
 // BuffDefinition from buff package
 type BuffDefinition = buff.BuffDefinition
 
-// EffectHandler from buff package
-type EffectHandler = buff.EffectHandler
+// EffectHandler from handler package (unified for Buff/Item/Event)
+type EffectHandler = handler.EffectHandler
 
 // Buff registry access functions from buff package
 var (
