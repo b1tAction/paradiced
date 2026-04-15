@@ -105,7 +105,7 @@ m.SetInt("count", 10)
 m.SetString("name", "test")
 m.SetBool("active", true)
 
-// 式调用
+// 链式调用
 m.SetInt("turn", 1).SetString("event", "fog")
 
 // 获取值（带错误处理）
@@ -185,40 +185,13 @@ jsonBytes, err := m.MarshalJSON()
 
 // 反序列化
 m2 := util.NewMetadata()
-err = m2.UnmarshalJSON(jsonBytes)
+err := m2.UnmarshalJSON(jsonBytes)
 hp := m2.GetIntOrDefault("hp", 0)  // 100（自动处理 float64→int 转换）
-```
-
-### LogEntry 中的 Metadata 使用
-
-```go
-// LogEntry 使用 Metadata 存储扩展信息
-entry := gamelog.LogEntry{
-    Timestamp: time.Now(),
-    Type:      gamelog.EntryTypeAction,
-    ActionType: "damage",
-    Target:    "player1",
-    Delta:     -20,
-    Metadata:  util.NewMetadata(),  // 类型安全的元数据
-}
-
-// 设置元数据
-entry.Metadata.SetString("blocked_by", "Buff_Hidden")
-entry.Metadata.SetBool("piercing", false)
-
-// 序列化整个 LogEntry（Metadata 自动序列化）
-jsonEntry, _ := json.Marshal(entry)
-// 输出: {"timestamp":"...", "type":"action", "action_type":"damage", ...}
-
-// 反序列化时 Metadata 自动重建
-var parsedEntry gamelog.LogEntry
-json.Unmarshal(jsonEntry, &parsedEntry)
-blockedBy := parsedEntry.Metadata.GetStringOrDefault("blocked_by", "")
 ```
 
 ---
 
-## 数据迁移
+## 数据迁移示例
 
 ### Player
 
@@ -226,12 +199,6 @@ blockedBy := parsedEntry.Metadata.GetStringOrDefault("blocked_by", "")
 |---------------|--------------|---------------------|
 | `ChargeCount int` | `charge_count` | `GetChargeCount/SetChargeCount` |
 | `FireCounter int` | `fire_counter` | `GetFireCounter/SetFireCounter` |
-
-### Context
-
-| 原字段 | Metadata 键名 | 便捷方法 |
-|---------------|--------------|---------------------|
-| `Data interface{}` | `data` | `WithData/GetData` |
 
 ---
 
@@ -248,6 +215,28 @@ blockedBy := parsedEntry.Metadata.GetStringOrDefault("blocked_by", "")
 
 - 使用 `snake_case` 格式
 - 示例：`fire_counter`、`charge_count`、`turn_count`
+
+---
+
+## Metadata 字段契约
+
+**重要**：所有使用 `util.Metadata` 的类型的字段契约已迁移到独立文档。
+
+详见：[doc/metadata/README.md](../metadata/README.md) - Metadata契约文档总览
+
+| 类型 | 契约文档 | 可见性 |
+|------|----------|--------|
+| `gamelog.LogEntry.Metadata` | [doc/metadata/logentry.md](../metadata/logentry.md) | **客户端可见** |
+| `core.Player.Metadata` | [doc/metadata/player.md](../metadata/player.md) | **客户端可见** |
+| `event.Context.Metadata` | [doc/metadata/event_context.md](../metadata/event_context.md) | 内部 |
+| `hsm.StateContext.Metadata` | [doc/metadata/hsm_context.md](../metadata/hsm_context.md) | 内部 |
+| `action.ActionContext.Metadata` | [doc/metadata/action_context.md](../metadata/action_context.md) | 内部 |
+
+### 新增 Metadata 字段时
+
+1. **确定字段归属**：根据使用类型选择对应契约文档
+2. **更新契约表格**：添加字段名、类型、用途说明
+3. **客户端同步**（仅 LogEntry.Metadata）：更新 TypeScript 类型定义
 
 ---
 
@@ -270,5 +259,8 @@ blockedBy := parsedEntry.Metadata.GetStringOrDefault("blocked_by", "")
 
 ## 相关文档
 
-- [core.md](./core.md) - Player/Buff 结构定义
-- [event_bus_system.md](./event_bus_system.md) - Context 使用
+- [doc/metadata/README.md](../metadata/README.md) - Metadata契约文档
+- [pkg/gamelog/README.md](../../pkg/gamelog/README.md) - GameLog系统
+- [internal/core/README.md](../../internal/core/README.md) - Player结构
+- [pkg/event/README.md](../../pkg/event/README.md) - EventBus系统
+- [internal/engine/hsm/README.md](../../internal/engine/hsm/README.md) - HSM状态机

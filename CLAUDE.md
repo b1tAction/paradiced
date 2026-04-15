@@ -169,6 +169,28 @@ GOMODCACHE=/app/.gomodcache go test ./...
 - `docs(scope): description` - Documentation update
 - `chore(scope): description` - Maintenance tasks
 
+## Metadata Contracts
+
+**重要**：项目中多个类型嵌入 `util.Metadata`，所有字段使用必须遵循契约文档。
+
+### 契约文档位置
+
+契约文档按类划分，位于 `doc/metadata/` 目录：
+
+| 文件 | 类型 | 可见性 | 说明 |
+|------|------|--------|------|
+| [doc/metadata/logentry.md](doc/metadata/logentry.md) | `gamelog.LogEntry.Metadata` | **客户端可见** | Action效果详情，客户端渲染关键 |
+| [doc/metadata/player.md](doc/metadata/player.md) | `core.Player.Metadata` | **客户端可见** | 玩家动态属性（阵营特定） |
+| [doc/metadata/event_context.md](doc/metadata/event_context.md) | `event.Context.Metadata` | 内部 | EventBus Handler通信 |
+| [doc/metadata/hsm_context.md](doc/metadata/hsm_context.md) | `hsm.StateContext.Metadata` | 内部 | HSM状态机通信 |
+| [doc/metadata/action_context.md](doc/metadata/action_context.md) | `action.ActionContext.Metadata` | 内部 | Action执行上下文 |
+
+### 新增 Metadata 字段时
+
+1. 确定字段归属（LogEntry/Player/Context/StateContext/ActionContext）
+2. 在对应契约文档更新表格
+3. 若客户端可见，同步更新 TypeScript 类型定义
+
 ## Faction System
 
 | Faction | Skill | Description |
@@ -198,7 +220,8 @@ GOMODCACHE=/app/.gomodcache go test ./...
 - [doc/internal/event_bus_system.md](doc/internal/event_bus_system.md) - EventBus documentation (Chinese)
 - [doc/internal/core.md](doc/internal/core.md) - Core structures (Chinese)
 - [doc/internal/rng_engine.md](doc/internal/rng_engine.md) - RNG engine (Chinese)
-- [doc/internal/metadata.md](doc/internal/metadata.md) - Metadata utility (Chinese)
+- [doc/internal/metadata.md](doc/internal/metadata.md) - Metadata utility usage (Chinese)
+- [doc/metadata/README.md](doc/metadata/README.md) - Metadata contracts (Chinese)
 - [doc/internal/gamemap.md](doc/internal/gamemap.md) - Map system (Chinese)
 - [pkg/constants/README.md](pkg/constants/README.md) - Unified enum types
 - [pkg/protocol/README.md](pkg/protocol/README.md) - Protocol interface layer
