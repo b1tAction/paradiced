@@ -15,9 +15,10 @@ const (
 	// Data: StateSync
 	OpStateSync OpCode = 1
 
-	// OpActionSync broadcasts action execution results for client rendering.
-	// Data: ActionSync
-	OpActionSync OpCode = 2
+	// OpTurnSync broadcasts turn/phase action list for client rendering.
+	// Data: TurnSync (contains Actions array)
+	// Client loops through actions and plays animations sequentially.
+	OpTurnSync OpCode = 2
 
 	// OpDecisionRequest requests user decision input (dice roll, item selection, etc).
 	// Data: Decision
@@ -28,16 +29,20 @@ const (
 	OpAvailable OpCode = 4
 
 	// OpMiniGameStart notifies all players that mini-game phase is starting.
-	// Data: MiniGameStart
+	// Data: MiniGameStart (includes participating player IDs)
 	OpMiniGameStart OpCode = 5
+
+	// OpMiniGameResult broadcasts mini-game ranking results.
+	// Data: MiniGameResult (contains Rankings array)
+	OpMiniGameResult OpCode = 6
 
 	// OpGameOver broadcasts game end with winner and statistics.
 	// Data: GameOver
-	OpGameOver OpCode = 6
+	OpGameOver OpCode = 7
 
 	// OpFullSync sends complete game state for reconnecting players.
-	// Data: StateSync (complete snapshot)
-	OpFullSync OpCode = 7
+	// Data: StateSync (complete snapshot) + TurnSync (current turn actions)
+	OpFullSync OpCode = 8
 
 	// ========== Client -> Server Messages ==========
 
@@ -57,26 +62,27 @@ const (
 	// Data: UserChoice
 	OpUserChoice OpCode = 103
 
-	// OpMiniGameResult submits mini-game ranking result.
-	// Data: MiniGameResult
-	OpMiniGameResult OpCode = 104
+	// OpMiniGameResultSubmit submits mini-game ranking result (deprecated - server calculates).
+	// Data: MiniGameResultSubmit
+	OpMiniGameResultSubmit OpCode = 104
 )
 
 // String returns the opcode name for logging and debugging.
 func (op OpCode) String() string {
 	names := map[OpCode]string{
-		OpStateSync:       "state_sync",
-		OpActionSync:      "action_sync",
-		OpDecisionRequest: "decision_request",
-		OpAvailable:       "available",
-		OpMiniGameStart:   "mini_game_start",
-		OpGameOver:        "game_over",
-		OpFullSync:        "full_sync",
-		OpRollDice:        "roll_dice",
-		OpUseItem:         "use_item",
-		OpUseSkill:        "use_skill",
-		OpUserChoice:      "user_choice",
-		OpMiniGameResult:  "mini_game_result",
+		OpStateSync:           "state_sync",
+		OpTurnSync:            "turn_sync",
+		OpDecisionRequest:     "decision_request",
+		OpAvailable:           "available",
+		OpMiniGameStart:       "mini_game_start",
+		OpMiniGameResult:      "mini_game_result",
+		OpGameOver:            "game_over",
+		OpFullSync:            "full_sync",
+		OpRollDice:            "roll_dice",
+		OpUseItem:             "use_item",
+		OpUseSkill:            "use_skill",
+		OpUserChoice:          "user_choice",
+		OpMiniGameResultSubmit: "mini_game_result_submit",
 	}
 	if name, ok := names[op]; ok {
 		return name

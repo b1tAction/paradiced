@@ -1,4 +1,13 @@
+// Package net provides network message protocol definitions for client-server communication.
+// This package defines the message opcodes, data structures, and abstract handler interface
+// for implementing authoritative server communication (e.g., Nakama Match Handler).
 package net
+
+import (
+	"time"
+
+	"github.com/b1tAction/paradiced/pkg/gamelog"
+)
 
 // StateSync represents complete game state for synchronization.
 // Broadcast when entering a new state or for reconnecting players.
@@ -27,13 +36,68 @@ type StateSync struct {
 	Players []Player `json:"players"`
 }
 
+// TurnSync represents all events for a turn/phase.
+// Broadcast after executing effects, client renders entries sequentially.
+//
+// LogEntry.Metadata Field Contract:
+// Each action_type has specific metadata fields that client should parse.
+//
+// | action_type   | metadata fields                                      | client usage                |
+// |---------------|------------------------------------------------------|----------------------------|
+// | damage        | blocked_by?: string, piercing?: bool                 | 显示阻挡来源、穿透效果       |
+// | heal          | -                                                    | 显示治疗动画                |
+// | modify_lp     | -                                                    | 显示LP变化动画              |
+// | move          | start_pos: int, end_pos: int, path: []int            | 显示移动路径动画            |
+// | add_buff      | buff_type: string                                    | 显示获得Buff动画            |
+// | remove_buff   | buff_type: string                                    | 显示移除Buff动画           |
+// | teleport      | from_pos: int, to_pos: int                           | 显示传送动画               |
+// | steal_buff    | stolen_by: string, buff_type: string                 | 显示白虎劫运动画           |
+// | respawn       | checkpoint_pos: int                                  | 显示重生动画               |
+// | fell_down     | position: int                                        | 显示落坑动画               |
+// | draw_event    | event_type: string, event_name: string               | 显示抽取事件动画           |
+// | dice_roll     | dice_type: string, dice_steps: int                   | 显示骰子动画               |
+// | state         | from: string, to: string                             | 状态转换记录               |
+//
+// Client rendering example (TypeScript):
+//
+//	for (const entry of turnSync.entries) {
+//	    switch (entry.action_type) {
+//	        case "move":
+//	            const path = entry.metadata?.path || [];
+//	            playMoveAnimation(entry.target, path);
+//	            break;
+//	        case "add_buff":
+//	            const buffType = entry.metadata?.buff_type;
+//	            playBuffGainAnimation(entry.target, buffType);
+//	            break;
+//	    }
+//	}
+type TurnSync struct {
+	// Round is the current round number.
+	Round int `json:"round"`
+
+	// Turn is the current turn index.
+	Turn int `json:"turn"`
+
+	// Player is the user ID of the turn player.
+	Player string `json:"player"`
+
+	// Entries contains all log entries for this turn/phase.
+	// Directly uses gamelog.LogEntry (no conversion to Action).
+	Entries []gamelog.LogEntry `json:"entries"`
+}
+
+// LogEntry is aliased from gamelog.LogEntry for protocol usage.
+// This alias allows pkg/net to expose LogEntry without importing gamelog in all files.
+type LogEntry = gamelog.LogEntry
+
 // Player represents a player state snapshot for synchronization.
 // Builder extracts known keys from core.Player.Metadata into typed fields.
 type Player struct {
 	// UserID is the player's unique identifier.
 	UserID string `json:"user_id"`
 
-	// Faction is the player's faction (青龙/朱雀/白虎/玄武).
+	// Faction is the player's faction (snake_case: "qing_long", "zhu_que", "bai_hu", "xuan_wu").
 	Faction string `json:"faction"`
 
 	// Position is the player's current position on the map.
@@ -65,43 +129,33 @@ type Player struct {
 }
 
 // Buff represents a buff state for synchronization.
+// Includes display name for client UI.
 type Buff struct {
 	// Type is the buff type identifier (snake_case).
 	// Values: "divine", "curse", "fire", "lost", "hidden", "rain", "corrupt", "exorcism", "poison"
 	Type string `json:"type"`
+
+	// Name is the buff Chinese display name for client UI.
+	// Values: "神眷", "诅咒", "离火", "迷途", "隐匿", "甘霖", "腐化", "辟邪", "毒瘴"
+	Name string `json:"name"`
 
 	// Duration is the remaining turn count. -1 for permanent buffs (离火).
 	Duration int `json:"duration"`
 }
 
 // Item represents an item state for synchronization.
+// Includes display name for client UI.
 type Item struct {
 	// ID is the unique item instance ID.
 	ID string `json:"id"`
 
 	// Type is the item type identifier (snake_case).
+	// Values: "reverse_clock", "any_door", "dice_swap", "dice_upgrade"
 	Type string `json:"type"`
-}
 
-// ActionSync represents an action execution result for client rendering.
-// Maps directly from gamelog.LogEntry.
-type ActionSync struct {
-	// ActionType is the action type (snake_case).
-	// Values: "damage", "heal", "modify_lp", "move", "add_buff", "remove_buff", "respawn", etc.
-	ActionType string `json:"action_type"`
-
-	// Target is the player ID affected by this action.
-	Target string `json:"target"`
-
-	// Delta is the change amount (negative for damage/LP loss, positive for heal/LP gain).
-	Delta int `json:"delta"`
-
-	// Source is the action source identifier (buff ID, item ID, event ID, "System").
-	Source string `json:"source"`
-
-	// Metadata contains additional action data (path, position, etc).
-	// Converted from util.Metadata.ToMap().
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	// Name is the item Chinese display name for client UI.
+	// Values: "反方向的钟", "任意门", "骰子交换", "骰子升级卡"
+	Name string `json:"name"`
 }
 
 // Available represents available actions for the current player.
@@ -120,9 +174,29 @@ type Available struct {
 }
 
 // MiniGameStart represents mini-game start notification.
+// Sent to all players when entering mini-game phase.
 type MiniGameStart struct {
 	// GameType identifies the mini-game type for client to load.
 	GameType string `json:"game_type"`
+
+	// Players contains all participating player IDs.
+	Players []string `json:"players"`
+}
+
+// MiniGameResult represents mini-game ranking result notification.
+// Broadcast after mini-game completes.
+type MiniGameResult struct {
+	// Rankings contains player rankings (sorted by rank 1-4).
+	Rankings []RankingEntry `json:"rankings"`
+}
+
+// RankingEntry represents a single player's mini-game ranking.
+type RankingEntry struct {
+	// PlayerID is the player's user ID.
+	PlayerID string `json:"player_id"`
+
+	// Rank is the player's ranking (1-4).
+	Rank int `json:"rank"`
 }
 
 // GameOver represents game end notification.
@@ -147,4 +221,34 @@ type PlayerStats struct {
 
 	// ItemsUsed is the number of items consumed.
 	ItemsUsed int `json:"items_used"`
+}
+
+// FullSync represents complete sync data for reconnecting players.
+type FullSync struct {
+	// State is the current game state.
+	State *StateSync `json:"state"`
+
+	// Turn is the current turn's log entries.
+	Turn *TurnSync `json:"turn"`
+}
+
+// ========== Backward Compatibility Aliases ==========
+
+// Action is deprecated. Use LogEntry directly in TurnSync.Entries.
+// This type alias exists for backward compatibility during migration.
+// Deprecated: Use gamelog.LogEntry instead.
+type Action = gamelog.LogEntry
+
+// NewLogEntry creates a simple log entry for protocol testing.
+// For production use, use gamelog.NewActionEntry instead.
+func NewLogEntry(actionType string, target string, delta int, source string) LogEntry {
+	return gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       gamelog.EntryTypeAction,
+		ActionType: actionType,
+		Target:     target,
+		Delta:      delta,
+		Source:     source,
+		Metadata:   nil,
+	}
 }

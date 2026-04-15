@@ -1,3 +1,4 @@
+// Package net provides network message protocol definitions for client-server communication.
 package net
 
 // Decision represents a decision request sent to client.
@@ -8,6 +9,10 @@ type Decision struct {
 
 	// Prompt is the decision prompt text to display.
 	Prompt string `json:"prompt"`
+
+	// Context is the source identifier (buff ID, item ID, event ID).
+	// Example: "Buff_Divine", "Item_AnyDoor", "Event_Exchange"
+	Context string `json:"context"`
 
 	// Options contains available choices.
 	Options []Option `json:"options"`
@@ -27,6 +32,10 @@ type Option struct {
 
 	// Label is the display text for this option.
 	Label string `json:"label"`
+
+	// Effect is the effect preview text for client UI.
+	// Example: "HP+1", "LP-1", "获得神眷Buff"
+	Effect string `json:"effect,omitempty"`
 }
 
 // ========== Client -> Server Request Structures ==========
@@ -57,8 +66,10 @@ type UserChoice struct {
 	Choice int `json:"choice"`
 }
 
-// MiniGameResult represents mini-game ranking submission.
-type MiniGameResult struct {
-	// Rank is the player's ranking (1-4 for 4 players).
-	Rank int `json:"rank"`
+// MiniGameResultSubmit represents mini-game ranking submission from client.
+// Note: In authoritative server mode, server should calculate rankings.
+// This is kept for potential client-side mini-game implementations.
+type MiniGameResultSubmit struct {
+	// Rankings contains player rankings submitted by mini-game system.
+	Rankings []RankingEntry `json:"rankings"`
 }
