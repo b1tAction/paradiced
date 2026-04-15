@@ -13,7 +13,7 @@ const (
 	FactionXuanWu                  // XuanWu玄武 (North) - 鎮厄
 )
 
-// String returns the faction name.
+// String returns the faction name (for logging/debugging).
 func (f Faction) String() string {
 	names := map[Faction]string{
 		FactionQingLong: "QingLong",
@@ -25,6 +25,20 @@ func (f Faction) String() string {
 		return name
 	}
 	return "Unknown"
+}
+
+// SnakeCase returns the faction name in snake_case (for JSON serialization).
+func (f Faction) SnakeCase() string {
+	names := map[Faction]string{
+		FactionQingLong: "qing_long",
+		FactionZhuQue:   "zhu_que",
+		FactionBaiHu:    "bai_hu",
+		FactionXuanWu:   "xuan_wu",
+	}
+	if name, ok := names[f]; ok {
+		return name
+	}
+	return "unknown"
 }
 
 // IsValid checks if the faction is valid.

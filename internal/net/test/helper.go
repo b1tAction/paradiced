@@ -19,6 +19,7 @@ type TestHelper struct {
 	hsm         *hsm.HSM
 	builder     *internalnet.Builder
 	diceMgr     *rng.DiceManager
+	mockAdapter *pkgnet.MockBroadcastAdapter
 
 	// Message capture
 	broadcasts  []pkgnet.Message
@@ -36,12 +37,13 @@ func NewTestHelper(seed int64) *TestHelper {
 	hsm.RegisterInterruptStates(hsmInstance)
 
 	return &TestHelper{
-		game:       game,
-		hsm:        hsmInstance,
-		builder:    internalnet.NewBuilder(hsmInstance, game),
-		diceMgr:    rng.NewDiceManager(game.RNG),
-		broadcasts: make([]pkgnet.Message, 0),
-		playerMsgs: make(map[string][]pkgnet.Message),
+		game:        game,
+		hsm:         hsmInstance,
+		builder:     internalnet.NewBuilder(hsmInstance, game),
+		diceMgr:     rng.NewDiceManager(game.RNG),
+		mockAdapter: pkgnet.NewMockBroadcastAdapter(),
+		broadcasts:  make([]pkgnet.Message, 0),
+		playerMsgs:  make(map[string][]pkgnet.Message),
 	}
 }
 
@@ -90,11 +92,17 @@ func (h *TestHelper) GetPlayerMessages(playerID string) []pkgnet.Message {
 func (h *TestHelper) ClearMessages() {
 	h.broadcasts = make([]pkgnet.Message, 0)
 	h.playerMsgs = make(map[string][]pkgnet.Message)
+	h.mockAdapter.Clear()
 }
 
 // BuildStateSync builds current state sync using the builder.
 func (h *TestHelper) BuildStateSync() *pkgnet.StateSync {
 	return h.builder.BuildStateSync()
+}
+
+// BuildTurnSync builds turn sync with current turn actions.
+func (h *TestHelper) BuildTurnSync() *pkgnet.TurnSync {
+	return h.builder.BuildTurnSync()
 }
 
 // BuildAvailable builds available actions for a player.
@@ -104,11 +112,6 @@ func (h *TestHelper) BuildAvailable(diceType rng.DiceType) *pkgnet.Available {
 		return h.builder.BuildAvailable(player)
 	}
 	return nil
-}
-
-// BuildActionSyncBatch builds all ActionSync from current turn entries.
-func (h *TestHelper) BuildActionSyncBatch() []*pkgnet.ActionSync {
-	return h.builder.BuildActionSyncBatch()
 }
 
 // GetGame returns the game instance for direct manipulation.
@@ -126,6 +129,11 @@ func (h *TestHelper) GetBuilder() *internalnet.Builder {
 	return h.builder
 }
 
+// GetMockAdapter returns the mock broadcast adapter.
+func (h *TestHelper) GetMockAdapter() *pkgnet.MockBroadcastAdapter {
+	return h.mockAdapter
+}
+
 // SetDiceType sets the current player's dice type.
 func (h *TestHelper) SetDiceType(diceType rng.DiceType) {
 	h.builder.SetDiceType(diceType)
@@ -141,16 +149,10 @@ func (h *TestHelper) SimulateStateTransition(globalState, turnState string) erro
 	return h.CaptureBroadcast(pkgnet.OpStateSync, stateSync)
 }
 
-// SimulateActionExecution simulates action execution and captures broadcasts.
-func (h *TestHelper) SimulateActionExecution(actionType, target string, delta int, source string) error {
-	actionSync := &pkgnet.ActionSync{
-		ActionType: actionType,
-		Target:     target,
-		Delta:      delta,
-		Source:     source,
-		Metadata:   make(map[string]interface{}),
-	}
-	return h.CaptureBroadcast(pkgnet.OpActionSync, actionSync)
+// SimulateTurnSync simulates broadcasting turn actions.
+func (h *TestHelper) SimulateTurnSync() error {
+	turnSync := h.builder.BuildTurnSync()
+	return h.CaptureBroadcast(pkgnet.OpTurnSync, turnSync)
 }
 
 // WaitForDecision simulates sending a decision request to a player.

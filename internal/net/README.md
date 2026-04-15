@@ -33,16 +33,103 @@ builder := internalnet.NewBuilder(hsm, game)
 // 构建状态同步
 stateSync := builder.BuildStateSync()
 
+// 构建回合同步（从GameLog提取所有Action）
+turnSync := builder.BuildTurnSync()
+
 // 构建玩家快照
 players := builder.BuildPlayers()
-
-// 构建Action同步（从GameLog）
-entry := gamelog.LogEntry{...}
-actionSync := builder.BuildActionSync(entry)
 
 // 构建可用操作列表
 builder.SetDiceType(rng.DiceTypeGold) // 设置骰子类型（使用 pkg/rng.DiceType 枚举）
 available := builder.BuildAvailable(player)
+
+// 构建完整同步（断线重连）
+stateSync, turnSync := builder.BuildFullSync()
+```
+
+## TurnSync 构建
+
+`BuildTurnSync()` 从当前回合的 GameLog 提取所有 LogEntry，转换为 Action 列表：
+
+```go
+func (b *Builder) BuildTurnSync() *pkgnet.TurnSync {
+    entries := b.GetCurrentTurnEntries()
+    actions := make([]pkgnet.Action, len(entries))
+    for i, entry := range entries {
+        actions[i] = b.buildAction(entry)
+    }
+    return &pkgnet.TurnSync{
+        Round:   b.game.State.Round,
+        Turn:    b.game.State.Turn,
+        Player:  playerID,
+        Actions: actions,
+    }
+}
+```
+
+### buildAction 字段映射
+
+| ActionType | 提取字段 | 说明 |
+|------------|----------|------|
+| `damage`/`heal`/`modify_lp` | `delta` | HP/LP变化值 |
+| `move` | `path`, `dice_steps`, `dice_type` | 移动路径和骰子信息 |
+| `add_buff` | `buff_type`, `duration` | 添加Buff |
+| `remove_buff` | `buff_type` | 移除Buff |
+| `draw_event` | `event_type`, `event_name` | 抽取事件 |
+| `teleport` | `position` | 传送位置 |
+| `steal_buff` | `stolen_buff`, `stolen_from` | 白虎劫运 |
+| `fell_down` | `position`, `fall_damage` | 落坑 |
+| `respawn` | `position` | 重生位置 |
+| `dice_roll` | `dice_type`, `dice_steps` | 投骰子 |
+| `state` | `from_state`, `to_state` | 状态转换 |
+
+## Buff/Item Name 提取
+
+Builder 从定义获取显示名：
+
+```go
+func (b *Builder) BuildBuffs(activeBuffs []*buff.Buff) []pkgnet.Buff {
+    for i, bf := range activeBuffs {
+        def := buff.GetBuffDefinition(bf.Type)
+        name := ""
+        if def != nil {
+            name = def.Name // "神眷", "诅咒" 等中文名
+        }
+        result[i] = pkgnet.Buff{
+            Type:     string(bf.Type),
+            Name:     name,
+            Duration: bf.Duration,
+        }
+    }
+}
+
+func (b *Builder) BuildItems(inventory []*item.Item) []pkgnet.Item {
+    for i, it := range inventory {
+        def := item.GetItemDefinition(it.Type)
+        name := ""
+        if def != nil {
+            name = def.Name // "任意门", "反方向的钟" 等中文名
+        }
+        result[i] = pkgnet.Item{
+            ID:   it.ID.UUID(),
+            Type: string(it.Type),
+            Name: name,
+        }
+    }
+}
+```
+
+## Faction SnakeCase 转换
+
+`protocol.Faction` 使用 `SnakeCase()` 方法获取 snake_case 值用于 JSON：
+
+```go
+func (b *Builder) BuildPlayer(p *core.Player) pkgnet.Player {
+    return pkgnet.Player{
+        Faction: p.Faction.SnakeCase(), // "zhu_que" 而非 "ZhuQue"
+        ...
+    }
+}
 ```
 
 ## Metadata 键提取
@@ -62,6 +149,21 @@ pkgnet.Player{
     ...
 }
 ```
+
+## Metadata Helper 函数
+
+Builder 内部使用辅助函数从 LogEntry.Metadata 提取字段：
+
+```go
+func metadataGetInt(meta *util.Metadata, key string) int
+func metadataGetString(meta *util.Metadata, key string) string
+func metadataGetIntSlice(meta *util.Metadata, key string) []int
+```
+
+`metadataGetIntSlice` 处理 JSON unmarshal 后的多种类型：
+- `[]int`：直接返回
+- `[]float64`：转换为 `[]int`
+- `[]interface{}`：逐个转换
 
 ## 骰子计算
 
@@ -108,6 +210,9 @@ import "github.com/b1tAction/paradiced/internal/net/test"
 // 创建测试辅助
 helper := test.NewTestHelper(12345)
 
+// 获取 MockBroadcastAdapter
+mock := helper.GetMockAdapter()
+
 // 模拟投骰子（使用 pkg/rng.DiceType 枚举）
 steps := helper.SimulateRollDice(rng.DiceTypeGold)
 
@@ -122,37 +227,30 @@ broadcasts := helper.GetBroadcasts()
 
 // 构建完整同步数据
 fullSync := helper.BuildStateSync()
+turnSync := helper.BuildTurnSync()
 ```
 
-## 与 Nakama Handler 集成
+## 与 BroadcastAdapter 集成
 
-实现 `pkg/net.MatchHandler` 时使用 Builder：
+Builder 生成的数据通过 BroadcastAdapter 发送：
 
 ```go
-func (h *NakamaMatchHandler) HandleMessage(sender string, msg pkgnet.Message) error {
-    switch msg.OpCode {
-    case pkgnet.OpRollDice:
-        // 1. 计算骰子结果
-        diceType := h.getCurrentDiceType(sender)
-        steps := h.diceCalc.Calculate(diceType)
-
-        // 2. 调用 HSM
-        ctx := hsm.NewStateContext().WithGame(h.game)
-        h.hsm.OnRollDice(steps, ctx)
-
-        // 3. 广播结果
-        actionSync := h.builder.BuildActionSync(...)
-        h.Broadcast(pkgnet.OpActionSync, actionSync)
-
-        // 4. 广播新状态
-        stateSync := h.builder.BuildStateSync()
-        h.Broadcast(pkgnet.OpStateSync, stateSync)
-    }
+func (h *NakamaMatchHandler) broadcastTurnEnd() {
+    // 构建回合同步
+    turnSync := h.builder.BuildTurnSync()
+    
+    // 广播给所有玩家
+    h.adapter.BroadcastTurnSync(turnSync)
+    
+    // 构建状态同步
+    stateSync := h.builder.BuildStateSync()
+    h.adapter.BroadcastStateSync(stateSync)
 }
 ```
 
 ## 相关文档
 
 - [pkg/net/README.md](../../pkg/net/README.md) - 协议层定义
+- [doc/internal/net_protocol.md](../../doc/internal/net_protocol.md) - 协议层完整设计
 - [internal/engine/hsm/README.md](../engine/hsm/README.md) - HSM 状态机
 - [pkg/gamelog/README.md](../../pkg/gamelog/README.md) - 游戏日志
