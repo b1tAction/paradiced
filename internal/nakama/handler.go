@@ -22,6 +22,9 @@ type NakamaMatchHandler struct {
 	mapEngine *gamemap.MapEngine // Map engine for path calculation
 	diceMgr   *rng.DiceManager  // Dice manager for rolling
 
+	// Message dispatcher
+	dispatcher DispatcherAdapter // Dispatcher for sending messages to clients
+
 	// Match identification
 	matchID string // Nakama match ID
 
@@ -30,9 +33,9 @@ type NakamaMatchHandler struct {
 	playerList []string                // Ordered player list for turn sequence
 
 	// Configuration
-	maxPlayers   int // Maximum players (default: 4)
-	mapLength    int // Map length (default: 100)
-	randomSeed   int64 // Random seed for reproducibility
+	maxPlayers  int    // Maximum players (default: 4)
+	mapLength   int    // Map length (default: 100)
+	randomSeed  int64  // Random seed for reproducibility
 }
 
 // NewNakamaMatchHandler creates a new match handler with configuration.
@@ -53,14 +56,26 @@ func NewNakamaMatchHandler(matchID string, seed int64, maxPlayers int, mapLength
 	}
 
 	return &NakamaMatchHandler{
-		matchID:     matchID,
-		maxPlayers:  maxPlayers,
-		mapLength:   mapLength,
-		randomSeed:  seed,
-		players:     make(map[string]*core.Player),
-		playerList:  make([]string, 0),
-		diceMgr:     rng.NewDiceManager(rngInst),
+		matchID:    matchID,
+		maxPlayers: maxPlayers,
+		mapLength:  mapLength,
+		randomSeed: seed,
+		players:    make(map[string]*core.Player),
+		playerList: make([]string, 0),
+		diceMgr:    rng.NewDiceManager(rngInst),
+		dispatcher: nil, // Set via WithDispatcher or during MatchInit
 	}
+}
+
+// WithDispatcher sets the dispatcher for message sending.
+func (h *NakamaMatchHandler) WithDispatcher(dispatcher DispatcherAdapter) *NakamaMatchHandler {
+	h.dispatcher = dispatcher
+	return h
+}
+
+// GetDispatcher returns the current dispatcher.
+func (h *NakamaMatchHandler) GetDispatcher() DispatcherAdapter {
+	return h.dispatcher
 }
 
 // initializeGame creates the Game instance and HSM.

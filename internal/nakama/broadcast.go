@@ -8,7 +8,7 @@ import (
 )
 
 // NakamaBroadcastAdapter implements BroadcastAdapter for Nakama match.
-// Uses Nakama's message broadcast API to send messages to clients.
+// Uses DispatcherAdapter to send messages to clients.
 type NakamaBroadcastAdapter struct {
 	handler *NakamaMatchHandler
 }
@@ -21,99 +21,121 @@ func NewNakamaBroadcastAdapter(handler *NakamaMatchHandler) *NakamaBroadcastAdap
 }
 
 // BroadcastStateSync broadcasts state sync to all players.
-// In actual Nakama implementation, this would use Nakama's broadcast API.
 func (a *NakamaBroadcastAdapter) BroadcastStateSync(state *net.StateSync) error {
+	if a.handler.dispatcher == nil {
+		return nil // No dispatcher set
+	}
+
 	// Serialize state sync
 	data, err := json.Marshal(state)
 	if err != nil {
 		return err
 	}
 
-	// Create message
-	msg := net.MustNewMessage(net.OpStateSync, state)
-
-	// Broadcast to all players (placeholder - actual Nakama implementation needed)
-	// In production: a.handler.nakama.BroadcastMessage(a.handler.matchID, msg)
-	_ = data // Placeholder for actual broadcast
-	_ = msg  // Placeholder for actual broadcast
-
-	return nil
+	// Broadcast to all players
+	return a.handler.dispatcher.BroadcastMessage(int64(net.OpStateSync), data)
 }
 
 // BroadcastTurnSync broadcasts turn action list to all players.
 func (a *NakamaBroadcastAdapter) BroadcastTurnSync(turn *net.TurnSync) error {
-	msg := net.MustNewMessage(net.OpTurnSync, turn)
+	if a.handler.dispatcher == nil {
+		return nil // No dispatcher set
+	}
 
-	// Broadcast to all players (placeholder - actual Nakama implementation needed)
-	_ = msg // Placeholder
+	data, err := json.Marshal(turn)
+	if err != nil {
+		return err
+	}
 
-	return nil
+	return a.handler.dispatcher.BroadcastMessage(int64(net.OpTurnSync), data)
 }
 
 // SendDecision sends a decision request to a specific player.
 func (a *NakamaBroadcastAdapter) SendDecision(playerID string, decision *net.Decision) error {
-	msg := net.MustNewMessage(net.OpDecisionRequest, decision)
+	if a.handler.dispatcher == nil {
+		return nil // No dispatcher set
+	}
 
-	// Send to specific player (placeholder - actual Nakama implementation needed)
-	_ = playerID // Placeholder
-	_ = msg      // Placeholder
+	data, err := json.Marshal(decision)
+	if err != nil {
+		return err
+	}
 
-	return nil
+	return a.handler.dispatcher.SendMessage(playerID, int64(net.OpDecisionRequest), data)
 }
 
 // SendAvailable sends available actions to a specific player.
 func (a *NakamaBroadcastAdapter) SendAvailable(playerID string, available *net.Available) error {
-	msg := net.MustNewMessage(net.OpAvailable, available)
+	if a.handler.dispatcher == nil {
+		return nil // No dispatcher set
+	}
 
-	// Send to specific player (placeholder - actual Nakama implementation needed)
-	_ = playerID // Placeholder
-	_ = msg      // Placeholder
+	data, err := json.Marshal(available)
+	if err != nil {
+		return err
+	}
 
-	return nil
+	return a.handler.dispatcher.SendMessage(playerID, int64(net.OpAvailable), data)
 }
 
 // BroadcastMiniGameStart broadcasts mini-game start notification.
 func (a *NakamaBroadcastAdapter) BroadcastMiniGameStart(start *net.MiniGameStart) error {
-	msg := net.MustNewMessage(net.OpMiniGameStart, start)
+	if a.handler.dispatcher == nil {
+		return nil // No dispatcher set
+	}
 
-	// Broadcast to all players (placeholder - actual Nakama implementation needed)
-	_ = msg // Placeholder
+	data, err := json.Marshal(start)
+	if err != nil {
+		return err
+	}
 
-	return nil
+	return a.handler.dispatcher.BroadcastMessage(int64(net.OpMiniGameStart), data)
 }
 
 // BroadcastMiniGameResult broadcasts mini-game ranking results.
 func (a *NakamaBroadcastAdapter) BroadcastMiniGameResult(result *net.MiniGameResult) error {
-	msg := net.MustNewMessage(net.OpMiniGameResult, result)
+	if a.handler.dispatcher == nil {
+		return nil // No dispatcher set
+	}
 
-	// Broadcast to all players (placeholder - actual Nakama implementation needed)
-	_ = msg // Placeholder
+	data, err := json.Marshal(result)
+	if err != nil {
+		return err
+	}
 
-	return nil
+	return a.handler.dispatcher.BroadcastMessage(int64(net.OpMiniGameResult), data)
 }
 
 // BroadcastGameOver broadcasts game end notification.
 func (a *NakamaBroadcastAdapter) BroadcastGameOver(over *net.GameOver) error {
-	msg := net.MustNewMessage(net.OpGameOver, over)
+	if a.handler.dispatcher == nil {
+		return nil // No dispatcher set
+	}
 
-	// Broadcast to all players (placeholder - actual Nakama implementation needed)
-	_ = msg // Placeholder
+	data, err := json.Marshal(over)
+	if err != nil {
+		return err
+	}
 
-	return nil
+	return a.handler.dispatcher.BroadcastMessage(int64(net.OpGameOver), data)
 }
 
 // SendFullSync sends complete state to a reconnecting player.
 func (a *NakamaBroadcastAdapter) SendFullSync(playerID string, state *net.StateSync, turn *net.TurnSync) error {
+	if a.handler.dispatcher == nil {
+		return nil // No dispatcher set
+	}
+
 	// Send state sync and turn sync in one message
 	fullSync := map[string]interface{}{
 		"state_sync": state,
 		"turn_sync":  turn,
 	}
-	msg := net.MustNewMessage(net.OpFullSync, fullSync)
 
-	// Send to specific player (placeholder - actual Nakama implementation needed)
-	_ = playerID // Placeholder
-	_ = msg      // Placeholder
+	data, err := json.Marshal(fullSync)
+	if err != nil {
+		return err
+	}
 
-	return nil
+	return a.handler.dispatcher.SendMessage(playerID, int64(net.OpFullSync), data)
 }
