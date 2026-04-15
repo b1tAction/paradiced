@@ -119,6 +119,17 @@ type Faction = protocol.Faction
 - Faction 类型定义在 protocol 包
 - Buff Handler 使用 `protocol.PlayerLite` 最小接口
 
+## Metadata 契约
+
+**重要**：`Player.Metadata` 字段使用遵循契约文档定义。
+
+详见：[doc/metadata/player.md](../../doc/metadata/player.md) - Player.Metadata 契约（客户端可见字段）
+
+新增阵营特定属性时：
+1. 在 Player 添加便捷方法（GetXxx/SetXxx/IncrementXxx）
+2. 在契约文档更新表格
+3. 更新 `internal/net/builder.go` 的 `BuildPlayer()` 方法
+
 ## 测试
 
 ```bash

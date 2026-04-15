@@ -188,6 +188,19 @@ mapAdapter := NewMapEngineWrapper(mapEngine)
 gameWrapper := NewGameWrapper(game)
 ```
 
+## Metadata 契约
+
+**重要**：`StateContext.Metadata` 字段使用遵循契约文档定义。
+
+详见：[doc/metadata/hsm_context.md](../../../doc/metadata/hsm_context.md) - StateContext.Metadata 契约（状态机通信字段）
+
+所有 Metadata key 使用预定义常量（KeyXxx），确保类型安全和命名统一。
+
+新增状态标记时：
+1. 在 `state.go` 添加常量定义（KeyXxx）
+2. 如常用，添加便捷方法（WithXxx/GetXxx/SetXxx/IsXxx）
+3. 在契约文档更新表格
+
 ## 测试
 
 ```bash

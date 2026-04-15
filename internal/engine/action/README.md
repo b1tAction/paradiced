@@ -266,6 +266,24 @@ func (q *Queue) IsEmpty() bool
 go test ./internal/engine/action/... -v
 ```
 
+## Metadata 契约
+
+**重要**：`ActionContext.Metadata` 字段使用遵循契约文档定义。
+
+详见：[doc/metadata/action_context.md](../../../doc/metadata/action_context.md) - ActionContext.Metadata 契约
+
+ActionContext.Metadata 主要用于：
+- 存储当前Action信息（传递给EventBus）
+- 执行过程中的临时标记
+
+**LogEntry.Metadata** 契约：
+详见：[doc/metadata/logentry.md](../../../doc/metadata/logentry.md) - LogEntry.Metadata 契约（客户端可见字段）
+
+新增 ActionType 的 Metadata 字段时：
+1. 在 LogEntry 契约文档更新表格
+2. 同步更新 TypeScript 类型定义
+3. 更新 `internal/net/builder.go` 的 `buildAction()` 方法
+
 ## 相关文档
 
 - [pkg/action/README.md](../../../pkg/action/README.md) - Action 接口层

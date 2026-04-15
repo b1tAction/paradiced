@@ -144,3 +144,14 @@ d := event.NewDecisionBuilder("选择目标：").
 ## 测试覆盖率
 
 91.9% statements
+
+## Metadata 契约
+
+**重要**：`Context.Metadata` 字段使用遵循契约文档定义。
+
+详见：[doc/metadata/event_context.md](../../doc/metadata/event_context.md) - Context.Metadata 契约（Handler通信字段）
+
+新增 Handler 意图信号时：
+1. 选择语义明确的字段名（如 `hp_change` 而非 `val`）
+2. 在契约文档更新表格
+3. 确保信号消费方正确解析

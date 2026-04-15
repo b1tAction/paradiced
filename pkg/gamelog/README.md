@@ -178,6 +178,17 @@ func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
 4. **类型安全** - 使用 util.Metadata 存储元数据，支持类型安全访问
 5. **snake_case 命名** - ActionType 使用 snake_case，符合 JSON 常规命名习惯
 
+## Metadata 契约
+
+**重要**：`LogEntry.Metadata` 字段使用遵循契约文档定义。
+
+详见：[doc/metadata/logentry.md](../../doc/metadata/logentry.md) - LogEntry.Metadata 契约（客户端可见字段）
+
+新增 ActionType 的 Metadata 字段时：
+1. 在契约文档更新表格
+2. 同步更新 TypeScript 类型定义
+3. 更新 `internal/net/builder.go` 的 `buildAction()` 方法
+
 ## 测试
 
 ```bash
