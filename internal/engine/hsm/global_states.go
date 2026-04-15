@@ -2,6 +2,7 @@ package hsm
 
 import (
 	"github.com/b1tAction/paradiced/internal/core"
+	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
@@ -79,12 +80,24 @@ func NewRoundMiniGameState() *RoundMiniGameState {
 
 func (s *RoundMiniGameState) Enter(ctx *StateContext) {
 	// Start mini-game phase
-	// Broadcast MiniGameStart to all clients
 	s.totalPlayers = len(ctx.Game.Players)
 	s.resultsReceived = 0
 
 	ctx.SetBool(KeyMiniGameStarted, true)
 	ctx.SetBool(KeyWaitingForResults, true)
+
+	// Broadcast MiniGameStart to all clients
+	if ctx.Broadcast != nil {
+		playerIDs := make([]string, len(ctx.Game.Players))
+		for i, p := range ctx.Game.Players {
+			playerIDs[i] = p.ID.UUID()
+		}
+		start := &pkgnet.MiniGameStart{
+			GameType: "dice_race",
+			Players:  playerIDs,
+		}
+		ctx.Broadcast.BroadcastMiniGameStart(start)
+	}
 }
 
 func (s *RoundMiniGameState) Update(ctx *StateContext) StateID {
@@ -323,9 +336,7 @@ func NewGameOverState() *GameOverState {
 }
 
 func (s *GameOverState) Enter(ctx *StateContext) {
-	// Broadcast winner
-	// Perform final data settlement
-	// Cleanup resources
+	// Broadcast winner and perform final data settlement
 
 	winnerID := ctx.GetStringOrDefault(KeyWinner, "")
 	if winnerID != "" {
@@ -337,6 +348,24 @@ func (s *GameOverState) Enter(ctx *StateContext) {
 
 	ctx.Success = true
 	ctx.SetBool(KeyGameOver, true)
+
+	// Broadcast GameOver to all clients
+	if ctx.Broadcast != nil {
+		stats := make([]pkgnet.PlayerStats, len(ctx.Game.Players))
+		for i, p := range ctx.Game.Players {
+			stats[i] = pkgnet.PlayerStats{
+				UserID:      p.ID.UUID(),
+				RoundsWon:   0, // TODO: track rounds won
+				EventsDrawn: 0, // TODO: track events drawn
+				ItemsUsed:   0, // TODO: track items used
+			}
+		}
+		over := &pkgnet.GameOver{
+			WinnerID: winnerID,
+			Stats:    stats,
+		}
+		ctx.Broadcast.BroadcastGameOver(over)
+	}
 }
 
 func (s *GameOverState) Update(ctx *StateContext) StateID {

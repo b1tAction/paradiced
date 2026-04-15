@@ -8,6 +8,8 @@ import (
 	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/event"
+	"github.com/b1tAction/paradiced/pkg/gamelog"
+	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/protocol"
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
@@ -89,6 +91,8 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 		player.SkipTurn = false // Clear flag
 		s.skipTurn = true
 		ctx.SetSkipTurn(true)
+		// Broadcast StateSync even when skipping
+		s.broadcastStateSync(ctx)
 		return // Skip all BeforeTurn effects
 	}
 
@@ -108,6 +112,144 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 	if len(s.decisions) > 0 {
 		// Will be handled in Update - push WaitDecision if needed
 		ctx.Decisions = s.decisions
+	}
+
+	// Broadcast StateSync after all BeforeTurn effects
+	s.broadcastStateSync(ctx)
+}
+
+// broadcastStateSync broadcasts current game state to clients.
+func (s *TurnUpkeepState) broadcastStateSync(ctx *StateContext) {
+	if ctx.Broadcast == nil || ctx.Game == nil {
+		return
+	}
+	stateSync := buildStateSync(ctx)
+	ctx.Broadcast.BroadcastStateSync(stateSync)
+}
+
+// buildStateSync creates StateSync from context data.
+func buildStateSync(ctx *StateContext) *pkgnet.StateSync {
+	globalState := ctx.Game.State.CurrentPhase // Use CurrentPhase as global state
+	turnState := "" // Will be set by current turn state
+
+	var turnPlayerID string
+	if ctx.Player != nil {
+		turnPlayerID = ctx.Player.ID.UUID()
+	}
+
+	players := make([]pkgnet.Player, len(ctx.Game.Players))
+	for i, p := range ctx.Game.Players {
+		players[i] = pkgnet.Player{
+			UserID:      p.ID.UUID(),
+			Faction:     p.GetFaction().SnakeCase(),
+			Position:    p.Position,
+			HP:          p.HP,
+			LP:          p.LP,
+			Buffs:       buildBuffs(p.ActiveBuffs),
+			Items:       buildItems(p.Inventory),
+			Charge:      p.GetChargeCount(),
+			FireCounter: p.GetFireCounter(),
+			IsDead:      p.IsDead,
+			SkipTurn:    p.SkipTurn,
+		}
+	}
+
+	return &pkgnet.StateSync{
+		GlobalState: globalState,
+		TurnState:   turnState,
+		TurnPlayer:  turnPlayerID,
+		Round:       ctx.Game.State.Round,
+		Turn:        ctx.Game.State.Turn,
+		Paused:      false,
+		Players:     players,
+	}
+}
+
+// buildBuffs creates Buff list from player's active buffs.
+func buildBuffs(activeBuffs []*core.Buff) []pkgnet.Buff {
+	result := make([]pkgnet.Buff, len(activeBuffs))
+	for i, b := range activeBuffs {
+		result[i] = pkgnet.Buff{
+			Type:     string(b.Type),
+			Name:     "", // TODO: get from definition
+			Duration: b.Duration,
+		}
+	}
+	return result
+}
+
+// buildItems creates Item list from player's inventory.
+func buildItems(inventory []*core.Item) []pkgnet.Item {
+	result := make([]pkgnet.Item, len(inventory))
+	for i, it := range inventory {
+		result[i] = pkgnet.Item{
+			ID:   it.ID.UUID(),
+			Type: string(it.Type),
+			Name: "", // TODO: get from definition
+		}
+	}
+	return result
+}
+
+// buildAvailable creates Available for a specific player.
+func buildAvailable(ctx *StateContext, player *core.Player) *pkgnet.Available {
+	// Build items list (only PhaseAnyTime items are available during MainAction)
+	items := make([]pkgnet.Item, 0)
+	for _, it := range player.Inventory {
+		// Check if item can be used anytime (PhaseAnyTime)
+		// For now, include all items; actual filtering would need item definition lookup
+		items = append(items, pkgnet.Item{
+			ID:   it.ID.UUID(),
+			Type: string(it.Type),
+			Name: "", // TODO: get from definition
+		})
+	}
+
+	// Check if faction skill is available (charge count >= 1)
+	canUseSkill := false
+	faction := player.GetFaction()
+	if faction == protocol.FactionQingLong || faction == protocol.FactionXuanWu {
+		canUseSkill = player.GetChargeCount() >= 1
+	}
+
+	// Get dice type from context
+	diceType := ctx.GetDiceType(player.ID.UUID())
+	diceTypeStr := "wood" // default
+	switch diceType {
+	case rng.DiceTypeGold:
+		diceTypeStr = "gold"
+	case rng.DiceTypeSilver:
+		diceTypeStr = "silver"
+	case rng.DiceTypeCopper:
+		diceTypeStr = "copper"
+	}
+
+	return &pkgnet.Available{
+		Items:       items,
+		CanUseSkill: canUseSkill,
+		DiceType:    diceTypeStr,
+	}
+}
+
+// buildTurnSync creates TurnSync from game log.
+func buildTurnSync(ctx *StateContext) *pkgnet.TurnSync {
+	var playerID string
+	if ctx.Player != nil {
+		playerID = ctx.Player.ID.UUID()
+	}
+
+	// Get current turn's entries from GameLog
+	var entries []gamelog.LogEntry
+	if ctx.Game != nil && ctx.Game.Log != nil {
+		// Get entries for current turn
+		entries = ctx.Game.Log.GetCurrentTurnEntries()
+	}
+
+	return &pkgnet.TurnSync{
+		Round:   ctx.Game.State.Round,
+		Turn:    ctx.Game.State.Turn,
+		Player:  playerID,
+		Entries: entries,
 	}
 }
 
@@ -180,10 +322,34 @@ func (s *MainActionState) Enter(ctx *StateContext) {
 	s.waitingForAction = true
 	s.diceRolled = false
 
+	// Broadcast StateSync
+	s.broadcastStateSync(ctx)
+
+	// Send Available to current player
+	s.sendAvailable(ctx)
+
 	// Build available actions:
 	// 1. PhaseItemUsed items (active items)
 	// 2. Faction skills (QingLong/XuanWu charge check)
 	// Note: Actual item/skill execution is handled by OnUseItem/OnUseSkill
+}
+
+// broadcastStateSync broadcasts current game state.
+func (s *MainActionState) broadcastStateSync(ctx *StateContext) {
+	if ctx.Broadcast == nil || ctx.Game == nil {
+		return
+	}
+	stateSync := buildStateSync(ctx)
+	ctx.Broadcast.BroadcastStateSync(stateSync)
+}
+
+// sendAvailable sends available actions to current player.
+func (s *MainActionState) sendAvailable(ctx *StateContext) {
+	if ctx.Broadcast == nil || ctx.Game == nil || ctx.Player == nil {
+		return
+	}
+	available := buildAvailable(ctx, ctx.Player)
+	ctx.Broadcast.SendAvailable(ctx.Player.ID.UUID(), available)
 }
 
 func (s *MainActionState) Update(ctx *StateContext) StateID {
@@ -607,6 +773,30 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 	if ctx.Game != nil && ctx.Game.Log != nil {
 		ctx.Game.Log.EndTurn()
 	}
+
+	// Broadcast TurnSync (all actions from this turn)
+	s.broadcastTurnSync(ctx)
+
+	// Broadcast StateSync (final state after turn)
+	s.broadcastStateSync(ctx)
+}
+
+// broadcastTurnSync broadcasts all actions from current turn.
+func (s *TurnEndState) broadcastTurnSync(ctx *StateContext) {
+	if ctx.Broadcast == nil || ctx.Game == nil {
+		return
+	}
+	turnSync := buildTurnSync(ctx)
+	ctx.Broadcast.BroadcastTurnSync(turnSync)
+}
+
+// broadcastStateSync broadcasts final game state after turn.
+func (s *TurnEndState) broadcastStateSync(ctx *StateContext) {
+	if ctx.Broadcast == nil || ctx.Game == nil {
+		return
+	}
+	stateSync := buildStateSync(ctx)
+	ctx.Broadcast.BroadcastStateSync(stateSync)
 }
 
 func (s *TurnEndState) Update(ctx *StateContext) StateID {

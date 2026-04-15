@@ -5,6 +5,7 @@ import (
 
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/engine"
+	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/event"
 	"github.com/b1tAction/paradiced/pkg/rng"
@@ -71,6 +72,7 @@ type StateContext struct {
 	// Adapter interfaces - for cross-package isolation
 	Bus       EventBusAdapter  // EventBus adapter (isolates pkg/event)
 	MapEngine MapEngineAdapter // MapEngine adapter (isolates internal/gamemap)
+	Broadcast pkgnet.BroadcastAdapter // Broadcast adapter for client communication
 
 	// Phase triggering
 	Phase     constants.Phase // Current phase to trigger
@@ -127,6 +129,12 @@ func (ctx *StateContext) WithBus(bus EventBusAdapter) *StateContext {
 // WithMapEngine sets the MapEngine adapter.
 func (ctx *StateContext) WithMapEngine(engine MapEngineAdapter) *StateContext {
 	ctx.MapEngine = engine
+	return ctx
+}
+
+// WithBroadcast sets the Broadcast adapter for client communication.
+func (ctx *StateContext) WithBroadcast(adapter pkgnet.BroadcastAdapter) *StateContext {
+	ctx.Broadcast = adapter
 	return ctx
 }
 
