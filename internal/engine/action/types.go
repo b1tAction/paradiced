@@ -5,8 +5,11 @@ import (
 
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/core/buff"
+	"github.com/b1tAction/paradiced/internal/core/event"
+	pkgevent "github.com/b1tAction/paradiced/pkg/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
+	"github.com/b1tAction/paradiced/pkg/rng"
 	"github.com/b1tAction/paradiced/pkg/util"
 )
 
@@ -521,8 +524,10 @@ func (a *StealBuffAction) LogEntry() gamelog.LogEntry {
 // DrawEventAction represents drawing a random event.
 // Can be intercepted by 辟邪/玄武 to block bad events.
 type DrawEventAction struct {
-	TargetPlayer *core.Player // Player drawing event
-	SourceID     string       // Source identifier
+	TargetPlayer *core.Player        // Player drawing event
+	SourceID     string              // Source identifier
+	DrawnType    constants.EventType // Event type drawn (set after Execute)
+	DrawnName    string              // Event name (set after Execute)
 }
 
 // NewDrawEventAction creates a new DrawEventAction.
@@ -549,20 +554,81 @@ func (a *DrawEventAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *DrawEventAction) Execute(ctx *ActionContext) error {
-	// Event drawing logic would be implemented here
-	// This would use RNG engine to draw from event pool
+	player := a.TargetPlayer
+
+	// Step 1: Get LP for weight calculation
+	lp := player.GetLP()
+
+	// Step 2: Determine PoolType
+	// Default is Neutral, but Poison buff forces Bad pool
+	poolType := rng.PoolTypeNeutral
+	if ctx.GetBoolOrDefault("draw_bad_event", false) {
+		poolType = rng.PoolTypeBad
+	}
+
+	// Step 3: Use DrawEngine to draw event
+	if ctx.DrawEngine == nil {
+		// No draw engine available, skip drawing
+		return nil
+	}
+
+	eventType := ctx.DrawEngine.DrawEvent(poolType, lp)
+	if !eventType.IsValid() {
+		return nil
+	}
+
+	// Step 4: Get event definition and handler config
+	eventDef := event.GetEventDefinition(eventType)
+	handlerConfig := event.GetEventHandlerConfig(eventType)
+	if eventDef == nil {
+		return nil
+	}
+
+	// Step 5: Execute event handler
+	// Create handler context with player reference
+	handlerCtx := pkgevent.NewContext(player)
+	handlerCtx.Set("action_context", ctx)
+	handlerCtx.Set("current_player", player)
+
+	// Execute the handler if available (events triggered on land)
+	if handlerConfig != nil && handlerConfig.Handler != nil {
+		handlerConfig.Handler(constants.PhaseOnLand, handlerCtx)
+	}
+
+	// Step 6: Process derived actions from handler
+	for _, derived := range handlerCtx.GetDerivedActions() {
+		if execAction, ok := derived.(ExecutableAction); ok {
+			ctx.PushDerivedAction(execAction)
+		}
+	}
+
+	// Step 7: Store drawn event info for LogEntry
+	a.DrawnType = eventType
+	a.DrawnName = eventDef.Name
+
 	return nil
 }
 
 func (a *DrawEventAction) LogEntry() gamelog.LogEntry {
-	return gamelog.LogEntry{
+	entry := gamelog.LogEntry{
 		Timestamp:  time.Now(),
 		Type:       gamelog.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
 		Delta:      0,
 		Source:     a.SourceID,
+		Metadata:   util.NewMetadata(),
 	}
+
+	// Add event type and name to metadata
+	if a.DrawnType.IsValid() {
+		entry.Metadata.SetString("event_type", string(a.DrawnType))
+	}
+	if a.DrawnName != "" {
+		entry.Metadata.SetString("event_name", a.DrawnName)
+	}
+
+	return entry
 }
 
 // ========== RespawnAction ==========

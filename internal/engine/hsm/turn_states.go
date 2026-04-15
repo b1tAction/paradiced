@@ -74,6 +74,7 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 		NewGameWrapper(ctx.Game),
 		ctx.Game.Bus,
 		NewProtocolMapEngineWrapper(ctx.MapEngine),
+		ctx.Game.Draw,
 	)
 
 	// Step 1: Check IsDead -> Respawn at checkpoint using RespawnAction
@@ -316,6 +317,7 @@ func (s *MainActionState) Enter(ctx *StateContext) {
 		NewGameWrapper(ctx.Game),
 		ctx.Game.Bus,
 		NewProtocolMapEngineWrapper(ctx.MapEngine),
+		ctx.Game.Draw,
 	)
 
 	s.startTime = time.Now()
@@ -465,6 +467,7 @@ func (s *TurnMovingState) Enter(ctx *StateContext) {
 		NewGameWrapper(ctx.Game),
 		ctx.Game.Bus,
 		NewProtocolMapEngineWrapper(ctx.MapEngine),
+		ctx.Game.Draw,
 	)
 
 	// Create and execute MoveAction
@@ -577,6 +580,7 @@ func (s *TurnLandedState) Enter(ctx *StateContext) {
 		NewGameWrapper(ctx.Game),
 		ctx.Game.Bus,
 		NewProtocolMapEngineWrapper(ctx.MapEngine),
+		ctx.Game.Draw,
 	)
 
 	// Get cell type at landing position
@@ -661,6 +665,7 @@ func (s *TurnEventState) Enter(ctx *StateContext) {
 		NewGameWrapper(ctx.Game),
 		ctx.Game.Bus,
 		NewProtocolMapEngineWrapper(ctx.MapEngine),
+		ctx.Game.Draw,
 	)
 
 	// Create DrawEventAction (PreTriggerPhase = PhasePreEvent)
@@ -733,6 +738,7 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 		NewGameWrapper(ctx.Game),
 		ctx.Game.Bus,
 		NewProtocolMapEngineWrapper(ctx.MapEngine),
+		ctx.Game.Draw,
 	)
 
 	// Trigger PhaseAfterTurn

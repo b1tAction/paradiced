@@ -136,7 +136,7 @@ func TestDamageAction(t *testing.T) {
 	}
 
 	// Execute with minimal context
-	ctx := NewActionContext(nil, nil, nil)
+	ctx := NewActionContext(nil, nil, nil, nil)
 	err := action.Execute(ctx)
 	if err != nil {
 		t.Errorf("Execute failed: %v", err)
@@ -172,7 +172,7 @@ func TestPiercingDamageAction(t *testing.T) {
 		t.Error("IsPiercing should be true")
 	}
 
-	ctx := NewActionContext(nil, nil, nil)
+	ctx := NewActionContext(nil, nil, nil, nil)
 	action.Execute(ctx)
 
 	if player.HP != 70 {
@@ -188,7 +188,7 @@ func TestBlockedDamageAction(t *testing.T) {
 	action.Amount = 0 // Blocked by interceptor
 	action.BlockedBy = "Buff_Hidden"
 
-	ctx := NewActionContext(nil, nil, nil)
+	ctx := NewActionContext(nil, nil, nil, nil)
 	action.Execute(ctx)
 
 	if player.HP != 100 {
@@ -211,7 +211,7 @@ func TestHealAction(t *testing.T) {
 		t.Error("HealAction should be modifiable")
 	}
 
-	ctx := NewActionContext(nil, nil, nil)
+	ctx := NewActionContext(nil, nil, nil, nil)
 	action.Execute(ctx)
 
 	if player.HP != 80 {
@@ -236,7 +236,7 @@ func TestModifyLPAction(t *testing.T) {
 		t.Error("ModifyLPAction should not be modifiable")
 	}
 
-	ctx := NewActionContext(nil, nil, nil)
+	ctx := NewActionContext(nil, nil, nil, nil)
 	actionPlus.Execute(ctx)
 
 	if player.LP != 6 {
@@ -269,7 +269,7 @@ func TestAddBuffAction(t *testing.T) {
 		t.Errorf("BuffType should be Divine, got %s", string(action.BuffType))
 	}
 
-	ctx := NewActionContext(nil, nil, nil)
+	ctx := NewActionContext(nil, nil, nil, nil)
 	action.Execute(ctx)
 
 	if len(player.ActiveBuffs) != 1 {
@@ -301,7 +301,7 @@ func TestRemoveBuffAction(t *testing.T) {
 
 	action := NewRemoveBuffAction(player, constants.BuffTypeCurse, "Manual_Remove")
 
-	ctx := NewActionContext(nil, nil, nil)
+	ctx := NewActionContext(nil, nil, nil, nil)
 	action.Execute(ctx)
 
 	if len(player.ActiveBuffs) != 1 {
@@ -327,7 +327,7 @@ func TestTeleportAction(t *testing.T) {
 		t.Errorf("TargetPos should be 20, got %d", action.TargetPos)
 	}
 
-	ctx := NewActionContext(nil, nil, nil)
+	ctx := NewActionContext(nil, nil, nil, nil)
 	action.Execute(ctx)
 
 	if player.Position != 20 {
@@ -357,7 +357,7 @@ func TestStealBuffAction(t *testing.T) {
 		t.Errorf("SourcePlayer should be source, got %s", action.SourcePlayer.ID.UUID())
 	}
 
-	ctx := NewActionContext(nil, nil, nil)
+	ctx := NewActionContext(nil, nil, nil, nil)
 	action.Execute(ctx)
 
 	// Target should lose a buff
@@ -382,7 +382,7 @@ func TestStealBuffActionNoBuffs(t *testing.T) {
 
 	action := NewStealBuffAction(target, source, "Faction_BaiHu")
 
-	ctx := NewActionContext(nil, nil, nil)
+	ctx := NewActionContext(nil, nil, nil, nil)
 	action.Execute(ctx)
 
 	// Should not fail when target has no buffs
@@ -413,7 +413,7 @@ func TestRespawnAction(t *testing.T) {
 		t.Errorf("CheckpointPos should be 50, got %d", action.CheckpointPos)
 	}
 
-	ctx := NewActionContext(nil, nil, nil)
+	ctx := NewActionContext(nil, nil, nil, nil)
 	action.Execute(ctx)
 
 	if player.Position != 50 {
@@ -448,7 +448,7 @@ func TestFellDownAction(t *testing.T) {
 		t.Errorf("Damage should be 1, got %d", action.Damage)
 	}
 
-	ctx := NewActionContext(nil, nil, nil)
+	ctx := NewActionContext(nil, nil, nil, nil)
 	action.Execute(ctx)
 
 	if player.HP != 9 {
@@ -470,7 +470,7 @@ func TestActionContextExecuteAction(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.HP = 100
 
-	ctx := NewActionContext(nil, nil, nil)
+	ctx := NewActionContext(nil, nil, nil, nil)
 	action := NewDamageAction(player, 10, "test")
 
 	err := ctx.ExecuteAction(action)
@@ -488,7 +488,7 @@ func TestActionContextProcessQueue(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.HP = 100
 
-	ctx := NewActionContext(nil, nil, nil)
+	ctx := NewActionContext(nil, nil, nil, nil)
 
 	// Push derived actions
 	ctx.PushDerivedAction(NewDamageAction(player, 10, "derived1"))
@@ -514,7 +514,7 @@ func TestActionContextProcessQueue(t *testing.T) {
 
 func TestActionContextClear(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
-	ctx := NewActionContext(nil, nil, nil)
+	ctx := NewActionContext(nil, nil, nil, nil)
 
 	ctx.PushDerivedAction(NewDamageAction(player, 10, "test"))
 
@@ -528,7 +528,7 @@ func TestActionContextClear(t *testing.T) {
 // ========== ActionContext Metadata Tests ==========
 
 func TestActionContextMetadata(t *testing.T) {
-	ctx := NewActionContext(nil, nil, nil)
+	ctx := NewActionContext(nil, nil, nil, nil)
 
 	// Test Metadata functionality
 	ctx.SetBool("test_key", true)

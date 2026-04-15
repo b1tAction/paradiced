@@ -82,6 +82,7 @@ func TestTurnFlow_BuffEffect_GameLog(t *testing.T) {
 		NewGameWrapper(game),
 		game.Bus,
 		NewProtocolMapEngineWrapper(mapAdapter),
+		game.Draw,
 	)
 
 	// Simulate BeforeTurn phase trigger
@@ -124,6 +125,7 @@ func TestTurnFlow_Respawn_GameLog(t *testing.T) {
 		NewGameWrapper(game),
 		game.Bus,
 		NewProtocolMapEngineWrapper(mapAdapter),
+		game.Draw,
 	)
 
 	// Execute RespawnAction
@@ -190,6 +192,7 @@ func TestTurnFlow_Damage_GameLog(t *testing.T) {
 		NewGameWrapper(game),
 		game.Bus,
 		NewProtocolMapEngineWrapper(mapAdapter),
+		game.Draw,
 	)
 
 	// Execute DamageAction (trap damage)
@@ -256,6 +259,7 @@ func TestTurnFlow_CompleteTurn(t *testing.T) {
 		NewGameWrapper(game),
 		game.Bus,
 		NewProtocolMapEngineWrapper(mapAdapter),
+		game.Draw,
 	)
 
 	triggerCtx := event.NewContext(player)
@@ -384,6 +388,7 @@ func TestTurnFlow_Interrupt_Respawn(t *testing.T) {
 		NewGameWrapper(game),
 		game.Bus,
 		NewProtocolMapEngineWrapper(mapAdapter),
+		game.Draw,
 	)
 
 	// Execute RespawnAction (should be interceptable with PhasePreRespawn)
@@ -436,6 +441,7 @@ func TestDerivedActions_FromHandler(t *testing.T) {
 		NewGameWrapper(game),
 		game.Bus,
 		NewProtocolMapEngineWrapper(mapAdapter),
+		game.Draw,
 	)
 
 	// Simulate a handler adding derived actions via triggerCtx

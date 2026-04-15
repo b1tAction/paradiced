@@ -5,6 +5,7 @@ import (
 	"github.com/b1tAction/paradiced/pkg/event"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
 	"github.com/b1tAction/paradiced/pkg/protocol"
+	"github.com/b1tAction/paradiced/pkg/rng"
 	"github.com/b1tAction/paradiced/pkg/util"
 )
 
@@ -17,16 +18,18 @@ type ActionContext struct {
 	Game        protocol.Game      // Game instance (interface to avoid circular dependency)
 	EventBus    *event.EventBus    // EventBus for interception (nil if no interception)
 	MapEngine   protocol.MapEngine // MapEngine for movement calculation
+	DrawEngine  *rng.DrawEngine    // DrawEngine for random draws (events, buffs, items)
 	ActionQueue *Queue             // Queue for derived actions
 }
 
 // NewActionContext creates a new ActionContext with required components.
-func NewActionContext(game protocol.Game, bus *event.EventBus, mapEngine protocol.MapEngine) *ActionContext {
+func NewActionContext(game protocol.Game, bus *event.EventBus, mapEngine protocol.MapEngine, drawEngine *rng.DrawEngine) *ActionContext {
 	return &ActionContext{
 		Metadata:    util.NewMetadata(),
 		Game:        game,
 		EventBus:    bus,
 		MapEngine:   mapEngine,
+		DrawEngine:  drawEngine,
 		ActionQueue: NewQueue(),
 	}
 }
