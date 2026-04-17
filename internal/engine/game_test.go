@@ -94,10 +94,17 @@ func TestGameAddPlayer(t *testing.T) {
 func TestGameAddMultiplePlayers(t *testing.T) {
 	game := NewGame(id.NewGameID(), 0)
 
-	for i := 1; i <= 4; i++ {
+	factions := []constants.Faction{
+	 constants.FactionQingLong,
+	 constants.FactionZhuQue,
+	 constants.FactionBaiHu,
+	 constants.FactionXuanWu,
+	}
+
+	for i := 0; i < 4; i++ {
 		player := core.NewPlayer(core.PlayerConfig{
 			ID:      id.NewPlayerID(),
-			Faction: core.Faction(i),
+			Faction: factions[i],
 		})
 		game.AddPlayer(player)
 	}

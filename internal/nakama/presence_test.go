@@ -4,7 +4,7 @@ package nakama
 import (
 	"testing"
 
-	"github.com/b1tAction/paradiced/pkg/protocol"
+	"github.com/b1tAction/paradiced/pkg/constants"
 )
 
 func TestHandlePresenceJoin(t *testing.T) {
@@ -49,7 +49,7 @@ func TestHandlePresenceJoinWithFaction(t *testing.T) {
 	}
 
 	// Faction should be ZhuQue from metadata
-	if player.GetFaction() != protocol.FactionZhuQue {
+	if player.GetFaction() != constants.FactionZhuQue {
 		t.Errorf("player faction = %v, want ZhuQue", player.GetFaction())
 	}
 }
@@ -202,10 +202,10 @@ func TestFactionAssignmentOrder(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Add 4 players in order
-	handler.addPlayer("user-001", protocol.FactionQingLong)
-	handler.addPlayer("user-002", protocol.FactionQingLong) // Will be reassigned
-	handler.addPlayer("user-003", protocol.FactionQingLong)
-	handler.addPlayer("user-004", protocol.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-002", constants.FactionQingLong) // Will be reassigned
+	handler.addPlayer("user-003", constants.FactionQingLong)
+	handler.addPlayer("user-004", constants.FactionQingLong)
 
 	// Assign factions (should assign by join order)
 	handler.assignFactions()

@@ -3,6 +3,7 @@ package core
 import (
 	"testing"
 
+	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
 )
 
@@ -10,36 +11,36 @@ import (
 
 func TestFactionString(t *testing.T) {
 	tests := []struct {
-		f        Faction
+		f        constants.Faction
 		expected string
 	}{
-		{FactionQingLong, "QingLong"},
-		{FactionZhuQue, "ZhuQue"},
-		{FactionBaiHu, "BaiHu"},
-		{FactionXuanWu, "XuanWu"},
-		{Faction(999), "Unknown"},
+		{constants.FactionQingLong, "QingLong"},
+		{constants.FactionZhuQue, "ZhuQue"},
+		{constants.FactionBaiHu, "BaiHu"},
+		{constants.FactionXuanWu, "XuanWu"},
+		{constants.Faction("unknown"), "Unknown"},
 	}
 
 	for _, tt := range tests {
 		result := tt.f.String()
 		if result != tt.expected {
-			t.Errorf("Faction(%d).String() = %s, expected %s", tt.f, result, tt.expected)
+			t.Errorf("Faction(%s).String() = %s, expected %s", tt.f, result, tt.expected)
 		}
 	}
 }
 
 func TestFactionIsValid(t *testing.T) {
-	validFactions := []Faction{FactionQingLong, FactionZhuQue, FactionBaiHu, FactionXuanWu}
+	validFactions := []constants.Faction{constants.FactionQingLong, constants.FactionZhuQue, constants.FactionBaiHu, constants.FactionXuanWu}
 	for _, f := range validFactions {
 		if !f.IsValid() {
-			t.Errorf("Faction(%d).IsValid() should be true", f)
+			t.Errorf("Faction(%s).IsValid() should be true", f)
 		}
 	}
 
-	invalidFactions := []Faction{Faction(-1), Faction(100)}
+	invalidFactions := []constants.Faction{constants.Faction("invalid"), constants.Faction("random")}
 	for _, f := range invalidFactions {
 		if f.IsValid() {
-			t.Errorf("Faction(%d).IsValid() should be false", f)
+			t.Errorf("Faction(%s).IsValid() should be false", f)
 		}
 	}
 }
@@ -50,7 +51,7 @@ func TestNewPlayer(t *testing.T) {
 	testID := id.NewPlayerID()
 	config := PlayerConfig{
 		ID:       testID,
-		Faction:  FactionQingLong,
+		Faction:  constants.FactionQingLong,
 		MaxHP:    10,
 		MaxLP:    5,
 		StartPos: 0,
@@ -60,8 +61,8 @@ func TestNewPlayer(t *testing.T) {
 	if player.ID != testID {
 		t.Errorf("player.ID = %s, expected %s", player.ID.UUID(), testID.UUID())
 	}
-	if player.Faction != FactionQingLong {
-		t.Errorf("player.Faction = %d, expected QingLong", player.Faction)
+	if player.Faction != constants.FactionQingLong {
+		t.Errorf("player.Faction = %s, expected QingLong", player.Faction)
 	}
 	if player.HP != 10 {
 		t.Errorf("player.HP = %d, expected 10", player.HP)
@@ -80,12 +81,12 @@ func TestNewPlayer(t *testing.T) {
 func TestNewPlayerZhuQue(t *testing.T) {
 	config := PlayerConfig{
 		ID:      id.NewPlayerID(),
-		Faction: FactionZhuQue,
+		Faction: constants.FactionZhuQue,
 	}
 
 	player := NewPlayer(config)
-	// 朱雀玩家应该携带离火 Buff
-	if !player.HasBuff(BuffTypeFire) {
+	// ZhuQue player should have Fire buff
+	if !player.HasBuff(constants.BuffTypeFire) {
 		t.Error("ZhuQue player should have Fire buff initially")
 	}
 }
@@ -93,8 +94,8 @@ func TestNewPlayerZhuQue(t *testing.T) {
 func TestNewPlayerDefaultConfig(t *testing.T) {
 	config := PlayerConfig{
 		ID:      id.NewPlayerID(),
-		Faction: FactionBaiHu,
-		MaxHP:   0, // 使用默认值
+		Faction: constants.FactionBaiHu,
+		MaxHP:   0, // Use default
 		MaxLP:   0,
 	}
 
@@ -112,12 +113,12 @@ func TestNewPlayerDefaultConfig(t *testing.T) {
 func TestApplyDamage(t *testing.T) {
 	player := NewPlayer(PlayerConfig{
 		ID:      id.NewPlayerID(),
-		Faction: FactionQingLong,
+		Faction: constants.FactionQingLong,
 		MaxHP:   10,
 	})
 	player.Position = 20
 
-	// 正常扣血
+	// Normal damage
 	err := player.ApplyDamage(3)
 	if err != nil {
 		t.Fatalf("ApplyDamage failed: %v", err)
@@ -133,12 +134,12 @@ func TestApplyDamage(t *testing.T) {
 func TestApplyDamageDeath(t *testing.T) {
 	player := NewPlayer(PlayerConfig{
 		ID:      id.NewPlayerID(),
-		Faction: FactionQingLong,
+		Faction: constants.FactionQingLong,
 		MaxHP:   10,
 	})
 	player.Position = 25
 
-	// 扣血致死
+	// Damage to death
 	err := player.ApplyDamage(15)
 	if err != nil {
 		t.Fatalf("ApplyDamage failed: %v", err)
@@ -149,7 +150,7 @@ func TestApplyDamageDeath(t *testing.T) {
 	if player.HP != 0 {
 		t.Errorf("player.HP = %d, expected 0", player.HP)
 	}
-	// 注意：回城逻辑由 engine 包处理，player 只标记死亡状态
+	// Note: respawn logic handled by engine package, player only marks death status
 }
 
 func TestApplyDamageNegative(t *testing.T) {
@@ -163,7 +164,7 @@ func TestApplyDamageNegative(t *testing.T) {
 
 func TestApplyDamageHiddenImmune(t *testing.T) {
 	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
-	player.AddBuff(NewBuff(BuffTypeHidden, 3))
+	player.AddBuff(NewBuff(constants.BuffTypeHidden, 3))
 
 	err := player.ApplyDamage(5)
 	if err != nil {
@@ -172,7 +173,7 @@ func TestApplyDamageHiddenImmune(t *testing.T) {
 	if player.IsDead {
 		t.Error("player with Hidden buff should be immune to damage")
 	}
-	// HP 应保持初始值
+	// HP should remain initial value
 	if player.HP != DefaultPlayerConfig.MaxHP {
 		t.Errorf("player.HP = %d, expected %d (immune)", player.HP, DefaultPlayerConfig.MaxHP)
 	}
@@ -190,7 +191,7 @@ func TestHeal(t *testing.T) {
 		t.Errorf("player.HP = %d, expected 8", player.HP)
 	}
 
-	// 负数回血
+	// Negative heal
 	err = player.Heal(-1)
 	if err == nil {
 		t.Error("Heal with negative amount should return error")
@@ -200,25 +201,25 @@ func TestHeal(t *testing.T) {
 func TestModifyLP(t *testing.T) {
 	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID(), MaxLP: 5})
 
-	// 增加 LP
+	// Increase LP
 	player.ModifyLP(2)
 	if player.LP != 7 {
 		t.Errorf("player.LP = %d, expected 7", player.LP)
 	}
 
-	// 上限限制
+	// Upper limit
 	player.ModifyLP(5)
 	if player.LP != 8 {
 		t.Errorf("player.LP = %d, expected 8 (max)", player.LP)
 	}
 
-	// 减少 LP
+	// Decrease LP
 	player.ModifyLP(-3)
 	if player.LP != 5 {
 		t.Errorf("player.LP = %d, expected 5", player.LP)
 	}
 
-	// 下限限制
+	// Lower limit
 	player.ModifyLP(-10)
 	if player.LP != 0 {
 		t.Errorf("player.LP = %d, expected 0 (min)", player.LP)
@@ -238,7 +239,7 @@ func TestMove(t *testing.T) {
 		t.Errorf("player.Position = %d, expected 10", player.Position)
 	}
 
-	// 移动到终点之外
+	// Move beyond end
 	err = player.Move(100, 50)
 	if err != nil {
 		t.Fatalf("Move failed: %v", err)
@@ -247,7 +248,7 @@ func TestMove(t *testing.T) {
 		t.Errorf("player.Position = %d, expected 49 (end)", player.Position)
 	}
 
-	// 负数位置
+	// Negative position
 	err = player.Move(-1, 50)
 	if err == nil {
 		t.Error("Move to negative position should return error")
@@ -279,7 +280,7 @@ func TestRespawn(t *testing.T) {
 
 func TestAddBuff(t *testing.T) {
 	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
-	buff := NewBuff(BuffTypeCurse, 3)
+	buff := NewBuff(constants.BuffTypeCurse, 3)
 
 	err := player.AddBuff(buff)
 	if err != nil {
@@ -288,7 +289,7 @@ func TestAddBuff(t *testing.T) {
 	if len(player.ActiveBuffs) != 1 {
 		t.Errorf("ActiveBuffs count = %d, expected 1", len(player.ActiveBuffs))
 	}
-	if !player.HasBuff(BuffTypeCurse) {
+	if !player.HasBuff(constants.BuffTypeCurse) {
 		t.Error("player should have Curse buff")
 	}
 }
@@ -303,46 +304,46 @@ func TestAddBuffNil(t *testing.T) {
 
 func TestAddBuffHiddenImmune(t *testing.T) {
 	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
-	player.AddBuff(NewBuff(BuffTypeHidden, 3))
+	player.AddBuff(NewBuff(constants.BuffTypeHidden, 3))
 
-	// 隐匿状态下免疫负面 Buff
-	err := player.AddBuff(NewBuff(BuffTypeCurse, 3))
+	// Hidden immune to negative buff
+	err := player.AddBuff(NewBuff(constants.BuffTypeCurse, 3))
 	if err != nil {
 		t.Fatalf("AddBuff failed: %v", err)
 	}
-	// Curse buff 不应该被添加
-	if player.HasBuff(BuffTypeCurse) {
+	// Curse buff should not be added
+	if player.HasBuff(constants.BuffTypeCurse) {
 		t.Error("player with Hidden buff should not receive negative buff")
 	}
 
-	// 正面 Buff 应该可以添加
-	err = player.AddBuff(NewBuff(BuffTypeDivine, 3))
+	// Positive buff should be added
+	err = player.AddBuff(NewBuff(constants.BuffTypeDivine, 3))
 	if err != nil {
 		t.Fatalf("AddBuff failed: %v", err)
 	}
-	if !player.HasBuff(BuffTypeDivine) {
+	if !player.HasBuff(constants.BuffTypeDivine) {
 		t.Error("player with Hidden buff should receive positive buff")
 	}
 }
 
 func TestRemoveBuff(t *testing.T) {
 	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
-	player.AddBuff(NewBuff(BuffTypeCurse, 3))
-	player.AddBuff(NewBuff(BuffTypeDivine, 3))
+	player.AddBuff(NewBuff(constants.BuffTypeCurse, 3))
+	player.AddBuff(NewBuff(constants.BuffTypeDivine, 3))
 
-	removed := player.RemoveBuff(BuffTypeCurse)
+	removed := player.RemoveBuff(constants.BuffTypeCurse)
 	if !removed {
 		t.Error("RemoveBuff should return true")
 	}
-	if player.HasBuff(BuffTypeCurse) {
+	if player.HasBuff(constants.BuffTypeCurse) {
 		t.Error("player should not have Curse buff after removal")
 	}
-	if !player.HasBuff(BuffTypeDivine) {
+	if !player.HasBuff(constants.BuffTypeDivine) {
 		t.Error("player should still have Divine buff")
 	}
 
-	// 移除不存在的 Buff
-	removed = player.RemoveBuff(BuffTypeFire)
+	// Remove non-existent buff
+	removed = player.RemoveBuff(constants.BuffTypeFire)
 	if removed {
 		t.Error("RemoveBuff non-existent buff should return false")
 	}
@@ -350,9 +351,9 @@ func TestRemoveBuff(t *testing.T) {
 
 func TestGetBuff(t *testing.T) {
 	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
-	player.AddBuff(NewBuff(BuffTypeCurse, 3))
+	player.AddBuff(NewBuff(constants.BuffTypeCurse, 3))
 
-	buff := player.GetBuff(BuffTypeCurse)
+	buff := player.GetBuff(constants.BuffTypeCurse)
 	if buff == nil {
 		t.Error("GetBuff should return buff")
 	}
@@ -360,8 +361,8 @@ func TestGetBuff(t *testing.T) {
 		t.Errorf("buff.Duration = %d, expected 3", buff.Duration)
 	}
 
-	// 获取不存在的 Buff
-	buff = player.GetBuff(BuffTypeFire)
+	// Get non-existent buff
+	buff = player.GetBuff(constants.BuffTypeFire)
 	if buff != nil {
 		t.Error("GetBuff non-existent buff should return nil")
 	}
@@ -369,35 +370,35 @@ func TestGetBuff(t *testing.T) {
 
 func TestTickBuffs(t *testing.T) {
 	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
-	player.AddBuff(NewBuff(BuffTypeCurse, 1)) // 只剩1回合
-	player.AddBuff(NewBuff(BuffTypeDivine, 3))
+	player.AddBuff(NewBuff(constants.BuffTypeCurse, 1)) // Only 1 turn left
+	player.AddBuff(NewBuff(constants.BuffTypeDivine, 3))
 
 	expired := player.TickBuffs()
 	if len(expired) != 1 {
 		t.Errorf("expired count = %d, expected 1", len(expired))
 	}
-	if player.HasBuff(BuffTypeCurse) {
+	if player.HasBuff(constants.BuffTypeCurse) {
 		t.Error("Curse buff should be expired")
 	}
-	if !player.HasBuff(BuffTypeDivine) {
+	if !player.HasBuff(constants.BuffTypeDivine) {
 		t.Error("Divine buff should still be active")
 	}
 }
 
 func TestClearNegativeBuffs(t *testing.T) {
 	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
-	player.AddBuff(NewBuff(BuffTypeCurse, 3))
-	player.AddBuff(NewBuff(BuffTypePoison, 3))
-	player.AddBuff(NewBuff(BuffTypeDivine, 3))
+	player.AddBuff(NewBuff(constants.BuffTypeCurse, 3))
+	player.AddBuff(NewBuff(constants.BuffTypePoison, 3))
+	player.AddBuff(NewBuff(constants.BuffTypeDivine, 3))
 
 	count := player.ClearNegativeBuffs()
 	if count != 2 {
 		t.Errorf("cleared count = %d, expected 2", count)
 	}
-	if player.HasBuff(BuffTypeCurse) || player.HasBuff(BuffTypePoison) {
+	if player.HasBuff(constants.BuffTypeCurse) || player.HasBuff(constants.BuffTypePoison) {
 		t.Error("negative buffs should be cleared")
 	}
-	if !player.HasBuff(BuffTypeDivine) {
+	if !player.HasBuff(constants.BuffTypeDivine) {
 		t.Error("positive buff should remain")
 	}
 }
@@ -406,7 +407,7 @@ func TestClearNegativeBuffs(t *testing.T) {
 
 func TestAddItem(t *testing.T) {
 	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
-	item := NewItem(ItemTypeReverseClock)
+	item := NewItem(constants.ItemTypeReverseClock)
 
 	err := player.AddItem(item)
 	if err != nil {
@@ -415,7 +416,7 @@ func TestAddItem(t *testing.T) {
 	if len(player.Inventory) != 1 {
 		t.Errorf("Inventory count = %d, expected 1", len(player.Inventory))
 	}
-	if !player.HasItem(ItemTypeReverseClock) {
+	if !player.HasItem(constants.ItemTypeReverseClock) {
 		t.Error("player should have ReverseClock item")
 	}
 }
@@ -430,8 +431,8 @@ func TestAddItemNil(t *testing.T) {
 
 func TestRemoveItem(t *testing.T) {
 	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
-	item1 := NewItem(ItemTypeReverseClock)
-	item2 := NewItem(ItemTypeAnyDoor)
+	item1 := NewItem(constants.ItemTypeReverseClock)
+	item2 := NewItem(constants.ItemTypeAnyDoor)
 	player.AddItem(item1)
 	player.AddItem(item2)
 
@@ -442,11 +443,11 @@ func TestRemoveItem(t *testing.T) {
 	if removed.ID != item1.ID {
 		t.Errorf("removed.ID = %s, expected %s", removed.ID, item1.ID)
 	}
-	if player.HasItem(ItemTypeReverseClock) {
+	if player.HasItem(constants.ItemTypeReverseClock) {
 		t.Error("player should not have ReverseClock after removal")
 	}
 
-	// 移除不存在的道具
+	// Remove non-existent item
 	_, err = player.RemoveItem(id.NewItemID())
 	if err == nil {
 		t.Error("RemoveItem non-existent should return error")
@@ -455,7 +456,7 @@ func TestRemoveItem(t *testing.T) {
 
 func TestGetItem(t *testing.T) {
 	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
-	item := NewItem(ItemTypeReverseClock)
+	item := NewItem(constants.ItemTypeReverseClock)
 	player.AddItem(item)
 
 	found := player.GetItem(item.ID)
@@ -474,46 +475,46 @@ func TestGetItem(t *testing.T) {
 func TestTriggerFactionSkillZhuQue(t *testing.T) {
 	player := NewPlayer(PlayerConfig{
 		ID:      id.NewPlayerID(),
-		Faction: FactionZhuQue,
+		Faction: constants.FactionZhuQue,
 		MaxLP:   5,
 	})
 
-	// 朱雀被动是离火 Buff，已在创建时添加
-	if !player.HasBuff(BuffTypeFire) {
+	// ZhuQue passive is Fire buff, added on creation
+	if !player.HasBuff(constants.BuffTypeFire) {
 		t.Error("ZhuQue should have Fire buff")
 	}
 }
 
-// 注意：阵营被动技能的触发逻辑已迁移到 engine 包，
-// 通过 EventBus + Decision 系统处理。
+// Note: faction passive skill trigger logic moved to engine package,
+// handled via EventBus + Decision system.
 
 // ========== Helper Methods Tests ==========
 
 func TestPlayerClone(t *testing.T) {
 	original := NewPlayer(PlayerConfig{
 		ID:      id.NewPlayerID(),
-		Faction: FactionQingLong,
+		Faction: constants.FactionQingLong,
 	})
-	original.AddItem(NewItem(ItemTypeReverseClock))
-	original.AddBuff(NewBuff(BuffTypeCurse, 3))
+	original.AddItem(NewItem(constants.ItemTypeReverseClock))
+	original.AddBuff(NewBuff(constants.BuffTypeCurse, 3))
 	original.HP = 5
 
 	cloned := original.Clone()
 
-	// 修改克隆不影响原版
+	// Modify clone doesn't affect original
 	cloned.HP = 10
-	cloned.RemoveBuff(BuffTypeCurse)
+	cloned.RemoveBuff(constants.BuffTypeCurse)
 
 	if original.HP != 5 {
 		t.Error("original HP should not change")
 	}
-	if !original.HasBuff(BuffTypeCurse) {
+	if !original.HasBuff(constants.BuffTypeCurse) {
 		t.Error("original should still have Curse buff")
 	}
 	if cloned.HP != 10 {
 		t.Error("cloned HP should be 10")
 	}
-	if cloned.HasBuff(BuffTypeCurse) {
+	if cloned.HasBuff(constants.BuffTypeCurse) {
 		t.Error("cloned should not have Curse buff after removal")
 	}
 }
@@ -522,13 +523,13 @@ func TestPlayerString(t *testing.T) {
 	testID := id.NewPlayerID()
 	player := NewPlayer(PlayerConfig{
 		ID:      testID,
-		Faction: FactionQingLong,
+		Faction: constants.FactionQingLong,
 		MaxHP:   10,
 		MaxLP:   5,
 	})
 	player.Position = 20
-	player.AddItem(NewItem(ItemTypeReverseClock))
-	player.AddBuff(NewBuff(BuffTypeCurse, 3))
+	player.AddItem(NewItem(constants.ItemTypeReverseClock))
+	player.AddBuff(NewBuff(constants.BuffTypeCurse, 3))
 
 	str := player.String()
 	expected := "Player{ID: " + testID.UUID() + ", Faction: QingLong, Pos: 20, HP: 10, LP: 5, Buffs: 1, Items: 1}"
@@ -580,7 +581,7 @@ func TestPlayerCanAct(t *testing.T) {
 func TestPlayerMetadataInitialized(t *testing.T) {
 	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
 
-	// Metadata 应该被初始化
+	// Metadata should be initialized
 	if player.Metadata == nil {
 		t.Error("player Metadata should be initialized")
 	}
@@ -590,20 +591,20 @@ func TestPlayerMetadataInitialized(t *testing.T) {
 }
 
 func TestPlayerChargeCount(t *testing.T) {
-	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID(), Faction: FactionQingLong})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID(), Faction: constants.FactionQingLong})
 
-	// 初始充能计数为 0
+	// Initial charge count is 0
 	if player.GetChargeCount() != 0 {
 		t.Errorf("initial charge count = %d, expected 0", player.GetChargeCount())
 	}
 
-	// 设置充能计数
+	// Set charge count
 	player.SetChargeCount(5)
 	if player.GetChargeCount() != 5 {
 		t.Errorf("charge count = %d, expected 5", player.GetChargeCount())
 	}
 
-	// 递增充能计数
+	// Increment charge count
 	result := player.IncrementChargeCount()
 	if result != 6 {
 		t.Errorf("increment result = %d, expected 6", result)
@@ -614,20 +615,20 @@ func TestPlayerChargeCount(t *testing.T) {
 }
 
 func TestPlayerFireCounter(t *testing.T) {
-	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID(), Faction: FactionZhuQue})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID(), Faction: constants.FactionZhuQue})
 
-	// 初始离火计数为 0
+	// Initial fire counter is 0
 	if player.GetFireCounter() != 0 {
 		t.Errorf("initial fire counter = %d, expected 0", player.GetFireCounter())
 	}
 
-	// 设置离火计数
+	// Set fire counter
 	player.SetFireCounter(3)
 	if player.GetFireCounter() != 3 {
 		t.Errorf("fire counter = %d, expected 3", player.GetFireCounter())
 	}
 
-	// 递增离火计数
+	// Increment fire counter
 	result := player.IncrementFireCounter()
 	if result != 4 {
 		t.Errorf("increment result = %d, expected 4", result)

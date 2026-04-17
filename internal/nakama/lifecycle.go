@@ -8,7 +8,6 @@ import (
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
-	"github.com/b1tAction/paradiced/pkg/protocol"
 )
 
 // MatchInit initializes the match when created.
@@ -110,7 +109,7 @@ func (h *NakamaMatchHandler) getCurrentPlayer() *core.Player {
 
 // addPlayer adds a new player to the match.
 // Called during MatchInit or when players join.
-func (h *NakamaMatchHandler) addPlayer(userID string, faction protocol.Faction) *core.Player {
+func (h *NakamaMatchHandler) addPlayer(userID string, faction constants.Faction) *core.Player {
 	playerID := id.NewPlayerID()
 	player := core.NewPlayer(core.PlayerConfig{
 		ID:      playerID,
@@ -128,11 +127,11 @@ func (h *NakamaMatchHandler) addPlayer(userID string, faction protocol.Faction) 
 
 // assignFactions assigns factions to players based on join order.
 func (h *NakamaMatchHandler) assignFactions() {
-	factions := []protocol.Faction{
-		protocol.FactionQingLong,
-		protocol.FactionZhuQue,
-		protocol.FactionBaiHu,
-		protocol.FactionXuanWu,
+	factions := []constants.Faction{
+	 constants.FactionQingLong,
+	 constants.FactionZhuQue,
+	 constants.FactionBaiHu,
+	 constants.FactionXuanWu,
 	}
 
 	for i, userID := range h.playerList {
@@ -144,7 +143,7 @@ func (h *NakamaMatchHandler) assignFactions() {
 			// For now, we'll create new players with correct factions in addPlayer
 
 			// ZhuQue players get Fire buff (离火 passive)
-			if factions[i] == protocol.FactionZhuQue {
+			if factions[i] == constants.FactionZhuQue {
 				player.AddBuff(core.NewBuff(constants.BuffTypeFire, -1)) // Permanent buff
 			}
 		}

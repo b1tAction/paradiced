@@ -7,7 +7,6 @@ import (
 
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/pkg/constants"
-	"github.com/b1tAction/paradiced/pkg/protocol"
 )
 
 func TestHandleMessageUnknownOpCode(t *testing.T) {
@@ -16,7 +15,7 @@ func TestHandleMessageUnknownOpCode(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player and initialize
-	handler.addPlayer("user-001", protocol.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong)
 	handler.MatchInit()
 
 	// Send unknown opcode
@@ -42,8 +41,8 @@ func TestHandleRollDiceNonCurrentPlayer(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add 2 players
-	handler.addPlayer("user-001", protocol.FactionQingLong)
-	handler.addPlayer("user-002", protocol.FactionZhuQue)
+	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-002", constants.FactionZhuQue)
 	handler.MatchInit()
 
 	// Send roll dice from non-current player (user-002)
@@ -60,7 +59,7 @@ func TestHandleUseItem(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player with an item
-	player := handler.addPlayer("user-001", protocol.FactionQingLong)
+	player := handler.addPlayer("user-001", constants.FactionQingLong)
 	player.AddItem(core.NewItem(constants.ItemTypeAnyDoor))
 
 	handler.MatchInit()
@@ -84,7 +83,7 @@ func TestHandleUseSkill(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player with charge
-	player := handler.addPlayer("user-001", protocol.FactionQingLong)
+	player := handler.addPlayer("user-001", constants.FactionQingLong)
 	player.SetChargeCount(1)
 
 	handler.MatchInit()
@@ -108,7 +107,7 @@ func TestHandleUseSkillNoCharge(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player without charge
-	player := handler.addPlayer("user-001", protocol.FactionQingLong)
+	player := handler.addPlayer("user-001", constants.FactionQingLong)
 	player.SetChargeCount(0)
 
 	handler.MatchInit()
@@ -133,7 +132,7 @@ func TestHandleUserChoice(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player
-	handler.addPlayer("user-001", protocol.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong)
 	handler.MatchInit()
 
 	// Send user choice
@@ -155,7 +154,7 @@ func TestHandleMiniGameResult(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player
-	handler.addPlayer("user-001", protocol.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong)
 	handler.MatchInit()
 
 	// Send mini-game result
@@ -176,7 +175,7 @@ func TestHandleMessageNonExistingPlayer(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add one player
-	handler.addPlayer("user-001", protocol.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong)
 	handler.MatchInit()
 
 	// Send message from non-existing player

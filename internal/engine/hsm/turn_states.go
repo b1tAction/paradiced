@@ -10,7 +10,6 @@ import (
 	"github.com/b1tAction/paradiced/pkg/event"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
-	"github.com/b1tAction/paradiced/pkg/protocol"
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
@@ -209,7 +208,7 @@ func buildAvailable(ctx *StateContext, player *core.Player) *pkgnet.Available {
 	// Check if faction skill is available (charge count >= 1)
 	canUseSkill := false
 	faction := player.GetFaction()
-	if faction == protocol.FactionQingLong || faction == protocol.FactionXuanWu {
+	if faction == constants.FactionQingLong || faction == constants.FactionXuanWu {
 		canUseSkill = player.GetChargeCount() >= 1
 	}
 
@@ -822,22 +821,22 @@ func (s *TurnEndState) handleFactionCharging(ctx *StateContext, player *core.Pla
 	faction := player.GetFaction()
 
 	switch faction {
-	case protocol.FactionQingLong:
+	case constants.FactionQingLong:
 		// 青龙行迹: charge every turn (max 1)
 		current := player.GetChargeCount()
 		if current < 1 {
 			player.SetChargeCount(current + 1)
 		}
-	case protocol.FactionXuanWu:
+	case constants.FactionXuanWu:
 		// 玄武镇厄: charge every turn (max 1)
 		current := player.GetChargeCount()
 		if current < 1 {
 			player.SetChargeCount(current + 1)
 		}
-	case protocol.FactionZhuQue:
+	case constants.FactionZhuQue:
 		// 朱雀离火: handled by Fire buff handler in PhaseBeforeTurn
 		// No additional action needed here
-	case protocol.FactionBaiHu:
+	case constants.FactionBaiHu:
 		// 白虎劫运: handled during movement (overtaken check)
 		// No additional action needed here
 	}

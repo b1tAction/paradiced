@@ -4,7 +4,7 @@ package nakama
 import (
 	"testing"
 
-	"github.com/b1tAction/paradiced/pkg/protocol"
+	"github.com/b1tAction/paradiced/pkg/constants"
 )
 
 func TestNakamaMatchHandlerNew(t *testing.T) {
@@ -71,7 +71,7 @@ func TestNakamaMatchHandlerAddPlayer(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Add player
-	player := handler.addPlayer("user-001", protocol.FactionQingLong)
+	player := handler.addPlayer("user-001", constants.FactionQingLong)
 
 	if player == nil {
 		t.Fatal("addPlayer should return non-nil player")
@@ -98,7 +98,7 @@ func TestNakamaMatchHandlerGetPlayer(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Add player
-	handler.addPlayer("user-001", protocol.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong)
 
 	// Get existing player
 	player := handler.GetPlayer("user-001")
@@ -123,7 +123,7 @@ func TestNakamaMatchHandlerGetGameState(t *testing.T) {
 	}
 
 	// Add player first
-	handler.addPlayer("user-001", protocol.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong)
 
 	// Initialize game
 	err := handler.initializeGame()
@@ -152,10 +152,10 @@ func TestNakamaMatchHandlerInitializeGame(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Add players
-	handler.addPlayer("user-001", protocol.FactionQingLong)
-	handler.addPlayer("user-002", protocol.FactionZhuQue)
-	handler.addPlayer("user-003", protocol.FactionBaiHu)
-	handler.addPlayer("user-004", protocol.FactionXuanWu)
+	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-002", constants.FactionZhuQue)
+	handler.addPlayer("user-003", constants.FactionBaiHu)
+	handler.addPlayer("user-004", constants.FactionXuanWu)
 
 	// Initialize game
 	err := handler.initializeGame()

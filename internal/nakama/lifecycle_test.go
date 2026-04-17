@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
-	"github.com/b1tAction/paradiced/pkg/protocol"
+	"github.com/b1tAction/paradiced/pkg/constants"
 )
 
 func TestMatchInit(t *testing.T) {
@@ -15,10 +15,10 @@ func TestMatchInit(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add players first
-	handler.addPlayer("user-001", protocol.FactionQingLong)
-	handler.addPlayer("user-002", protocol.FactionZhuQue)
-	handler.addPlayer("user-003", protocol.FactionBaiHu)
-	handler.addPlayer("user-004", protocol.FactionXuanWu)
+	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-002", constants.FactionZhuQue)
+	handler.addPlayer("user-003", constants.FactionBaiHu)
+	handler.addPlayer("user-004", constants.FactionXuanWu)
 
 	// Assign factions
 	handler.assignFactions()
@@ -64,8 +64,8 @@ func TestMatchLoop(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Setup match
-	handler.addPlayer("user-001", protocol.FactionQingLong)
-	handler.addPlayer("user-002", protocol.FactionZhuQue)
+	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-002", constants.FactionZhuQue)
 	handler.MatchInit()
 
 	// Run one loop tick
@@ -81,7 +81,7 @@ func TestMatchStop(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Setup match
-	handler.addPlayer("user-001", protocol.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong)
 	handler.MatchInit()
 
 	// Stop match
@@ -115,8 +115,8 @@ func TestGetCurrentPlayer(t *testing.T) {
 	}
 
 	// Add players and initialize
-	handler.addPlayer("user-001", protocol.FactionQingLong)
-	handler.addPlayer("user-002", protocol.FactionZhuQue)
+	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-002", constants.FactionZhuQue)
 	handler.MatchInit()
 
 	// Turn 0 should return first player
@@ -134,10 +134,10 @@ func TestAssignFactions(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Add 4 players
-	handler.addPlayer("user-001", protocol.FactionQingLong)
-	handler.addPlayer("user-002", protocol.FactionZhuQue)
-	handler.addPlayer("user-003", protocol.FactionBaiHu)
-	handler.addPlayer("user-004", protocol.FactionXuanWu)
+	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-002", constants.FactionZhuQue)
+	handler.addPlayer("user-003", constants.FactionBaiHu)
+	handler.addPlayer("user-004", constants.FactionXuanWu)
 
 	// Assign factions
 	handler.assignFactions()
@@ -166,13 +166,13 @@ func TestAddPlayer(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Add first player
-	player1 := handler.addPlayer("user-001", protocol.FactionQingLong)
+	player1 := handler.addPlayer("user-001", constants.FactionQingLong)
 	if player1 == nil {
 		t.Fatal("addPlayer should return non-nil player")
 	}
 
 	// Verify player properties
-	if player1.GetFaction() != protocol.FactionQingLong {
+	if player1.GetFaction() != constants.FactionQingLong {
 		t.Errorf("player faction = %v, want QingLong", player1.GetFaction())
 	}
 
@@ -185,7 +185,7 @@ func TestAddPlayer(t *testing.T) {
 	}
 
 	// Add second player
-	player2 := handler.addPlayer("user-002", protocol.FactionZhuQue)
+	player2 := handler.addPlayer("user-002", constants.FactionZhuQue)
 	if player2 == nil {
 		t.Fatal("addPlayer should return non-nil player")
 	}
@@ -206,10 +206,10 @@ func TestFullGameFlow(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Phase 1: Players join
-	handler.addPlayer("user-001", protocol.FactionQingLong)
-	handler.addPlayer("user-002", protocol.FactionZhuQue)
-	handler.addPlayer("user-003", protocol.FactionBaiHu)
-	handler.addPlayer("user-004", protocol.FactionXuanWu)
+	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-002", constants.FactionZhuQue)
+	handler.addPlayer("user-003", constants.FactionBaiHu)
+	handler.addPlayer("user-004", constants.FactionXuanWu)
 
 	// Phase 2: Match initialization
 	handler.assignFactions()

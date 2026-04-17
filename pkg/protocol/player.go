@@ -1,66 +1,9 @@
 package protocol
 
-import "github.com/b1tAction/paradiced/pkg/id"
-
-// Faction represents player's faction (Four Divine Beasts 阵营).
-// Defined in protocol to avoid circular dependency.
-type Faction int
-
-const (
-	FactionQingLong Faction = iota // QingLong青龙 (East) - 行迹
-	FactionZhuQue                  // ZhuQue朱雀 (South) - 离火
-	FactionBaiHu                   // BaiHu白虎 (West) - 劫运
-	FactionXuanWu                  // XuanWu玄武 (North) - 鎮厄
+import (
+	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/id"
 )
-
-// String returns the faction name (for logging/debugging).
-func (f Faction) String() string {
-	names := map[Faction]string{
-		FactionQingLong: "QingLong",
-		FactionZhuQue:   "ZhuQue",
-		FactionBaiHu:    "BaiHu",
-		FactionXuanWu:   "XuanWu",
-	}
-	if name, ok := names[f]; ok {
-		return name
-	}
-	return "Unknown"
-}
-
-// SnakeCase returns the faction name in snake_case (for JSON serialization).
-func (f Faction) SnakeCase() string {
-	names := map[Faction]string{
-		FactionQingLong: "qing_long",
-		FactionZhuQue:   "zhu_que",
-		FactionBaiHu:    "bai_hu",
-		FactionXuanWu:   "xuan_wu",
-	}
-	if name, ok := names[f]; ok {
-		return name
-	}
-	return "unknown"
-}
-
-// IsValid checks if the faction is valid.
-func (f Faction) IsValid() bool {
-	return f >= FactionQingLong && f <= FactionXuanWu
-}
-
-// GetChineseName returns the faction Chinese name.
-func (f Faction) GetChineseName() string {
-	names := map[Faction]string{
-		FactionQingLong: "青龙",
-		FactionZhuQue:   "朱雀",
-		FactionBaiHu:    "白虎",
-		FactionXuanWu:   "玄武",
-	}
-	if name, ok := names[f]; ok {
-		return name
-	}
-	return "未知"
-}
-
-// ========== Player Interfaces ==========
 
 // PlayerReader defines read-only methods for Player.
 // Used by handlers that only need to inspect player state.
@@ -70,7 +13,7 @@ type PlayerReader interface {
 	GetHP() int
 	GetLP() int
 	GetPosition() int
-	GetFaction() Faction
+	GetFaction() constants.Faction
 	IsAlive() bool
 	CanAct() bool
 }

@@ -13,7 +13,6 @@ import (
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
 	"github.com/b1tAction/paradiced/pkg/id"
-	"github.com/b1tAction/paradiced/pkg/protocol"
 	"github.com/b1tAction/paradiced/pkg/rng"
 	"github.com/b1tAction/paradiced/pkg/util"
 )
@@ -29,7 +28,7 @@ func newTestBuilder() (*Builder, *engine.Game, *hsm.HSM) {
 }
 
 // Helper function to create a player
-func newTestPlayer(faction protocol.Faction) *core.Player {
+func newTestPlayer(faction constants.Faction) *core.Player {
 	return core.NewPlayer(core.PlayerConfig{
 		ID:      id.NewPlayerID(),
 		Faction: faction,
@@ -39,7 +38,7 @@ func newTestPlayer(faction protocol.Faction) *core.Player {
 func TestBuildStateSync(t *testing.T) {
 	builder, game, hsmInstance := newTestBuilder()
 
-	player := newTestPlayer(protocol.FactionQingLong)
+	player := newTestPlayer(constants.FactionQingLong)
 	game.AddPlayer(player)
 	hsmInstance.SetTurnPlayer(player)
 
@@ -59,7 +58,7 @@ func TestBuildStateSync(t *testing.T) {
 func TestBuildTurnSync(t *testing.T) {
 	builder, game, hsmInstance := newTestBuilder()
 
-	player := newTestPlayer(protocol.FactionZhuQue)
+	player := newTestPlayer(constants.FactionZhuQue)
 	game.AddPlayer(player)
 	hsmInstance.SetTurnPlayer(player)
 
@@ -97,7 +96,7 @@ func TestBuildTurnSync(t *testing.T) {
 func TestBuildTurnSyncWithMetadata(t *testing.T) {
 	builder, game, hsmInstance := newTestBuilder()
 
-	player := newTestPlayer(protocol.FactionQingLong)
+	player := newTestPlayer(constants.FactionQingLong)
 	game.AddPlayer(player)
 	hsmInstance.SetTurnPlayer(player)
 
@@ -138,7 +137,7 @@ func TestBuildTurnSyncWithMetadata(t *testing.T) {
 func TestBuildPlayers(t *testing.T) {
 	builder, game, _ := newTestBuilder()
 
-	player := newTestPlayer(protocol.FactionZhuQue)
+	player := newTestPlayer(constants.FactionZhuQue)
 	player.LP = 6
 	player.Position = 25
 	game.AddPlayer(player)
@@ -162,7 +161,7 @@ func TestBuildPlayers(t *testing.T) {
 func TestBuildBuffsWithName(t *testing.T) {
 	builder, _, _ := newTestBuilder()
 
-	player := newTestPlayer(protocol.FactionQingLong)
+	player := newTestPlayer(constants.FactionQingLong)
 	divineBuff := buff.NewBuff(constants.BuffTypeDivine, 3)
 	player.AddBuff(divineBuff)
 
@@ -185,7 +184,7 @@ func TestBuildBuffsWithName(t *testing.T) {
 func TestBuildItemsWithName(t *testing.T) {
 	builder, _, _ := newTestBuilder()
 
-	player := newTestPlayer(protocol.FactionQingLong)
+	player := newTestPlayer(constants.FactionQingLong)
 	anyDoorItem := item.NewItem(constants.ItemTypeAnyDoor)
 	player.AddItem(anyDoorItem)
 
@@ -205,7 +204,7 @@ func TestBuildItemsWithName(t *testing.T) {
 func TestBuildAvailable(t *testing.T) {
 	builder, game, hsmInstance := newTestBuilder()
 
-	player := newTestPlayer(protocol.FactionQingLong)
+	player := newTestPlayer(constants.FactionQingLong)
 	anyDoorItem := item.NewItem(constants.ItemTypeAnyDoor)
 	anyDoorItem.Usable = true
 	player.AddItem(anyDoorItem)
@@ -230,7 +229,7 @@ func TestBuildAvailable(t *testing.T) {
 func TestBuildAvailableWithCharge(t *testing.T) {
 	builder, game, hsmInstance := newTestBuilder()
 
-	player := newTestPlayer(protocol.FactionQingLong)
+	player := newTestPlayer(constants.FactionQingLong)
 	player.SetChargeCount(1) // Set charge >= 1
 	game.AddPlayer(player)
 	hsmInstance.SetTurnPlayer(player)
@@ -246,7 +245,7 @@ func TestBuildAvailableWithCharge(t *testing.T) {
 func TestBuildFullSync(t *testing.T) {
 	builder, game, hsmInstance := newTestBuilder()
 
-	player := newTestPlayer(protocol.FactionQingLong)
+	player := newTestPlayer(constants.FactionQingLong)
 	game.AddPlayer(player)
 	hsmInstance.SetTurnPlayer(player)
 
@@ -293,7 +292,7 @@ func TestBuildDecision(t *testing.T) {
 func TestGetCurrentTurnEntries(t *testing.T) {
 	builder, game, hsmInstance := newTestBuilder()
 
-	player := newTestPlayer(protocol.FactionQingLong)
+	player := newTestPlayer(constants.FactionQingLong)
 	game.AddPlayer(player)
 	hsmInstance.SetTurnPlayer(player)
 

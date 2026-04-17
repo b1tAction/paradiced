@@ -4,8 +4,8 @@ package nakama
 import (
 	"fmt"
 
+	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/net"
-	"github.com/b1tAction/paradiced/pkg/protocol"
 )
 
 // HandlePresenceJoin handles a player joining the match.
@@ -22,17 +22,17 @@ func (h *NakamaMatchHandler) HandlePresenceJoin(userID string, metadata map[stri
 	}
 
 	// Get faction from metadata (if provided)
-	faction := protocol.FactionQingLong // Default
+	faction := constants.FactionQingLong // Default
 	if factionStr, ok := metadata["faction"]; ok {
 		switch factionStr {
 		case "qing_long":
-			faction = protocol.FactionQingLong
+			faction = constants.FactionQingLong
 		case "zhu_que":
-			faction = protocol.FactionZhuQue
+			faction = constants.FactionZhuQue
 		case "bai_hu":
-			faction = protocol.FactionBaiHu
+			faction = constants.FactionBaiHu
 		case "xuan_wu":
-			faction = protocol.FactionXuanWu
+			faction = constants.FactionXuanWu
 		}
 	}
 
