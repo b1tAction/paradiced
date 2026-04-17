@@ -11,36 +11,41 @@ internal/core 是《派乐代》游戏的核心数据模块，采用**Direct Imp
 ```
 internal/core/
 ├── buff/               # Buff 子包
-│   ├── buff.go         # BuffType、Buff、BuffDefinition、BuffHandlerConfig、Registry
+│   ├── buff.go         # Buff、BuffDefinition、BuffHandlerConfig、Registry
 │   └── init.go         # init() + registerAllBuffs() + handlers
 ├── event/              # Event 子包
-│   ├── event.go        # EventType、EventDefinition、EventHandlerConfig、Registry
+│   ├── event.go        # Event、EventDefinition、EventHandlerConfig、Registry
 │   └── init.go         # init() + registerAllEvents() + handlers
 ├── item/               # Item 子包
-│   ├── item.go         # ItemType、Item、ItemDefinition、ItemHandlerConfig、Registry
+│   ├── item.go         # Item、ItemDefinition、ItemHandlerConfig、Registry
 │   └── init.go         # init() + registerAllItems() + handlers
-├── player.go           # Player结构（HP/LP/Buffs/Items）
-├── faction.go          # 阵营定义（四神兽）
-└── init.go             # 统一入口（重导出所有类型）
+├── player.go           # Player结构（HP/LP/Buffs/Items/Metadata）
+├── faction.go          # 阵营辅助函数（GetFactionNames等）
+└── init.go             # 统一入口（重导出函数和类型）
 ```
+
+**注意**：所有枚举类型（BuffType、EventType、ItemType、Faction）定义在 `pkg/constants` 包。
 
 ## Direct Import 模式
 
 ```go
 // 只需要 Buff（自动初始化）
 import "github.com/b1tAction/paradiced/internal/core/buff"
-buff.GetBuffDefinition(buff.BuffTypeFire)
-buff.GetBuffHandlerConfig(buff.BuffTypeFire)
+import "github.com/b1tAction/paradiced/pkg/constants"
+buff.GetBuffDefinition(constants.BuffTypeFire)
+buff.GetBuffHandlerConfig(constants.BuffTypeFire)
 
 // 只需要 Event（自动初始化）
 import "github.com/b1tAction/paradiced/internal/core/event"
-event.GetEventDefinition(event.EventTypeHerb)
-event.GetEventHandlerConfig(event.EventTypeHerb)
+import "github.com/b1tAction/paradiced/pkg/constants"
+event.GetEventDefinition(constants.EventTypeHerb)
+event.GetEventHandlerConfig(constants.EventTypeHerb)
 
 // 需要完整游戏逻辑（自动初始化所有子包）
 import "github.com/b1tAction/paradiced/internal/core"
-core.GetBuffDefinition(core.BuffTypeFire)
-core.GetBuffHandlerConfig(core.BuffTypeFire)
+import "github.com/b1tAction/paradiced/pkg/constants"
+core.GetBuffDefinition(constants.BuffTypeFire)
+core.GetBuffHandlerConfig(constants.BuffTypeFire)
 ```
 
 ## 架构原则
@@ -56,7 +61,7 @@ core.GetBuffHandlerConfig(core.BuffTypeFire)
 | Item | ItemDefinition | ItemHandlerConfig |
 
 **Definition** 只包含：
-- Type（类型标识）
+- Type（类型标识，来自 constants 包）
 - Eval（评估分数）
 - EnglishName/Name/Desc（显示信息）
 - Duration（持续时间，仅Buff）
@@ -81,16 +86,18 @@ Handler 通过 `ctx.SetInt/SetBool/SetString` 信号意图，engine层通过 Act
 
 ```
 constants/  ← 独立，无外部依赖（包含所有枚举类型）
-buff/       ← import constants, event, protocol
+buff/       ← import constants, event, handler
 event/      ← import constants, event, handler
 item/       ← import constants, event, handler
-core/       ← import buff, event, item（重导出）
+core/       ← import buff, event, item（重导出函数）
 engine/     ← import core, action
 ```
 
-## 数据类型
+## 数据类型（定义在 pkg/constants）
 
 ### Evaluation (评分系统)
+
+定义在 `pkg/constants/evaluation.go`：
 
 ```go
 type Evaluation int  // 0-100
@@ -103,33 +110,46 @@ EvaluationNeutralThreshold = 65   // 中性上限（≤65）
 
 ### Faction (阵营)
 
+定义在 `pkg/constants/faction.go`：
+
 ```go
-type Faction int
+type Faction string
 
 const (
-    FactionQingLong Faction = iota // 青龙（东方）- 行迹
-    FactionZhuQue                  // 朱雀（南方）- 离火
-    FactionBaiHu                   // 白虎（西方）- 劫运
-    FactionXuanWu                  // 玄武（北方）- 鎮厄
+    FactionQingLong Faction = "qing_long" // 青龙（东方）- 行迹
+    FactionZhuQue   Faction = "zhu_que"   // 朱雀（南方）- 离火
+    FactionBaiHu    Faction = "bai_hu"    // 白虎（西方）- 劫运
+    FactionXuanWu   Faction = "xuan_wu"   // 玄武（北方）- 鎮厄
 )
+
+func (f Faction) SnakeCase() string    // 返回 snake_case 值
+func (f Faction) GetChineseName() string // 返回中文名
+func (f Faction) GetSkillName() string   // 返回技能名
+func (f Faction) GetSkillDesc() string   // 返回技能描述
 ```
+
+### BuffType/EventType/ItemType
+
+分别定义在 `pkg/constants/buff.go`、`event.go`、`item.go`。
 
 ### Player (玩家)
 
 ```go
 type Player struct {
-    ID          id.PlayerID   // 玩家唯一标识（UUID v7 + prefix）
-    Faction     Faction       // 阵营
-    Position    int           // 当前位置
-    HP          int           // 血量（默认最大6）
-    LP          int           // 幸运值（范围0~8，影响随机事件）
-    Inventory   []*Item       // 道具栏
-    ActiveBuffs []*Buff       // 持续状态
-    IsDead      bool          // 是否死亡
-    SkipTurn    bool          // 是否跳过回合
-    *util.Metadata            // 类型安全的动态数据容器
+    ID          id.PlayerID       // 玩家唯一标识（UUID v7 + prefix）
+    Faction     constants.Faction // 阵营
+    Position    int               // 当前位置
+    HP          int               // 血量（默认最大6）
+    LP          int               // 幸运值（范围0~8，影响随机事件）
+    Inventory   []*item.Item      // 道具栏
+    ActiveBuffs []*buff.Buff      // 持续状态
+    IsDead      bool              // 是否死亡
+    SkipTurn    bool              // 是否跳过回合
+    *util.Metadata               // 类型安全的动态数据容器
 }
 ```
+
+**Metadata 契约**：详见 [doc/metadata/player.md](../metadata/player.md)。
 
 ## 统一注册表
 
@@ -150,11 +170,13 @@ GlobalBuffRegistry.RegisterBuff(def, config)
 ### 访问方式
 
 ```go
+import "github.com/b1tAction/paradiced/pkg/constants"
+
 // 获取静态元数据
-buff.GetBuffDefinition(buff.BuffTypeFire)
+buff.GetBuffDefinition(constants.BuffTypeFire)
 
 // 获取执行配置（含Handler）
-config := buff.GetBuffHandlerConfig(buff.BuffTypeFire)
+config := buff.GetBuffHandlerConfig(constants.BuffTypeFire)
 config.Phases           // 触发Phase列表
 config.Priority         // 执行优先级
 config.Handler          // 效果处理函数
@@ -267,40 +289,55 @@ player.ModifyLP(amount)
 ### 2. Buff 管理
 
 ```go
-player.AddBuff(buff)              // 添加 Buff
-player.RemoveBuff(buffType)       // 移除指定类型 Buff
-player.HasBuff(buffType)          // 检查是否有 Buff
-player.GetBuff(buffType)          // 获取 Buff 实例
-player.TickBuffs()                // 更新持续时间，返回失效的 Buff
+player.AddBuff(buff)                    // 添加 Buff
+player.RemoveBuff(buffType)             // 移除指定类型 Buff
+player.HasBuff(constants.BuffTypeFire)  // 检查是否有 Buff
+player.GetBuff(constants.BuffTypeFire)  // 获取 Buff 实例
+player.TickBuffs()                      // 更新持续时间，返回失效的 Buff
 ```
 
 ### 3. 阵营特性
 
 ```go
+import "github.com/b1tAction/paradiced/pkg/constants"
+
 // 朱雀玩家初始携带离火 Buff
-if config.Faction == FactionZhuQue {
-    player.AddBuff(NewBuff(BuffTypeFire, -1))
+if config.Faction == constants.FactionZhuQue {
+    player.AddBuff(buff.NewBuff(constants.BuffTypeFire, -1))
 }
+```
+
+### 4. Metadata 方法
+
+```go
+// 阵营特定属性
+player.GetChargeCount()     // 青龙/玄武充能数
+player.SetChargeCount(count)
+player.IncrementChargeCount()
+
+player.GetFireCounter()     // 朱雀火计数
+player.SetFireCounter(count)
+player.IncrementFireCounter()
 ```
 
 ## 测试覆盖
 
 | 子包 | 测试文件 | 覆盖内容 |
 |------|---------|---------|
-| buff/ | buff_test.go | BuffType、Buff实例、BuffDefinition、BuffHandlerConfig |
-| event/ | event_test.go | EventType、EventDefinition、EventHandlerConfig |
-| item/ | item_test.go | ItemType、Item实例、ItemDefinition、ItemHandlerConfig |
+| buff/ | buff_test.go | Buff实例、BuffDefinition、BuffHandlerConfig |
+| event/ | event_test.go | EventDefinition、EventHandlerConfig |
+| item/ | item_test.go | Item实例、ItemDefinition、ItemHandlerConfig |
 | core | player_test.go | Player 创建、数值逻辑、Buff/道具管理 |
 
 ## 新增内容流程
 
 添加新的 Buff/Event/Item 需要：
 
-1. 在 constants 包添加枚举常量
+1. 在 `pkg/constants` 包添加枚举常量
 2. 在子包 init.go 中注册 Definition + HandlerConfig
 
 ```go
-// constants/buff_type.go - 添加枚举
+// constants/buff.go - 添加枚举
 const (
     ...
     BuffTypeNewBuff BuffType = "new_buff"
@@ -321,3 +358,8 @@ GlobalBuffRegistry.RegisterBuff(&BuffDefinition{
     Handler:     createModifyLPHandler(1),
 })
 ```
+
+## 相关文档
+
+- [pkg/constants/README.md](../../pkg/constants/README.md) - 统一枚举类型
+- [doc/metadata/player.md](../metadata/player.md) - Player.Metadata 契约
