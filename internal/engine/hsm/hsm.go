@@ -9,6 +9,7 @@ import (
 	"github.com/b1tAction/paradiced/internal/engine"
 	"github.com/b1tAction/paradiced/pkg/event"
 	"github.com/b1tAction/paradiced/pkg/id"
+	"github.com/b1tAction/paradiced/pkg/protocol"
 )
 
 // HSM is the main Hierarchical State Machine structure.
@@ -32,9 +33,10 @@ type HSM struct {
 	states  map[StateID]State // All registered states
 	factory StateFactory      // State factory for creating instances
 
-	// ========== Game Reference - direct type ==========
-	game *engine.Game    // Game instance (direct access)
-	bus  EventBusAdapter // EventBus adapter
+	// ========== Core References ==========
+	game      *engine.Game      // Game instance (single source of truth)
+	bus       EventBusAdapter   // EventBus adapter (derived from game)
+	mapEngine MapEngineAdapter  // MapEngine adapter (set externally)
 
 	// ========== Timing ==========
 	lastUpdate     time.Time // Last update timestamp
@@ -143,6 +145,23 @@ func (hsm *HSM) GetGame() *engine.Game {
 // GetBus returns the EventBus adapter.
 func (hsm *HSM) GetBus() EventBusAdapter {
 	return hsm.bus
+}
+
+// GetMapEngine returns the MapEngine adapter.
+func (hsm *HSM) GetMapEngine() MapEngineAdapter {
+	return hsm.mapEngine
+}
+
+// SetMapEngine sets the MapEngine adapter.
+func (hsm *HSM) SetMapEngine(engine MapEngineAdapter) {
+	hsm.mapEngine = engine
+}
+
+// GetBroadcast returns a protocol.Broadcast interface.
+// Creates NakamaBroadcastAdapter if needed (placeholder for now).
+func (hsm *HSM) GetBroadcast() protocol.Broadcast {
+	// Placeholder - actual implementation in Nakama integration
+	return nil
 }
 
 // GetCurrentStateID returns the currently active state ID.
