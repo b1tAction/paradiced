@@ -150,7 +150,10 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - Documentation files in Chinese
 - Follow TDD principles
 - No external dependencies in core packages
-- **禁止使用类型别名**：不使用 `type PlayerID = id.PlayerID` 等别名写法，应直接使用 `id.PlayerID`。类型别名削弱类型安全，增加维护成本。
+- **禁止使用类型别名**：不使用 `type Faction = constants.Faction`、`type BuffType = constants.BuffType` 等别名写法。应直接使用完整路径如 `constants.Faction`、`constants.BuffType`、`constants.EntryType` 等。
+  - 类型别名削弱类型安全，增加维护成本
+  - 所有枚举类型应通过 `constants.Type` 格式引用，例如：`constants.FactionQingLong`、`constants.BuffTypeCurse`
+  - 不要在 internal/core 或其他包中重导出 constants 的常量
 
 ### Environment
 - **GOMODCACHE**: `/app/.gomodcache` (本地模块缓存位置)
