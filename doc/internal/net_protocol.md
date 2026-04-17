@@ -34,8 +34,8 @@
 
 1. **权威服务器模式**：所有计算在服务端完成，客户端只负责渲染和发送请求
 2. **抽象接口设计**：`pkg/net.BroadcastAdapter` 定义抽象接口，不引入 Nakama SDK 依赖
-3. **Action列表模式**：使用 TurnSync 包含 Action 数组，客户端顺序渲染
-4. **字段展平**：Action 字段展平便于客户端直接使用，不嵌套 Metadata
+3. **LogEntry 模式**：使用 TurnSync 包含 LogEntry 数组，客户端顺序渲染
+4. **Metadata 契约**：LogEntry.Metadata 字段遵循 [doc/metadata/logentry.md](../metadata/logentry.md) 契约
 5. **命名统一**：所有同步数据结构使用无后缀命名（StateSync、Player、Buff）
 
 ## 消息操作码
@@ -45,7 +45,7 @@
 | OpCode | 名称 | 数据类型 | 说明 |
 |--------|------|----------|------|
 | 1 | `OpStateSync` | `StateSync` | 状态同步（进入新状态） |
-| 2 | `OpTurnSync` | `TurnSync` | 回合内Action效果列表 |
+| 2 | `OpTurnSync` | `TurnSync` | 回合内效果列表（使用LogEntry） |
 | 3 | `OpDecisionRequest` | `Decision` | 决策请求 |
 | 4 | `OpAvailable` | `Available` | 可用操作列表（道具/技能） |
 | 5 | `OpMiniGameStart` | `MiniGameStart` | 小游戏开始 |
@@ -83,60 +83,51 @@ type StateSync struct {
 
 ### TurnSync
 
-回合内所有效果同步，使用Action列表供客户端顺序渲染：
+回合内所有效果同步，使用 LogEntry 数组供客户端顺序渲染：
 
 ```go
 type TurnSync struct {
-    Round   int      `json:"round"`
-    Turn    int      `json:"turn"`
-    Player  string   `json:"player"`    // 回合玩家ID
-    Actions []Action `json:"actions"`   // 效果列表（客户端顺序播放）
+    Round   int               `json:"round"`
+    Turn    int               `json:"turn"`
+    Player  string            `json:"player"`    // 回合玩家ID
+    Entries []gamelog.LogEntry `json:"entries"`  // 效果列表（使用LogEntry）
 }
 ```
 
-**设计理由**：客户端循环遍历 Actions 数组，按顺序播放每个效果的动画。展平字段便于直接使用，无需解析嵌套 Metadata。
+**设计理由**：`TurnSync.Entries` 直接使用 `gamelog.LogEntry`，避免额外的 Action 展平结构。客户端根据 `LogEntry.ActionType` 和 `LogEntry.Metadata` 解析效果详情。
 
-### Action
-
-单个效果，所有字段展平便于客户端渲染：
+### LogEntry 结构
 
 ```go
-type Action struct {
-    Type   string `json:"type"`            // "damage", "move", "heal", "add_buff"
-    Target string `json:"target"`          // 目标玩家ID
-    Source string `json:"source"`          // 来源（Buff/Item/Event名称）
-
-    // Type-specific fields (omitempty - 客户端判断非空即可使用)
-    Delta       int    `json:"delta,omitempty"`       // HP/LP变化值
-    Path        []int  `json:"path,omitempty"`        // 移动路径
-    BuffType    string `json:"buff_type,omitempty"`   // Buff类型
-    Duration    int    `json:"duration,omitempty"`    // Buff持续时间
-    EventType   string `json:"event_type,omitempty"`  // 事件类型
-    EventName   string `json:"event_name,omitempty"`  // 事件显示名
-    Position    int    `json:"position,omitempty"`    // 位置（teleport/respawn）
-    StolenFrom  string `json:"stolen_from,omitempty"` // 被偷玩家（白虎劫运）
-    StolenBuff  string `json:"stolen_buff,omitempty"` // 被偷Buff类型
-    DiceType    string `json:"dice_type,omitempty"`   // 骰子类型
-    DiceSteps   int    `json:"dice_steps,omitempty"`  // 骰子步数
-    FallDamage  int    `json:"fall_damage,omitempty"` // 落坑伤害
-    FromState   string `json:"from_state,omitempty"`  // 状态转换：原状态
-    ToState     string `json:"to_state,omitempty"`    // 状态转换：新状态
+type LogEntry struct {
+    Timestamp  time.Time         `json:"timestamp"`
+    Type       constants.EntryType `json:"type"`        // "action", "state"
+    ActionType string            `json:"action_type,omitempty"` // "damage", "move", "heal"
+    Target     string            `json:"target,omitempty"`
+    Delta      int               `json:"delta,omitempty"`     // HP/LP变化值
+    Source     string            `json:"source,omitempty"`
+    Metadata   *util.Metadata    `json:"metadata,omitempty"`  // 效果详情
 }
 ```
+
+**Metadata 契约**：各 ActionType 的 Metadata 字段详见 [doc/metadata/logentry.md](../metadata/logentry.md)。
 
 客户端渲染逻辑：
 
 ```javascript
-for (const action of turnSync.actions) {
-    switch (action.type) {
+for (const entry of turnSync.entries) {
+    switch (entry.action_type) {
         case "damage":
-            playDamageAnimation(action.target, action.delta, action.source);
+            const blockedBy = entry.metadata?.blocked_by;
+            playDamageAnimation(entry.target, entry.delta, entry.source, blockedBy);
             break;
         case "move":
-            playMoveAnimation(action.target, action.path);
+            const path = entry.metadata?.path || [];
+            playMoveAnimation(entry.target, path);
             break;
         case "add_buff":
-            playBuffAnimation(action.target, action.buff_type, action.duration);
+            const buffType = entry.metadata?.buff_type;
+            playBuffAnimation(entry.target, buffType);
             break;
         // ...
     }
@@ -258,188 +249,36 @@ type FullSync struct {
 
 ## BroadcastAdapter 接口
 
-抽象广播接口，供 HSM 和 ActionContext 使用：
+抽象广播接口，供 HSM 和 ActionContext 使用。接口使用 `interface{}` 参数以支持不同实现：
 
 ```go
 type BroadcastAdapter interface {
     // 状态广播
-    BroadcastStateSync(stateSync *StateSync) error
-    BroadcastTurnSync(turnSync *TurnSync) error
+    BroadcastStateSync(state interface{}) error
+    BroadcastTurnSync(turn interface{}) error
     
     // 单播
-    SendDecision(playerID string, decision *Decision) error
-    SendAvailable(playerID string, available *Available) error
-    SendFullSync(playerID string, state *StateSync, turn *TurnSync) error
+    SendDecision(playerID string, decision interface{}) error
+    SendAvailable(playerID string, available interface{}) error
+    SendFullSync(playerID string, state, turn interface{}) error
     
     // 小游戏
-    BroadcastMiniGameStart(start *MiniGameStart) error
-    BroadcastMiniGameResult(result *MiniGameResult) error
+    BroadcastMiniGameStart(start interface{}) error
+    BroadcastMiniGameResult(result interface{}) error
     
     // 游戏结束
-    BroadcastGameOver(over *GameOver) error
+    BroadcastGameOver(over interface{}) error
 }
 ```
 
-### MockBroadcastAdapter
-
-测试实现，捕获所有广播调用：
-
-```go
-type MockBroadcastAdapter struct {
-    StateSyncs     []*StateSync
-    TurnSyncs      []*TurnSync
-    Decisions      map[string]*Decision
-    Availables     map[string]*Available
-    MiniGameStarts []*MiniGameStart
-    MiniGameResults []*MiniGameResult
-    GameOvers      []*GameOver
-    FullSyncs      map[string]*FullSync
-}
-
-// 使用示例
-mock := NewMockBroadcastAdapter()
-mock.BroadcastStateSync(stateSync)
-mock.BroadcastTurnSync(turnSync)
-
-// 检查捕获的消息
-if mock.StateSyncs[0].GlobalState == "turn_loop" { ... }
-if mock.TurnSyncs[0].Actions[0].Type == "damage" { ... }
-
-mock.Clear() // 清空所有捕获的消息
-```
-
-## 交互流程
-
-### 回合主流程
-
-```
-【TurnUpkeep Enter】
-→ Broadcast(OpStateSync, StateSync{global=turn_loop, turn=turn_upkeep})
-→ execute BeforeTurn Buffs → GameLog记录
-→ 回合结束时 Broadcast(OpTurnSync, TurnSync{actions=[modify_lp/heal/damage]})
-→ 检查决策队列 → 若有: SendToPlayer(playerID, OpDecisionRequest, Decision)
-
-【MainAction】
-→ Broadcast(OpStateSync, StateSync{turn=main_action})
-→ SendToPlayer(playerID, OpAvailable, Available{items, skill, dice_type})
-→ 等待客户端 OpRollDice 或 OpUseItem
-
-【Client: OpRollDice】
-→ HandleMessage() → handleRollDice()
-→ 使用 rng.DiceManager 根据玩家骰子类型计算
-→ hsm.OnRollDice(steps, ctx)
-→ GameLog记录 dice_roll
-→ 自动进入 TurnMoving
-
-【TurnMoving Enter】
-→ Broadcast(OpStateSync, StateSync{turn=turn_moving})
-→ execute MoveAction → GameLog记录 move
-→ 路径效果: GameLog记录 fell_down, steal_buff...
-→ 若有决策(任意门): SendToPlayer(OpDecisionRequest)
-
-【TurnLanded Enter】
-→ Broadcast(OpStateSync, StateSync{turn=turn_landed})
-→ execute OnLand effects → GameLog记录
-
-【TurnEvent Enter】
-→ Broadcast(OpStateSync, StateSync{turn=turn_event})
-→ execute DrawEventAction → GameLog记录 draw_event
-→ execute event effects → GameLog记录 add_buff, damage...
-
-【TurnEnd Enter】
-→ Broadcast(OpStateSync, StateSync{turn=turn_end})
-→ execute AfterTurn Buffs → GameLog记录
-→ tickBuffs → GameLog记录 remove_buff
-→ Broadcast(OpTurnSync, TurnSync{actions=[本回合所有效果]})
-→ 结束回合 → 下一玩家
-```
-
-### Decision处理流程
-
-```
-【服务端生成Decision】
-→ HSM检测到 ctx.Decisions 不为空
-→ PushInterrupt(WaitDecision)
-→ SendToPlayer(playerID, OpDecisionRequest, Decision)
-
-【客户端等待】
-→ 显示决策UI（根据Context区分来源）
-→ 等待玩家选择或超时
-
-【Client: OpUserChoice】
-→ HandleMessage() → handleUserChoice(decisionID, choice)
-→ hsm.OnUserChoice(choice, ctx)
-→ PopInterrupt → 恢复原状态继续执行
-→ GameLog记录决策结果效果
-```
-
-### 断线重连流程
-
-```
-【玩家断线】
-→ HandlePresenceLeave(userID)
-→ 若当前回合是该玩家 → 决策超时自动处理（HSM已有30秒超时）
-
-【玩家重连】
-→ HandlePresenceJoin(userID, sessionID)
-→ SendToPlayer(userID, OpFullSync, FullSync{state, turn})
-→ 发送当前回合的完整 GameLog（转换为 TurnSync）
-→ 若有等待该玩家的决策 → resendDecisionRequest()
-```
-
-## Builder 使用
-
-Builder 负责将内部数据结构转换为 `pkg/net` 协议数据：
-
-```go
-import (
-    internalnet "github.com/b1tAction/paradiced/internal/net"
-    pkgnet "github.com/b1tAction/paradiced/pkg/net"
-    "github.com/b1tAction/paradiced/pkg/rng"
-)
-
-// 创建构建器
-builder := internalnet.NewBuilder(hsm, game)
-
-// 构建状态同步
-stateSync := builder.BuildStateSync()
-
-// 构建回合同步（从GameLog提取所有Action）
-turnSync := builder.BuildTurnSync()
-
-// 构建玩家快照
-players := builder.BuildPlayers()
-
-// 构建可用操作列表
-builder.SetDiceType(rng.DiceTypeGold) // 使用 pkg/rng.DiceType 枚举
-available := builder.BuildAvailable(player)
-
-// 构建完整同步（断线重连）
-stateSync, turnSync := builder.BuildFullSync()
-```
-
-### buildAction 字段映射
-
-| ActionType | 提取字段 | 说明 |
-|------------|----------|------|
-| `damage`/`heal`/`modify_lp` | `delta` | HP/LP变化值 |
-| `move` | `path`, `dice_steps`, `dice_type` | 移动路径和骰子信息 |
-| `add_buff` | `buff_type`, `duration` | 添加Buff |
-| `remove_buff` | `buff_type` | 移除Buff |
-| `draw_event` | `event_type`, `event_name` | 抽取事件 |
-| `teleport` | `position` | 传送位置 |
-| `steal_buff` | `stolen_buff`, `stolen_from` | 白虎劫运 |
-| `fell_down` | `position`, `fall_damage` | 落坑 |
-| `respawn` | `position` | 重生位置 |
-| `dice_roll` | `dice_type`, `dice_steps` | 投骰子 |
-| `state` | `from_state`, `to_state` | 状态转换 |
+**注意**：接口使用 `interface{}` 参数，实现方需要进行类型断言。
 
 ## Faction SnakeCase 转换
 
-`protocol.Faction` 使用 `SnakeCase()` 方法获取 snake_case 值用于 JSON：
+`constants.Faction` 使用 `SnakeCase()` 方法获取 snake_case 值用于 JSON：
 
 ```go
-// protocol/player.go
+// pkg/constants/faction.go
 func (f Faction) SnakeCase() string {
     names := map[Faction]string{
         FactionQingLong: "qing_long",
@@ -478,60 +317,20 @@ steps := diceMgr.RollSpecialDice(playerID)
 
 ## 与 Nakama Handler 集成
 
-实现 `BroadcastAdapter` 接口：
+`internal/nakama/broadcast.go` 实现 BroadcastAdapter 接口：
 
 ```go
-type NakamaBroadcastAdapter struct {
-    matchID   string
-    nakama    *nakama.Server
-}
-
-func (a *NakamaBroadcastAdapter) BroadcastStateSync(stateSync *pkgnet.StateSync) error {
-    msg := pkgnet.MustNewMessage(pkgnet.OpStateSync, stateSync)
-    return a.nakama.BroadcastMessage(a.matchID, msg)
-}
-
-func (a *NakamaBroadcastAdapter) BroadcastTurnSync(turnSync *pkgnet.TurnSync) error {
-    msg := pkgnet.MustNewMessage(pkgnet.OpTurnSync, turnSync)
-    return a.nakama.BroadcastMessage(a.matchID, msg)
-}
-
-func (a *NakamaBroadcastAdapter) SendDecision(playerID string, decision *pkgnet.Decision) error {
-    msg := pkgnet.MustNewMessage(pkgnet.OpDecisionRequest, decision)
-    return a.nakama.SendToPlayer(a.matchID, playerID, msg)
-}
-
-// ... 其他方法实现
-```
-
-## 相关文档
-
-- [pkg/net/README.md](../../pkg/net/README.md) - 协议层包文档
-- [internal/net/README.md](../../internal/net/README.md) - 构建层包文档
-- [pkg/rng/README.md](../../pkg/rng/README.md) - RNG引擎和骰子类型
-- [internal/engine/hsm/README.md](../engine/hsm/README.md) - HSM状态机
-- [pkg/gamelog/README.md](../../pkg/gamelog/README.md) - 游戏日志系统
-- [doc/internal/nakama.md](../nakama.md) - Nakama Match Handler 集成
-
-## Nakama Match Handler 集成
-
-`internal/nakama` 包实现 Nakama Match Handler，使用 `DispatcherAdapter` 接口隔离 SDK 依赖：
-
-```go
-// DispatcherAdapter 接口定义
-type DispatcherAdapter interface {
-    BroadcastMessage(opCode int64, data []byte) error
-    SendMessage(playerID string, opCode int64, data []byte) error
-}
-
-// NakamaBroadcastAdapter 实现 BroadcastAdapter
 type NakamaBroadcastAdapter struct {
     handler *NakamaMatchHandler
 }
 
-func (a *NakamaBroadcastAdapter) BroadcastStateSync(state *StateSync) error {
-    data, _ := json.Marshal(state)
-    return a.handler.dispatcher.BroadcastMessage(int64(OpStateSync), data)
+func (a *NakamaBroadcastAdapter) BroadcastStateSync(state interface{}) error {
+    stateSync, ok := state.(*pkgnet.StateSync)
+    if !ok {
+        return nil // Invalid type, skip
+    }
+    data, _ := json.Marshal(stateSync)
+    return a.handler.dispatcher.BroadcastMessage(int64(pkgnet.OpStateSync), data)
 }
 ```
 
@@ -544,3 +343,13 @@ Nakama Server → NakamaMatchHandler → DispatcherAdapter → pkg/net.Broadcast
 ```
 
 完整集成文档见：[doc/internal/nakama.md](../nakama.md)
+
+## 相关文档
+
+- [pkg/net/README.md](../../pkg/net/README.md) - 协议层包文档
+- [internal/net/README.md](../../internal/net/README.md) - 构建层包文档
+- [pkg/rng/README.md](../../pkg/rng/README.md) - RNG引擎和骰子类型
+- [internal/engine/hsm/README.md](../engine/hsm/README.md) - HSM状态机
+- [pkg/gamelog/README.md](../../pkg/gamelog/README.md) - 游戏日志系统
+- [doc/internal/nakama.md](../nakama.md) - Nakama Match Handler 集成
+- [doc/metadata/logentry.md](../metadata/logentry.md) - LogEntry.Metadata 契约

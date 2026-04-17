@@ -47,7 +47,7 @@ for (const action of turnSync.actions) {
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
-| `delta` | int | 是 | HP变化值（负数） | 显示伤害数值动画 |
+| `delta` | int | 是 | HP变化值（负数，存储在LogEntry.Delta） | 显示伤害数值动画 |
 | `blocked_by` | string | 否 | 阻挡来源Buff名称 | 显示"被XX阻挡"提示 |
 | `piercing` | bool | 否 | 是否穿透防御 | 显示穿透效果图标 |
 
@@ -55,21 +55,21 @@ for (const action of turnSync.actions) {
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
-| `delta` | int | 是 | HP变化值（正数） | 显示恢复数值动画 |
+| `delta` | int | 是 | HP变化值（正数，存储在LogEntry.Delta） | 显示恢复数值动画 |
 
 ### modify_lp 类型
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
-| `delta` | int | 是 | LP变化值 | 显示LP变化动画 |
+| `delta` | int | 是 | LP变化值（存储在LogEntry.Delta） | 显示LP变化动画 |
 
 ### move 类型
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
+| `start_pos` | int | 是 | 移动起点位置 | 内部计算 |
+| `end_pos` | int | 是 | 移动终点位置 | 内部计算 |
 | `path` | []int | 是 | 移动路径（格子索引列表） | 播放移动动画 |
-| `dice_steps` | int | 否 | 骰子结果步数 | 显示骰子结果 |
-| `dice_type` | string | 否 | 骰子类型 | 显示骰子类型图标 |
 
 **注意**：`path` 从 JSON 反序列化后可能是 `[]float64` 或 `[]interface{}`，需要转换为 `[]int`。
 
@@ -78,7 +78,7 @@ for (const action of turnSync.actions) {
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
 | `buff_type` | string | 是 | Buff类型标识 | 显示Buff图标 |
-| `duration` | int | 是 | 持续回合数 | 显示持续时间（-1表示永久） |
+| `duration` | int | 是 | 持续回合数（存储在LogEntry.Delta） | 显示持续时间（-1表示永久） |
 
 ### remove_buff 类型
 
@@ -97,27 +97,28 @@ for (const action of turnSync.actions) {
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
-| `position` | int | 是 | 目标位置 | 传送动画终点 |
+| `from_pos` | int | 是 | 传送起点位置 | 传送动画起点 |
+| `to_pos` | int | 是 | 传送终点位置 | 传送动画终点 |
 
 ### steal_buff 类型（白虎劫运）
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
-| `stolen_buff` | string | 是 | 被偷的Buff类型 | 显示被偷Buff |
-| `stolen_from` | string | 是 | 被偷玩家ID | 显示来源玩家 |
+| `stolen_by` | string | 是 | 偷取者玩家ID | 显示偷取来源 |
+| `buff_type` | string | 是 | 被偷的Buff类型 | 显示被偷Buff |
 
 ### fell_down 类型
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
 | `position` | int | 是 | 落坑位置 | 落坑动画位置 |
-| `fall_damage` | int | 是 | 坠落伤害 | 显示坠落伤害 |
+| `delta` | int | 是 | 坠落伤害（存储在LogEntry.Delta） | 显示坠落伤害 |
 
 ### respawn 类型
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
-| `position` | int | 是 | 重生点位置 | 重生动画位置 |
+| `checkpoint_pos` | int | 是 | 重生检查点位置 | 重生动画位置 |
 
 ### dice_roll 类型
 
@@ -143,7 +144,7 @@ interface Action {
     target: string;
     source: string;
     
-    // damage/heal/modify_lp
+    // damage/heal/modify_lp (stored in delta field)
     delta?: number;
     
     // damage
@@ -151,25 +152,27 @@ interface Action {
     piercing?: boolean;
     
     // move
+    start_pos?: number;
+    end_pos?: number;
     path?: number[];
-    dice_steps?: number;
-    dice_type?: string;
     
     // add_buff/remove_buff
     buff_type?: string;
-    duration?: number;
     
     // draw_event
     event_type?: string;
     event_name?: string;
     
-    // teleport/respawn/fell_down
+    // teleport
+    from_pos?: number;
+    to_pos?: number;
+    
+    // fell_down/respawn
     position?: number;
-    fall_damage?: number;
+    checkpoint_pos?: number;
     
     // steal_buff
-    stolen_buff?: string;
-    stolen_from?: string;
+    stolen_by?: string;
     
     // state
     from_state?: string;
@@ -195,11 +198,10 @@ func (b *Builder) buildAction(entry gamelog.LogEntry) pkgnet.Action {
     switch entry.ActionType {
     case "move":
         action.Path = metadataGetIntSlice(meta, "path")
-        action.DiceSteps = metadataGetInt(meta, "dice_steps")
-        action.DiceType = metadataGetString(meta, "dice_type")
+        action.StartPos = metadataGetInt(meta, "start_pos")
+        action.EndPos = metadataGetInt(meta, "end_pos")
     case "add_buff":
         action.BuffType = metadataGetString(meta, "buff_type")
-        action.Duration = metadataGetInt(meta, "duration")
     // ... 其他类型
     }
 }
