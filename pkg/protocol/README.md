@@ -36,6 +36,13 @@ internal/engine/action (使用protocol.Game)
 internal/engine (实现protocol.Game)
 ```
 
+## 包分工
+
+根据架构设计：
+
+- **pkg/constants**: 存放 const 变量数据（BuffType, EventType, Faction, CellType 等）
+- **pkg/protocol**: 存放 interface 定义（Player, Game, MapEngine, Broadcast 等）
+
 ## 接口分层
 
 遵循Go的接口隔离原则，每个接口只包含必要的方法：
@@ -49,7 +56,7 @@ type PlayerReader interface {
     GetHP() int
     GetLP() int
     GetPosition() int
-    GetFaction() Faction
+    GetFaction() constants.Faction
     IsAlive() bool
     CanAct() bool
 }
@@ -88,9 +95,10 @@ type PlayerLite interface {
 
 ```go
 type Game interface {
-    GetCurrentPlayer() Player
-    GetPlayer(id string) Player
-    GetPlayers() []Player
+    GetCurrentPlayer() interface{}
+    GetPlayer(playerID id.PlayerID) interface{}
+    GetPlayers() []interface{}
+    GetGameLog() *gamelog.GameLog
 }
 ```
 
@@ -102,29 +110,45 @@ type PathResult interface {
     GetPath() []int
 }
 
+type Cell interface {
+    GetPosition() int
+    GetType() constants.CellType
+    IsFogActive() bool
+}
+
 type MapEngine interface {
     CalculatePath(startPos int, steps int) (PathResult, error)
+    GetLength() int
+    GetCell(pos int) (Cell, error)
+    GetLastCheckpoint(pos int) int
+    SetCellType(pos int, cellType constants.CellType) error
+    ActivateFog(pos int) error
+    IsFogActivated(pos int) bool
 }
 ```
 
-## 类型迁移
-
-部分类型从internal/core移至pkg/protocol以避免循环依赖：
-
-### Faction类型
+### Broadcast接口
 
 ```go
-// pkg/protocol/player.go
-type Faction int
-const (
-    FactionQingLong Faction = iota
-    FactionZhuQue
-    FactionBaiHu
-    FactionXuanWu
-)
+type Broadcast interface {
+    BroadcastStateSync(state interface{}) error
+    BroadcastTurnSync(turn interface{}) error
+    SendDecision(playerID string, decision interface{}) error
+    SendAvailable(playerID string, available interface{}) error
+    BroadcastMiniGameStart(start interface{}) error
+    BroadcastMiniGameResult(result interface{}) error
+    BroadcastGameOver(over interface{}) error
+    SendFullSync(playerID string, state, turn interface{}) error
+}
+```
 
-// internal/core/faction.go
-type Faction = protocol.Faction  // 类型别名
+### Dispatcher接口
+
+```go
+type Dispatcher interface {
+    BroadcastMessage(opCode int64, data []byte) error
+    SendMessage(playerID string, opCode int64, data []byte) error
+}
 ```
 
 ## 使用方式
@@ -169,8 +193,19 @@ type ActionContext struct {
 }
 ```
 
+## Metadata 契约
+
+**重要**: 项目中多个类型嵌入 `util.Metadata`，所有字段使用必须遵循契约文档。
+
+详见 [doc/metadata/README.md](../../doc/metadata/README.md)。
+
 ## 命名规范
 
 - 接口不带Interface后缀（遵循Go惯例）
 - Reader/Writer分离表示读写能力
 - Lite表示最小接口（仅包含必要方法）
+
+## 相关文档
+
+- [pkg/constants/README.md](../constants/README.md) - 常量类型定义
+- [doc/internal/metadata.md](../../doc/internal/metadata.md) - Metadata工具类使用说明

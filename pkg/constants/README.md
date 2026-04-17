@@ -203,6 +203,12 @@ pkg/constants/
 | Evaluation | internal/core/types | pkg/constants | ✓ 已完成 |
 | ActionSource | - | pkg/constants | ✓ 已添加 |
 
+## Metadata 契约
+
+**重要**: 项目中多个类型嵌入 `util.Metadata`，所有字段使用必须遵循契约文档。
+
+详见 [doc/metadata/README.md](../../doc/metadata/README.md)。
+
 ## Alias 使用
 
 其他包通过 type alias 引用 constants 类型，保持 API 兼容性：
