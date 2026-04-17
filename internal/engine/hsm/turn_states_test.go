@@ -7,6 +7,7 @@ import (
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/engine"
 	"github.com/b1tAction/paradiced/internal/gamemap"
+	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
@@ -416,11 +417,11 @@ func TestTurnEndState_Enter_TickBuffs(t *testing.T) {
 	game.AddPlayer(player)
 
 	// Add buff with 1 duration (will expire)
-	buff1 := core.NewBuff(core.BuffTypeCurse, 1)
+	buff1 := core.NewBuff(constants.BuffTypeCurse, 1)
 	game.ApplyBuffToPlayer(player, buff1)
 
 	// Add buff with 3 duration (won't expire)
-	buff2 := core.NewBuff(core.BuffTypeDivine, 3)
+	buff2 := core.NewBuff(constants.BuffTypeDivine, 3)
 	game.ApplyBuffToPlayer(player, buff2)
 
 	state := NewTurnEndState()
@@ -435,7 +436,7 @@ func TestTurnEndState_Enter_TickBuffs(t *testing.T) {
 	if len(player.ActiveBuffs) != 1 {
 		t.Errorf("Player should have 1 buff remaining, got %d", len(player.ActiveBuffs))
 	}
-	if player.ActiveBuffs[0].Type != core.BuffTypeDivine {
+	if player.ActiveBuffs[0].Type != constants.BuffTypeDivine {
 		t.Errorf("Remaining buff should be Divine, got %s", string(player.ActiveBuffs[0].Type))
 	}
 }
@@ -444,7 +445,7 @@ func TestTurnEndState_Enter_FactionCharging(t *testing.T) {
 	game := engine.NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{
 		ID:      id.NewPlayerID(),
-		Faction: core.FactionQingLong,
+		Faction: constants.FactionQingLong,
 	})
 	game.AddPlayer(player)
 

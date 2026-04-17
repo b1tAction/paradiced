@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/util"
 )
 
@@ -230,7 +231,7 @@ func TestLogStateTransition(t *testing.T) {
 
 	// Verify entry type
 	entry := seg.Entries[0]
-	if entry.Type != EntryTypeState {
+	if entry.Type != constants.EntryTypeState {
 		t.Errorf("Entry type should be state, got %s", entry.Type)
 	}
 
@@ -250,7 +251,7 @@ func TestNewActionEntry(t *testing.T) {
 	metadata := util.NewMetadata().SetBool("piercing", true)
 	entry := NewActionEntryWithMetadata("Damage", "player1", -5, "Event_Trap", metadata)
 
-	if entry.Type != EntryTypeAction {
+	if entry.Type != constants.EntryTypeAction {
 		t.Errorf("Type should be action, got %s", entry.Type)
 	}
 	if entry.ActionType != "Damage" {
@@ -276,7 +277,7 @@ func TestNewActionEntry(t *testing.T) {
 func TestNewStateEntry(t *testing.T) {
 	entry := NewStateEntry("TurnUpkeep", "MainAction", "player1")
 
-	if entry.Type != EntryTypeState {
+	if entry.Type != constants.EntryTypeState {
 		t.Errorf("Type should be state, got %s", entry.Type)
 	}
 	if entry.Target != "player1" {

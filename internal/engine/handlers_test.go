@@ -78,7 +78,7 @@ func TestFireBuffHandlerBehavior(t *testing.T) {
 	// Test Fire buff handler behavior
 	player := core.NewPlayer(core.PlayerConfig{
 		ID:      id.NewPlayerID(),
-		Faction: core.FactionZhuQue,
+		Faction: constants.FactionZhuQue,
 		MaxLP:   5,
 	})
 	initialLP := player.LP
@@ -125,7 +125,7 @@ func TestFireBuffHandlerNonBeforeTurnPhase(t *testing.T) {
 	// Fire only executes in BeforeTurn Phase
 	player := core.NewPlayer(core.PlayerConfig{
 		ID:      id.NewPlayerID(),
-		Faction: core.FactionZhuQue,
+		Faction: constants.FactionZhuQue,
 		MaxLP:   5,
 	})
 	ctx := event.NewContext(player)

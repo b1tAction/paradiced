@@ -7,7 +7,6 @@ import (
 	"github.com/b1tAction/paradiced/internal/core/buff"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/event"
-	"github.com/b1tAction/paradiced/pkg/gamelog"
 	"github.com/b1tAction/paradiced/pkg/id"
 )
 
@@ -148,7 +147,7 @@ func TestDamageAction(t *testing.T) {
 
 	// Verify log entry
 	entry := action.LogEntry()
-	if entry.Type != gamelog.EntryTypeAction {
+	if entry.Type != constants.EntryTypeAction {
 		t.Errorf("Log type should be action, got %s", entry.Type)
 	}
 	if entry.ActionType != "damage" {

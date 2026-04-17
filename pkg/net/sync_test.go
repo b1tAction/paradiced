@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
 	"github.com/b1tAction/paradiced/pkg/util"
 )
@@ -176,7 +177,7 @@ func TestLogEntryMetadataWithPath(t *testing.T) {
 func TestLogEntryMetadataOmitempty(t *testing.T) {
 	// Create entry with nil metadata (not using NewActionEntry)
 	entry := gamelog.LogEntry{
-		Type:       gamelog.EntryTypeAction,
+		Type:       constants.EntryTypeAction,
 		ActionType: "damage",
 		Target:     "player-001",
 		Delta:      -1,
