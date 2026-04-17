@@ -511,3 +511,36 @@ func (a *NakamaBroadcastAdapter) SendDecision(playerID string, decision *pkgnet.
 - [pkg/rng/README.md](../../pkg/rng/README.md) - RNG引擎和骰子类型
 - [internal/engine/hsm/README.md](../engine/hsm/README.md) - HSM状态机
 - [pkg/gamelog/README.md](../../pkg/gamelog/README.md) - 游戏日志系统
+- [doc/internal/nakama.md](../nakama.md) - Nakama Match Handler 集成
+
+## Nakama Match Handler 集成
+
+`internal/nakama` 包实现 Nakama Match Handler，使用 `DispatcherAdapter` 接口隔离 SDK 依赖：
+
+```go
+// DispatcherAdapter 接口定义
+type DispatcherAdapter interface {
+    BroadcastMessage(opCode int64, data []byte) error
+    SendMessage(playerID string, opCode int64, data []byte) error
+}
+
+// NakamaBroadcastAdapter 实现 BroadcastAdapter
+type NakamaBroadcastAdapter struct {
+    handler *NakamaMatchHandler
+}
+
+func (a *NakamaBroadcastAdapter) BroadcastStateSync(state *StateSync) error {
+    data, _ := json.Marshal(state)
+    return a.handler.dispatcher.BroadcastMessage(int64(OpStateSync), data)
+}
+```
+
+### 集成架构
+
+```
+Nakama Server → NakamaMatchHandler → DispatcherAdapter → pkg/net.BroadcastAdapter
+                     ↓
+              HSM StateContext.WithBroadcast()
+```
+
+完整集成文档见：[doc/internal/nakama.md](../nakama.md)

@@ -365,3 +365,26 @@ Faction 字段使用 **snake_case** 值：
 - [pkg/protocol/README.md](../protocol/README.md) - 协议接口层
 - [doc/internal/net_protocol.md](../../doc/internal/net_protocol.md) - 协议层完整设计
 - [internal/engine/hsm/README.md](../../internal/engine/hsm/README.md) - HSM 状态机
+- [doc/internal/nakama.md](../../doc/internal/nakama.md) - Nakama Match Handler 集成
+- [internal/nakama/README.md](../../internal/nakama/README.md) - Nakama 包文档
+
+## Nakama 集成实现
+
+`internal/nakama.NakamaBroadcastAdapter` 实现本包的 `BroadcastAdapter` 接口：
+
+```go
+// internal/nakama/broadcast.go
+type NakamaBroadcastAdapter struct {
+    handler *NakamaMatchHandler
+}
+
+func (a *NakamaBroadcastAdapter) BroadcastStateSync(state *StateSync) error {
+    data, err := json.Marshal(state)
+    if err != nil {
+        return err
+    }
+    return a.handler.dispatcher.BroadcastMessage(int64(OpStateSync), data)
+}
+```
+
+使用 `DispatcherAdapter` 接口隔离 Nakama SDK 依赖，支持无真实服务器的测试。
