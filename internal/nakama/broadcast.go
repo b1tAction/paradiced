@@ -21,28 +21,37 @@ func NewNakamaBroadcastAdapter(handler *NakamaMatchHandler) *NakamaBroadcastAdap
 }
 
 // BroadcastStateSync broadcasts state sync to all players.
-func (a *NakamaBroadcastAdapter) BroadcastStateSync(state *net.StateSync) error {
+func (a *NakamaBroadcastAdapter) BroadcastStateSync(state interface{}) error {
 	if a.handler.dispatcher == nil {
 		return nil // No dispatcher set
 	}
 
-	// Serialize state sync
-	data, err := json.Marshal(state)
+	// Type assert to concrete type for JSON serialization
+	stateSync, ok := state.(*net.StateSync)
+	if !ok {
+		return nil // Invalid type, skip
+	}
+
+	data, err := json.Marshal(stateSync)
 	if err != nil {
 		return err
 	}
 
-	// Broadcast to all players
 	return a.handler.dispatcher.BroadcastMessage(int64(net.OpStateSync), data)
 }
 
 // BroadcastTurnSync broadcasts turn action list to all players.
-func (a *NakamaBroadcastAdapter) BroadcastTurnSync(turn *net.TurnSync) error {
+func (a *NakamaBroadcastAdapter) BroadcastTurnSync(turn interface{}) error {
 	if a.handler.dispatcher == nil {
 		return nil // No dispatcher set
 	}
 
-	data, err := json.Marshal(turn)
+	turnSync, ok := turn.(*net.TurnSync)
+	if !ok {
+		return nil // Invalid type, skip
+	}
+
+	data, err := json.Marshal(turnSync)
 	if err != nil {
 		return err
 	}
@@ -51,12 +60,17 @@ func (a *NakamaBroadcastAdapter) BroadcastTurnSync(turn *net.TurnSync) error {
 }
 
 // SendDecision sends a decision request to a specific player.
-func (a *NakamaBroadcastAdapter) SendDecision(playerID string, decision *net.Decision) error {
+func (a *NakamaBroadcastAdapter) SendDecision(playerID string, decision interface{}) error {
 	if a.handler.dispatcher == nil {
 		return nil // No dispatcher set
 	}
 
-	data, err := json.Marshal(decision)
+	decisionReq, ok := decision.(*net.Decision)
+	if !ok {
+		return nil // Invalid type, skip
+	}
+
+	data, err := json.Marshal(decisionReq)
 	if err != nil {
 		return err
 	}
@@ -65,12 +79,17 @@ func (a *NakamaBroadcastAdapter) SendDecision(playerID string, decision *net.Dec
 }
 
 // SendAvailable sends available actions to a specific player.
-func (a *NakamaBroadcastAdapter) SendAvailable(playerID string, available *net.Available) error {
+func (a *NakamaBroadcastAdapter) SendAvailable(playerID string, available interface{}) error {
 	if a.handler.dispatcher == nil {
 		return nil // No dispatcher set
 	}
 
-	data, err := json.Marshal(available)
+	avail, ok := available.(*net.Available)
+	if !ok {
+		return nil // Invalid type, skip
+	}
+
+	data, err := json.Marshal(avail)
 	if err != nil {
 		return err
 	}
@@ -79,12 +98,17 @@ func (a *NakamaBroadcastAdapter) SendAvailable(playerID string, available *net.A
 }
 
 // BroadcastMiniGameStart broadcasts mini-game start notification.
-func (a *NakamaBroadcastAdapter) BroadcastMiniGameStart(start *net.MiniGameStart) error {
+func (a *NakamaBroadcastAdapter) BroadcastMiniGameStart(start interface{}) error {
 	if a.handler.dispatcher == nil {
 		return nil // No dispatcher set
 	}
 
-	data, err := json.Marshal(start)
+	miniStart, ok := start.(*net.MiniGameStart)
+	if !ok {
+		return nil // Invalid type, skip
+	}
+
+	data, err := json.Marshal(miniStart)
 	if err != nil {
 		return err
 	}
@@ -93,12 +117,17 @@ func (a *NakamaBroadcastAdapter) BroadcastMiniGameStart(start *net.MiniGameStart
 }
 
 // BroadcastMiniGameResult broadcasts mini-game ranking results.
-func (a *NakamaBroadcastAdapter) BroadcastMiniGameResult(result *net.MiniGameResult) error {
+func (a *NakamaBroadcastAdapter) BroadcastMiniGameResult(result interface{}) error {
 	if a.handler.dispatcher == nil {
 		return nil // No dispatcher set
 	}
 
-	data, err := json.Marshal(result)
+	miniResult, ok := result.(*net.MiniGameResult)
+	if !ok {
+		return nil // Invalid type, skip
+	}
+
+	data, err := json.Marshal(miniResult)
 	if err != nil {
 		return err
 	}
@@ -107,12 +136,17 @@ func (a *NakamaBroadcastAdapter) BroadcastMiniGameResult(result *net.MiniGameRes
 }
 
 // BroadcastGameOver broadcasts game end notification.
-func (a *NakamaBroadcastAdapter) BroadcastGameOver(over *net.GameOver) error {
+func (a *NakamaBroadcastAdapter) BroadcastGameOver(over interface{}) error {
 	if a.handler.dispatcher == nil {
 		return nil // No dispatcher set
 	}
 
-	data, err := json.Marshal(over)
+	gameOver, ok := over.(*net.GameOver)
+	if !ok {
+		return nil // Invalid type, skip
+	}
+
+	data, err := json.Marshal(gameOver)
 	if err != nil {
 		return err
 	}
@@ -121,15 +155,25 @@ func (a *NakamaBroadcastAdapter) BroadcastGameOver(over *net.GameOver) error {
 }
 
 // SendFullSync sends complete state to a reconnecting player.
-func (a *NakamaBroadcastAdapter) SendFullSync(playerID string, state *net.StateSync, turn *net.TurnSync) error {
+func (a *NakamaBroadcastAdapter) SendFullSync(playerID string, state, turn interface{}) error {
 	if a.handler.dispatcher == nil {
 		return nil // No dispatcher set
 	}
 
+	stateSync, ok := state.(*net.StateSync)
+	if !ok {
+		return nil // Invalid state type, skip
+	}
+
+	turnSync, ok := turn.(*net.TurnSync)
+	if !ok {
+		return nil // Invalid turn type, skip
+	}
+
 	// Send state sync and turn sync in one message
 	fullSync := map[string]interface{}{
-		"state_sync": state,
-		"turn_sync":  turn,
+		"state_sync": stateSync,
+		"turn_sync":  turnSync,
 	}
 
 	data, err := json.Marshal(fullSync)
