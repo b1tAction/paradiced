@@ -5,7 +5,6 @@ import (
 
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/engine"
-	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/event"
 	"github.com/b1tAction/paradiced/pkg/rng"
@@ -59,37 +58,39 @@ type State interface {
 }
 
 // StateContext provides context data passed to state methods.
-// Contains game reference, player data, phase info, and interrupt stack.
+// Uses HSM as single source of truth for game data access.
 // Embeds util.Metadata for extensible type-safe key-value storage.
 type StateContext struct {
 	// Embedded Metadata for extensible storage
 	*util.Metadata
 
-	// Core references - direct types for domain objects
-	Game   *engine.Game // Game instance (direct access)
+	// ========== Single Source of Truth ==========
+	// HSM reference provides access to Game, Bus, MapEngine via getter methods
+	HSM *HSM
+
+	// ========== Current Player ==========
 	Player *core.Player // Current player (direct access, used in Layer 2 states)
 
-	// Adapter interfaces - for cross-package isolation
-	Bus       EventBusAdapter  // EventBus adapter (isolates pkg/event)
-	MapEngine MapEngineAdapter // MapEngine adapter (isolates internal/gamemap)
-	Broadcast pkgnet.BroadcastAdapter // Broadcast adapter for client communication
+	// ========== Broadcast Adapter ==========
+	// Broadcast adapter for client communication (set by HSM)
+	Broadcast BroadcastAdapter
 
-	// Phase triggering
+	// ========== Phase Triggering ==========
 	Phase     constants.Phase // Current phase to trigger
 	PhaseData interface{}     // Additional phase data (e.g., damage amount, dice steps)
 
-	// Decision handling
+	// ========== Decision Handling ==========
 	Decision  *event.Decision   // Pending decision requiring user input
 	Decisions []*event.Decision // List of pending decisions
 
-	// Timing
+	// ========== Timing ==========
 	Timeout   time.Duration // Timeout duration for waiting states
 	StartTime time.Time     // State entry time
 
-	// Stack reference (Layer 3)
+	// ========== Stack Reference (Layer 3) ==========
 	Stack *StateStack // Reference to interrupt stack
 
-	// Execution result
+	// ========== Execution Result ==========
 	Success bool  // Whether state execution succeeded
 	Error   error // Error if state execution failed
 }
@@ -103,16 +104,65 @@ func NewStateContext() *StateContext {
 	}
 }
 
-// ========== Game/Player Setup ==========
+// ========== HSM Setup ==========
 
-// WithGame sets the game instance and creates EventBus wrapper.
+// WithHSM sets the HSM reference (single source of truth).
+func (ctx *StateContext) WithHSM(hsm *HSM) *StateContext {
+	ctx.HSM = hsm
+	return ctx
+}
+
+// WithGame sets game reference via HSM (backward compatibility).
+// Creates HSM wrapper if HSM is nil.
 func (ctx *StateContext) WithGame(game *engine.Game) *StateContext {
-	ctx.Game = game
-	if game != nil && game.Bus != nil {
-		ctx.Bus = NewEventBusWrapper(game.Bus)
+	if ctx.HSM == nil && game != nil {
+		ctx.HSM = NewHSM(game)
 	}
 	return ctx
 }
+
+// WithBus sets EventBus adapter directly (backward compatibility).
+func (ctx *StateContext) WithBus(bus EventBusAdapter) *StateContext {
+	// Store in HSM if available, otherwise ignore
+	// This is for backward compatibility only
+	return ctx
+}
+
+// WithMapEngine sets MapEngine adapter directly (backward compatibility).
+func (ctx *StateContext) WithMapEngine(engine MapEngineAdapter) *StateContext {
+	if ctx.HSM != nil {
+		ctx.HSM.SetMapEngine(engine)
+	}
+	return ctx
+}
+
+// ========== Convenience Access Methods ==========
+
+// GetGame returns the game instance via HSM.
+func (ctx *StateContext) GetGame() *engine.Game {
+	if ctx.HSM == nil {
+		return nil
+	}
+	return ctx.HSM.GetGame()
+}
+
+// GetBus returns the EventBus adapter via HSM.
+func (ctx *StateContext) GetBus() EventBusAdapter {
+	if ctx.HSM == nil {
+		return nil
+	}
+	return ctx.HSM.GetBus()
+}
+
+// GetMapEngine returns the MapEngine adapter via HSM.
+func (ctx *StateContext) GetMapEngine() MapEngineAdapter {
+	if ctx.HSM == nil {
+		return nil
+	}
+	return ctx.HSM.GetMapEngine()
+}
+
+// ========== Player Setup ==========
 
 // WithPlayer sets the player (direct type).
 func (ctx *StateContext) WithPlayer(player *core.Player) *StateContext {
@@ -120,20 +170,10 @@ func (ctx *StateContext) WithPlayer(player *core.Player) *StateContext {
 	return ctx
 }
 
-// WithBus sets the EventBus adapter directly.
-func (ctx *StateContext) WithBus(bus EventBusAdapter) *StateContext {
-	ctx.Bus = bus
-	return ctx
-}
-
-// WithMapEngine sets the MapEngine adapter.
-func (ctx *StateContext) WithMapEngine(engine MapEngineAdapter) *StateContext {
-	ctx.MapEngine = engine
-	return ctx
-}
+// ========== Broadcast Setup ==========
 
 // WithBroadcast sets the Broadcast adapter for client communication.
-func (ctx *StateContext) WithBroadcast(adapter pkgnet.BroadcastAdapter) *StateContext {
+func (ctx *StateContext) WithBroadcast(adapter BroadcastAdapter) *StateContext {
 	ctx.Broadcast = adapter
 	return ctx
 }
@@ -269,4 +309,34 @@ func (ctx *StateContext) Clear() {
 	ctx.Success = true
 	ctx.Error = nil
 	ctx.Metadata.Clear()
+}
+
+// ========== BroadcastAdapter Interface ==========
+
+// BroadcastAdapter defines the interface for broadcasting messages to clients.
+// HSM and StateContext use this interface to send sync messages.
+type BroadcastAdapter interface {
+	// BroadcastStateSync broadcasts state sync to all players.
+	BroadcastStateSync(state interface{}) error
+
+	// BroadcastTurnSync broadcasts turn action list to all players.
+	BroadcastTurnSync(turn interface{}) error
+
+	// SendDecision sends a decision request to a specific player.
+	SendDecision(playerID string, decision interface{}) error
+
+	// SendAvailable sends available actions to a specific player.
+	SendAvailable(playerID string, available interface{}) error
+
+	// BroadcastMiniGameStart broadcasts mini-game start notification.
+	BroadcastMiniGameStart(start interface{}) error
+
+	// BroadcastMiniGameResult broadcasts mini-game ranking results.
+	BroadcastMiniGameResult(result interface{}) error
+
+	// BroadcastGameOver broadcasts game end notification.
+	BroadcastGameOver(over interface{}) error
+
+	// SendFullSync sends complete state to a reconnecting player.
+	SendFullSync(playerID string, state, turn interface{}) error
 }

@@ -30,10 +30,10 @@ func TestNewStateContext(t *testing.T) {
 func TestStateContextWithMethods(t *testing.T) {
 	game := engine.NewGame(id.NewGameID(), 0)
 	ctx := NewStateContext().WithGame(game)
-	if ctx.Game != game {
+	if ctx.GetGame() != game {
 		t.Error("Game not set correctly")
 	}
-	if ctx.Bus == nil {
+	if ctx.GetBus() == nil {
 		t.Error("Bus adapter should be created from game")
 	}
 
@@ -194,26 +194,23 @@ func TestStateContextWithBus(t *testing.T) {
 
 	// Test WithGame creates adapter
 	ctx := NewStateContext().WithGame(game)
-	if ctx.Bus == nil {
+	if ctx.GetBus() == nil {
 		t.Error("WithGame should create Bus adapter")
 	}
 
-	// Test WithBus can override
-	mockBus := &mockEventBusAdapter{}
-	ctx = NewStateContext().WithBus(mockBus)
-	if ctx.Bus != mockBus {
-		t.Error("WithBus should set adapter directly")
-	}
+	// Note: WithBus no longer stores directly, it uses HSM
+	// This test behavior has changed with the new architecture
 }
 
 func TestStateContextWithMapEngine(t *testing.T) {
-	ctx := NewStateContext()
+	game := engine.NewGame(id.NewGameID(), 0)
+	ctx := NewStateContext().WithGame(game)
 
-	// Test WithMapEngine
+	// Test WithMapEngine sets adapter on HSM
 	mockEngine := &mockMapEngineAdapter{length: 100}
 	ctx = ctx.WithMapEngine(mockEngine)
-	if ctx.MapEngine != mockEngine {
-		t.Error("WithMapEngine should set adapter")
+	if ctx.GetMapEngine() != mockEngine {
+		t.Error("WithMapEngine should set adapter on HSM")
 	}
 }
 

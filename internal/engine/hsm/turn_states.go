@@ -64,22 +64,24 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 	}
 
 	// Start turn log segment
-	if ctx.Game != nil && ctx.Game.Log != nil {
-		ctx.Game.Log.StartTurn(ctx.Game.State.Round, ctx.Game.State.Turn, player.ID.UUID())
+	game := ctx.GetGame()
+	if game != nil && game.Log != nil {
+		game.Log.StartTurn(game.State.Round, game.State.Turn, player.ID.UUID())
 	}
 
 	// Create ActionContext for executing Actions
+	mapEngine := ctx.GetMapEngine()
 	s.actionCtx = engineaction.NewActionContext(
-		NewGameWrapper(ctx.Game),
-		ctx.Game.Bus,
-		NewProtocolMapEngineWrapper(ctx.MapEngine),
-		ctx.Game.Draw,
+		NewGameWrapper(game),
+		game.Bus,
+		NewProtocolMapEngineWrapper(mapEngine),
+		game.Draw,
 	)
 
 	// Step 1: Check IsDead -> Respawn at checkpoint using RespawnAction
 	if player.IsDead {
-		if ctx.MapEngine != nil {
-			checkpoint := ctx.MapEngine.GetLastCheckpoint(player.Position)
+		if mapEngine != nil {
+			checkpoint := mapEngine.GetLastCheckpoint(player.Position)
 			respawnAction := engineaction.NewRespawnAction(player, checkpoint, "DeathRespawn")
 			s.actionCtx.ExecuteAction(respawnAction)
 		}
@@ -103,7 +105,7 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 	triggerCtx.Set("current_player", player)
 
 	// Publish PhaseBeforeTurn to trigger Buff effects
-	s.decisions = ctx.Bus.Publish(constants.PhaseBeforeTurn, player.ID.UUID(), triggerCtx)
+	s.decisions = ctx.GetBus().Publish(constants.PhaseBeforeTurn, player.ID.UUID(), triggerCtx)
 
 	// Step 4: Execute any derived Actions from handlers
 	s.actionCtx.ProcessQueue()
@@ -120,7 +122,8 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 
 // broadcastStateSync broadcasts current game state to clients.
 func (s *TurnUpkeepState) broadcastStateSync(ctx *StateContext) {
-	if ctx.Broadcast == nil || ctx.Game == nil {
+	game := ctx.GetGame()
+	if ctx.Broadcast == nil || game == nil {
 		return
 	}
 	stateSync := buildStateSync(ctx)
@@ -129,7 +132,8 @@ func (s *TurnUpkeepState) broadcastStateSync(ctx *StateContext) {
 
 // buildStateSync creates StateSync from context data.
 func buildStateSync(ctx *StateContext) *pkgnet.StateSync {
-	globalState := ctx.Game.State.CurrentPhase // Use CurrentPhase as global state
+	game := ctx.GetGame()
+	globalState := game.State.CurrentPhase // Use CurrentPhase as global state
 	turnState := "" // Will be set by current turn state
 
 	var turnPlayerID string
@@ -137,8 +141,8 @@ func buildStateSync(ctx *StateContext) *pkgnet.StateSync {
 		turnPlayerID = ctx.Player.ID.UUID()
 	}
 
-	players := make([]pkgnet.Player, len(ctx.Game.Players))
-	for i, p := range ctx.Game.Players {
+	players := make([]pkgnet.Player, len(game.Players))
+	for i, p := range game.Players {
 		players[i] = pkgnet.Player{
 			UserID:      p.ID.UUID(),
 			Faction:     p.GetFaction().SnakeCase(),
@@ -158,8 +162,8 @@ func buildStateSync(ctx *StateContext) *pkgnet.StateSync {
 		GlobalState: globalState,
 		TurnState:   turnState,
 		TurnPlayer:  turnPlayerID,
-		Round:       ctx.Game.State.Round,
-		Turn:        ctx.Game.State.Turn,
+		Round:       game.State.Round,
+		Turn:        game.State.Turn,
 		Paused:      false,
 		Players:     players,
 	}
@@ -240,14 +244,15 @@ func buildTurnSync(ctx *StateContext) *pkgnet.TurnSync {
 
 	// Get current turn's entries from GameLog
 	var entries []gamelog.LogEntry
-	if ctx.Game != nil && ctx.Game.Log != nil {
+	game := ctx.GetGame()
+	if game != nil && game.Log != nil {
 		// Get entries for current turn
-		entries = ctx.Game.Log.GetCurrentTurnEntries()
+		entries = game.Log.GetCurrentTurnEntries()
 	}
 
 	return &pkgnet.TurnSync{
-		Round:   ctx.Game.State.Round,
-		Turn:    ctx.Game.State.Turn,
+		Round:   game.State.Round,
+		Turn:    game.State.Turn,
 		Player:  playerID,
 		Entries: entries,
 	}
@@ -312,11 +317,13 @@ func (s *MainActionState) Enter(ctx *StateContext) {
 	}
 
 	// Initialize action context
+	game := ctx.GetGame()
+	mapEngine := ctx.GetMapEngine()
 	s.actionCtx = engineaction.NewActionContext(
-		NewGameWrapper(ctx.Game),
-		ctx.Game.Bus,
-		NewProtocolMapEngineWrapper(ctx.MapEngine),
-		ctx.Game.Draw,
+		NewGameWrapper(game),
+		game.Bus,
+		NewProtocolMapEngineWrapper(mapEngine),
+		game.Draw,
 	)
 
 	s.startTime = time.Now()
@@ -337,7 +344,8 @@ func (s *MainActionState) Enter(ctx *StateContext) {
 
 // broadcastStateSync broadcasts current game state.
 func (s *MainActionState) broadcastStateSync(ctx *StateContext) {
-	if ctx.Broadcast == nil || ctx.Game == nil {
+	game := ctx.GetGame()
+	if ctx.Broadcast == nil || game == nil {
 		return
 	}
 	stateSync := buildStateSync(ctx)
@@ -346,7 +354,8 @@ func (s *MainActionState) broadcastStateSync(ctx *StateContext) {
 
 // sendAvailable sends available actions to current player.
 func (s *MainActionState) sendAvailable(ctx *StateContext) {
-	if ctx.Broadcast == nil || ctx.Game == nil || ctx.Player == nil {
+	game := ctx.GetGame()
+	if ctx.Broadcast == nil || game == nil || ctx.Player == nil {
 		return
 	}
 	available := buildAvailable(ctx, ctx.Player)
@@ -394,7 +403,7 @@ func (s *MainActionState) OnUseItem(ctx *StateContext, itemID string) {
 	triggerCtx.Set("item_id", itemID)
 	triggerCtx.Set("action_context", s.actionCtx)
 
-	ctx.Bus.Publish(constants.PhaseItemUsed, player.ID.UUID(), triggerCtx)
+	ctx.GetBus().Publish(constants.PhaseItemUsed, player.ID.UUID(), triggerCtx)
 
 	// Process derived actions
 	s.actionCtx.ProcessQueue()
@@ -462,11 +471,13 @@ func (s *TurnMovingState) Enter(ctx *StateContext) {
 	}
 
 	// Create ActionContext
+	game := ctx.GetGame()
+	mapEngine := ctx.GetMapEngine()
 	s.actionCtx = engineaction.NewActionContext(
-		NewGameWrapper(ctx.Game),
-		ctx.Game.Bus,
-		NewProtocolMapEngineWrapper(ctx.MapEngine),
-		ctx.Game.Draw,
+		NewGameWrapper(game),
+		game.Bus,
+		NewProtocolMapEngineWrapper(mapEngine),
+		game.Draw,
 	)
 
 	// Create and execute MoveAction
@@ -495,8 +506,8 @@ func (s *TurnMovingState) Enter(ctx *StateContext) {
 	}
 
 	// Check for reaching end (Boss cell)
-	if ctx.MapEngine != nil {
-		mapLength := ctx.MapEngine.GetLength()
+	if mapEngine != nil {
+		mapLength := mapEngine.GetLength()
 		if player.Position >= mapLength-1 {
 			s.reachedEnd = true
 			ctx.SetReachedEnd(true)
@@ -505,10 +516,10 @@ func (s *TurnMovingState) Enter(ctx *StateContext) {
 
 	// Handle Fog activation (first player passing through)
 	for _, pos := range s.pathResult.Path {
-		if ctx.MapEngine != nil {
-			cell, _ := ctx.MapEngine.GetCell(pos)
+		if mapEngine != nil {
+			cell, _ := mapEngine.GetCell(pos)
 			if cell != nil && cell.CellType == gamemap.CellTypeFog {
-				ctx.MapEngine.ActivateFog(pos)
+				mapEngine.ActivateFog(pos)
 			}
 		}
 	}
@@ -575,16 +586,18 @@ func (s *TurnLandedState) Enter(ctx *StateContext) {
 	}
 
 	// Create ActionContext
+	game := ctx.GetGame()
+	mapEngine := ctx.GetMapEngine()
 	s.actionCtx = engineaction.NewActionContext(
-		NewGameWrapper(ctx.Game),
-		ctx.Game.Bus,
-		NewProtocolMapEngineWrapper(ctx.MapEngine),
-		ctx.Game.Draw,
+		NewGameWrapper(game),
+		game.Bus,
+		NewProtocolMapEngineWrapper(mapEngine),
+		game.Draw,
 	)
 
 	// Get cell type at landing position
-	if ctx.MapEngine != nil {
-		cell, err := ctx.MapEngine.GetCell(player.Position)
+	if mapEngine != nil {
+		cell, err := mapEngine.GetCell(player.Position)
 		if err == nil && cell != nil {
 			s.cellType = cell.CellType
 		}
@@ -596,7 +609,7 @@ func (s *TurnLandedState) Enter(ctx *StateContext) {
 	triggerCtx.Set("cell_type", s.cellType)
 	triggerCtx.Set("position", player.Position)
 
-	s.decisions = ctx.Bus.Publish(constants.PhaseOnLand, player.ID.UUID(), triggerCtx)
+	s.decisions = ctx.GetBus().Publish(constants.PhaseOnLand, player.ID.UUID(), triggerCtx)
 
 	// Process derived actions
 	s.actionCtx.ProcessQueue()
@@ -660,11 +673,13 @@ func (s *TurnEventState) Enter(ctx *StateContext) {
 	}
 
 	// Create ActionContext
+	game := ctx.GetGame()
+	mapEngine := ctx.GetMapEngine()
 	s.actionCtx = engineaction.NewActionContext(
-		NewGameWrapper(ctx.Game),
-		ctx.Game.Bus,
-		NewProtocolMapEngineWrapper(ctx.MapEngine),
-		ctx.Game.Draw,
+		NewGameWrapper(game),
+		game.Bus,
+		NewProtocolMapEngineWrapper(mapEngine),
+		game.Draw,
 	)
 
 	// Create DrawEventAction (PreTriggerPhase = PhasePreEvent)
@@ -733,18 +748,20 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 	}
 
 	// Create ActionContext
+	game := ctx.GetGame()
+	mapEngine := ctx.GetMapEngine()
 	s.actionCtx = engineaction.NewActionContext(
-		NewGameWrapper(ctx.Game),
-		ctx.Game.Bus,
-		NewProtocolMapEngineWrapper(ctx.MapEngine),
-		ctx.Game.Draw,
+		NewGameWrapper(game),
+		game.Bus,
+		NewProtocolMapEngineWrapper(mapEngine),
+		game.Draw,
 	)
 
 	// Trigger PhaseAfterTurn
 	triggerCtx := event.NewContext(player)
 	triggerCtx.Set("action_context", s.actionCtx)
 
-	decisions := ctx.Bus.Publish(constants.PhaseAfterTurn, player.ID.UUID(), triggerCtx)
+	decisions := ctx.GetBus().Publish(constants.PhaseAfterTurn, player.ID.UUID(), triggerCtx)
 
 	// Process derived actions (甘霖/腐化 effects)
 	s.actionCtx.ProcessQueue()
@@ -754,13 +771,13 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 
 	// Handle expired buffs (unsubscribe from EventBus)
 	for _, expired := range expiredBuffs {
-		ctx.Game.UnsubscribeBuff(expired)
+		game.UnsubscribeBuff(expired)
 	}
 
 	// Check IsDead after AfterTurn effects - use RespawnAction
 	if player.IsDead {
-		if ctx.MapEngine != nil {
-			checkpoint := ctx.MapEngine.GetLastCheckpoint(player.Position)
+		if mapEngine != nil {
+			checkpoint := mapEngine.GetLastCheckpoint(player.Position)
 			respawnAction := engineaction.NewRespawnAction(player, checkpoint, "AfterTurnRespawn")
 			s.actionCtx.ExecuteAction(respawnAction)
 		}
@@ -775,8 +792,8 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 	}
 
 	// End turn log segment
-	if ctx.Game != nil && ctx.Game.Log != nil {
-		ctx.Game.Log.EndTurn()
+	if game != nil && game.Log != nil {
+		game.Log.EndTurn()
 	}
 
 	// Broadcast TurnSync (all actions from this turn)
@@ -788,7 +805,8 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 
 // broadcastTurnSync broadcasts all actions from current turn.
 func (s *TurnEndState) broadcastTurnSync(ctx *StateContext) {
-	if ctx.Broadcast == nil || ctx.Game == nil {
+	game := ctx.GetGame()
+	if ctx.Broadcast == nil || game == nil {
 		return
 	}
 	turnSync := buildTurnSync(ctx)
@@ -797,7 +815,8 @@ func (s *TurnEndState) broadcastTurnSync(ctx *StateContext) {
 
 // broadcastStateSync broadcasts final game state after turn.
 func (s *TurnEndState) broadcastStateSync(ctx *StateContext) {
-	if ctx.Broadcast == nil || ctx.Game == nil {
+	game := ctx.GetGame()
+	if ctx.Broadcast == nil || game == nil {
 		return
 	}
 	stateSync := buildStateSync(ctx)

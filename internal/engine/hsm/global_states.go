@@ -80,7 +80,8 @@ func NewRoundMiniGameState() *RoundMiniGameState {
 
 func (s *RoundMiniGameState) Enter(ctx *StateContext) {
 	// Start mini-game phase
-	s.totalPlayers = len(ctx.Game.Players)
+	game := ctx.GetGame()
+	s.totalPlayers = len(game.Players)
 	s.resultsReceived = 0
 
 	ctx.SetBool(KeyMiniGameStarted, true)
@@ -88,8 +89,8 @@ func (s *RoundMiniGameState) Enter(ctx *StateContext) {
 
 	// Broadcast MiniGameStart to all clients
 	if ctx.Broadcast != nil {
-		playerIDs := make([]string, len(ctx.Game.Players))
-		for i, p := range ctx.Game.Players {
+		playerIDs := make([]string, len(game.Players))
+		for i, p := range game.Players {
 			playerIDs[i] = p.ID.UUID()
 		}
 		start := &pkgnet.MiniGameStart{
@@ -143,7 +144,8 @@ func (s *RoundPrepState) Enter(ctx *StateContext) {
 	// Rank 3 -> Copper dice
 	// Rank 4 -> Wood dice (uniform distribution)
 
-	players := ctx.Game.Players
+	game := ctx.GetGame()
+	players := game.Players
 	for _, player := range players {
 		// Default assignment based on position (will be updated by mini-game results)
 		rank := len(players) // Default to lowest rank
@@ -157,7 +159,7 @@ func (s *RoundPrepState) Enter(ctx *StateContext) {
 	}
 
 	// Increment round counter
-	ctx.Game.State.Round++
+	game.State.Round++
 
 	ctx.Success = true
 }
@@ -194,9 +196,10 @@ func NewTurnLoopState() *TurnLoopState {
 func (s *TurnLoopState) Enter(ctx *StateContext) {
 	// Initialize turn queue
 	// First player starts their turn
-	players := ctx.Game.Players
+	game := ctx.GetGame()
+	players := game.Players
 	if len(players) > 0 {
-		ctx.Game.State.Turn = 0
+		game.State.Turn = 0
 	}
 
 	ctx.SetBool(KeyTurnLoopActive, true)
@@ -226,7 +229,8 @@ func (s *TurnLoopState) Exit(ctx *StateContext) {
 
 // StartPlayerTurn initiates a player's turn (called by external controller).
 func (s *TurnLoopState) StartPlayerTurn(ctx *StateContext) StateID {
-	players := ctx.Game.Players
+	game := ctx.GetGame()
+	players := game.Players
 	if s.currentPlayerIndex >= len(players) {
 		// All players completed, next round
 		s.currentPlayerIndex = 0
@@ -235,7 +239,7 @@ func (s *TurnLoopState) StartPlayerTurn(ctx *StateContext) StateID {
 	}
 
 	// Set current player
-	ctx.Game.State.Turn = s.currentPlayerIndex
+	game.State.Turn = s.currentPlayerIndex
 
 	// Transition to TurnUpkeep (first turn state)
 	return StateTurnUpkeep
@@ -292,7 +296,7 @@ func (s *BossBattleState) Enter(ctx *StateContext) {
 	if triggerID != "" {
 		parsedID, err := id.ParsePlayerID(triggerID)
 		if err == nil {
-			s.triggerPlayer = ctx.Game.GetPlayer(parsedID)
+			s.triggerPlayer = ctx.GetGame().GetPlayer(parsedID)
 		}
 	}
 
@@ -337,12 +341,13 @@ func NewGameOverState() *GameOverState {
 
 func (s *GameOverState) Enter(ctx *StateContext) {
 	// Broadcast winner and perform final data settlement
+	game := ctx.GetGame()
 
 	winnerID := ctx.GetStringOrDefault(KeyWinner, "")
 	if winnerID != "" {
 		parsedID, err := id.ParsePlayerID(winnerID)
 		if err == nil {
-			s.winner = ctx.Game.GetPlayer(parsedID)
+			s.winner = game.GetPlayer(parsedID)
 		}
 	}
 
@@ -351,8 +356,8 @@ func (s *GameOverState) Enter(ctx *StateContext) {
 
 	// Broadcast GameOver to all clients
 	if ctx.Broadcast != nil {
-		stats := make([]pkgnet.PlayerStats, len(ctx.Game.Players))
-		for i, p := range ctx.Game.Players {
+		stats := make([]pkgnet.PlayerStats, len(game.Players))
+		for i, p := range game.Players {
 			stats[i] = pkgnet.PlayerStats{
 				UserID:      p.ID.UUID(),
 				RoundsWon:   0, // TODO: track rounds won
