@@ -14,7 +14,7 @@ import (
 // Player represents a player in the game.
 type Player struct {
 	ID             id.PlayerID       `json:"id"`           // Player unique identifier (UUID v7)
-	Faction        Faction           `json:"faction"`      // Faction (阵营)
+	Faction        constants.Faction `json:"faction"`      // Faction (阵营)
 	Position       int               `json:"position"`     // Current position
 	HP             int               `json:"hp"`           // Health points
 	LP             int               `json:"lp"`           // Luck points (affects random events)
@@ -27,8 +27,8 @@ type Player struct {
 
 // PlayerConfig represents player configuration.
 type PlayerConfig struct {
-	ID       id.PlayerID // Player unique identifier
-	Faction  Faction
+	ID       id.PlayerID
+	Faction  constants.Faction
 	MaxHP    int
 	MaxLP    int
 	StartPos int
@@ -69,7 +69,7 @@ func NewPlayer(config PlayerConfig) *Player {
 	}
 
 	// ZhuQue朱雀 faction starts with Fire离火 buff
-	if config.Faction == FactionZhuQue {
+	if config.Faction == constants.FactionZhuQue {
 		player.AddBuff(buff.NewBuff(constants.BuffTypeFire, -1))
 	}
 
@@ -94,7 +94,7 @@ func (p *Player) GetLP() int { return p.LP }
 func (p *Player) GetPosition() int { return p.Position }
 
 // GetFaction returns the player's faction.
-func (p *Player) GetFaction() Faction { return p.Faction }
+func (p *Player) GetFaction() constants.Faction { return p.Faction }
 
 // ========== HP/LP Logic ==========
 

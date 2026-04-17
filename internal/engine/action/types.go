@@ -77,7 +77,7 @@ func (a *DamageAction) LogEntry() gamelog.LogEntry {
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
-		Type:       gamelog.EntryTypeAction,
+		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
 		Delta:      -a.Amount,
@@ -131,7 +131,7 @@ func (a *HealAction) Execute(ctx *ActionContext) error {
 func (a *HealAction) LogEntry() gamelog.LogEntry {
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
-		Type:       gamelog.EntryTypeAction,
+		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
 		Delta:      a.Amount,
@@ -185,7 +185,7 @@ func (a *ModifyLPAction) Execute(ctx *ActionContext) error {
 func (a *ModifyLPAction) LogEntry() gamelog.LogEntry {
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
-		Type:       gamelog.EntryTypeAction,
+		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
 		Delta:      a.Amount,
@@ -265,7 +265,7 @@ func (a *MoveAction) LogEntry() gamelog.LogEntry {
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
-		Type:       gamelog.EntryTypeAction,
+		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
 		Delta:      a.Steps,
@@ -331,7 +331,7 @@ func (a *AddBuffAction) LogEntry() gamelog.LogEntry {
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
-		Type:       gamelog.EntryTypeAction,
+		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
 		Delta:      a.Duration,
@@ -384,7 +384,7 @@ func (a *RemoveBuffAction) LogEntry() gamelog.LogEntry {
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
-		Type:       gamelog.EntryTypeAction,
+		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
 		Delta:      0,
@@ -439,7 +439,7 @@ func (a *TeleportAction) LogEntry() gamelog.LogEntry {
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
-		Type:       gamelog.EntryTypeAction,
+		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
 		Delta:      a.TargetPos,
@@ -510,7 +510,7 @@ func (a *StealBuffAction) LogEntry() gamelog.LogEntry {
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
-		Type:       gamelog.EntryTypeAction,
+		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
 		Delta:      0,
@@ -612,7 +612,7 @@ func (a *DrawEventAction) Execute(ctx *ActionContext) error {
 func (a *DrawEventAction) LogEntry() gamelog.LogEntry {
 	entry := gamelog.LogEntry{
 		Timestamp:  time.Now(),
-		Type:       gamelog.EntryTypeAction,
+		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
 		Delta:      0,
@@ -676,7 +676,7 @@ func (a *RespawnAction) LogEntry() gamelog.LogEntry {
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
-		Type:       gamelog.EntryTypeAction,
+		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
 		Delta:      0,
@@ -735,7 +735,7 @@ func (a *FellDownAction) LogEntry() gamelog.LogEntry {
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
-		Type:       gamelog.EntryTypeAction,
+		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
 		Delta:      -a.Damage,

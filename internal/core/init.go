@@ -7,29 +7,11 @@ import (
 	"github.com/b1tAction/paradiced/internal/core/buff"
 	"github.com/b1tAction/paradiced/internal/core/event"
 	"github.com/b1tAction/paradiced/internal/core/item"
-	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/handler"
 )
 
 // Re-export types from subpackages for convenience.
 // This allows users to import core and access all types directly.
-
-// BuffType from constants package
-type BuffType = constants.BuffType
-
-// BuffType constants from constants package
-const (
-	BuffTypeNone     = constants.BuffTypeNone
-	BuffTypeCurse    = constants.BuffTypeCurse
-	BuffTypeLost     = constants.BuffTypeLost
-	BuffTypeCorrupt  = constants.BuffTypeCorrupt
-	BuffTypePoison   = constants.BuffTypePoison
-	BuffTypeHidden   = constants.BuffTypeHidden
-	BuffTypeDivine   = constants.BuffTypeDivine
-	BuffTypeRain     = constants.BuffTypeRain
-	BuffTypeExorcism = constants.BuffTypeExorcism
-	BuffTypeFire     = constants.BuffTypeFire
-)
 
 // Buff from buff package
 type Buff = buff.Buff
@@ -59,28 +41,6 @@ var (
 // BuffHandlerConfig from buff package
 type BuffHandlerConfig = buff.BuffHandlerConfig
 
-// EventType from constants package
-type EventType = constants.EventType
-
-// EventType constants from constants package
-const (
-	EventTypeNone        = constants.EventTypeNone
-	EventTypeHerb        = constants.EventTypeHerb
-	EventTypeMilkTea     = constants.EventTypeMilkTea
-	EventTypeRelic       = constants.EventTypeRelic
-	EventTypeDivineBless = constants.EventTypeDivineBless
-	EventTypeExchange    = constants.EventTypeExchange
-	EventTypeHiddenBuff  = constants.EventTypeHiddenBuff
-	EventTypeTasteTest   = constants.EventTypeTasteTest
-	EventTypeMosquito    = constants.EventTypeMosquito
-	EventTypeGhostHit    = constants.EventTypeGhostHit
-	EventTypeDogPoop     = constants.EventTypeDogPoop
-	EventTypeThief       = constants.EventTypeThief
-	EventTypeCurseBuddha = constants.EventTypeCurseBuddha
-	EventTypeLostWay     = constants.EventTypeLostWay
-	EventTypeThunder     = constants.EventTypeThunder
-)
-
 // Event registry access functions from event package
 var (
 	GetEventDefinition      = event.GetEventDefinition
@@ -97,18 +57,6 @@ type EventDefinition = event.EventDefinition
 
 // EventHandlerConfig from event package
 type EventHandlerConfig = event.EventHandlerConfig
-
-// ItemType from constants package
-type ItemType = constants.ItemType
-
-// ItemType constants from constants package
-const (
-	ItemTypeNone         = constants.ItemTypeNone
-	ItemTypeReverseClock = constants.ItemTypeReverseClock
-	ItemTypeAnyDoor      = constants.ItemTypeAnyDoor
-	ItemTypeDiceSwap     = constants.ItemTypeDiceSwap
-	ItemTypeDiceUpgrade  = constants.ItemTypeDiceUpgrade
-)
 
 // Item from item package
 type Item = item.Item
@@ -142,25 +90,3 @@ var GlobalEventRegistry = event.GlobalEventRegistry
 
 // GlobalItemRegistry from item package (for advanced use)
 var GlobalItemRegistry = item.GlobalItemRegistry
-
-// CombinedRegistry provides a unified interface for all registries.
-// Used for backward compatibility with tests and legacy code.
-type CombinedRegistry struct{}
-
-// GlobalRegistry is the combined registry for backward compatibility.
-var GlobalRegistry = &CombinedRegistry{}
-
-// GetBuffTypesByEvaluationRange delegates to BuffRegistry.
-func (r *CombinedRegistry) GetBuffTypesByEvaluationRange(minEval, maxEval constants.Evaluation) []constants.BuffType {
-	return GlobalBuffRegistry.GetBuffTypesByEvaluationRange(minEval, maxEval)
-}
-
-// GetEventTypesByEvaluationRange delegates to EventRegistry.
-func (r *CombinedRegistry) GetEventTypesByEvaluationRange(minEval, maxEval constants.Evaluation) []constants.EventType {
-	return GlobalEventRegistry.GetEventTypesByEvaluationRange(minEval, maxEval)
-}
-
-// GetItemTypesByEvaluationRange delegates to ItemRegistry.
-func (r *CombinedRegistry) GetItemTypesByEvaluationRange(minEval, maxEval constants.Evaluation) []constants.ItemType {
-	return GlobalItemRegistry.GetItemTypesByEvaluationRange(minEval, maxEval)
-}

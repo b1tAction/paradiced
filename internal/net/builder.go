@@ -9,6 +9,7 @@ import (
 	"github.com/b1tAction/paradiced/internal/core/item"
 	"github.com/b1tAction/paradiced/internal/engine"
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
+	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
@@ -164,7 +165,7 @@ func (b *Builder) BuildAvailable(player *core.Player) *pkgnet.Available {
 	// Check faction skill availability
 	canUseSkill := false
 	switch player.Faction {
-	case core.FactionQingLong, core.FactionXuanWu:
+	case constants.FactionQingLong, constants.FactionXuanWu:
 		// 青龙行迹 / 玄武镇厄: requires charge count >= 1
 		canUseSkill = player.GetChargeCount() >= 1
 	}

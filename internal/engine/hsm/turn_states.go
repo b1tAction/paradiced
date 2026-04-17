@@ -564,7 +564,7 @@ func (s *TurnMovingState) Exit(ctx *StateContext) {
 // TurnLandedState handles landing effects and PhaseOnLand trigger.
 type TurnLandedState struct {
 	BaseTurnState
-	cellType  CellType
+	cellType  gamemap.CellType
 	decisions []*event.Decision
 	actionCtx *engineaction.ActionContext
 }
@@ -919,6 +919,3 @@ func NewStateError(id StateID, msg string) *StateError {
 func (e *StateError) Error() string {
 	return e.StateID.String() + ": " + e.Message
 }
-
-// CellType is imported from gamemap package for convenience.
-type CellType = gamemap.CellType

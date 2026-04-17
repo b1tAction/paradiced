@@ -6,6 +6,7 @@ package net
 import (
 	"time"
 
+	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
 )
 
@@ -86,10 +87,6 @@ type TurnSync struct {
 	// Directly uses gamelog.LogEntry (no conversion to Action).
 	Entries []gamelog.LogEntry `json:"entries"`
 }
-
-// LogEntry is aliased from gamelog.LogEntry for protocol usage.
-// This alias allows pkg/net to expose LogEntry without importing gamelog in all files.
-type LogEntry = gamelog.LogEntry
 
 // Player represents a player state snapshot for synchronization.
 // Builder extracts known keys from core.Player.Metadata into typed fields.
@@ -232,19 +229,12 @@ type FullSync struct {
 	Turn *TurnSync `json:"turn"`
 }
 
-// ========== Backward Compatibility Aliases ==========
-
-// Action is deprecated. Use LogEntry directly in TurnSync.Entries.
-// This type alias exists for backward compatibility during migration.
-// Deprecated: Use gamelog.LogEntry instead.
-type Action = gamelog.LogEntry
-
 // NewLogEntry creates a simple log entry for protocol testing.
 // For production use, use gamelog.NewActionEntry instead.
-func NewLogEntry(actionType string, target string, delta int, source string) LogEntry {
+func NewLogEntry(actionType string, target string, delta int, source string) gamelog.LogEntry {
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
-		Type:       gamelog.EntryTypeAction,
+		Type:       constants.EntryTypeAction,
 		ActionType: actionType,
 		Target:     target,
 		Delta:      delta,

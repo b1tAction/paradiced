@@ -9,17 +9,7 @@ import (
 )
 
 // EntryType identifies the type of log entry.
-// Alias to constants.EntryType for unified enum system.
-type EntryType = constants.EntryType
-
-// EntryType constants - aliases to constants package.
-const (
-	EntryTypeAction   = constants.EntryTypeAction
-	EntryTypeState    = constants.EntryTypeState
-	EntryTypeMiniGame = constants.EntryTypeMiniGame
-	EntryTypeBoss     = constants.EntryTypeBoss
-	EntryTypeDecision = constants.EntryTypeDecision
-)
+// Use constants.EntryType directly - single source of definition.
 
 // LogEntry represents a single game event for client playback.
 // This replaces the old TurnEventLogEntry structure.
@@ -28,7 +18,7 @@ type LogEntry struct {
 	// Timestamp is when the event occurred.
 	Timestamp time.Time `json:"timestamp"`
 	// Type is the entry type (action, state, etc).
-	Type EntryType `json:"type"`
+	Type constants.EntryType `json:"type"`
 	// ActionType is the specific action type name (e.g., "Damage", "Move", "Respawn").
 	ActionType string `json:"action_type,omitempty"`
 	// Target is the player ID affected by this event.
@@ -45,7 +35,7 @@ type LogEntry struct {
 func NewActionEntry(actionType string, target string, delta int, source string) LogEntry {
 	return LogEntry{
 		Timestamp:  time.Now(),
-		Type:       EntryTypeAction,
+		Type:       constants.EntryTypeAction,
 		ActionType: actionType,
 		Target:     target,
 		Delta:      delta,
@@ -58,7 +48,7 @@ func NewActionEntry(actionType string, target string, delta int, source string) 
 func NewActionEntryWithMetadata(actionType string, target string, delta int, source string, metadata *util.Metadata) LogEntry {
 	return LogEntry{
 		Timestamp:  time.Now(),
-		Type:       EntryTypeAction,
+		Type:       constants.EntryTypeAction,
 		ActionType: actionType,
 		Target:     target,
 		Delta:      delta,
@@ -75,7 +65,7 @@ func NewStateEntry(from, to string, playerID string) LogEntry {
 
 	return LogEntry{
 		Timestamp: time.Now(),
-		Type:      EntryTypeState,
+		Type:      constants.EntryTypeState,
 		Target:    playerID,
 		Metadata:  metadata,
 	}
