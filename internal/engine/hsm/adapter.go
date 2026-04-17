@@ -199,6 +199,41 @@ func (w *MapEngineWrapper) IsFogActivated(pos int) bool {
 	return cell.CellType == gamemap.CellTypeFog && cell.FogActive
 }
 
+// PathResultWrapper wraps gamemap.PathResult to implement protocol.PathResult.
+type PathResultWrapper struct {
+	result *gamemap.PathResult
+}
+
+// GetTargetIndex returns the target position.
+func (w *PathResultWrapper) GetTargetIndex() int {
+	return w.result.TargetIndex
+}
+
+// GetPath returns the path of visited cells.
+func (w *PathResultWrapper) GetPath() []int {
+	return w.result.Path
+}
+
+// CellWrapper wraps gamemap.MapCell to implement protocol.Cell.
+type CellWrapper struct {
+	cell *gamemap.MapCell
+}
+
+// GetPosition returns the cell position.
+func (w *CellWrapper) GetPosition() int {
+	return w.cell.Index
+}
+
+// GetType returns the cell type.
+func (w *CellWrapper) GetType() constants.CellType {
+	return constants.CellType(w.cell.CellType.String())
+}
+
+// IsFogActive returns whether fog is active.
+func (w *CellWrapper) IsFogActive() bool {
+	return w.cell.FogActive
+}
+
 // ========== Protocol MapEngine Adapter ==========
 
 // ProtocolMapEngineWrapper wraps MapEngineAdapter to implement protocol.MapEngine.
@@ -221,17 +256,56 @@ func (w *ProtocolMapEngineWrapper) CalculatePath(startPos int, steps int) (proto
 	return &PathResultWrapper{result: result}, nil
 }
 
-// PathResultWrapper wraps gamemap.PathResult to implement protocol.PathResult.
-type PathResultWrapper struct {
-	result *gamemap.PathResult
+// GetLength returns the total map length.
+func (w *ProtocolMapEngineWrapper) GetLength() int {
+	return w.adapter.GetLength()
 }
 
-// GetTargetIndex returns the target position.
-func (w *PathResultWrapper) GetTargetIndex() int {
-	return w.result.TargetIndex
+// GetCell returns the cell at specified position.
+func (w *ProtocolMapEngineWrapper) GetCell(pos int) (protocol.Cell, error) {
+	cell, err := w.adapter.GetCell(pos)
+	if err != nil {
+		return nil, err
+	}
+	return &CellWrapper{cell: cell}, nil
 }
 
-// GetPath returns the path of visited cells.
-func (w *PathResultWrapper) GetPath() []int {
-	return w.result.Path
+// GetLastCheckpoint returns the last checkpoint before specified position.
+func (w *ProtocolMapEngineWrapper) GetLastCheckpoint(pos int) int {
+	return w.adapter.GetLastCheckpoint(pos)
+}
+
+// SetCellType sets cell type at specified position.
+func (w *ProtocolMapEngineWrapper) SetCellType(pos int, cellType constants.CellType) error {
+	// Convert constants.CellType to gamemap.CellType
+	gamemapCellType := gamemapCellTypeFromConstants(cellType)
+	return w.adapter.SetCellType(pos, gamemapCellType)
+}
+
+// ActivateFog activates a fog cell at specified position.
+func (w *ProtocolMapEngineWrapper) ActivateFog(pos int) error {
+	return w.adapter.ActivateFog(pos)
+}
+
+// IsFogActivated checks if fog is activated at specified position.
+func (w *ProtocolMapEngineWrapper) IsFogActivated(pos int) bool {
+	return w.adapter.IsFogActivated(pos)
+}
+
+// gamemapCellTypeFromConstants converts constants.CellType to gamemap.CellType.
+func gamemapCellTypeFromConstants(ct constants.CellType) gamemap.CellType {
+	switch ct {
+	case constants.CellTypeNormal:
+		return gamemap.CellTypeNormal
+	case constants.CellTypeFragile:
+		return gamemap.CellTypeFragile
+	case constants.CellTypeFog:
+		return gamemap.CellTypeFog
+	case constants.CellTypeCheckpoint:
+		return gamemap.CellTypeCheckpoint
+	case constants.CellTypeBoss:
+		return gamemap.CellTypeBoss
+	default:
+		return gamemap.CellTypeNormal
+	}
 }
