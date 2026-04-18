@@ -3,173 +3,179 @@ package nakama
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
+
+	"github.com/heroiclabs/nakama-common/runtime"
 )
 
-// NakamaMatchAdapter wraps Nakama's MatchAdapter to implement NakamaMatchWrapper.
-// This implementation bridges between Paradiced's DispatcherAdapter and Nakama's
-// MatchAdapter interface.
+// NakamaMatchHandlerAdapter implements runtime.Match interface.
+// This adapter wraps NakamaMatchHandler to work with Nakama's match system.
 //
-// When deployed to Nakama server, use this adapter with the real MatchAdapter:
+// Usage in InitModule:
 //
-//	func InitModule(ctx context.Context, logger runtime.Logger, initializer runtime.Initializer) error {
-//	    return initializer.RegisterMatch("paradiced_match", func(ctx context.Context, logger runtime.Logger, match runtime.Match) (runtime.MatchHandler, error) {
-//	        // Create wrapper
-//	        adapter := NewNakamaMatchAdapter(match)
-//	        // Create handler
-//	        handler := NewNakamaMatchHandler(matchId, seed, 4, 100)
-//	        handler.WithDispatcher(NewRealDispatcherAdapter(ctx, adapter))
-//	        return handler, nil
+//	func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, initializer runtime.Initializer) error {
+//	    return initializer.RegisterMatch("paradiced_match", func(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule) (runtime.Match, error) {
+//	        return &NakamaMatchHandlerAdapter{}, nil
 //	    })
 //	}
-type NakamaMatchAdapter struct {
-	match MatchAdapter
+type NakamaMatchHandlerAdapter struct {
+	handler   *NakamaMatchHandler
+	logger    runtime.Logger
+	db        *sql.DB
+	nk        runtime.NakamaModule
+	matchID   string
+	seed      int64
 }
 
-// MatchAdapter is the Nakama match interface stub.
-// When deployed to Nakama server, this matches runtime.MatchAdapter.
-type MatchAdapter interface {
-	// Broadcast broadcasts data to presences.
-	Broadcast(opCode int64, data []byte, presences []MatchPresence, reliability int) error
-
-	// Send sends data to specific presences.
-	Send(opCode int64, data []byte, presences []MatchPresence, reliability int) error
-
-	// GetPresences returns current match presences.
-	GetPresences() []MatchPresence
-}
-
-// MatchPresence is the Nakama presence stub.
-// When deployed to Nakama server, this matches runtime.MatchPresence.
-type MatchPresence interface {
-	GetUserId() string
-	GetSessionId() string
-	GetNodeId() string
-}
-
-// NewNakamaMatchAdapter creates a new adapter wrapping a MatchAdapter.
-func NewNakamaMatchAdapter(match MatchAdapter) *NakamaMatchAdapter {
-	return &NakamaMatchAdapter{match: match}
-}
-
-// BroadcastData broadcasts message to all or specific presences.
-func (a *NakamaMatchAdapter) BroadcastData(opCode int64, data []byte, presences []NakamaPresence, reliability int) error {
-	// Convert NakamaPresence to MatchPresence
-	matchPresences := make([]MatchPresence, len(presences))
-	for i, p := range presences {
-		matchPresences[i] = p.(MatchPresence)
-	}
-	return a.match.Broadcast(opCode, data, matchPresences, reliability)
-}
-
-// SendData sends message to specific presences.
-func (a *NakamaMatchAdapter) SendData(opCode int64, data []byte, presences []NakamaPresence, reliability int) error {
-	// Convert NakamaPresence to MatchPresence
-	matchPresences := make([]MatchPresence, len(presences))
-	for i, p := range presences {
-		matchPresences[i] = p.(MatchPresence)
-	}
-	return a.match.Send(opCode, data, matchPresences, reliability)
-}
-
-// GetPresences returns current match presences.
-func (a *NakamaMatchAdapter) GetPresences() []NakamaPresence {
-	matchPresences := a.match.GetPresences()
-	result := make([]NakamaPresence, len(matchPresences))
-	for i, p := range matchPresences {
-		result[i] = p
-	}
-	return result
-}
-
-// NakamaMatchHandlerWrapper wraps NakamaMatchHandler to implement Nakama's MatchHandler interface.
-// This allows Paradiced's handler to be used directly as Nakama's match handler.
-type NakamaMatchHandlerWrapper struct {
-	handler *NakamaMatchHandler
-	ctx     context.Context
-	logger  Logger
-	match   MatchAdapter
-}
-
-// Logger stub for Nakama logger interface.
-type Logger interface {
-	Info(msg string, fields ...interface{})
-	Debug(msg string, fields ...interface{})
-	Warn(msg string, fields ...interface{})
-	Error(msg string, fields ...interface{})
-}
-
-// NewNakamaMatchHandlerWrapper creates a wrapper for Nakama MatchHandler interface.
-func NewNakamaMatchHandlerWrapper(ctx context.Context, logger Logger, match MatchAdapter, matchID string, seed int64) *NakamaMatchHandlerWrapper {
-	handler := NewNakamaMatchHandler(matchID, seed, 4, 100)
-	adapter := NewNakamaMatchAdapter(match)
-	dispatcher := NewRealDispatcherAdapter(ctx, adapter)
-	handler.WithDispatcher(dispatcher)
-
-	return &NakamaMatchHandlerWrapper{
-		handler: handler,
-		ctx:     ctx,
-		logger:  logger,
-		match:   match,
+// NewNakamaMatchHandlerAdapter creates a new adapter.
+func NewNakamaMatchHandlerAdapter(matchID string, seed int64) *NakamaMatchHandlerAdapter {
+	return &NakamaMatchHandlerAdapter{
+		matchID: matchID,
+		seed:    seed,
 	}
 }
 
-// MatchInit implements Nakama MatchHandler.MatchInit.
-func (w *NakamaMatchHandlerWrapper) MatchInit(ctx context.Context, logger Logger, match MatchAdapter) (interface{}, error) {
-	// Update dispatcher with new match reference
-	adapter := NewNakamaMatchAdapter(match)
-	dispatcher := NewRealDispatcherAdapter(ctx, adapter)
-	w.handler.WithDispatcher(dispatcher)
-	w.ctx = ctx
-	w.logger = logger
-	w.match = match
+// MatchInit implements runtime.Match.MatchInit.
+// Called when match is created. Returns initial state.
+func (a *NakamaMatchHandlerAdapter) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, params map[string]interface{}) (interface{}, int, string) {
+	a.logger = logger
+	a.db = db
+	a.nk = nk
 
-	return w.handler, nil
+	// Extract config from params
+	maxPlayers := 4
+	mapLength := 100
+	if mp, ok := params["max_players"].(int); ok {
+		maxPlayers = mp
+	}
+	if ml, ok := params["map_length"].(int); ok {
+		mapLength = ml
+	}
+
+	// Create handler
+	a.handler = NewNakamaMatchHandler(a.matchID, a.seed, maxPlayers, mapLength)
+
+	// Return state, tick rate (10 = 100ms), empty label
+	return a.handler, 10, ""
 }
 
-// MatchJoin implements Nakama MatchHandler.MatchJoin.
-func (w *NakamaMatchHandlerWrapper) MatchJoin(ctx context.Context, logger Logger, match MatchAdapter, presences []MatchPresence) error {
+// MatchJoinAttempt implements runtime.Match.MatchJoinAttempt.
+// Called when a player attempts to join.
+func (a *NakamaMatchHandlerAdapter) MatchJoinAttempt(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, presence runtime.Presence, metadata map[string]string) (interface{}, bool, string) {
+	handler := state.(*NakamaMatchHandler)
+
+	// Check if match is full
+	if len(handler.playerList) >= handler.maxPlayers {
+		// Reject join
+		return state, false, "match is full"
+	}
+
+	// Allow join
+	return state, true, ""
+}
+
+// MatchJoin implements runtime.Match.MatchJoin.
+// Called when players successfully join.
+func (a *NakamaMatchHandlerAdapter) MatchJoin(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, presences []runtime.Presence) interface{} {
+	handler := state.(*NakamaMatchHandler)
+
+	// Update dispatcher
+	realDispatcher := NewRealDispatcherAdapter(ctx, dispatcher, presences)
+	handler.WithDispatcher(realDispatcher)
+
+	// Handle each joining presence
 	for _, p := range presences {
 		userID := p.GetUserId()
-		// Update dispatcher presence map
-		if dispatcher, ok := w.handler.dispatcher.(*RealDispatcherAdapter); ok {
-			dispatcher.UpdatePresence(userID, p)
-		}
-		// Handle join logic
-		w.handler.HandlePresenceJoin(userID, nil)
+		// Extract metadata from presence if available
+		metadata := make(map[string]string)
+		// Note: Nakama presence metadata handling may differ
+		handler.HandlePresenceJoin(userID, metadata)
+		realDispatcher.UpdatePresence(p)
 	}
-	return nil
+
+	return state
 }
 
-// MatchLeave implements Nakama MatchHandler.MatchLeave.
-func (w *NakamaMatchHandlerWrapper) MatchLeave(ctx context.Context, logger Logger, match MatchAdapter, presences []MatchPresence) error {
+// MatchLeave implements runtime.Match.MatchLeave.
+// Called when players leave/disconnect.
+func (a *NakamaMatchHandlerAdapter) MatchLeave(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, presences []runtime.Presence) interface{} {
+	handler := state.(*NakamaMatchHandler)
+
+	// Update dispatcher
+	realDispatcher, ok := handler.dispatcher.(*RealDispatcherAdapter)
+	if ok {
+		for _, p := range presences {
+			realDispatcher.RemovePresence(p.GetUserId())
+		}
+	}
+
+	// Handle each leaving presence
 	for _, p := range presences {
-		userID := p.GetUserId()
-		// Update dispatcher presence map
-		if dispatcher, ok := w.handler.dispatcher.(*RealDispatcherAdapter); ok {
-			dispatcher.RemovePresence(userID)
+		handler.HandlePresenceLeave(p.GetUserId())
+	}
+
+	return state
+}
+
+// MatchLoop implements runtime.Match.MatchLoop.
+// Called every tick (based on tick rate from MatchInit).
+func (a *NakamaMatchHandlerAdapter) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, messages []runtime.MatchData) interface{} {
+	handler := state.(*NakamaMatchHandler)
+
+	// Update dispatcher with current presences
+	presences := make([]runtime.Presence, 0)
+	for _, id := range handler.playerList {
+		if !handler.disconnected[id] {
+			realDispatcher, ok := handler.dispatcher.(*RealDispatcherAdapter)
+			if ok && realDispatcher != nil {
+				p := realDispatcher.GetPresence(id)
+				if p != nil {
+					presences = append(presences, p)
+				}
+			}
 		}
-		// Handle leave logic
-		w.handler.HandlePresenceLeave(userID)
 	}
-	return nil
-}
 
-// MatchLoop implements Nakama MatchHandler.MatchLoop.
-func (w *NakamaMatchHandlerWrapper) MatchLoop(ctx context.Context, logger Logger, match MatchAdapter) error {
-	// Update dispatcher with fresh presences
-	if dispatcher, ok := w.handler.dispatcher.(*RealDispatcherAdapter); ok {
-		dispatcher.RefreshPresences()
+	realDispatcher := NewRealDispatcherAdapter(ctx, dispatcher, presences)
+	handler.WithDispatcher(realDispatcher)
+
+	// Process incoming messages
+	for _, msg := range messages {
+		userID := msg.GetUserId() // MatchData extends Presence
+		data := msg.GetData()
+		handler.HandleMessage(userID, data)
 	}
-	return w.handler.MatchLoop(0) // delta time from Nakama tick
+
+	// Run match loop
+	handler.MatchLoop(0) // delta time not used, tick rate controls timing
+
+	return state
 }
 
-// MatchTerminate implements Nakama MatchHandler.MatchTerminate.
-func (w *NakamaMatchHandlerWrapper) MatchTerminate(ctx context.Context, logger Logger, match MatchAdapter, graceSeconds int) error {
-	w.handler.MatchStop()
-	return nil
+// MatchTerminate implements runtime.Match.MatchTerminate.
+// Called when match is shutting down.
+func (a *NakamaMatchHandlerAdapter) MatchTerminate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, graceSeconds int) interface{} {
+	handler := state.(*NakamaMatchHandler)
+	handler.MatchStop()
+	return nil // Return nil to indicate match ended
 }
 
-// HandleMessage implements Nakama MatchHandler.MatchMessage.
-func (w *NakamaMatchHandlerWrapper) HandleMessage(ctx context.Context, logger Logger, match MatchAdapter, sender MatchPresence, data []byte) error {
-	return w.handler.HandleMessage(sender.GetUserId(), data)
+// MatchSignal implements runtime.Match.MatchSignal.
+// Called when a signal is received (e.g., from server admin).
+func (a *NakamaMatchHandlerAdapter) MatchSignal(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, data string) (interface{}, string) {
+	// Handle signal data
+	var signal struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal([]byte(data), &signal); err == nil {
+		switch signal.Type {
+		case "pause":
+			// Pause match logic if needed
+		case "resume":
+			// Resume match logic if needed
+		}
+	}
+
+	return state, "" // Return state and empty response
 }

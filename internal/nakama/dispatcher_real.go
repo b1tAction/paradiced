@@ -3,81 +3,47 @@ package nakama
 
 import (
 	"context"
+
+	"github.com/heroiclabs/nakama-common/runtime"
 )
 
-// NakamaPresence represents a player presence in Nakama match.
-// This is a local stub that matches runtime.MatchPresence interface.
-// When deployed to Nakama server, use the real runtime.MatchPresence type.
-type NakamaPresence interface {
-	// GetUserId returns the user ID of this presence.
-	GetUserId() string
-
-	// GetSessionId returns the session ID of this presence.
-	GetSessionId() string
-
-	// GetNodeId returns the node ID where this session is connected.
-	GetNodeId() string
-}
-
-// NakamaMatchWrapper isolates Nakama Match interface functions needed for dispatching.
-// This interface captures the essential methods from Nakama's runtime.Match interface.
-// When deployed to Nakama server, implement this using real Match functions.
-type NakamaMatchWrapper interface {
-	// BroadcastData broadcasts message to all or specific presences.
-	// If presences is nil, broadcasts to all match members.
-	BroadcastData(opCode int64, data []byte, presences []NakamaPresence, reliability int) error
-
-	// SendData sends message to specific presences.
-	SendData(opCode int64, data []byte, presences []NakamaPresence, reliability int) error
-
-	// GetPresences returns current match presences.
-	GetPresences() []NakamaPresence
-}
-
-// Reliability constants for Nakama message delivery.
-const (
-	Reliable   = 0 // Reliable delivery (TCP-like)
-	Unreliable = 1 // Unreliable delivery (UDP-like)
-)
-
-// RealDispatcherAdapter implements DispatcherAdapter using real Nakama Match functions.
+// RealDispatcherAdapter implements DispatcherAdapter using real Nakama MatchDispatcher.
 // This adapter is used in production with actual Nakama server.
 //
-// Usage:
+// Usage in MatchLoop/MatchJoin/MatchLeave:
 //
-//	func (m *MyMatch) MatchInit(ctx context.Context, logger runtime.Logger, match runtime.Match) error {
-//	    dispatcher := NewRealDispatcherAdapter(ctx, match)
-//	    handler := NewNakamaMatchHandler(matchId, seed, maxPlayers, mapLength)
-//	    handler.WithDispatcher(dispatcher)
+//	func (m *MyMatch) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, messages []runtime.MatchData) interface{} {
+//	    realDispatcher := NewRealDispatcherAdapter(dispatcher)
+//	    handler.state.(*NakamaMatchHandler).WithDispatcher(realDispatcher)
 //	    ...
 //	}
 type RealDispatcherAdapter struct {
-	ctx   context.Context
-	match NakamaMatchWrapper
+	dispatcher runtime.MatchDispatcher
+	ctx        context.Context
 
 	// userID -> Presence mapping for sending individual messages
-	userPresences map[string]NakamaPresence
+	userPresences map[string]runtime.Presence
 }
 
-// NewRealDispatcherAdapter creates a new real dispatcher with Nakama match context.
-func NewRealDispatcherAdapter(ctx context.Context, match NakamaMatchWrapper) *RealDispatcherAdapter {
+// NewRealDispatcherAdapter creates a new real dispatcher with Nakama MatchDispatcher.
+func NewRealDispatcherAdapter(ctx context.Context, dispatcher runtime.MatchDispatcher, presences []runtime.Presence) *RealDispatcherAdapter {
 	// Build presence map
-	userPresences := make(map[string]NakamaPresence)
-	for _, p := range match.GetPresences() {
+	userPresences := make(map[string]runtime.Presence)
+	for _, p := range presences {
 		userPresences[p.GetUserId()] = p
 	}
 
 	return &RealDispatcherAdapter{
+		dispatcher:    dispatcher,
 		ctx:           ctx,
-		match:         match,
 		userPresences: userPresences,
 	}
 }
 
 // BroadcastMessage broadcasts a message to all players in the match.
 func (d *RealDispatcherAdapter) BroadcastMessage(opCode int64, data []byte) error {
-	// Broadcast to all presences (nil = all)
-	return d.match.BroadcastData(opCode, data, nil, Reliable)
+	// Broadcast to all presences (nil = all), no sender, reliable delivery
+	return d.dispatcher.BroadcastMessage(opCode, data, nil, nil, true)
 }
 
 // SendMessage sends a message to a specific player.
@@ -89,12 +55,12 @@ func (d *RealDispatcherAdapter) SendMessage(playerID string, opCode int64, data 
 	}
 
 	// Send to specific presence
-	return d.match.SendData(opCode, data, []NakamaPresence{presence}, Reliable)
+	return d.dispatcher.BroadcastMessage(opCode, data, []runtime.Presence{presence}, nil, true)
 }
 
 // UpdatePresence updates the presence map when players join.
-func (d *RealDispatcherAdapter) UpdatePresence(userID string, presence NakamaPresence) {
-	d.userPresences[userID] = presence
+func (d *RealDispatcherAdapter) UpdatePresence(presence runtime.Presence) {
+	d.userPresences[presence.GetUserId()] = presence
 }
 
 // RemovePresence removes a presence when player leaves.
@@ -102,11 +68,25 @@ func (d *RealDispatcherAdapter) RemovePresence(userID string) {
 	delete(d.userPresences, userID)
 }
 
-// RefreshPresences rebuilds the presence map from current match presences.
+// RefreshPresences rebuilds the presence map from new presences.
 // Call this after join/leave events to update the internal mapping.
-func (d *RealDispatcherAdapter) RefreshPresences() {
-	d.userPresences = make(map[string]NakamaPresence)
-	for _, p := range d.match.GetPresences() {
+func (d *RealDispatcherAdapter) RefreshPresences(presences []runtime.Presence) {
+	d.userPresences = make(map[string]runtime.Presence)
+	for _, p := range presences {
 		d.userPresences[p.GetUserId()] = p
 	}
+}
+
+// GetPresence returns the Presence for a given userID.
+func (d *RealDispatcherAdapter) GetPresence(userID string) runtime.Presence {
+	return d.userPresences[userID]
+}
+
+// GetAllPresences returns all current presences.
+func (d *RealDispatcherAdapter) GetAllPresences() []runtime.Presence {
+	result := make([]runtime.Presence, 0, len(d.userPresences))
+	for _, p := range d.userPresences {
+		result = append(result, p)
+	}
+	return result
 }
