@@ -41,7 +41,7 @@ func NewPiercingDamageAction(target *core.Player, amount int, sourceID string) *
 	}
 }
 
-func (a *DamageAction) Type() ActionType { return ActionDamage }
+func (a *DamageAction) Type() constants.ActionType { return constants.ActionDamage }
 func (a *DamageAction) CanModify() bool  { return !a.IsPiercing && a.Amount > 0 }
 func (a *DamageAction) Source() string   { return a.SourceID }
 func (a *DamageAction) Target() string   { return a.TargetPlayer.ID.UUID() }
@@ -101,7 +101,7 @@ func NewHealAction(target *core.Player, amount int, sourceID string) *HealAction
 	}
 }
 
-func (a *HealAction) Type() ActionType { return ActionHeal }
+func (a *HealAction) Type() constants.ActionType { return constants.ActionHeal }
 func (a *HealAction) CanModify() bool  { return a.Amount > 0 }
 func (a *HealAction) Source() string   { return a.SourceID }
 func (a *HealAction) Target() string   { return a.TargetPlayer.ID.UUID() }
@@ -157,7 +157,7 @@ func NewModifyLPAction(target *core.Player, amount int, sourceID string) *Modify
 	}
 }
 
-func (a *ModifyLPAction) Type() ActionType { return ActionModifyLP }
+func (a *ModifyLPAction) Type() constants.ActionType { return constants.ActionModifyLP }
 func (a *ModifyLPAction) CanModify() bool  { return false } // LP changes cannot be intercepted
 func (a *ModifyLPAction) Source() string   { return a.SourceID }
 func (a *ModifyLPAction) Target() string   { return a.TargetPlayer.ID.UUID() }
@@ -218,7 +218,7 @@ func NewMoveAction(target *core.Player, steps int, sourceID string) *MoveAction 
 	}
 }
 
-func (a *MoveAction) Type() ActionType { return ActionMove }
+func (a *MoveAction) Type() constants.ActionType { return constants.ActionMove }
 func (a *MoveAction) CanModify() bool  { return a.Steps != 0 }
 func (a *MoveAction) Source() string   { return a.SourceID }
 func (a *MoveAction) Target() string   { return a.TargetPlayer.ID.UUID() }
@@ -306,7 +306,7 @@ func NewAddBuffAction(target *core.Player, buffType constants.BuffType, duration
 	}
 }
 
-func (a *AddBuffAction) Type() ActionType { return ActionAddBuff }
+func (a *AddBuffAction) Type() constants.ActionType { return constants.ActionAddBuff }
 func (a *AddBuffAction) CanModify() bool  { return false } // Buff addition cannot be intercepted
 func (a *AddBuffAction) Source() string   { return a.SourceID }
 func (a *AddBuffAction) Target() string   { return a.TargetPlayer.ID.UUID() }
@@ -360,7 +360,7 @@ func NewRemoveBuffAction(target *core.Player, buffType constants.BuffType, sourc
 	}
 }
 
-func (a *RemoveBuffAction) Type() ActionType { return ActionRemoveBuff }
+func (a *RemoveBuffAction) Type() constants.ActionType { return constants.ActionRemoveBuff }
 func (a *RemoveBuffAction) CanModify() bool  { return false }
 func (a *RemoveBuffAction) Source() string   { return a.SourceID }
 func (a *RemoveBuffAction) Target() string   { return a.TargetPlayer.ID.UUID() }
@@ -413,7 +413,7 @@ func NewTeleportAction(target *core.Player, targetPos int, sourceID string) *Tel
 	}
 }
 
-func (a *TeleportAction) Type() ActionType { return ActionTeleport }
+func (a *TeleportAction) Type() constants.ActionType { return constants.ActionTeleport }
 func (a *TeleportAction) CanModify() bool  { return false }
 func (a *TeleportAction) Source() string   { return a.SourceID }
 func (a *TeleportAction) Target() string   { return a.TargetPlayer.ID.UUID() }
@@ -468,7 +468,7 @@ func NewStealBuffAction(target, source *core.Player, sourceID string) *StealBuff
 	}
 }
 
-func (a *StealBuffAction) Type() ActionType { return ActionStealBuff }
+func (a *StealBuffAction) Type() constants.ActionType { return constants.ActionStealBuff }
 func (a *StealBuffAction) CanModify() bool  { return false }
 func (a *StealBuffAction) Source() string   { return a.SourceID }
 func (a *StealBuffAction) Target() string   { return a.TargetPlayer.ID.UUID() }
@@ -537,7 +537,7 @@ func NewDrawEventAction(target *core.Player, sourceID string) *DrawEventAction {
 	}
 }
 
-func (a *DrawEventAction) Type() ActionType { return ActionDrawEvent }
+func (a *DrawEventAction) Type() constants.ActionType { return constants.ActionDrawEvent }
 func (a *DrawEventAction) CanModify() bool  { return true }
 func (a *DrawEventAction) Source() string   { return a.SourceID }
 func (a *DrawEventAction) Target() string   { return a.TargetPlayer.ID.UUID() }
@@ -606,7 +606,7 @@ func NewRespawnAction(target *core.Player, checkpointPos int, sourceID string) *
 	}
 }
 
-func (a *RespawnAction) Type() ActionType { return ActionRespawn }
+func (a *RespawnAction) Type() constants.ActionType { return constants.ActionRespawn }
 func (a *RespawnAction) CanModify() bool  { return false }
 func (a *RespawnAction) Source() string   { return a.SourceID }
 func (a *RespawnAction) Target() string   { return a.TargetPlayer.ID.UUID() }
@@ -661,7 +661,7 @@ func NewFellDownAction(target *core.Player, position int, damage int, sourceID s
 	}
 }
 
-func (a *FellDownAction) Type() ActionType { return ActionFellDown }
+func (a *FellDownAction) Type() constants.ActionType { return constants.ActionFellDown }
 func (a *FellDownAction) CanModify() bool  { return false }
 func (a *FellDownAction) Source() string   { return a.SourceID }
 func (a *FellDownAction) Target() string   { return a.TargetPlayer.ID.UUID() }

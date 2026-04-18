@@ -13,22 +13,22 @@ import (
 
 func TestActionTypeString(t *testing.T) {
 	tests := []struct {
-		at       ActionType
+		at       constants.ActionType
 		expected string
 	}{
-		{ActionDamage, "damage"},
-		{ActionHeal, "heal"},
-		{ActionModifyLP, "modify_lp"},
-		{ActionMove, "move"},
-		{ActionAddBuff, "add_buff"},
-		{ActionRemoveBuff, "remove_buff"},
-		{ActionRespawn, "respawn"},
-		{ActionSkipTurn, "skip_turn"},
-		{ActionDrawEvent, "draw_event"},
-		{ActionTeleport, "teleport"},
-		{ActionStealBuff, "steal_buff"},
-		{ActionFellDown, "fell_down"},
-		{ActionUnknown, "unknown"},
+		{constants.ActionDamage, "damage"},
+		{constants.ActionHeal, "heal"},
+		{constants.ActionModifyLP, "modify_lp"},
+		{constants.ActionMove, "move"},
+		{constants.ActionAddBuff, "add_buff"},
+		{constants.ActionRemoveBuff, "remove_buff"},
+		{constants.ActionRespawn, "respawn"},
+		{constants.ActionSkipTurn, "skip_turn"},
+		{constants.ActionDrawEvent, "draw_event"},
+		{constants.ActionTeleport, "teleport"},
+		{constants.ActionStealBuff, "steal_buff"},
+		{constants.ActionFellDown, "fell_down"},
+		{constants.ActionUnknown, "unknown"},
 	}
 
 	for _, tt := range tests {
@@ -120,7 +120,7 @@ func TestDamageAction(t *testing.T) {
 	action := NewDamageAction(player, 20, "Event_Trap")
 
 	// Verify Action interface implementation
-	if action.Type() != ActionDamage {
+	if action.Type() != constants.ActionDamage {
 		t.Errorf("Type should be ActionDamage, got %s", action.Type())
 	}
 	if !action.CanModify() {
@@ -202,7 +202,7 @@ func TestHealAction(t *testing.T) {
 
 	action := NewHealAction(player, 30, "Buff_Rain")
 
-	if action.Type() != ActionHeal {
+	if action.Type() != constants.ActionHeal {
 		t.Errorf("Type should be ActionHeal, got %s", action.Type())
 	}
 	if !action.CanModify() {
@@ -257,7 +257,7 @@ func TestAddBuffAction(t *testing.T) {
 
 	action := NewAddBuffAction(player, constants.BuffTypeDivine, 3, "Event_DivineGift")
 
-	if action.Type() != ActionAddBuff {
+	if action.Type() != constants.ActionAddBuff {
 		t.Errorf("Type should be ActionAddBuff, got %s", action.Type())
 	}
 	if action.CanModify() {
@@ -318,7 +318,7 @@ func TestTeleportAction(t *testing.T) {
 
 	action := NewTeleportAction(player, 20, "Item_AnyDoor")
 
-	if action.Type() != ActionTeleport {
+	if action.Type() != constants.ActionTeleport {
 		t.Errorf("Type should be ActionTeleport, got %s", action.Type())
 	}
 	if action.TargetPos != 20 {
@@ -348,7 +348,7 @@ func TestStealBuffAction(t *testing.T) {
 
 	action := NewStealBuffAction(target, source, "Faction_BaiHu")
 
-	if action.Type() != ActionStealBuff {
+	if action.Type() != constants.ActionStealBuff {
 		t.Errorf("Type should be ActionStealBuff, got %s", action.Type())
 	}
 	if action.SourcePlayer != source {
@@ -401,7 +401,7 @@ func TestRespawnAction(t *testing.T) {
 
 	action := NewRespawnAction(player, 50, "DeathRespawn")
 
-	if action.Type() != ActionRespawn {
+	if action.Type() != constants.ActionRespawn {
 		t.Errorf("Type should be ActionRespawn, got %s", action.Type())
 	}
 	if action.CanModify() {
@@ -436,7 +436,7 @@ func TestFellDownAction(t *testing.T) {
 
 	action := NewFellDownAction(player, 30, 1, "FragileCell")
 
-	if action.Type() != ActionFellDown {
+	if action.Type() != constants.ActionFellDown {
 		t.Errorf("Type should be ActionFellDown, got %s", action.Type())
 	}
 	if action.CanModify() {
@@ -624,7 +624,7 @@ func TestModifyLPActionFull(t *testing.T) {
 	action := NewModifyLPAction(player, 1, "Buff_Divine")
 
 	// Test all methods
-	if action.Type() != ActionModifyLP {
+	if action.Type() != constants.ActionModifyLP {
 		t.Errorf("Type should be ActionModifyLP, got %s", action.Type())
 	}
 	if action.Source() != "Buff_Divine" {
@@ -676,7 +676,7 @@ func TestMoveActionFull(t *testing.T) {
 	action := NewMoveAction(player, 5, "DiceRoll")
 
 	// Test all methods
-	if action.Type() != ActionMove {
+	if action.Type() != constants.ActionMove {
 		t.Errorf("Type should be ActionMove, got %s", action.Type())
 	}
 	if action.Source() != "DiceRoll" {
@@ -724,7 +724,7 @@ func TestHealActionFull(t *testing.T) {
 	action := NewHealAction(player, 30, "Buff_Rain")
 
 	// Test all methods
-	if action.Type() != ActionHeal {
+	if action.Type() != constants.ActionHeal {
 		t.Errorf("Type should be ActionHeal, got %s", action.Type())
 	}
 	if action.Source() != "Buff_Rain" {
@@ -772,7 +772,7 @@ func TestAddBuffActionFull(t *testing.T) {
 	action := NewAddBuffAction(player, constants.BuffTypeDivine, 3, "Event_Gift")
 
 	// Test all methods
-	if action.Type() != ActionAddBuff {
+	if action.Type() != constants.ActionAddBuff {
 		t.Errorf("Type should be ActionAddBuff, got %s", action.Type())
 	}
 	if action.Source() != "Event_Gift" {
@@ -806,7 +806,7 @@ func TestRemoveBuffActionFull(t *testing.T) {
 	action := NewRemoveBuffAction(player, constants.BuffTypeCurse, "Manual")
 
 	// Test all methods
-	if action.Type() != ActionRemoveBuff {
+	if action.Type() != constants.ActionRemoveBuff {
 		t.Errorf("Type should be ActionRemoveBuff, got %s", action.Type())
 	}
 	if action.Source() != "Manual" {
@@ -840,7 +840,7 @@ func TestTeleportActionFull(t *testing.T) {
 	action := NewTeleportAction(player, 20, "Item_Door")
 
 	// Test all methods
-	if action.Type() != ActionTeleport {
+	if action.Type() != constants.ActionTeleport {
 		t.Errorf("Type should be ActionTeleport, got %s", action.Type())
 	}
 	if action.Source() != "Item_Door" {
@@ -875,7 +875,7 @@ func TestStealBuffActionFull(t *testing.T) {
 	action := NewStealBuffAction(target, source, "Faction_BaiHu")
 
 	// Test all methods
-	if action.Type() != ActionStealBuff {
+	if action.Type() != constants.ActionStealBuff {
 		t.Errorf("Type should be ActionStealBuff, got %s", action.Type())
 	}
 	if action.Source() != "Faction_BaiHu" {
@@ -908,7 +908,7 @@ func TestDrawEventAction(t *testing.T) {
 	action := NewDrawEventAction(player, "EventCard")
 
 	// Test all methods
-	if action.Type() != ActionDrawEvent {
+	if action.Type() != constants.ActionDrawEvent {
 		t.Errorf("Type should be ActionDrawEvent, got %s", action.Type())
 	}
 	if !action.CanModify() {
@@ -946,7 +946,7 @@ func TestFellDownActionFull(t *testing.T) {
 	action := NewFellDownAction(player, 30, 1, "FragileCell")
 
 	// Test all methods
-	if action.Type() != ActionFellDown {
+	if action.Type() != constants.ActionFellDown {
 		t.Errorf("Type should be ActionFellDown, got %s", action.Type())
 	}
 	if action.Source() != "FragileCell" {
@@ -995,7 +995,7 @@ func TestRespawnActionFull(t *testing.T) {
 	action := NewRespawnAction(player, 50, "DeathRespawn")
 
 	// Test all methods
-	if action.Type() != ActionRespawn {
+	if action.Type() != constants.ActionRespawn {
 		t.Errorf("Type should be ActionRespawn, got %s", action.Type())
 	}
 	if action.Source() != "DeathRespawn" {
