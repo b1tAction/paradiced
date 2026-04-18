@@ -26,6 +26,8 @@ go.work.sum
 
 # Go cache file
 .gomodcache
+.gocache
+.gopath
 
 # env file
 .env
