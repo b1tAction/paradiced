@@ -332,7 +332,7 @@ func (hsm *HSM) transitionInterrupt(target State, ctx *StateContext) error {
 
 	// Enter interrupt state (WaitDecision)
 	hsm.waitingState = target
-	hsm.decision = ctx.Decision
+	hsm.decision = ctx.GetDecision()
 	hsm.paused = true
 	hsm.stateEnterTime = time.Now()
 
@@ -609,6 +609,45 @@ type RollDiceHandler interface {
 // UseItemHandler is an interface for states that handle item usage input.
 type UseItemHandler interface {
 	OnUseItem(ctx *StateContext, itemID string)
+}
+
+// ========== Mini-Game Result Handler ==========
+
+// OnMiniGameResult handles mini-game result submission.
+// Must be called when in RoundMiniGame state.
+func (hsm *HSM) OnMiniGameResult(playerID string, rank int, ctx *StateContext) error {
+	// Must be in RoundMiniGame state
+	if hsm.globalStateID != StateRoundMiniGame {
+		return errors.New("OnMiniGameResult requires RoundMiniGame state")
+	}
+
+	// Get the global state
+	globalState := hsm.GetGlobalState()
+	if globalState == nil {
+		return errors.New("no global state active")
+	}
+
+	// Type assertion to RoundMiniGameState
+	miniGameState, ok := globalState.(*RoundMiniGameState)
+	if !ok {
+		return errors.New("current global state is not RoundMiniGameState")
+	}
+
+	// Create context if not provided
+	if ctx == nil {
+		ctx = NewStateContext().WithHSM(hsm)
+	}
+
+	// Call the state's OnMiniGameResult method
+	miniGameState.OnMiniGameResult(ctx, playerID, rank)
+
+	// Trigger update to check for state transition
+	nextID := globalState.Update(ctx)
+	if nextID != StateNone && nextID != hsm.globalStateID {
+		return hsm.TransitionTo(nextID, ctx)
+	}
+
+	return nil
 }
 
 // ========== Snapshot ==========

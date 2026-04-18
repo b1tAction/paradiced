@@ -29,7 +29,7 @@ func TestWaitDecisionState_Enter(t *testing.T) {
 
 	state.Enter(ctx)
 
-	if ctx.Success != true {
+	if ctx.Error != nil {
 		t.Errorf("Enter should succeed, got error: %v", ctx.Error)
 	}
 	if state.completed != false {
@@ -46,11 +46,8 @@ func TestWaitDecisionState_Enter_NoDecision(t *testing.T) {
 
 	state.Enter(ctx)
 
-	if ctx.Success != false {
-		t.Error("Enter should fail without decision")
-	}
 	if ctx.Error == nil {
-		t.Error("Error should be set")
+		t.Error("Enter should fail without decision")
 	}
 }
 
@@ -71,7 +68,7 @@ func TestWaitDecisionState_Enter_ContextDecision(t *testing.T) {
 
 	state.Enter(ctx)
 
-	if ctx.Success != true {
+	if ctx.Error != nil {
 		t.Errorf("Enter should succeed, got error: %v", ctx.Error)
 	}
 	if state.decision != decision {

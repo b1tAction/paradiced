@@ -73,13 +73,12 @@ func (s *WaitDecisionState) WithDefaultOption(option int) *WaitDecisionState {
 
 func (s *WaitDecisionState) Enter(ctx *StateContext) {
 	// Initialize decision from context if not already set
-	if s.decision == nil && ctx.Decision != nil {
-		s.decision = ctx.Decision
+	if s.decision == nil {
+		s.decision = ctx.GetDecision()
 	}
 
 	// Validate decision exists
 	if s.decision == nil {
-		ctx.Success = false
 		ctx.Error = NewStateError(StateWaitDecision, "no decision to wait for")
 		return
 	}
