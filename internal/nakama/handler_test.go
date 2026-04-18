@@ -163,9 +163,10 @@ func TestNakamaMatchHandlerInitializeGame(t *testing.T) {
 		t.Fatalf("initializeGame failed: %v", err)
 	}
 
-	// Verify game is created
-	if handler.game == nil {
-		t.Fatal("game should be created after initialization")
+	// Verify game is created (via HSM)
+	game := handler.hsm.GetGame()
+	if game == nil {
+		t.Fatal("game should be created after initialization (via HSM)")
 	}
 
 	// Verify HSM is created
@@ -179,8 +180,8 @@ func TestNakamaMatchHandlerInitializeGame(t *testing.T) {
 	}
 
 	// Verify players added to game
-	if len(handler.game.Players) != 4 {
-		t.Errorf("game.Players count = %d, want 4", len(handler.game.Players))
+	if len(game.Players) != 4 {
+		t.Errorf("game.Players count = %d, want 4", len(game.Players))
 	}
 }
 

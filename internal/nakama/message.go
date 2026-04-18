@@ -6,8 +6,12 @@ import (
 	"strconv"
 
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
-	"github.com/b1tAction/paradiced/pkg/net"
+	"github.com/b1tAction/paradiced/internal/net"
+	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 )
+
+// Message types for client requests (not defined in pkg/net, define here)
+// These are the request structures for client messages.
 
 // Message types for client requests (not defined in pkg/net, define here)
 // These are the request structures for client messages.
@@ -55,15 +59,15 @@ func (h *NakamaMatchHandler) HandleMessage(sender string, data []byte) error {
 	// Route to appropriate handler
 	opCode := base.OpCode
 	switch opCode {
-	case strconv.FormatInt(int64(net.OpRollDice), 10):
+	case strconv.FormatInt(int64(pkgnet.OpRollDice), 10):
 		return h.handleRollDice(sender)
-	case strconv.FormatInt(int64(net.OpUseItem), 10):
+	case strconv.FormatInt(int64(pkgnet.OpUseItem), 10):
 		return h.handleUseItem(sender, data)
-	case strconv.FormatInt(int64(net.OpUseSkill), 10):
+	case strconv.FormatInt(int64(pkgnet.OpUseSkill), 10):
 		return h.handleUseSkill(sender)
-	case strconv.FormatInt(int64(net.OpUserChoice), 10):
+	case strconv.FormatInt(int64(pkgnet.OpUserChoice), 10):
 		return h.handleUserChoice(sender, data)
-	case strconv.FormatInt(int64(net.OpMiniGameResultSubmit), 10):
+	case strconv.FormatInt(int64(pkgnet.OpMiniGameResultSubmit), 10):
 		return h.handleMiniGameResult(sender, data)
 	default:
 		// Unknown opcode, ignore
@@ -93,10 +97,18 @@ func (h *NakamaMatchHandler) handleRollDice(sender string) error {
 	// Roll dice using dice manager
 	steps := h.diceMgr.RollSpecialDice(sender)
 
-	_ = steps // Placeholder for actual HSM integration
-	// In actual implementation, notify HSM about dice roll
+	// Create builder for context
+	builder := net.NewBuilder(h.hsm)
 
-	return nil
+	// Create state context for HSM
+	ctx := hsm.NewStateContext().
+		WithHSM(h.hsm).
+		WithPlayer(player).
+		WithBroadcast(NewNakamaBroadcastAdapter(h)).
+		WithBuilder(builder)
+
+	// Call HSM's OnRollDice method
+	return h.hsm.OnRollDice(steps, ctx)
 }
 
 // handleUseItem handles item usage request.
@@ -136,9 +148,18 @@ func (h *NakamaMatchHandler) handleUseItem(sender string, data []byte) error {
 		return nil // Item not found
 	}
 
-	_ = req.ItemID // Placeholder for actual HSM integration
+	// Create builder for context
+	builder := net.NewBuilder(h.hsm)
 
-	return nil
+	// Create state context for HSM
+	ctx := hsm.NewStateContext().
+		WithHSM(h.hsm).
+		WithPlayer(player).
+		WithBroadcast(NewNakamaBroadcastAdapter(h)).
+		WithBuilder(builder)
+
+	// Call HSM's OnUseItem method
+	return h.hsm.OnUseItem(req.ItemID, ctx)
 }
 
 // handleUseSkill handles faction skill usage request.
@@ -210,12 +231,20 @@ func (h *NakamaMatchHandler) handleMiniGameResult(sender string, data []byte) er
 	}
 
 	// Check if in RoundMiniGame state
-	if h.hsm.GetCurrentStateID() != hsm.StateRoundMiniGame {
+	if h.hsm.GetGlobalStateID() != hsm.StateRoundMiniGame {
 		return nil // Not in mini-game state
 	}
 
-	// Record mini-game result
-	_ = req.Rank // Placeholder for actual HSM integration
+	// Create builder for context
+	builder := net.NewBuilder(h.hsm)
 
-	return nil
+	// Create state context for HSM
+	ctx := hsm.NewStateContext().
+		WithHSM(h.hsm).
+		WithPlayer(player).
+		WithBroadcast(NewNakamaBroadcastAdapter(h)).
+		WithBuilder(builder)
+
+	// Call HSM's OnMiniGameResult method
+	return h.hsm.OnMiniGameResult(player.ID.UUID(), req.Rank, ctx)
 }

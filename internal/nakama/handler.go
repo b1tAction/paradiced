@@ -15,10 +15,10 @@ import (
 
 // NakamaMatchHandler implements the authoritative match handler for Paradiced.
 // It manages game state, HSM execution, and client communication.
+// HSM is the single source of truth - Game is accessed via hsm.GetGame().
 type NakamaMatchHandler struct {
 	// Core game components
-	game      *engine.Game      // Game instance with EventBus and GameLog
-	hsm       *hsm.HSM          // Hierarchical State Machine
+	hsm       *hsm.HSM          // Hierarchical State Machine (holds Game reference)
 	mapEngine *gamemap.MapEngine // Map engine for path calculation
 	diceMgr   *rng.DiceManager  // Dice manager for rolling
 
@@ -83,10 +83,10 @@ func (h *NakamaMatchHandler) GetDispatcher() DispatcherAdapter {
 func (h *NakamaMatchHandler) initializeGame() error {
 	// Create Game instance
 	gameID := id.NewGameID()
-	h.game = engine.NewGame(gameID, h.randomSeed)
+	game := engine.NewGame(gameID, h.randomSeed)
 
-	// Create HSM with game reference
-	h.hsm = hsm.NewHSM(h.game)
+	// Create HSM with game reference (HSM is single source of truth)
+	h.hsm = hsm.NewHSM(game)
 
 	// Create MapEngine
 	h.mapEngine = gamemap.NewMapEngine(h.mapLength)
@@ -103,14 +103,15 @@ func (h *NakamaMatchHandler) initializeGame() error {
 		return err
 	}
 
-	// Add players to game
+	// Add players to game (access via HSM)
+	game = h.hsm.GetGame()
 	for _, playerID := range h.playerList {
 		player := h.players[playerID]
-		h.game.AddPlayer(player)
+		game.AddPlayer(player)
 
 		// Subscribe player buffs to EventBus
 		for _, buff := range player.ActiveBuffs {
-			h.game.SubscribeBuff(player, buff)
+			game.SubscribeBuff(player, buff)
 		}
 	}
 

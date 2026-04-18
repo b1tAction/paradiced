@@ -29,9 +29,10 @@ func TestMatchInit(t *testing.T) {
 		t.Fatalf("MatchInit error: %v", err)
 	}
 
-	// Verify game is created
-	if handler.game == nil {
-		t.Fatal("game should be created after MatchInit")
+	// Verify game is created (via HSM)
+	game := handler.hsm.GetGame()
+	if game == nil {
+		t.Fatal("game should be created after MatchInit (via HSM)")
 	}
 
 	// Verify HSM is running
@@ -53,8 +54,8 @@ func TestMatchInit(t *testing.T) {
 	}
 
 	// Verify players in game
-	if len(handler.game.Players) != 4 {
-		t.Errorf("game.Players count = %d, want 4", len(handler.game.Players))
+	if len(game.Players) != 4 {
+		t.Errorf("game.Players count = %d, want 4", len(game.Players))
 	}
 }
 
@@ -125,7 +126,8 @@ func TestGetCurrentPlayer(t *testing.T) {
 		t.Fatal("getCurrentPlayer should return first player")
 	}
 
-	if player != handler.game.Players[0] {
+	game := handler.hsm.GetGame()
+	if player != game.Players[0] {
 		t.Error("current player should be first player (turn 0)")
 	}
 }
@@ -133,32 +135,29 @@ func TestGetCurrentPlayer(t *testing.T) {
 func TestAssignFactions(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
-	// Add 4 players
+	// Add 4 players with factions set via PlayerConfig
 	handler.addPlayer("user-001", constants.FactionQingLong)
 	handler.addPlayer("user-002", constants.FactionZhuQue)
 	handler.addPlayer("user-003", constants.FactionBaiHu)
 	handler.addPlayer("user-004", constants.FactionXuanWu)
 
-	// Assign factions
-	handler.assignFactions()
+	// Note: assignFactions() is deprecated and does nothing now.
+	// Factions are set during addPlayer via PlayerConfig.
+	// Fire buff is added later by game.InitializePlayerFactionBuffs().
 
-	// Verify ZhuQue player has Fire buff
+	// Verify ZhuQue player does NOT have Fire buff yet (added later)
 	zhuQuePlayer := handler.players["user-002"]
 	if zhuQuePlayer == nil {
 		t.Fatal("user-002 should exist")
 	}
 
-	// Check for Fire buff
-	hasFireBuff := false
-	for _, buff := range zhuQuePlayer.ActiveBuffs {
-		if string(buff.Type) == "fire" {
-			hasFireBuff = true
-			break
-		}
+	if zhuQuePlayer.GetFaction() != constants.FactionZhuQue {
+		t.Errorf("ZhuQue player faction = %v, want ZhuQue", zhuQuePlayer.GetFaction())
 	}
 
-	if !hasFireBuff {
-		t.Error("ZhuQue player should have Fire buff (离火 passive)")
+	// No Fire buff yet - will be added by InitializePlayerFactionBuffs during match init
+	if zhuQuePlayer.HasBuff(constants.BuffTypeFire) {
+		t.Error("ZhuQue player should NOT have Fire buff yet (added by InitializePlayerFactionBuffs)")
 	}
 }
 

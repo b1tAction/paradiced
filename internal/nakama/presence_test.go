@@ -183,9 +183,10 @@ func TestMatchFullPlayerJoin(t *testing.T) {
 	}
 
 	// When match is full, MatchInit should be called automatically
-	// Verify game is initialized
-	if handler.game == nil {
-		t.Error("game should be initialized when match is full")
+	// Verify game is initialized (via HSM)
+	game := handler.hsm.GetGame()
+	if game == nil {
+		t.Error("game should be initialized when match is full (via HSM)")
 	}
 
 	if handler.hsm == nil {
@@ -193,34 +194,39 @@ func TestMatchFullPlayerJoin(t *testing.T) {
 	}
 
 	// Verify all 4 players are in game
-	if len(handler.game.Players) != 4 {
-		t.Errorf("game.Players count = %d, want 4", len(handler.game.Players))
+	if len(game.Players) != 4 {
+		t.Errorf("game.Players count = %d, want 4", len(game.Players))
 	}
 }
 
-func TestFactionAssignmentOrder(t *testing.T) {
+// Note: Faction assignment order testing is no longer relevant.
+// Factions are now set during addPlayer via PlayerConfig, not reassigned by assignFactions.
+// The assignFactions() method is deprecated and does nothing.
+// For testing InitializePlayerFactionBuffs, see engine/game_test.go.
+
+func TestFactionSetDuringAddPlayer(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
-	// Add 4 players in order
+	// Add players with specific factions
 	handler.addPlayer("user-001", constants.FactionQingLong)
-	handler.addPlayer("user-002", constants.FactionQingLong) // Will be reassigned
-	handler.addPlayer("user-003", constants.FactionQingLong)
-	handler.addPlayer("user-004", constants.FactionQingLong)
+	handler.addPlayer("user-002", constants.FactionZhuQue)
+	handler.addPlayer("user-003", constants.FactionBaiHu)
+	handler.addPlayer("user-004", constants.FactionXuanWu)
 
-	// Assign factions (should assign by join order)
-	handler.assignFactions()
-
-	// Verify ZhuQue (index 1) has Fire buff
-	zhuQuePlayer := handler.players["user-002"]
-	hasFireBuff := false
-	for _, buff := range zhuQuePlayer.ActiveBuffs {
-		if string(buff.Type) == "fire" {
-			hasFireBuff = true
-			break
-		}
+	// Verify factions are set correctly
+	if handler.players["user-001"].GetFaction() != constants.FactionQingLong {
+		t.Error("user-001 should be QingLong")
+	}
+	if handler.players["user-002"].GetFaction() != constants.FactionZhuQue {
+		t.Error("user-002 should be ZhuQue")
+	}
+	if handler.players["user-003"].GetFaction() != constants.FactionBaiHu {
+		t.Error("user-003 should be BaiHu")
+	}
+	if handler.players["user-004"].GetFaction() != constants.FactionXuanWu {
+		t.Error("user-004 should be XuanWu")
 	}
 
-	if !hasFireBuff {
-		t.Error("Second player (ZhuQue position) should have Fire buff")
-	}
+	// Note: Fire buff is NOT added here - it's added by InitializePlayerFactionBuffs
+	// during match initialization (see engine/game_test.go)
 }

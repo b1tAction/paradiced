@@ -6,6 +6,7 @@ import (
 
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
+	"github.com/b1tAction/paradiced/internal/net"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
 )
@@ -21,13 +22,17 @@ func (h *NakamaMatchHandler) MatchInit() error {
 	// Create broadcast adapter
 	broadcastAdapter := NewNakamaBroadcastAdapter(h)
 
+	// Create builder for protocol messages
+	builder := net.NewBuilder(h.hsm)
+
 	// Set map engine in HSM
 	h.hsm.SetMapEngine(h.mapEngine)
 
-	// Create state context for HSM (using HSM reference)
+	// Create state context with all components
 	ctx := hsm.NewStateContext().
 		WithHSM(h.hsm).
-		WithBroadcast(broadcastAdapter)
+		WithBroadcast(broadcastAdapter).
+		WithBuilder(builder)
 
 	// Start HSM - enters MatchInit state
 	h.hsm.Start(hsm.StateMatchInit, ctx)
@@ -45,10 +50,31 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 
 	// Create state context with current player (using HSM reference)
 	currentPlayer := h.getCurrentPlayer()
+	broadcastAdapter := NewNakamaBroadcastAdapter(h)
+	builder := net.NewBuilder(h.hsm)
 	ctx := hsm.NewStateContext().
 		WithHSM(h.hsm).
 		WithPlayer(currentPlayer).
-		WithBroadcast(NewNakamaBroadcastAdapter(h))
+		WithBroadcast(broadcastAdapter).
+		WithBuilder(builder)
+
+	// Handle TurnEnd state - trigger next turn or round
+	if h.hsm.GetGlobalStateID() == hsm.StateTurnLoop &&
+		h.hsm.GetTurnStateID() == hsm.StateTurnEnd {
+		// Get TurnLoop state
+		globalState := h.hsm.GetGlobalState()
+		turnLoopState, ok := globalState.(*hsm.TurnLoopState)
+		if ok {
+			// Mark turn as complete
+			turnLoopState.OnTurnComplete(ctx)
+
+			// Start next player's turn
+			nextState := turnLoopState.StartPlayerTurn(ctx)
+			if nextState != hsm.StateNone {
+				h.hsm.TransitionTo(nextState, ctx)
+			}
+		}
+	}
 
 	// Update HSM
 	nextState, err := h.hsm.Update(ctx)
@@ -91,13 +117,17 @@ func (h *NakamaMatchHandler) MatchStop() error {
 
 // getCurrentPlayer returns the current player for the turn.
 func (h *NakamaMatchHandler) getCurrentPlayer() *core.Player {
-	if h.game == nil || len(h.game.Players) == 0 {
+	if h.hsm == nil {
+		return nil
+	}
+	game := h.hsm.GetGame()
+	if game == nil || len(game.Players) == 0 {
 		return nil
 	}
 
 	turnIndex := h.hsm.GetTurn()
-	if turnIndex >= 0 && turnIndex < len(h.game.Players) {
-		return h.game.Players[turnIndex]
+	if turnIndex >= 0 && turnIndex < len(game.Players) {
+		return game.Players[turnIndex]
 	}
 
 	return nil
@@ -122,26 +152,10 @@ func (h *NakamaMatchHandler) addPlayer(userID string, faction constants.Faction)
 }
 
 // assignFactions assigns factions to players based on join order.
+// Note: Faction-specific buffs (like ZhuQue Fire) are added later by
+// game.InitializePlayerFactionBuffs() during MatchInitState.Enter().
 func (h *NakamaMatchHandler) assignFactions() {
-	factions := []constants.Faction{
-	 constants.FactionQingLong,
-	 constants.FactionZhuQue,
-	 constants.FactionBaiHu,
-	 constants.FactionXuanWu,
-	}
-
-	for i, userID := range h.playerList {
-		player := h.players[userID]
-		if player != nil && i < len(factions) {
-			// Faction is set via PlayerConfig, but we can update the field
-			// Player.Faction is a private field, set via constructor
-			// For re-assignment, we need to use reflection or a setter method
-			// For now, we'll create new players with correct factions in addPlayer
-
-			// ZhuQue players get Fire buff (离火 passive)
-			if factions[i] == constants.FactionZhuQue {
-				player.AddBuff(core.NewBuff(constants.BuffTypeFire, -1)) // Permanent buff
-			}
-		}
-	}
+	// This method is deprecated - factions are set during addPlayer via PlayerConfig.
+	// The function exists for backwards compatibility but does nothing.
+	// Buff initialization is handled by engine.InitializePlayerFactionBuffs().
 }
