@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/util"
 )
 
 func TestHandlePresenceJoin(t *testing.T) {
@@ -36,7 +37,8 @@ func TestHandlePresenceJoinWithFaction(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Player joins with faction metadata
-	metadata := map[string]string{"faction": "zhu_que"}
+	metadata := util.NewMetadata()
+	metadata.SetString("faction", "zhu_que")
 	err := handler.HandlePresenceJoin("user-001", metadata)
 	if err != nil {
 		t.Fatalf("HandlePresenceJoin error: %v", err)
@@ -273,7 +275,8 @@ func TestMatchFullPlayerJoin(t *testing.T) {
 	factions := []string{"qing_long", "zhu_que", "bai_hu", "xuan_wu"}
 	for i := 0; i < 4; i++ {
 		userID := "user-" + string(rune('0'+'1'+i))
-		metadata := map[string]string{"faction": factions[i]}
+		metadata := util.NewMetadata()
+		metadata.SetString("faction", factions[i])
 		err := handler.HandlePresenceJoin(userID, metadata)
 		if err != nil {
 			t.Fatalf("HandlePresenceJoin[%d] error: %v", i, err)
