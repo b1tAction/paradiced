@@ -368,6 +368,38 @@ Faction 字段使用 **snake_case** 值：
 - [doc/internal/nakama.md](../../doc/internal/nakama.md) - Nakama Match Handler 集成
 - [internal/nakama/README.md](../../internal/nakama/README.md) - Nakama 包文档
 
+## Builder 接口
+
+定义在 `pkg/net/builder.go`，用于构建协议同步消息。接口设计避免 internal/engine/hsm 和 internal/net 之间的循环引用：
+
+```go
+type Builder interface {
+    BuildStateSync() *StateSync
+    BuildTurnSync() *TurnSync
+    BuildAvailable() *Available
+    SetDiceType(diceType string)
+}
+```
+
+实现在 `internal/net/builder.go`：
+
+```go
+type Builder struct {
+    hsm         *hsm.HSM
+    turnDiceType rng.DiceType
+}
+
+func NewBuilder(hsmInstance *hsm.HSM) *Builder
+func (b *Builder) BuildStateSync() *StateSync
+func (b *Builder) BuildTurnSync() *TurnSync
+func (b *Builder) BuildAvailable() *Available
+func (b *Builder) SetDiceType(diceType string)      // pkg/net.Builder interface
+func (b *Builder) SetDiceTypeFromRng(diceType rng.DiceType)  // internal use
+func (b *Builder) BuildAvailableForPlayer(player *core.Player) *Available  // specific player
+```
+
+HSM 状态通过 `StateContext.WithBuilder(builder)` 获取 Builder，用于广播消息。
+
 ## Nakama 集成实现
 
 `internal/nakama.NakamaBroadcastAdapter` 实现本包的 `BroadcastAdapter` 接口：

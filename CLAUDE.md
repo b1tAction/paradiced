@@ -36,16 +36,16 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 │   ├── gamemap/        # Map system (Cell, MapEngine, PathResult)
 │   └── net/            # Sync data builder (Builder, test helper)
 ├── pkg/
-│   ├── action/         # Action interface layer (ActionType string, Action interface)
 │   ├── constants/      # Unified enum types (BuffType, EventType, ItemType, Phase, etc.)
 │   ├── gamelog/        # Unified game log system for client playback
 │   ├── id/             # Typed ID wrapper system (PlayerID, BuffID, ItemID, etc.)
-│   ├── net/            # Network protocol layer (OpCode, Message, StateSync, MatchHandler)
+│   ├── net/            # Network protocol layer (OpCode, Message, StateSync, MatchHandler, Builder interface)
 │   ├── protocol/       # Public interfaces (Game, MapEngine) - for testing mocks
 │   ├── rng/            # Random number engine (WeightedPool, LuckModifier, DiceManager)
 │   └── util/           # Utilities (Metadata with JSON serialization)
 └── doc/
     ├── internal/       # Internal package documentation
+    ├── metadata/       # Metadata contract documentation
     └── background.md   # Game design document (Chinese)
 ```
 
@@ -68,11 +68,18 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **MapEngine**: Interface for map operations
 - **Faction**: Player faction type (青龙/朱雀/白虎/玄武)
 
-#### Action System (`pkg/action` + `internal/engine/action`)
+#### Action System (`internal/engine/action`)
 - **ActionType**: String type with snake_case naming (damage, heal, move, etc.)
 - **Action interface**: Core interface with PreTriggerPhase/PostTriggerPhase
 - **ExecutableAction**: Concrete implementations (DamageAction, HealAction, RespawnAction, FellDownAction, etc.)
 - **ActionContext**: Execution context with EventBus and global GameLog integration
+
+#### Protocol Layer (`pkg/net`)
+- **Builder interface**: Abstract interface for building protocol sync messages (implemented in internal/net)
+- **BroadcastAdapter**: Broadcast abstraction for client communication
+- **OpCode**: Message operation codes (Server→Client: 1-99, Client→Server: 100+)
+- **StateSync/TurnSync**: Complete state and turn synchronization structures
+- **Decision**: User confirmation request structure
 
 #### GameLog System (`pkg/gamelog`)
 - **EntryType**: Alias to constants.EntryType - log entry types (action, state, mini_game, boss, decision)
@@ -85,10 +92,6 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **EventBus**: Manages Buff/Item subscriptions and triggers
 - **Decision**: User confirmation mechanism
 - **Context**: Execution context with Metadata embedding and DerivedActions
-
-#### Handler System (`pkg/handler`)
-- **EffectHandler**: Unified handler function signature for Buff/Item/Event/Faction effects
-- Handlers use ctx.AddDerivedAction() to generate multiple actions
 
 #### ID System (`pkg/id`)
 - **PlayerID**: Player unique identifier (prefix: "player")
@@ -234,9 +237,13 @@ GOMODCACHE=/app/.gomodcache go test ./...
 - [doc/internal/metadata.md](doc/internal/metadata.md) - Metadata utility usage (Chinese)
 - [doc/metadata/README.md](doc/metadata/README.md) - Metadata contracts (Chinese)
 - [doc/internal/gamemap.md](doc/internal/gamemap.md) - Map system (Chinese)
+- [doc/internal/nakama.md](doc/internal/nakama.md) - Nakama integration (Chinese)
+- [doc/protocol_hsm_interaction.md](doc/protocol_hsm_interaction.md) - Protocol-HSM interaction flow (Chinese)
 - [pkg/constants/README.md](pkg/constants/README.md) - Unified enum types
+- [pkg/net/README.md](pkg/net/README.md) - Network protocol layer and Builder interface
 - [pkg/protocol/README.md](pkg/protocol/README.md) - Protocol interface layer
-- [pkg/action/README.md](pkg/action/README.md) - Action interface layer
-- [pkg/handler/README.md](pkg/handler/README.md) - Effect handler types
 - [pkg/id/README.md](pkg/id/README.md) - Typed ID wrapper system
+- [pkg/gamelog/README.md](pkg/gamelog/README.md) - GameLog system
+- [pkg/rng/README.md](pkg/rng/README.md) - RNG engine and dice system
+- [internal/engine/hsm/README.md](internal/engine/hsm/README.md) - HSM state machine
 - [internal/engine/action/README.md](internal/engine/action/README.md) - Action implementation
