@@ -8,8 +8,6 @@ import (
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
-	"github.com/b1tAction/paradiced/pkg/gamelog"
-	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
@@ -58,7 +56,6 @@ func NewTurnUpkeepState() *TurnUpkeepState {
 func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 	player := ctx.Player
 	if player == nil {
-		ctx.Success = false
 		ctx.Error = NewStateError(StateTurnUpkeep, "player is nil")
 		return
 	}
@@ -126,135 +123,10 @@ func (s *TurnUpkeepState) broadcastStateSync(ctx *StateContext) {
 	if ctx.Broadcast == nil || game == nil {
 		return
 	}
-	stateSync := buildStateSync(ctx)
-	ctx.Broadcast.BroadcastStateSync(stateSync)
-}
-
-// buildStateSync creates StateSync from context data.
-func buildStateSync(ctx *StateContext) *pkgnet.StateSync {
-	game := ctx.GetGame()
-	globalState := ctx.HSM.GetGlobalStateID().String() // Use CurrentPhase as global state
-	turnState := "" // Will be set by current turn state
-
-	var turnPlayerID string
-	if ctx.Player != nil {
-		turnPlayerID = ctx.Player.ID.UUID()
-	}
-
-	players := make([]pkgnet.Player, len(game.Players))
-	for i, p := range game.Players {
-		players[i] = pkgnet.Player{
-			UserID:      p.ID.UUID(),
-			Faction:     string(p.GetFaction()),
-			Position:    p.Position,
-			HP:          p.HP,
-			LP:          p.LP,
-			Buffs:       buildBuffs(p.ActiveBuffs),
-			Items:       buildItems(p.Inventory),
-			Charge:      p.GetChargeCount(),
-			FireCounter: p.GetFireCounter(),
-			IsDead:      p.IsDead,
-			SkipTurn:    p.SkipTurn,
-		}
-	}
-
-	return &pkgnet.StateSync{
-		GlobalState: globalState,
-		TurnState:   turnState,
-		TurnPlayer:  turnPlayerID,
-		Round:       ctx.GetRound(),
-		Turn:        ctx.GetTurn(),
-		Paused:      false,
-		Players:     players,
-	}
-}
-
-// buildBuffs creates Buff list from player's active buffs.
-func buildBuffs(activeBuffs []*core.Buff) []pkgnet.Buff {
-	result := make([]pkgnet.Buff, len(activeBuffs))
-	for i, b := range activeBuffs {
-		result[i] = pkgnet.Buff{
-			Type:     string(b.Type),
-			Name:     "", // TODO: get from definition
-			Duration: b.Duration,
-		}
-	}
-	return result
-}
-
-// buildItems creates Item list from player's inventory.
-func buildItems(inventory []*core.Item) []pkgnet.Item {
-	result := make([]pkgnet.Item, len(inventory))
-	for i, it := range inventory {
-		result[i] = pkgnet.Item{
-			ID:   it.ID.UUID(),
-			Type: string(it.Type),
-			Name: "", // TODO: get from definition
-		}
-	}
-	return result
-}
-
-// buildAvailable creates Available for a specific player.
-func buildAvailable(ctx *StateContext, player *core.Player) *pkgnet.Available {
-	// Build items list (only PhaseAnyTime items are available during MainAction)
-	items := make([]pkgnet.Item, 0)
-	for _, it := range player.Inventory {
-		// Check if item can be used anytime (PhaseAnyTime)
-		// For now, include all items; actual filtering would need item definition lookup
-		items = append(items, pkgnet.Item{
-			ID:   it.ID.UUID(),
-			Type: string(it.Type),
-			Name: "", // TODO: get from definition
-		})
-	}
-
-	// Check if faction skill is available (charge count >= 1)
-	canUseSkill := false
-	faction := player.GetFaction()
-	if faction == constants.FactionQingLong || faction == constants.FactionXuanWu {
-		canUseSkill = player.GetChargeCount() >= 1
-	}
-
-	// Get dice type from context
-	diceType := ctx.GetDiceType(player.ID.UUID())
-	diceTypeStr := "wood" // default
-	switch diceType {
-	case rng.DiceTypeGold:
-		diceTypeStr = "gold"
-	case rng.DiceTypeSilver:
-		diceTypeStr = "silver"
-	case rng.DiceTypeCopper:
-		diceTypeStr = "copper"
-	}
-
-	return &pkgnet.Available{
-		Items:       items,
-		CanUseSkill: canUseSkill,
-		DiceType:    diceTypeStr,
-	}
-}
-
-// buildTurnSync creates TurnSync from game log.
-func buildTurnSync(ctx *StateContext) *pkgnet.TurnSync {
-	var playerID string
-	if ctx.Player != nil {
-		playerID = ctx.Player.ID.UUID()
-	}
-
-	// Get current turn's entries from GameLog
-	var entries []gamelog.LogEntry
-	game := ctx.GetGame()
-	if game != nil && game.Log != nil {
-		// Get entries for current turn
-		entries = game.Log.GetCurrentTurnEntries()
-	}
-
-	return &pkgnet.TurnSync{
-		Round:   ctx.GetRound(),
-		Turn:    ctx.GetTurn(),
-		Player:  playerID,
-		Entries: entries,
+	// Use Builder if available
+	if ctx.Builder != nil {
+		stateSync := ctx.Builder.BuildStateSync()
+		ctx.Broadcast.BroadcastStateSync(stateSync)
 	}
 }
 
@@ -311,7 +183,6 @@ func NewMainActionState() *MainActionState {
 func (s *MainActionState) Enter(ctx *StateContext) {
 	player := ctx.Player
 	if player == nil {
-		ctx.Success = false
 		ctx.Error = NewStateError(StateMainAction, "player is nil")
 		return
 	}
@@ -348,8 +219,11 @@ func (s *MainActionState) broadcastStateSync(ctx *StateContext) {
 	if ctx.Broadcast == nil || game == nil {
 		return
 	}
-	stateSync := buildStateSync(ctx)
-	ctx.Broadcast.BroadcastStateSync(stateSync)
+	// Use Builder if available
+	if ctx.Builder != nil {
+		stateSync := ctx.Builder.BuildStateSync()
+		ctx.Broadcast.BroadcastStateSync(stateSync)
+	}
 }
 
 // sendAvailable sends available actions to current player.
@@ -358,8 +232,14 @@ func (s *MainActionState) sendAvailable(ctx *StateContext) {
 	if ctx.Broadcast == nil || game == nil || ctx.Player == nil {
 		return
 	}
-	available := buildAvailable(ctx, ctx.Player)
-	ctx.Broadcast.SendAvailable(ctx.Player.ID.UUID(), available)
+	// Use Builder if available
+	if ctx.Builder != nil {
+		// Set dice type from context
+		diceType := ctx.GetDiceType(ctx.Player.ID.UUID())
+		ctx.Builder.SetDiceType(diceType.String())
+		available := ctx.Builder.BuildAvailable()
+		ctx.Broadcast.SendAvailable(ctx.Player.ID.UUID(), available)
+	}
 }
 
 func (s *MainActionState) Update(ctx *StateContext) StateID {
@@ -458,7 +338,6 @@ func NewTurnMovingState() *TurnMovingState {
 func (s *TurnMovingState) Enter(ctx *StateContext) {
 	player := ctx.Player
 	if player == nil {
-		ctx.Success = false
 		ctx.Error = NewStateError(StateTurnMoving, "player is nil")
 		return
 	}
@@ -487,7 +366,6 @@ func (s *TurnMovingState) Enter(ctx *StateContext) {
 	// Execute through ActionContext (handles PreTrigger, Execute, PostTrigger)
 	err := s.actionCtx.ExecuteAction(moveAction)
 	if err != nil {
-		ctx.Success = false
 		ctx.Error = NewStateError(StateTurnMoving, err.Error())
 		return
 	}
@@ -580,7 +458,6 @@ func NewTurnLandedState() *TurnLandedState {
 func (s *TurnLandedState) Enter(ctx *StateContext) {
 	player := ctx.Player
 	if player == nil {
-		ctx.Success = false
 		ctx.Error = NewStateError(StateTurnLanded, "player is nil")
 		return
 	}
@@ -667,7 +544,6 @@ func NewTurnEventState() *TurnEventState {
 func (s *TurnEventState) Enter(ctx *StateContext) {
 	player := ctx.Player
 	if player == nil {
-		ctx.Success = false
 		ctx.Error = NewStateError(StateTurnEvent, "player is nil")
 		return
 	}
@@ -689,7 +565,6 @@ func (s *TurnEventState) Enter(ctx *StateContext) {
 	// Execute through ActionContext
 	err := s.actionCtx.ExecuteAction(drawAction)
 	if err != nil {
-		ctx.Success = false
 		ctx.Error = NewStateError(StateTurnEvent, err.Error())
 		return
 	}
@@ -742,7 +617,6 @@ func NewTurnEndState() *TurnEndState {
 func (s *TurnEndState) Enter(ctx *StateContext) {
 	player := ctx.Player
 	if player == nil {
-		ctx.Success = false
 		ctx.Error = NewStateError(StateTurnEnd, "player is nil")
 		return
 	}
@@ -809,8 +683,11 @@ func (s *TurnEndState) broadcastTurnSync(ctx *StateContext) {
 	if ctx.Broadcast == nil || game == nil {
 		return
 	}
-	turnSync := buildTurnSync(ctx)
-	ctx.Broadcast.BroadcastTurnSync(turnSync)
+	// Use Builder if available
+	if ctx.Builder != nil {
+		turnSync := ctx.Builder.BuildTurnSync()
+		ctx.Broadcast.BroadcastTurnSync(turnSync)
+	}
 }
 
 // broadcastStateSync broadcasts final game state after turn.
@@ -819,8 +696,11 @@ func (s *TurnEndState) broadcastStateSync(ctx *StateContext) {
 	if ctx.Broadcast == nil || game == nil {
 		return
 	}
-	stateSync := buildStateSync(ctx)
-	ctx.Broadcast.BroadcastStateSync(stateSync)
+	// Use Builder if available
+	if ctx.Builder != nil {
+		stateSync := ctx.Builder.BuildStateSync()
+		ctx.Broadcast.BroadcastStateSync(stateSync)
+	}
 }
 
 func (s *TurnEndState) Update(ctx *StateContext) StateID {

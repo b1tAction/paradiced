@@ -36,7 +36,7 @@ func TestTurnUpkeepState_Enter_NormalFlow(t *testing.T) {
 	state.Enter(ctx)
 
 	// Verify
-	if ctx.Success != true {
+	if ctx.Error != nil {
 		t.Errorf("Enter should succeed, got error: %v", ctx.Error)
 	}
 	if state.skipTurn != false {
@@ -330,7 +330,7 @@ func TestTurnLandedState_Enter(t *testing.T) {
 
 	state.Enter(ctx)
 
-	if ctx.Success != true {
+	if ctx.Error != nil {
 		t.Errorf("Enter should succeed, got error: %v", ctx.Error)
 	}
 	if state.cellType != gamemap.CellTypeCheckpoint {
@@ -398,7 +398,7 @@ func TestTurnEndState_Enter(t *testing.T) {
 
 	state.Enter(ctx)
 
-	if ctx.Success != true {
+	if ctx.Error != nil {
 		t.Errorf("Enter should succeed, got error: %v", ctx.Error)
 	}
 }
