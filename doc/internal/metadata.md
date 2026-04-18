@@ -262,5 +262,5 @@ hp := m2.GetIntOrDefault("hp", 0)  // 100（自动处理 float64→int 转换）
 - [doc/metadata/README.md](../metadata/README.md) - Metadata契约文档
 - [pkg/gamelog/README.md](../../pkg/gamelog/README.md) - GameLog系统
 - [internal/core/README.md](../../internal/core/README.md) - Player结构
-- [pkg/event/README.md](../../pkg/event/README.md) - EventBus系统
+- [internal/event/README.md](../../internal/core/README.md) - EventBus系统
 - [internal/engine/hsm/README.md](../../internal/engine/hsm/README.md) - HSM状态机

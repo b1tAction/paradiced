@@ -146,5 +146,5 @@ loaded, err := LoadMap(data)
 
 ## 与其他包的关系
 
-- 无外部依赖（不依赖 pkg/event 或 internal/core）
+- 无外部依赖（不依赖 internal/event 或 internal/core）
 - 被 internal/engine 使用（回城逻辑）
