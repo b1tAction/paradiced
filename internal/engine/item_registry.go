@@ -143,9 +143,6 @@ func registerAllItems() {
 		EnglishName: "ReverseClock",
 		Name:        "反方向的钟",
 		Desc:        "给予指定玩家迷途Buff",
-		TargetSelf:  false,
-		TargetOther: true,
-		Range:       0,
 	}, &ItemHandlerConfig{
 		Phase:       constants.PhaseAnyTime,
 		Priority:    50,
@@ -160,9 +157,6 @@ func registerAllItems() {
 		EnglishName: "AnyDoor",
 		Name:        "任意门",
 		Desc:        "去到30格内指定玩家身边",
-		TargetSelf:  false,
-		TargetOther: true,
-		Range:       30,
 	}, &ItemHandlerConfig{
 		Phase:       constants.PhaseOnLand,
 		Priority:    60,
@@ -177,9 +171,6 @@ func registerAllItems() {
 		EnglishName: "DiceSwap",
 		Name:        "骰子交换",
 		Desc:        "与指定玩家交换骰子等级",
-		TargetSelf:  false,
-		TargetOther: true,
-		Range:       0,
 	}, &ItemHandlerConfig{
 		Phase:       constants.PhaseAnyTime,
 		Priority:    40,
@@ -194,9 +185,6 @@ func registerAllItems() {
 		EnglishName: "DiceUpgrade",
 		Name:        "骰子升级卡",
 		Desc:        "将当前骰子升级为更高等级",
-		TargetSelf:  true,
-		TargetOther: false,
-		Range:       0,
 	}, &ItemHandlerConfig{
 		Phase:       constants.PhaseBeforeTurn,
 		Priority:    70,

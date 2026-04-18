@@ -268,9 +268,7 @@ func TestGameSubscribeBuff(t *testing.T) {
 			if game.Bus.GetSubscriptionCount() != 1 {
 				t.Errorf("Subscription count = %d, expected 1", game.Bus.GetSubscriptionCount())
 			}
-			if len(buff.SubscriptionIDs) != 1 {
-				t.Error("Buff should have SubscriptionIDs")
-			}
+			// Subscription managed by EventBus via sourceID
 		}
 	}
 }
@@ -289,9 +287,7 @@ func TestGameSubscribePassiveBuff(t *testing.T) {
 	config := GetBuffHandlerConfig(constants.BuffTypeFire)
 	for _, phase := range config.GetPhases() {
 		if phase.NeedsSubscription() {
-			if len(buff.SubscriptionIDs) == 0 {
-				t.Error("Fire Buff should have SubscriptionIDs (BeforeTurn)")
-			}
+			// Subscription managed by EventBus via sourceID
 		}
 	}
 }
@@ -314,9 +310,7 @@ func TestGameUnsubscribeBuff(t *testing.T) {
 	if game.Bus.GetSubscriptionCount() != initialCount-1 {
 		t.Errorf("Subscription count should decrease after unsubscribe")
 	}
-	if len(buff.SubscriptionIDs) != 0 {
-		t.Error("Buff SubscriptionIDs should be empty after unsubscribe")
-	}
+	// Subscription managed by EventBus via sourceID
 }
 
 func TestGameSubscribeBuffByPlayerAdd(t *testing.T) {
@@ -365,9 +359,7 @@ func TestGameSubscribeItem(t *testing.T) {
 		if game.Bus.GetSubscriptionCount() != 1 {
 			t.Errorf("Subscription count = %d, expected 1", game.Bus.GetSubscriptionCount())
 		}
-		if item.SubscriptionID == "" {
-			t.Error("Item should have SubscriptionID")
-		}
+		// Subscription managed by EventBus via sourceID
 	}
 }
 
@@ -384,9 +376,7 @@ func TestGameSubscribeAnyTimeItem(t *testing.T) {
 	// AnyTime 道具不需要订阅（主动触发）
 	config := GetItemHandlerConfig(constants.ItemTypeReverseClock)
 	if config.Phase == constants.PhaseAnyTime {
-		if item.SubscriptionID != "" {
-			t.Error("AnyTime Item should not have SubscriptionID")
-		}
+		// Subscription managed by EventBus via sourceID
 	}
 }
 
@@ -408,9 +398,7 @@ func TestGameUnsubscribeItem(t *testing.T) {
 	if game.Bus.GetSubscriptionCount() != initialCount-1 {
 		t.Errorf("Subscription count should decrease after unsubscribe")
 	}
-	if item.SubscriptionID != "" {
-		t.Error("Item SubscriptionID should be cleared after unsubscribe")
-	}
+	// Subscription managed by EventBus via sourceID
 }
 
 // ========== Multiple Subscriptions Tests ==========
@@ -534,9 +522,7 @@ func TestGameApplyBuffToPlayer(t *testing.T) {
 	}
 
 	// 验证 SubscriptionIDs 已填充
-	if len(buff.SubscriptionIDs) == 0 {
-		t.Error("Buff should have SubscriptionIDs")
-	}
+	// Subscription managed by EventBus via sourceID
 }
 
 func TestGameRemoveBuffFromPlayer(t *testing.T) {
@@ -673,19 +659,3 @@ func TestGameGetActiveBuffCount(t *testing.T) {
 	}
 }
 
-func TestGameGetBuffSubscriptionCount(t *testing.T) {
-	game := NewGame(id.NewGameID(), 0)
-	playerID := id.NewPlayerID()
-	player := core.NewPlayer(core.PlayerConfig{ID: playerID})
-	game.AddPlayer(player)
-
-	// 添加 Buff
-	buff := core.NewBuff(constants.BuffTypeCurse, 3)
-	game.SubscribeBuff(player, buff)
-
-	// 验证订阅数量
-	count := game.GetBuffSubscriptionCount(buff)
-	if count != 1 {
-		t.Errorf("Subscription count = %d, expected 1", count)
-	}
-}

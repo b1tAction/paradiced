@@ -73,14 +73,11 @@ func TestItemDefinitionsFields(t *testing.T) {
 		eval        constants.Evaluation
 		englishName string
 		name        string
-		targetSelf  bool
-		targetOther bool
-		rangeVal    int
-	}{
-		{constants.ItemTypeReverseClock, constants.EvaluationGood, "ReverseClock", "反方向的钟", false, true, 0},
-		{constants.ItemTypeAnyDoor, constants.EvaluationNeutral, "AnyDoor", "任意门", false, true, 30},
-		{constants.ItemTypeDiceSwap, constants.EvaluationNeutral, "DiceSwap", "骰子交换", false, true, 0},
-		{constants.ItemTypeDiceUpgrade, constants.EvaluationGood, "DiceUpgrade", "骰子升级卡", true, false, 0},
+			}{
+		{constants.ItemTypeReverseClock, constants.EvaluationGood, "ReverseClock", "反方向的钟"},
+		{constants.ItemTypeAnyDoor, constants.EvaluationNeutral, "AnyDoor", "任意门"},
+		{constants.ItemTypeDiceSwap, constants.EvaluationNeutral, "DiceSwap", "骰子交换"},
+		{constants.ItemTypeDiceUpgrade, constants.EvaluationGood, "DiceUpgrade", "骰子升级卡"},
 	}
 
 	for _, tt := range tests {
@@ -102,17 +99,8 @@ func TestItemDefinitionsFields(t *testing.T) {
 			t.Errorf("%s.Name = %s, expected %s", tt.itemType, def.Name, tt.name)
 		}
 
-		if def.TargetSelf != tt.targetSelf {
-			t.Errorf("%s.TargetSelf = %v, expected %v", tt.itemType, def.TargetSelf, tt.targetSelf)
-		}
 
-		if def.TargetOther != tt.targetOther {
-			t.Errorf("%s.TargetOther = %v, expected %v", tt.itemType, def.TargetOther, tt.targetOther)
-		}
 
-		if def.Range != tt.rangeVal {
-			t.Errorf("%s.Range = %d, expected %d", tt.itemType, def.Range, tt.rangeVal)
-		}
 	}
 }
 
