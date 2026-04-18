@@ -60,7 +60,7 @@ func TestBroadcastTurnSync(t *testing.T) {
 
 	broadcastAdapter := NewNakamaBroadcastAdapter(handler)
 
-	entry := gamelog.NewActionEntry("damage", "player-001", -1, "Cell_Fragile")
+	entry := gamelog.NewActionEntry("damage", "player-001", "Cell_Fragile")
 	turnSync := &net.TurnSync{
 		Round:   1,
 		Turn:    0,

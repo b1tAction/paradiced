@@ -43,21 +43,21 @@ type StateSync struct {
 // LogEntry.Metadata Field Contract:
 // Each action_type has specific metadata fields that client should parse.
 //
-// | action_type   | metadata fields                                      | client usage                |
-// |---------------|------------------------------------------------------|----------------------------|
-// | damage        | blocked_by?: string, piercing?: bool                 | 显示阻挡来源、穿透效果       |
-// | heal          | -                                                    | 显示治疗动画                |
-// | modify_lp     | -                                                    | 显示LP变化动画              |
-// | move          | start_pos: int, end_pos: int, path: []int            | 显示移动路径动画            |
-// | add_buff      | buff_type: string                                    | 显示获得Buff动画            |
-// | remove_buff   | buff_type: string                                    | 显示移除Buff动画           |
-// | teleport      | from_pos: int, to_pos: int                           | 显示传送动画               |
-// | steal_buff    | stolen_by: string, buff_type: string                 | 显示白虎劫运动画           |
-// | respawn       | checkpoint_pos: int                                  | 显示重生动画               |
-// | fell_down     | position: int                                        | 显示落坑动画               |
-// | draw_event    | event_type: string, event_name: string               | 显示抽取事件动画           |
-// | dice_roll     | dice_type: string, dice_steps: int                   | 显示骰子动画               |
-// | state         | from: string, to: string                             | 状态转换记录               |
+// | action_type   | metadata fields                                                      | client usage                |
+// |---------------|----------------------------------------------------------------------|----------------------------|
+// | damage        | hp_change: int, blocked_by?: string, piercing?: bool                 | 显示伤害数值、阻挡来源、穿透效果 |
+// | heal          | hp_change: int                                                       | 显示治疗数值动画             |
+// | modify_lp     | lp_change: int                                                       | 显示LP变化数值动画           |
+// | move          | steps: int, start_pos: int, end_pos: int, path: []int                | 显示移动路径动画             |
+// | add_buff      | buff_type: string, duration: int                                     | 显示获得Buff动画及持续时间   |
+// | remove_buff   | buff_type: string                                                    | 显示移除Buff动画           |
+// | teleport      | from_pos: int, to_pos: int                                           | 显示传送动画               |
+// | steal_buff    | stolen_by: string, buff_type: string                                 | 显示白虎劫运动画           |
+// | respawn       | checkpoint_pos: int                                                  | 显示重生动画               |
+// | fell_down     | position: int, hp_change: int                                        | 显示落坑动画及坠落伤害       |
+// | draw_event    | event_type: string, event_name: string                               | 显示抽取事件动画           |
+// | dice_roll     | dice_type: string, dice_steps: int                                   | 显示骰子动画               |
+// | state         | from: string, to: string                                             | 状态转换记录               |
 //
 // Client rendering example (TypeScript):
 //
@@ -231,13 +231,12 @@ type FullSync struct {
 
 // NewLogEntry creates a simple log entry for protocol testing.
 // For production use, use gamelog.NewActionEntry instead.
-func NewLogEntry(actionType string, target string, delta int, source string) gamelog.LogEntry {
+func NewLogEntry(actionType string, target string, source string) gamelog.LogEntry {
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeAction,
 		ActionType: actionType,
 		Target:     target,
-		Delta:      delta,
 		Source:     source,
 		Metadata:   nil,
 	}

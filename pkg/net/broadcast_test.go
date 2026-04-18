@@ -31,7 +31,7 @@ func TestMockBroadcastAdapterTurnSync(t *testing.T) {
 	mock := NewMockBroadcastAdapter()
 
 	// Create LogEntry using gamelog
-	entry := gamelog.NewActionEntry("damage", "player-001", -1, "Cell_Fragile")
+	entry := gamelog.NewActionEntry("damage", "player-001", "Cell_Fragile")
 
 	turnSync := &TurnSync{
 		Round:   1,

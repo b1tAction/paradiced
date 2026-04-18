@@ -49,11 +49,11 @@ func TestStateSyncJSON(t *testing.T) {
 
 func TestTurnSyncWithLogEntries(t *testing.T) {
 	// Create LogEntries using gamelog
-	entry1 := gamelog.NewActionEntry("damage", "player-abc123", -1, "Cell_Fragile")
+	entry1 := gamelog.NewActionEntry("damage", "player-abc123", "Cell_Fragile")
 
 	entry2Meta := util.NewMetadata()
 	entry2Meta.Set("path", []int{10, 11, 12, 13})
-	entry2 := gamelog.NewActionEntryWithMetadata("move", "player-abc123", 0, "DiceRoll", entry2Meta)
+	entry2 := gamelog.NewActionEntryWithMetadata("move", "player-abc123", "DiceRoll", entry2Meta)
 
 	sync := &TurnSync{
 		Round:   1,
@@ -80,9 +80,6 @@ func TestTurnSyncWithLogEntries(t *testing.T) {
 	}
 	if parsed.Entries[0].ActionType != "damage" {
 		t.Errorf("parsed.Entries[0].ActionType = %s, want damage", parsed.Entries[0].ActionType)
-	}
-	if parsed.Entries[0].Delta != -1 {
-		t.Errorf("parsed.Entries[0].Delta = %d, want -1", parsed.Entries[0].Delta)
 	}
 	if parsed.Entries[1].ActionType != "move" {
 		t.Errorf("parsed.Entries[1].ActionType = %s, want move", parsed.Entries[1].ActionType)
@@ -119,7 +116,7 @@ func TestLogEntryMetadataSerialization(t *testing.T) {
 	meta.SetString("buff_type", "divine")
 	meta.SetInt("duration", 3)
 
-	entry := gamelog.NewActionEntryWithMetadata("add_buff", "player-001", 0, "Buff_Divine", meta)
+	entry := gamelog.NewActionEntryWithMetadata("add_buff", "player-001", "Buff_Divine", meta)
 
 	jsonBytes, err := json.Marshal(entry)
 	if err != nil {
@@ -161,7 +158,7 @@ func TestLogEntryMetadataWithPath(t *testing.T) {
 	meta := util.NewMetadata()
 	meta.Set("path", []int{10, 11, 12, 13, 14, 15})
 
-	entry := gamelog.NewActionEntryWithMetadata("move", "player-001", 0, "DiceRoll", meta)
+	entry := gamelog.NewActionEntryWithMetadata("move", "player-001", "DiceRoll", meta)
 
 	jsonBytes, err := json.Marshal(entry)
 	if err != nil {
@@ -180,7 +177,6 @@ func TestLogEntryMetadataOmitempty(t *testing.T) {
 		Type:       constants.EntryTypeAction,
 		ActionType: "damage",
 		Target:     "player-001",
-		Delta:      -1,
 		Source:     "Cell_Fragile",
 		Metadata:   nil, // Explicitly nil
 	}
@@ -199,7 +195,7 @@ func TestLogEntryMetadataOmitempty(t *testing.T) {
 func TestLogEntryMetadataEmptyMap(t *testing.T) {
 	// NewActionEntry creates an empty but non-nil Metadata
 	// This will serialize as "metadata":{} not omitted
-	entry := gamelog.NewActionEntry("damage", "player-001", -1, "Cell_Fragile")
+	entry := gamelog.NewActionEntry("damage", "player-001", "Cell_Fragile")
 
 	jsonBytes, err := json.Marshal(entry)
 	if err != nil {
@@ -414,7 +410,7 @@ func TestFullSync(t *testing.T) {
 		Round:   1,
 		Turn:    0,
 		Player:  "player-001",
-		Entries: []gamelog.LogEntry{gamelog.NewActionEntry("damage", "player-001", -1, "Test")},
+		Entries: []gamelog.LogEntry{gamelog.NewActionEntry("damage", "player-001", "Test")},
 	}
 
 	fullSync := &FullSync{
@@ -444,16 +440,13 @@ func TestFullSync(t *testing.T) {
 }
 
 func TestNewLogEntry(t *testing.T) {
-	entry := NewLogEntry("heal", "player-001", 2, "Event_Herb")
+	entry := NewLogEntry("heal", "player-001", "Event_Herb")
 
 	if entry.ActionType != "heal" {
 		t.Errorf("entry.ActionType = %s, want heal", entry.ActionType)
 	}
 	if entry.Target != "player-001" {
 		t.Errorf("entry.Target = %s, want player-001", entry.Target)
-	}
-	if entry.Delta != 2 {
-		t.Errorf("entry.Delta = %d, want 2", entry.Delta)
 	}
 	if entry.Source != "Event_Herb" {
 		t.Errorf("entry.Source = %s, want Event_Herb", entry.Source)
