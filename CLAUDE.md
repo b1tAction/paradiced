@@ -20,11 +20,17 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 
 ```
 ├── internal/
-│   ├── core/           # Core data structures (Player, Buff, Item, Event)
-│   │   ├── buff/       # Buff system with multi-phase support
-│   │   ├── event/      # Event system with evaluation scores
-│   │   └── item/       # Item system with phase-specific triggers
-│   ├── engine/         # Game engine (Game, Handlers)
+│   ├── core/           # Core data structures (Player, Buff, Item, GameEvent)
+│   │   ├── buff.go     # Buff struct + BuffDefinition (static metadata)
+│   │   ├── item.go     # Item struct + ItemDefinition (static metadata)
+│   │   ├── game_event.go # GameEvent struct + EventDefinition (static metadata)
+│   │   ├── player.go   # Player struct (HP/LP/Buffs/Items/Metadata)
+│   │   └── faction.go  # Faction helper functions
+│   ├── event/          # EventBus system (Bus, Decision, Context)
+│   ├── engine/         # Game engine (Game, Registry, Handlers)
+│   │   ├── buff_registry.go # Buff Registry + HandlerConfig + handlers
+│   │   ├── item_registry.go # Item Registry + HandlerConfig + handlers
+│   │   ├── event_registry.go # Event Registry + HandlerConfig + handlers
 │   │   ├── action/     # Action system (DamageAction, HealAction, etc.)
 │   │   └── hsm/        # Hierarchical State Machine
 │   ├── gamemap/        # Map system (Cell, MapEngine, PathResult)
@@ -32,15 +38,12 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 ├── pkg/
 │   ├── action/         # Action interface layer (ActionType string, Action interface)
 │   ├── constants/      # Unified enum types (BuffType, EventType, ItemType, Phase, etc.)
-│   ├── event/          # EventBus system (Bus, Decision, Context)
 │   ├── gamelog/        # Unified game log system for client playback
-│   ├── handler/        # Effect handler types (EffectHandler for Buff/Item/Event)
 │   ├── id/             # Typed ID wrapper system (PlayerID, BuffID, ItemID, etc.)
 │   ├── net/            # Network protocol layer (OpCode, Message, StateSync, MatchHandler)
-│   ├── protocol/       # Public interfaces (Player, Game, MapEngine, Faction)
+│   ├── protocol/       # Public interfaces (Game, MapEngine) - for testing mocks
 │   ├── rng/            # Random number engine (WeightedPool, LuckModifier, DiceManager)
 │   └── util/           # Utilities (Metadata with JSON serialization)
-│   └── uuid/           # UUID v7 generation (github.com/google/uuid wrapper)
 └── doc/
     ├── internal/       # Internal package documentation
     └── background.md   # Game design document (Chinese)
