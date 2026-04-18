@@ -38,6 +38,10 @@ type HSM struct {
 	bus       *event.EventBus    // EventBus (derived from game)
 	mapEngine *gamemap.MapEngine // MapEngine (set externally)
 
+	// ========== Round/Turn State (moved from GameState) ==========
+	round int // Current round number
+	turn  int // Current turn (player index)
+
 	// ========== Timing ==========
 	lastUpdate     time.Time // Last update timestamp
 	stateEnterTime time.Time // Time when current state was entered
@@ -56,6 +60,8 @@ func NewHSM(game *engine.Game) *HSM {
 		states:        make(map[StateID]State),
 		game:          game,
 		bus:           game.Bus,
+		round:         1, // Start at round 1
+		turn:          0, // Start at turn 0 (first player)
 		running:       false,
 		paused:        false,
 	}
@@ -146,6 +152,33 @@ func (hsm *HSM) GetBus() *event.EventBus {
 // GetMapEngine returns the MapEngine (direct type).
 func (hsm *HSM) GetMapEngine() *gamemap.MapEngine {
 	return hsm.mapEngine
+}
+
+// GetRound returns the current round number.
+func (hsm *HSM) GetRound() int {
+	return hsm.round
+}
+
+// GetTurn returns the current turn (player index).
+func (hsm *HSM) GetTurn() int {
+	return hsm.turn
+}
+
+// IncrementRound increments the round number.
+func (hsm *HSM) IncrementRound() {
+	hsm.round++
+}
+
+// NextTurn advances to the next player turn.
+// Returns true if round wrapped around (all players completed).
+func (hsm *HSM) NextTurn() bool {
+	hsm.turn++
+	if hsm.turn >= len(hsm.game.Players) {
+		hsm.turn = 0
+		hsm.round++
+		return true // Round wrapped
+	}
+	return false
 }
 
 // SetMapEngine sets the MapEngine (direct type).
