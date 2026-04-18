@@ -3,6 +3,8 @@ package hsm
 import (
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/b1tAction/paradiced/internal/core"
@@ -11,6 +13,28 @@ import (
 	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/id"
 )
+
+// HSMConfig holds configuration for the HSM.
+type HSMConfig struct {
+	// MainActionTimeout is the timeout for MainAction state (default: 45s).
+	// In dev mode (PD_DEV=true), defaults to 10s.
+	MainActionTimeout time.Duration
+}
+
+// DefaultHSMConfig returns the default HSM configuration.
+func DefaultHSMConfig() *HSMConfig {
+	// Check if running in dev mode
+	isDev, _ := strconv.ParseBool(os.Getenv("PD_DEV"))
+
+	mainActionTimeout := 45 * time.Second
+	if isDev {
+		mainActionTimeout = 10 * time.Second
+	}
+
+	return &HSMConfig{
+		MainActionTimeout: mainActionTimeout,
+	}
+}
 
 // HSM is the main Hierarchical State Machine structure.
 // It manages three layers of states: Global (Layer 1), Turn (Layer 2), and Interrupt (Layer 3).
@@ -38,6 +62,9 @@ type HSM struct {
 	bus       *event.EventBus    // EventBus (derived from game)
 	mapEngine *gamemap.MapEngine // MapEngine (set externally)
 
+	// ========== Configuration ==========
+	config *HSMConfig // HSM configuration
+
 	// ========== Round/Turn State (moved from GameState) ==========
 	round int // Current round number
 	turn  int // Current turn (player index)
@@ -60,11 +87,18 @@ func NewHSM(game *engine.Game) *HSM {
 		states:        make(map[StateID]State),
 		game:          game,
 		bus:           game.Bus,
-		round:         1, // Start at round 1
-		turn:          0, // Start at turn 0 (first player)
+		config:        DefaultHSMConfig(), // Use default config
+		round:         1,                  // Start at round 1
+		turn:          0,                  // Start at turn 0 (first player)
 		running:       false,
 		paused:        false,
 	}
+}
+
+// WithConfig sets the HSM configuration.
+func (hsm *HSM) WithConfig(config *HSMConfig) *HSM {
+	hsm.config = config
+	return hsm
 }
 
 // ========== State Registration ==========

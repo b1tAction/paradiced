@@ -171,13 +171,19 @@ type MainActionState struct {
 }
 
 // NewMainActionState creates a new MainAction state.
-func NewMainActionState() *MainActionState {
+func NewMainActionState(timeout time.Duration) *MainActionState {
 	return &MainActionState{
 		BaseTurnState:    BaseTurnState{id: StateMainAction},
 		waitingForAction: true,
 		diceRolled:       false,
-		timeout:          45 * time.Second, // Default timeout
+		timeout:          timeout,
 	}
+}
+
+// NewMainActionStateDefault creates a new MainAction state with default timeout (45s).
+// Deprecated: Use NewMainActionState with explicit timeout.
+func NewMainActionStateDefault() *MainActionState {
+	return NewMainActionState(45 * time.Second)
 }
 
 func (s *MainActionState) Enter(ctx *StateContext) {
@@ -744,7 +750,9 @@ func (s *TurnEndState) handleFactionCharging(ctx *StateContext, player *core.Pla
 // ========== Turn State Factory ==========
 
 // TurnStateFactory creates turn layer states.
-type TurnStateFactory struct{}
+type TurnStateFactory struct {
+	config *HSMConfig
+}
 
 // CreateState creates a turn state by ID.
 func (f *TurnStateFactory) CreateState(id StateID) State {
@@ -752,7 +760,11 @@ func (f *TurnStateFactory) CreateState(id StateID) State {
 	case StateTurnUpkeep:
 		return NewTurnUpkeepState()
 	case StateMainAction:
-		return NewMainActionState()
+		timeout := f.config.MainActionTimeout
+		if timeout == 0 {
+			timeout = 45 * time.Second
+		}
+		return NewMainActionState(timeout)
 	case StateTurnMoving:
 		return NewTurnMovingState()
 	case StateTurnLanded:
@@ -768,7 +780,11 @@ func (f *TurnStateFactory) CreateState(id StateID) State {
 
 // RegisterTurnStates registers all turn states with HSM.
 func RegisterTurnStates(hsm *HSM) error {
-	factory := &TurnStateFactory{}
+	config := hsm.config
+	if config == nil {
+		config = DefaultHSMConfig()
+	}
+	factory := &TurnStateFactory{config: config}
 	states := []State{
 		factory.CreateState(StateTurnUpkeep),
 		factory.CreateState(StateMainAction),
