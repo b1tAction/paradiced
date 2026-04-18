@@ -7,6 +7,7 @@
 1. **SDK 隔离**：通过 `DispatcherAdapter` 接口隔离 Nakama SDK 依赖
 2. **可测试性**：使用 `MockDispatcherAdapter` 实现无真实 Nakama 服务器的测试
 3. **架构解耦**：广播逻辑与核心游戏逻辑分离
+4. **断线重连**：支持玩家临时断线后重新连接
 
 ## 文件说明
 
@@ -15,10 +16,12 @@
 | `handler.go` | NakamaMatchHandler 主结构、配置管理 |
 | `dispatcher.go` | DispatcherAdapter 接口定义、BroadcastRecord/MessageRecord |
 | `dispatcher_mock.go` | MockDispatcherAdapter 测试实现（消息捕获） |
+| `dispatcher_real.go` | RealDispatcherAdapter 生产实现（真实 Nakama SDK） |
+| `adapter.go` | NakamaMatchAdapter/NakamaMatchHandlerWrapper（Nakama 包装器） |
 | `broadcast.go` | NakamaBroadcastAdapter 实现 pkg/net.BroadcastAdapter |
 | `lifecycle.go` | MatchInit/MatchLoop/MatchStop、addPlayer/assignFactions |
 | `message.go` | HandleMessage 消息路由、各 OpCode 处理器 |
-| `presence.go` | HandlePresenceJoin/Leave、玩家连接管理 |
+| `presence.go` | HandlePresenceJoin/Leave、玩家连接管理、断线重连 |
 
 ## DispatcherAdapter 接口
 
@@ -132,6 +135,50 @@ broadcast.SendAvailable(playerID, available)
 MatchInit → 初始化 Game/HSM/MapEngine → HSM 启动
 MatchLoop → 每帧更新 → HSM.Update → 状态转换
 MatchStop → 停止 HSM → 清理资源
+```
+
+## RealDispatcherAdapter
+
+生产环境使用真实 Nakama SDK：
+
+```go
+// 创建适配器（需要真实 Nakama Match）
+adapter := NewNakamaMatchAdapter(match)
+dispatcher := NewRealDispatcherAdapter(ctx, adapter)
+handler.WithDispatcher(dispatcher)
+
+// 支持的方法
+dispatcher.BroadcastMessage(opCode, data)  // 广播消息
+dispatcher.SendMessage(playerID, opCode, data)  // 发送给特定玩家
+dispatcher.UpdatePresence(userID, presence)  // 更新连接状态
+dispatcher.RemovePresence(userID)  // 移除连接
+dispatcher.RefreshPresences()  // 刷新连接列表
+```
+
+## 断线重连
+
+玩家断线时不会立即从游戏移除，而是标记为 disconnected 状态：
+
+```go
+// 玩家断线
+handler.HandlePresenceLeave("user-001")
+// 玩家仍在 players map 中，但 disconnected["user-001"] = true
+
+// 玩家重连
+handler.HandlePresenceJoin("user-001", nil)
+// disconnected["user-001"] = false
+// 发送完整状态同步 (FullSync) 给重连玩家
+```
+
+检查玩家连接状态：
+
+```go
+if handler.IsPlayerConnected(userID) {
+    // 玩家在线
+}
+
+connectedPlayers := handler.GetConnectedPlayers()
+// 返回当前在线玩家列表
 ```
 
 ## 与其他包的关系

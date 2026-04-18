@@ -7,6 +7,7 @@ import (
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/engine"
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
+	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
 	"github.com/b1tAction/paradiced/pkg/rng"
@@ -183,6 +184,41 @@ func (b *Builder) BuildDecision(decisionID string, prompt string, context string
 		Options: options,
 		Timeout: timeout,
 		Default: defaultIdx,
+	}
+}
+
+// BuildDecisionFromEvent builds pkgnet.Decision from event.Decision.
+// Converts internal decision structure to protocol format for client.
+func (b *Builder) BuildDecisionFromEvent(decision *event.Decision) *pkgnet.Decision {
+	if decision == nil {
+		return nil
+	}
+
+	// Convert options
+	options := make([]pkgnet.Option, len(decision.Options))
+	for i, opt := range decision.Options {
+		options[i] = pkgnet.Option{
+			ID:    opt.ID,
+			Label: opt.Label,
+		}
+	}
+
+	// Build context string from source info
+	context := decision.SourceType
+	if decision.SourceID != "" {
+		context = decision.SourceType + "_" + decision.SourceID
+	}
+
+	// Convert timeout to seconds
+	timeoutSec := int(decision.Timeout.Seconds())
+
+	return &pkgnet.Decision{
+		ID:      decision.ID.UUID(),
+		Prompt:  decision.Prompt,
+		Context: context,
+		Options: options,
+		Timeout: timeoutSec,
+		Default: decision.Default,
 	}
 }
 
