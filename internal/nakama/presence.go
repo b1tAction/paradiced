@@ -2,24 +2,44 @@
 package nakama
 
 import (
+	"encoding/json"
 	"fmt"
 
+	"github.com/b1tAction/paradiced/internal/engine/hsm"
 	"github.com/b1tAction/paradiced/internal/net"
 	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/util"
+	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 )
+
+func parseFactionFromMetadata(metadata *util.Metadata) constants.Faction {
+	if metadata == nil {
+		return constants.FactionQingLong
+	}
+
+	faction := metadata.GetStringOrDefault("faction", "")
+	parsed := constants.ParseFaction(faction)
+	if parsed.IsValid() {
+		return parsed
+	}
+
+	return constants.FactionQingLong
+}
 
 // HandlePresenceJoin handles a player joining the match.
 // Called by Nakama when a new player joins the match.
-func (h *NakamaMatchHandler) HandlePresenceJoin(userID string, metadata map[string]string) error {
-	// Check if player already exists (rejoin case)
+func (h *NakamaMatchHandler) HandlePresenceJoin(userID string, metadata *util.Metadata) error {
+	// Check if player already exists (rejoin case or matchmaker pre-added)
 	if h.players[userID] != nil {
-		// Player was previously in match
+		// Player was pre-added from matchmaker or is reconnecting
 		if h.disconnected[userID] {
-			// Player reconnecting - send full sync
+			// Player was disconnected (pre-added or previously disconnected)
+			// Mark as connected and send full sync
 			h.disconnected[userID] = false
 			if h.hsm != nil && h.hsm.IsRunning() {
 				return h.handlePlayerRejoin(userID)
 			}
+			// Game not started yet, just mark as connected
 			return nil
 		}
 		// Player still connected (duplicate join) - ignore
@@ -32,27 +52,26 @@ func (h *NakamaMatchHandler) HandlePresenceJoin(userID string, metadata map[stri
 	}
 
 	// Get faction from metadata (if provided)
-	faction := constants.FactionQingLong // Default
-	if factionStr, ok := metadata["faction"]; ok {
-		switch factionStr {
-		case "qing_long":
-			faction = constants.FactionQingLong
-		case "zhu_que":
-			faction = constants.FactionZhuQue
-		case "bai_hu":
-			faction = constants.FactionBaiHu
-		case "xuan_wu":
-			faction = constants.FactionXuanWu
-		}
-	}
+	faction := parseFactionFromMetadata(metadata)
 
 	// Add player to match (faction set via PlayerConfig)
 	h.addPlayer(userID, faction)
 
-	// If match is now full, start the game
-	if len(h.playerList) == h.maxPlayers {
+	// Start the game only when match reaches max players and hasn't been initialized yet.
+	// This avoids starting an empty/incomplete game before all expected players join.
+	if len(h.playerList) >= h.maxPlayers && h.hsm == nil {
 		// Initialize game (factions already set, buff initialization happens in MatchInitState.Enter())
 		if err := h.MatchInit(); err != nil {
+			return err
+		}
+	} else if h.hsm != nil && h.hsm.IsRunning() {
+		// Game is already running, send state sync to new player
+		broadcastAdapter := NewNakamaBroadcastAdapter(h)
+		builder := net.NewBuilder(h.hsm)
+		stateSync := builder.BuildStateSync()
+		turnSync := builder.BuildTurnSync()
+		// Send full sync to joining player
+		if err := broadcastAdapter.SendFullSync(userID, stateSync, turnSync); err != nil {
 			return err
 		}
 	}
@@ -76,7 +95,62 @@ func (h *NakamaMatchHandler) handlePlayerRejoin(userID string) error {
 	turnSync := builder.BuildTurnSync()
 
 	// Send full sync to rejoining player
-	return broadcastAdapter.SendFullSync(userID, stateSync, turnSync)
+	if err := broadcastAdapter.SendFullSync(userID, stateSync, turnSync); err != nil {
+		return err
+	}
+
+	// If match is currently in mini-game related states, re-send mini-game start
+	// to the rejoining player. This avoids stalls when a player joins after the
+	// original broadcast and therefore misses the trigger to submit result.
+	if h.dispatcher != nil {
+		globalState := h.hsm.GetGlobalStateID()
+		if globalState == hsm.StateMatchInit || globalState == hsm.StateRoundMiniGame {
+			players := make([]string, len(h.playerList))
+			copy(players, h.playerList)
+
+			miniGameStart := &pkgnet.MiniGameStart{
+				GameType: "dice_race",
+				Players:  players,
+			}
+
+			data, err := json.Marshal(miniGameStart)
+			if err == nil {
+				_ = h.dispatcher.SendMessage(userID, int64(pkgnet.OpMiniGameStart), data)
+			}
+		}
+	}
+
+	// Re-send actionable prompt for the current turn when needed.
+	// This is important for matchmaker-created matches where the game may have
+	// already started before socket presences fully joined, causing the initial
+	// Available/Decision message to be missed.
+	if h.hsm == nil || !h.hsm.IsRunning() {
+		return nil
+	}
+
+	currentPlayer := h.getCurrentPlayer()
+	if currentPlayer == nil || currentPlayer.ID.UUID() != player.ID.UUID() {
+		return nil
+	}
+
+	if h.hsm.IsWaiting() {
+		decision := h.hsm.GetCurrentDecision()
+		if decision == nil {
+			return nil
+		}
+		decisionReq := builder.BuildDecisionFromEvent(decision)
+		return broadcastAdapter.SendDecision(userID, decisionReq)
+	}
+
+	if h.hsm.GetCurrentStateID() != hsm.StateMainAction {
+		return nil
+	}
+
+	available := builder.BuildAvailableForPlayer(player)
+	if available == nil {
+		return nil
+	}
+	return broadcastAdapter.SendAvailable(userID, available)
 }
 
 // HandlePresenceLeave handles a player leaving the match.

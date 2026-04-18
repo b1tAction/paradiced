@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
+	"github.com/b1tAction/paradiced/pkg/util"
 	"github.com/heroiclabs/nakama-common/runtime"
 )
 
@@ -22,15 +24,18 @@ import (
 //	    })
 //	}
 type NakamaMatchHandlerAdapter struct {
-	handler   *NakamaMatchHandler
-	logger    runtime.Logger
-	db        *sql.DB
-	nk        runtime.NakamaModule
+	handler      *NakamaMatchHandler
+	logger       runtime.Logger
+	db           *sql.DB
+	nk           runtime.NakamaModule
+	joinMetadata map[string]*util.Metadata
 }
 
 // NewNakamaMatchHandlerAdapter creates a new adapter with optional config.
 func NewNakamaMatchHandlerAdapter() *NakamaMatchHandlerAdapter {
-	return &NakamaMatchHandlerAdapter{}
+	return &NakamaMatchHandlerAdapter{
+		joinMetadata: make(map[string]*util.Metadata),
+	}
 }
 
 // MatchInit implements runtime.Match.MatchInit.
@@ -75,6 +80,27 @@ func (a *NakamaMatchHandlerAdapter) MatchInit(ctx context.Context, logger runtim
 
 	logger.Info("Paradiced match initialized: match_id=%s, seed=%d, max_players=%d, map_length=%d", matchID, seed, maxPlayers, mapLength)
 
+	// Check if this match was created by matchmaker (entries are passed in params)
+	if entriesRaw, ok := params["entries"]; ok {
+		if entries, ok := entriesRaw.([]runtime.MatchmakerEntry); ok {
+			logger.Info("Matchmaker-created match: adding %d players", len(entries))
+			// Add players from matchmaker entries before initializing game
+			for _, entry := range entries {
+				userID := entry.GetPresence().GetUserId()
+				// Extract faction from entry properties (if available)
+				faction := getFactionFromProperties(entry.GetProperties())
+				a.handler.addPlayer(userID, faction)
+				// Mark player as disconnected until they actually join
+				a.handler.disconnected[userID] = true
+				logger.Debug("Added player from matchmaker: user_id=%s (marked as disconnected)", userID)
+			}
+		}
+	}
+
+	// For matchmaker-created matches we only pre-add players here.
+	// Actual match init is deferred until MatchJoin so initial protocol messages
+	// are delivered through a live dispatcher with real presences.
+
 	// Return state, tick rate (10 = 100ms per tick), label
 	return a.handler, 10, string(labelJSON)
 }
@@ -83,27 +109,31 @@ func (a *NakamaMatchHandlerAdapter) MatchInit(ctx context.Context, logger runtim
 // Called when a player attempts to join.
 func (a *NakamaMatchHandlerAdapter) MatchJoinAttempt(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, presence runtime.Presence, metadata map[string]string) (interface{}, bool, string) {
 	handler := state.(*NakamaMatchHandler)
+	userID := presence.GetUserId()
+
+	// Log join attempt for debugging
+	logger.Info("MatchJoinAttempt: user_id=%s, hsm_nil=%v, player_list_len=%d", userID, handler.hsm == nil, len(handler.playerList))
+
+	// Existing player (connected or reconnecting) is always allowed.
+	if handler.players[userID] != nil {
+		a.joinMetadata[userID] = newJoinMetadata(metadata)
+		return state, true, ""
+	}
 
 	// Check if match is full
 	if len(handler.playerList) >= handler.maxPlayers {
-		// Reject join
 		return state, false, "match is full"
 	}
 
-	// Check if match is already running (4 players joined and game started)
+	// Check if match is already running
 	if handler.hsm != nil && handler.hsm.IsRunning() {
-		// Allow rejoin for disconnected players
-		if handler.players[presence.GetUserId()] != nil && handler.disconnected[presence.GetUserId()] {
-			return state, true, "rejoin allowed"
-		}
-		// Reject new players after game started
-		if handler.players[presence.GetUserId()] == nil {
-			return state, false, "game already in progress"
-		}
+		return state, false, "game already in progress"
 	}
 
+	a.joinMetadata[userID] = newJoinMetadata(metadata)
+
 	// Allow join
-	logger.Debug("Player join attempt accepted: user_id=%s", presence.GetUserId())
+	logger.Debug("Player join attempt accepted: user_id=%s", userID)
 	return state, true, ""
 }
 
@@ -111,6 +141,15 @@ func (a *NakamaMatchHandlerAdapter) MatchJoinAttempt(ctx context.Context, logger
 // Called when players successfully join.
 func (a *NakamaMatchHandlerAdapter) MatchJoin(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, presences []runtime.Presence) interface{} {
 	handler := state.(*NakamaMatchHandler)
+
+	// Log join info
+	logger.Info("MatchJoin called: user_ids=%v, hsm_nil=%v", func() []string {
+		ids := make([]string, len(presences))
+		for i, p := range presences {
+			ids[i] = p.GetUserId()
+		}
+		return ids
+	}(), handler.hsm == nil)
 
 	// Build presence list for dispatcher
 	presenceList := make([]runtime.Presence, 0)
@@ -135,16 +174,34 @@ func (a *NakamaMatchHandlerAdapter) MatchJoin(ctx context.Context, logger runtim
 	// Handle each joining presence
 	for _, p := range presences {
 		userID := p.GetUserId()
-		// Extract faction from metadata
-		metadata := make(map[string]string)
-		// Note: Nakama join metadata can be passed via presence properties
-		// For now, we use empty metadata and default faction
+		metadata := a.joinMetadata[userID]
 		logger.Debug("Player joined: user_id=%s", userID)
 		handler.HandlePresenceJoin(userID, metadata)
 		realDispatcher.UpdatePresence(p)
+		delete(a.joinMetadata, userID)
+	}
+
+	// For matchmaker-created matches, players were pre-added during MatchInit and
+	// HandlePresenceJoin only marks them connected. Initialize here once we have
+	// a live dispatcher/presence so startup sync/action prompts are deliverable.
+	if handler.hsm == nil && len(handler.playerList) > 0 {
+		logger.Info("Initializing deferred match game after player join...")
+		if err := handler.MatchInit(); err != nil {
+			logger.Error("Failed to initialize deferred match game: %v", err)
+		} else {
+			logger.Info("Deferred match game initialized successfully")
+		}
 	}
 
 	return state
+}
+
+func newJoinMetadata(raw map[string]string) *util.Metadata {
+	metadata := util.NewMetadata()
+	for k, v := range raw {
+		metadata.SetString(k, v)
+	}
+	return metadata
 }
 
 // MatchLeave implements runtime.Match.MatchLeave.
@@ -197,7 +254,7 @@ func (a *NakamaMatchHandlerAdapter) MatchLoop(ctx context.Context, logger runtim
 		data := msg.GetData()
 		opCode := msg.GetOpCode()
 		logger.Debug("Received message: user_id=%s, op_code=%d, data_len=%d", userID, opCode, len(data))
-		handler.HandleMessage(userID, data)
+		handler.HandleMessageWithOp(userID, opCode, data)
 	}
 
 	// Run match loop (delta time not used, tick rate controls timing)
@@ -247,4 +304,29 @@ type matchLabel struct {
 	MaxPlayers int    `json:"max_players"`
 	Game       string `json:"game"`
 	Status     string `json:"status"`
+}
+
+// getFactionFromProperties extracts faction from matchmaker entry properties.
+// Returns default faction (QingLong) if not specified.
+func getFactionFromProperties(props map[string]interface{}) constants.Faction {
+	if props == nil {
+		return constants.FactionQingLong
+	}
+
+	// Try string property first
+	if factionStr, ok := props["faction"].(string); ok {
+		parsed := constants.ParseFaction(factionStr)
+		if parsed.IsValid() {
+			return parsed
+		}
+		return constants.FactionQingLong
+	}
+
+	// Try float64 (JSON number) - should not happen for string but handle just in case
+	if factionNum, ok := props["faction"].(float64); ok {
+		// This would be unusual, but handle it by returning default
+		_ = factionNum
+	}
+
+	return constants.FactionQingLong
 }
