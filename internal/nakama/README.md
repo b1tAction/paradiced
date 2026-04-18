@@ -101,6 +101,22 @@ handler.HandleMessage("user-001", data)
 
 ## 消息 OpCode 路由
 
+### Server → Client (1-99)
+
+| OpCode | 处理方法 | 说明 |
+|--------|----------|------|
+| 1 (OpStateSync) | broadcastStateSync | 状态同步 |
+| 2 (OpTurnSync) | broadcastTurnSync | 回合效果列表 |
+| 3 (OpDecisionRequest) | sendDecision | 决策请求 |
+| 4 (OpAvailable) | sendAvailable | 可用操作列表 |
+| 5 (OpMiniGameStart) | broadcastMiniGameStart | 小游戏开始 |
+| 6 (OpMiniGameResult) | broadcastMiniGameResult | 小游戏结果 |
+| 7 (OpGameOver) | broadcastGameOver | 游戏结束 |
+| 8 (OpFullSync) | sendFullSync | 完整同步（重连） |
+| 9 (OpActionRejected) | sendActionRejected | 动作拒绝（新增） |
+
+### Client → Server (100+)
+
 | OpCode (Client→Server) | 处理方法 | 说明 |
 |------------------------|----------|------|
 | 100 (RollDice) | handleRollDice | 投骰子 |
@@ -108,6 +124,101 @@ handler.HandleMessage("user-001", data)
 | 102 (UseSkill) | handleUseSkill | 阵营技能 |
 | 103 (UserChoice) | handleUserChoice | 决策回复 |
 | 104 (MiniGameResultSubmit) | handleMiniGameResult | 小游戏排名 |
+
+## ActionRejected 拒绝反馈
+
+当客户端发送无效请求时，服务器发送 `OpActionRejected` 消息：
+
+```go
+// pkg/net/sync.go
+type ActionRejected struct {
+    OpCode  OpCode `json:"op_code"`   // 被拒绝的操作码
+    Reason  string `json:"reason"`    // 拒绝原因
+    Message string `json:"message"`   // 人类可读的错误信息
+}
+```
+
+**常见拒绝原因**：
+
+| Reason | 说明 | 触发场景 |
+|--------|------|----------|
+| `not_current_player` | 非当前回合玩家 | 其他玩家试图掷骰子/使用道具 |
+| `invalid_state` | 无效的游戏状态 | 在 MainAction 阶段发送 MoveRequest |
+| `item_not_found` | 道具不存在 | 使用不存在的道具 ID |
+| `item_not_usable` | 道具不可用 | 道具已使用过或非 PhaseAnyTime |
+| `skill_not_ready` | 技能未就绪 | 充能不足或技能冷却中 |
+| `invalid_choice` | 无效的决策选择 | 决策 ID 不匹配或选项超出范围 |
+
+**使用示例**：
+
+```go
+// internal/nakama/message.go
+func (h *NakamaMatchHandler) handleRollDice(sender string) error {
+    player := h.getPlayerByUserID(sender)
+    currentPlayer := h.getCurrentPlayer()
+
+    if player != currentPlayer {
+        // 发送拒绝消息
+        return h.sendActionRejected(sender, pkgnet.ActionRejected{
+            OpCode:  pkgnet.OpRollDice,
+            Reason:  "not_current_player",
+            Message: "当前不是你的回合",
+        })
+    }
+
+    // 正常处理...
+}
+```
+
+## 日志调试
+
+### 开发环境日志
+
+在开发环境中，可以通过 `--verbose` 参数启用详细日志：
+
+```bash
+# CLI 客户端
+pdcli playtest run --players 2 --verbose
+
+# Nakama 服务器日志
+docker logs -f nakama
+```
+
+### 结构化日志格式
+
+```
+INFO [Nakama] MatchInit: match_id=match-001, players=4
+DEBUG [Nakama] handleRollDice: player=user-001, dice_type=gold
+INFO [HSM] State transition: from=main_action, to=turn_moving
+DEBUG [Action] Executing: type=move, target=user-001, steps=5
+INFO [Nakama] BroadcastTurnSync: entries=3, round=1, turn=0
+```
+
+### 使用 zap 日志记录器
+
+```go
+// internal/nakama/logger.go (待实现)
+type Logger struct {
+    *zap.Logger
+    matchID string
+}
+
+func NewLogger(matchID string, verbose bool) *Logger {
+    config := zap.NewDevelopmentConfig()
+    if !verbose {
+        config.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
+    }
+    logger, _ := config.Build()
+    return &Logger{
+        Logger:  logger,
+        matchID: matchID,
+    }
+}
+
+func (l *Logger) Info(msg string, fields ...zap.Field) {
+    l.Logger.Info(msg, append([]zap.Field{zap.String("match_id", l.matchID)}, fields...)...)
+}
+```
 
 ## NakamaBroadcastAdapter
 
