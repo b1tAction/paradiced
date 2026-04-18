@@ -7,27 +7,30 @@ import (
 	"github.com/b1tAction/paradiced/pkg/id"
 )
 
-// ========== Faction Tests ==========
+// ========== ParseFaction Tests ==========
 
-func TestFactionString(t *testing.T) {
+func TestParseFaction(t *testing.T) {
 	tests := []struct {
-		f        constants.Faction
-		expected string
+		input    string
+		expected constants.Faction
 	}{
-		{constants.FactionQingLong, "QingLong"},
-		{constants.FactionZhuQue, "ZhuQue"},
-		{constants.FactionBaiHu, "BaiHu"},
-		{constants.FactionXuanWu, "XuanWu"},
-		{constants.Faction("unknown"), "Unknown"},
+		{"qing_long", constants.FactionQingLong},
+		{"zhu_que", constants.FactionZhuQue},
+		{"bai_hu", constants.FactionBaiHu},
+		{"xuan_wu", constants.FactionXuanWu},
+		{"unknown", constants.FactionNone},
+		{"", constants.FactionNone},
 	}
 
 	for _, tt := range tests {
-		result := tt.f.String()
+		result := constants.ParseFaction(tt.input)
 		if result != tt.expected {
-			t.Errorf("Faction(%s).String() = %s, expected %s", tt.f, result, tt.expected)
+			t.Errorf("ParseFaction(%s) = %s, expected %s", tt.input, result, tt.expected)
 		}
 	}
 }
+
+// ========== Faction IsValid Tests ==========
 
 func TestFactionIsValid(t *testing.T) {
 	validFactions := []constants.Faction{constants.FactionQingLong, constants.FactionZhuQue, constants.FactionBaiHu, constants.FactionXuanWu}
@@ -532,7 +535,7 @@ func TestPlayerString(t *testing.T) {
 	player.AddBuff(NewBuff(constants.BuffTypeCurse, 3))
 
 	str := player.String()
-	expected := "Player{ID: " + testID.UUID() + ", Faction: QingLong, Pos: 20, HP: 10, LP: 5, Buffs: 1, Items: 1}"
+	expected := "Player{ID: " + testID.UUID() + ", Faction: qing_long, Pos: 20, HP: 10, LP: 5, Buffs: 1, Items: 1}"
 	if str != expected {
 		t.Errorf("String() = %s, expected %s", str, expected)
 	}

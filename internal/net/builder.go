@@ -87,7 +87,7 @@ func (b *Builder) BuildPlayers() []pkgnet.Player {
 func (b *Builder) BuildPlayer(p *core.Player) pkgnet.Player {
 	return pkgnet.Player{
 		UserID:      p.ID.UUID(),
-		Faction:     p.Faction.SnakeCase(),
+		Faction:     string(p.Faction),
 		Position:    p.Position,
 		HP:          p.HP,
 		LP:          p.LP,

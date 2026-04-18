@@ -351,7 +351,7 @@ func (p *Player) Clone() *Player {
 // String returns the player info string.
 func (p *Player) String() string {
 	return fmt.Sprintf("Player{ID: %s, Faction: %s, Pos: %d, HP: %d, LP: %d, Buffs: %d, Items: %d}",
-		p.ID.UUID(), p.Faction.String(), p.Position, p.HP, p.LP, len(p.ActiveBuffs), len(p.Inventory))
+		p.ID.UUID(), string(p.Faction), p.Position, p.HP, p.LP, len(p.ActiveBuffs), len(p.Inventory))
 }
 
 // IsAlive checks if the player is alive.

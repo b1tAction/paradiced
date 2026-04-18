@@ -145,7 +145,7 @@ func buildStateSync(ctx *StateContext) *pkgnet.StateSync {
 	for i, p := range game.Players {
 		players[i] = pkgnet.Player{
 			UserID:      p.ID.UUID(),
-			Faction:     p.GetFaction().SnakeCase(),
+			Faction:     string(p.GetFaction()),
 			Position:    p.Position,
 			HP:          p.HP,
 			LP:          p.LP,

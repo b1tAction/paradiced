@@ -26,24 +26,21 @@ func AllFactions() []Faction {
 	return []Faction{FactionQingLong, FactionZhuQue, FactionBaiHu, FactionXuanWu}
 }
 
-// String returns the faction name in PascalCase (for logging/debugging).
-func (f Faction) String() string {
-	names := map[Faction]string{
-		FactionQingLong: "QingLong",
-		FactionZhuQue:   "ZhuQue",
-		FactionBaiHu:    "BaiHu",
-		FactionXuanWu:   "XuanWu",
+// ParseFaction converts a string to Faction type.
+// Returns FactionNone if the string is not a valid faction.
+func ParseFaction(s string) Faction {
+	switch s {
+	case "qing_long":
+		return FactionQingLong
+	case "zhu_que":
+		return FactionZhuQue
+	case "bai_hu":
+		return FactionBaiHu
+	case "xuan_wu":
+		return FactionXuanWu
+	default:
+		return FactionNone
 	}
-	if name, ok := names[f]; ok {
-		return name
-	}
-	return "Unknown"
-}
-
-// SnakeCase returns the faction name in snake_case (same as the value).
-// This is already the natural value for Faction, so it just returns itself.
-func (f Faction) SnakeCase() string {
-	return string(f)
 }
 
 // GetChineseName returns the faction Chinese name.
