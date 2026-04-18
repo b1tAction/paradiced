@@ -6,13 +6,25 @@ GOMODCACHE ?= /app/.gomodcache
 # Build output
 PLUGIN_NAME ?= paradiced-server
 PLUGIN_OUT ?= ./modules/$(PLUGIN_NAME).so
+PLUGINBUILDER_IMAGE ?= heroiclabs/nakama-pluginbuilder:3.22.0
 
 # Docker compose file
 DOCKER_COMPOSE ?= docker-compose.yml
 
 # Build the Nakama plugin as a shared object
 build-plugin:
-	GOMODCACHE=$(GOMODCACHE) CGO_ENABLED=1 go build -buildmode=plugin -o $(PLUGIN_OUT) ./cmd/paradiced-server
+	mkdir -p ./modules ./.gomodcache ./.gocache ./.gopath
+	docker run --rm \
+		--entrypoint /bin/sh \
+		--user $$(id -u):$$(id -g) \
+		-e GOCACHE=/workspace/.gocache \
+		-e GOMODCACHE=/workspace/.gomodcache \
+		-e GOPATH=/workspace/.gopath \
+		-e HOME=/tmp \
+		-v "$$(pwd):/workspace" \
+		-w /workspace \
+		$(PLUGINBUILDER_IMAGE) \
+		-lc 'CGO_ENABLED=1 /usr/local/go/bin/go build --trimpath --buildmode=plugin -o $(PLUGIN_OUT) ./cmd/paradiced-server'
 
 # Build for development (verify compilation without plugin mode)
 build-dev:

@@ -1,96 +1,49 @@
-# Paradiced Nakama Server Configuration
-# See: https://heroiclabs.com/docs/nakama/concepts/configuration/
+# fated/devops/config.yml
+name: fated-node-1
+data_dir: "/nakama/data"
 
 # Console configuration (web dashboard)
 console:
-  address: "0.0.0.0:7352"
+  # Nakama 使用 port 而非 address，且默认是 7351。如果改为 7352，需同步修改 docker-compose 的映射
+  port: 7351 
   username: "admin"
   password: "password123"
 
 # Database configuration (CockroachDB)
 database:
-  address:
-    host: "cockroachdb"
-    port: 26257
-  name: "nakama"
-  username: "root"
-  password: ""  # CockroachDB insecure mode has no password
-  # Connection pool settings
-  conn_max_lifetime_ms: 3600000  # 1 hour
+  # Nakama 强制要求 address 为 DSN 字符串的数组。不能拆分成 username/password/name
+  address: 
+    - "root@cockroachdb:26257"
+  conn_max_lifetime_ms: 3600000
   conn_max_idle: 10
   conn_max_open: 100
 
 # Socket configuration (real-time communication)
 socket:
-  address: "0.0.0.0:7350"
-  max_message_size_bytes: 4096  # 4KB max message size
-  read_timeout_ms: 10000  # 10 seconds
-  write_timeout_ms: 10000  # 10 seconds
-  ping_period_ms: 15000  # 15 seconds
-  pong_wait_ms: 25000  # 25 seconds
-  # Outgoing message queue size per session
+  port: 7350
+  max_message_size_bytes: 4096
+  read_timeout_ms: 10000
+  write_timeout_ms: 10000
+  ping_period_ms: 15000
+  pong_wait_ms: 25000
   outgoing_queue_size: 64
 
 # Session configuration
 session:
-  # Session token expiry
-  token_expiry_sec: 7200  # 2 hours
-  refresh_expiry_sec: 86400  # 24 hours
+  token_expiry_sec: 7200
+  refresh_expiry_sec: 86400
 
 # Runtime configuration (Go plugins)
 runtime:
-  # Path to load plugins from
-  path: "/nakama/modules"
-  # Registry key for callbacks
-  registry_key: ""
+  # 对应你项目中 fated/cmd/server 编译出的共享库或 Lua 脚本路径
+  path: "/nakama/modules" 
 
 # Match configuration
 match:
-  # Match creation and management
-  join_attempt_timeout_ms: 15000  # 15 seconds
-  max_empty_timeout_ms: 30000  # 30 seconds before empty match is removed
-  max_match_size: 4  # Paradiced max 4 players
-  # Rate limiting
-  rate_limit:
-    create:
-      per_sec: 10
-    join:
-      per_sec: 20
-
-# Leaderboard configuration
-leaderboard:
-  # Disable leaderboards for now (single match focus)
-  disabled: true
-
-# Group configuration
-group:
-  # Disable groups for now
-  disabled: true
-
+  join_attempt_timeout_ms: 15000
+  # max_empty_timeout_ms 和 max_match_size 通常在 Go 代码的 match_init 中控制，不在此全局配置
+  
 # Logging configuration
 logger:
-  # Log level: debug, info, warn, error
   level: "debug"
-  # stdout or file
-  output: "stdout"
-  # JSON format for structured logging
   format: "json"
-
-# Authentication configuration
-authentication:
-  # Enable basic authentication
-  basic:
-    enabled: true
-  # Email/password authentication
-  email:
-    enabled: true
-    password_min_length: 8
-    password_max_length: 64
-
-# Social configuration (friends, etc.)
-social:
-  # Disable social features for party game
-  friends:
-    enabled: false
-  groups:
-    enabled: false

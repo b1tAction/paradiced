@@ -1,61 +1,59 @@
-version: '3.9'
+version: '3'
 
 services:
   cockroachdb:
-    image: cockroachdb/cockroach:v23.1.11
-    container_name: paradiced-cockroachdb
-    command: start-single-node --insecure
+    image: cockroachdb/cockroach:latest-v23.1
+    command: start-single-node --insecure --store=attrs=ssd,path=/var/lib/cockroach/
+    restart: "no"
     volumes:
-      - cockroach-data:/cockroach/cockroach-data
+      - cockroach_data:/var/lib/cockroach
+    expose:
+      - "8080"
+      - "26257"
     ports:
-      - "26257:26257"  # Database port
-      - "8080:8080"    # Admin UI
+      - "26257:26257"
+      - "8080:8080"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
-      interval: 10s
-      timeout: 5s
+      # 探针：确保 CockroachDB 完全启动并准备好接受连接
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health?ready=1"]
+      interval: 3s
+      timeout: 3s
       retries: 5
 
   nakama:
-    image: heroiclabs/nakama:3.19.0
-    container_name: paradiced-nakama
+    image: heroiclabs/nakama:3.22.0
+    entrypoint:
+      - "/bin/sh"
+      - "-ecx"
+      - >
+        /nakama/nakama migrate up --database.address root@cockroachdb:26257 &&
+        exec /nakama/nakama --config /nakama/data/config.yml
+    restart: "no"
+    links:
+      - "cockroachdb:db"
     depends_on:
       cockroachdb:
+        # 核心修复：等待 cockroachdb 的 healthcheck 通过后再启动 nakama
         condition: service_healthy
-    environment:
-      NAKAMA_CONFIG: /nakama/config.yml
     volumes:
-      # Plugin modules directory
+      - nakama_data:/nakama/data
       - ./modules:/nakama/modules
-      # Configuration file
-      - ./config.yml:/nakama/config.yml
-      # Nakama data
-      - nakama-data:/nakama/data
+      # 挂载外部配置文件，对应官方 Configuration 文档的最佳实践
+      - ./config.yml:/nakama/data/config.yml 
+    expose:
+      - "7349"
+      - "7350"
+      - "7351"
     ports:
-      # API port (for client connections)
-      - "7350:7350"
-      # HTTP API port
-      - "7351:7351"
-      # gRPC port
-      - "7349:7349"
-      # Console port (web dashboard)
-      - "7352:7352"
-    command:
-      - "/nakama/nakama"
-      - "--config=/nakama/config.yml"
-      - "--runtime.path=/nakama/modules"
+      - "7349:7349"   # RPC
+      - "7350:7350"   # HTTP / WebSocket
+      - "7351:7351"   # Nakama Console
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:7351/ || exit 1"]
+      test: ["CMD", "/nakama/nakama", "healthcheck"]
       interval: 10s
       timeout: 5s
       retries: 5
 
 volumes:
-  cockroach-data:
-    driver: local
-  nakama-data:
-    driver: local
-
-networks:
-  default:
-    name: paradiced-network
+  cockroach_data:
+  nakama_data:
