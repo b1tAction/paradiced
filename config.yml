@@ -7,14 +7,14 @@ console:
   username: "admin"
   password: "password123"
 
-# Database configuration
+# Database configuration (CockroachDB)
 database:
   address:
-    host: "postgres"
-    port: 5432
+    host: "cockroachdb"
+    port: 26257
   name: "nakama"
-  username: "nakama"
-  password: "nakama"
+  username: "root"
+  password: ""  # CockroachDB insecure mode has no password
   # Connection pool settings
   conn_max_lifetime_ms: 3600000  # 1 hour
   conn_max_idle: 10
@@ -70,7 +70,7 @@ group:
 # Logging configuration
 logger:
   # Log level: debug, info, warn, error
-  level: "info"
+  level: "debug"
   # stdout or file
   output: "stdout"
   # JSON format for structured logging

@@ -14,10 +14,13 @@
 # 1. 构建 Nakama 插件
 make build-plugin
 
-# 2. 启动服务器
+# 2. 启动服务器（包含 CockroachDB）
 make docker-up
 
-# 3. 查看日志
+# 3. 等待服务启动后创建数据库
+make db-init
+
+# 4. 查看日志
 make docker-logs
 ```
 
@@ -29,12 +32,18 @@ make docker-logs
 | 7351 | HTTP API |
 | 7349 | gRPC API |
 | 7352 | Web 控制台 |
+| 26257 | CockroachDB 数据库 |
+| 8080 | CockroachDB Admin UI |
 
 ## Web 控制台
 
+### Nakama 控制台
 启动后访问 http://localhost:7352 登录管理控制台：
 - 用户名: `admin`
 - 密码: `password123`
+
+### CockroachDB Admin UI
+访问 http://localhost:8080 查看数据库状态。
 
 ## 架构说明
 
@@ -42,11 +51,11 @@ make docker-logs
 ┌─────────────────────────────────────────────────────┐
 │                    Docker                            │
 │  ┌──────────────────┐    ┌────────────────────────┐ │
-│  │   PostgreSQL     │    │     Nakama Server      │ │
-│  │   (port 5432)    │───▶│   (port 7350-7352)     │ │
-│  │                  │    │                        │ │
-│  │   数据库存储      │    │   ┌──────────────────┐ │ │
-│  │                  │    │   │  paradiced.so    │ │ │
+│  │   CockroachDB    │    │     Nakama Server      │ │
+│  │   (port 26257)   │───▶│   (port 7350-7352)     │ │
+│  │   (Admin: 8080)  │    │                        │ │
+│  │                  │    │   ┌──────────────────┐ │ │
+│  │   数据库存储      │    │   │  paradiced.so    │ │ │
 │  │                  │    │   │  (Go 插件)       │ │ │
 │  │                  │    │   └──────────────────┘ │ │
 │  └──────────────────┘    └────────────────────────┘ │
