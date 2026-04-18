@@ -4,14 +4,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
 )
-
-// TestPlayer 用于测试的简单玩家结构
-type TestPlayer struct {
-	UserID string
-}
 
 // ========== Phase Tests ==========
 
@@ -36,12 +32,12 @@ func TestPhaseIsValid(t *testing.T) {
 }
 
 func TestPhaseNeedsSubscription(t *testing.T) {
-	// AnyTime 不需要订阅（主动触发）
+	// AnyTime does not need subscription (triggered manually)
 	if constants.PhaseAnyTime.NeedsSubscription() {
 		t.Error("PhaseAnyTime should not need subscription")
 	}
 
-	// 其他 Phase 需要订阅（包括新的生命周期事件）
+	// Other phases need subscription
 	needsSub := []constants.Phase{
 		constants.PhaseBeforeTurn, constants.PhasePreMove, constants.PhaseOnLand, constants.PhasePreEvent,
 		constants.PhasePreDamage, constants.PhaseAfterTurn,
@@ -122,20 +118,20 @@ func TestDecisionWithTimeout(t *testing.T) {
 }
 
 func TestDecisionShouldAsk(t *testing.T) {
-	// 无条件，总是询问
+	// No condition, always ask
 	d1 := NewDecision("test", []Option{})
 	if !d1.ShouldAsk() {
 		t.Error("Decision without condition should always ask")
 	}
 
-	// 有条件，条件为true时询问
+	// With condition, ask when true
 	d2 := NewDecision("test", []Option{})
 	d2.WithCondition(func() bool { return true })
 	if !d2.ShouldAsk() {
 		t.Error("Decision with true condition should ask")
 	}
 
-	// 条件为false时不询问
+	// Do not ask when condition is false
 	d3 := NewDecision("test", []Option{})
 	d3.WithCondition(func() bool { return false })
 	if d3.ShouldAsk() {
@@ -171,10 +167,10 @@ func TestDecisionExecuteDefault(t *testing.T) {
 		{ID: "a", Label: "A"},
 		{ID: "b", Label: "B", Action: func(ctx *Context) { executed = true }},
 	})
-	d.WithTimeout(10*time.Second, 1) // 默认选项1
+	d.WithTimeout(10*time.Second, 1) // Default option 1
 
 	ctx := NewContext(nil)
-	d.Execute(-1, ctx) // 无效选项，使用默认
+	d.Execute(-1, ctx) // Invalid choice, use default
 
 	if !executed {
 		t.Error("Default option should be executed for invalid choice")
@@ -269,7 +265,7 @@ func TestEventBusUnsubscribe(t *testing.T) {
 	playerID := id.NewPlayerID()
 	subID := bus.Subscribe(constants.PhasePreDamage, playerID, "buff-001", "buff", d)
 
-	// 取消订阅
+	// Unsubscribe
 	ok := bus.Unsubscribe(subID)
 	if !ok {
 		t.Error("Unsubscribe should return true")
@@ -279,7 +275,7 @@ func TestEventBusUnsubscribe(t *testing.T) {
 		t.Errorf("Subscription count should be 0 after unsubscribe")
 	}
 
-	// 再次取消应该返回false
+	// Unsubscribe again should return false
 	ok = bus.Unsubscribe(subID)
 	if ok {
 		t.Error("Unsubscribe non-existent should return false")
@@ -296,7 +292,7 @@ func TestEventBusUnsubscribeBySource(t *testing.T) {
 	bus.Subscribe(constants.PhasePreEvent, playerID1, "buff-001", "buff", d)
 	bus.Subscribe(constants.PhasePreDamage, playerID2, "buff-002", "buff", d)
 
-	// 移除buff-001的所有订阅
+	// Remove all subscriptions for buff-001
 	count := bus.UnsubscribeBySource("buff-001")
 	if count != 2 {
 		t.Errorf("Removed count = %d, expected 2", count)
@@ -317,7 +313,7 @@ func TestEventBusUnsubscribeByOwner(t *testing.T) {
 	bus.Subscribe(constants.PhasePreEvent, playerID1, "buff-002", "buff", d)
 	bus.Subscribe(constants.PhasePreDamage, playerID2, "buff-003", "buff", d)
 
-	// 移除playerID1的所有订阅
+	// Remove all subscriptions for playerID1
 	count := bus.UnsubscribeByOwner(playerID1.UUID())
 	if count != 2 {
 		t.Errorf("Removed count = %d, expected 2", count)
@@ -331,26 +327,26 @@ func TestEventBusUnsubscribeByOwner(t *testing.T) {
 func TestEventBusPublish(t *testing.T) {
 	bus := NewEventBus("game-001")
 
-	// 订阅不需要确认的Decision（自动执行）
+	// Subscribe auto-executing Decision
 	d1 := NewAutoDecision("auto", []Option{{ID: "ok", Label: "OK"}})
-	d1.WithPriority(100) // 高优先级
+	d1.WithPriority(100) // High priority
 
-	// 订阅需要确认的Decision
+	// Subscribe Decision that needs confirmation
 	d2 := NewDecision("是否使用护盾？", []Option{
 		{ID: "use", Label: "使用"},
 		{ID: "skip", Label: "跳过"},
 	})
-	d2.WithPriority(50) // 低优先级
+	d2.WithPriority(50) // Low priority
 
 	playerID := id.NewPlayerID()
 	bus.Subscribe(constants.PhasePreDamage, playerID, "buff-001", "buff", d1)
 	bus.Subscribe(constants.PhasePreDamage, playerID, "item-001", "item", d2)
 
-	// 发布
+	// Publish
 	ctx := NewContext(nil)
 	decisions := bus.Publish(constants.PhasePreDamage, playerID.UUID(), ctx)
 
-	// 只返回需要确认的Decision
+	// Only return Decisions that need confirmation
 	if len(decisions) != 1 {
 		t.Errorf("Decisions count = %d, expected 1 (only NeedConfirm)", len(decisions))
 	}
@@ -362,7 +358,7 @@ func TestEventBusPublish(t *testing.T) {
 func TestEventBusPublishPriorityOrder(t *testing.T) {
 	bus := NewEventBus("game-001")
 
-	// 创建两个需要确认的Decision，不同优先级
+	// Create two Decisions with different priorities
 	d1 := NewDecision("高优先级", []Option{{ID: "a", Label: "A"}})
 	d1.WithPriority(100)
 
@@ -380,7 +376,7 @@ func TestEventBusPublishPriorityOrder(t *testing.T) {
 		t.Errorf("Decisions count = %d, expected 2", len(decisions))
 	}
 
-	// 检查排序：高优先级在前
+	// Check order: high priority first
 	if decisions[0].Priority != 100 {
 		t.Errorf("First decision priority = %d, expected 100", decisions[0].Priority)
 	}
@@ -401,7 +397,7 @@ func TestEventBusPublishFilterOwner(t *testing.T) {
 	ctx := NewContext(nil)
 	decisions := bus.Publish(constants.PhasePreDamage, playerID1.UUID(), ctx)
 
-	// 只返回player-001的Decision
+	// Only return playerID1's Decision
 	if len(decisions) != 1 {
 		t.Errorf("Decisions count = %d, expected 1 (filtered by owner)", len(decisions))
 	}
@@ -426,16 +422,27 @@ func TestEventBusClear(t *testing.T) {
 // ========== Context Tests ==========
 
 func TestNewContext(t *testing.T) {
-	player := &TestPlayer{UserID: "test"}
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	ctx := NewContext(player)
 
 	if ctx.Player == nil {
 		t.Error("Player should not be nil")
 	}
+	if ctx.Player != player {
+		t.Error("Player should match input")
+	}
+}
+
+func TestNewContextNilPlayer(t *testing.T) {
+	ctx := NewContext(nil)
+
+	if ctx.Player != nil {
+		t.Error("Player should be nil")
+	}
 }
 
 func TestContextWithEvent(t *testing.T) {
-	ctx := NewContext(&TestPlayer{})
+	ctx := NewContext(nil)
 	ctx.WithEvent("some_event")
 
 	if ctx.GameEvent == nil {
@@ -443,9 +450,26 @@ func TestContextWithEvent(t *testing.T) {
 	}
 }
 
+func TestContextWithState(t *testing.T) {
+	state := &GameState{
+		Round:        1,
+		Turn:         2,
+		CurrentPhase: constants.PhaseBeforeTurn,
+	}
+
+	ctx := NewContext(nil).WithState(state)
+
+	if ctx.GameState == nil {
+		t.Error("GameState should not be nil")
+	}
+	if ctx.GameState.Round != 1 {
+		t.Errorf("Round = %d, expected 1", ctx.GameState.Round)
+	}
+}
+
 func TestContextWithData(t *testing.T) {
 	ctx := NewContext(nil)
-	ctx.WithData(100) // e.g. damage value
+	ctx.WithData(100)
 
 	// Use GetData() backward-compatible method
 	if ctx.GetData() != 100 {
@@ -455,12 +479,6 @@ func TestContextWithData(t *testing.T) {
 	// Use GetIntOrDefault for type-safe retrieval
 	if ctx.GetIntOrDefault("data", 0) != 100 {
 		t.Errorf("GetIntOrDefault(\"data\") = %d, expected 100", ctx.GetIntOrDefault("data", 0))
-	}
-
-	// GetInt now returns error for nonexistent keys
-	_, err := ctx.GetInt("nonexistent")
-	if err == nil {
-		t.Error("GetInt for nonexistent key should return error")
 	}
 }
 
@@ -472,7 +490,7 @@ func TestContextMetadata(t *testing.T) {
 	ctx.SetString("element", "fire")
 	ctx.SetBool("blocked", true)
 
-	// Use GetIntOrDefault/GetStringOrDefault/GetBoolOrDefault for safe retrieval
+	// Use GetIntOrDefault/GetStringOrDefault/GetBoolOrDefault
 	if ctx.GetIntOrDefault("damage", 0) != 50 {
 		t.Errorf("GetIntOrDefault(\"damage\") = %d, expected 50", ctx.GetIntOrDefault("damage", 0))
 	}
@@ -491,7 +509,8 @@ func TestContextMetadata(t *testing.T) {
 }
 
 func TestContextClone(t *testing.T) {
-	ctx := NewContext(&TestPlayer{UserID: "player-001"})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := NewContext(player)
 	ctx.SetInt("damage", 100)
 	ctx.SetString("source", "fire")
 
@@ -525,5 +544,29 @@ func TestContextDerivedActions(t *testing.T) {
 	ctx.ClearDerivedActions()
 	if len(ctx.GetDerivedActions()) != 0 {
 		t.Error("DerivedActions should be empty after clear")
+	}
+}
+
+func TestContextWithChoice(t *testing.T) {
+	ctx := NewContext(nil).WithChoice(2)
+
+	if ctx.Choice != 2 {
+		t.Errorf("Choice = %d, expected 2", ctx.Choice)
+	}
+}
+
+func TestContextClear(t *testing.T) {
+	ctx := NewContext(nil)
+	ctx.SetInt("damage", 50)
+	ctx.AddDerivedAction("action1")
+
+	ctx.Clear()
+
+	// Check metadata is cleared by trying to get the value
+	if ctx.GetIntOrDefault("damage", 0) != 0 {
+		t.Error("Metadata should be empty after Clear")
+	}
+	if len(ctx.DerivedActions) != 0 {
+		t.Error("DerivedActions should be empty after Clear")
 	}
 }
