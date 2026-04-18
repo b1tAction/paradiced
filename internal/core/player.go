@@ -1,11 +1,10 @@
+// Package core provides core data structures for the Paradiced game.
 package core
 
 import (
 	"errors"
 	"fmt"
 
-	"github.com/b1tAction/paradiced/internal/core/buff"
-	"github.com/b1tAction/paradiced/internal/core/item"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/b1tAction/paradiced/pkg/util"
@@ -18,8 +17,8 @@ type Player struct {
 	Position       int               `json:"position"`     // Current position
 	HP             int               `json:"hp"`           // Health points
 	LP             int               `json:"lp"`           // Luck points (affects random events)
-	Inventory      []*item.Item      `json:"inventory"`    // Item inventory
-	ActiveBuffs    []*buff.Buff      `json:"active_buffs"` // Active buffs
+	Inventory      []*Item           `json:"inventory"`    // Item inventory
+	ActiveBuffs    []*Buff           `json:"active_buffs"` // Active buffs
 	IsDead         bool              `json:"is_dead"`      // Whether player is dead
 	SkipTurn       bool              `json:"skip_turn"`    // Whether player skips turn
 	*util.Metadata `json:"metadata"` // Type-safe dynamic data container
@@ -61,8 +60,8 @@ func NewPlayer(config PlayerConfig) *Player {
 		Position:    config.StartPos,
 		HP:          config.MaxHP,
 		LP:          config.MaxLP,
-		Inventory:   make([]*item.Item, 0),
-		ActiveBuffs: make([]*buff.Buff, 0),
+		Inventory:   make([]*Item, 0),
+		ActiveBuffs: make([]*Buff, 0),
 		IsDead:      false,
 		SkipTurn:    false,
 		Metadata:    util.NewMetadata(),
@@ -70,13 +69,13 @@ func NewPlayer(config PlayerConfig) *Player {
 
 	// ZhuQue朱雀 faction starts with Fire离火 buff
 	if config.Faction == constants.FactionZhuQue {
-		player.AddBuff(buff.NewBuff(constants.BuffTypeFire, -1))
+		player.AddBuff(NewBuff(constants.BuffTypeFire, -1))
 	}
 
 	return player
 }
 
-// ========== Getter Methods (implement protocol.Player) ==========
+// ========== Getter Methods ==========
 
 // GetID returns the player's ID.
 func (p *Player) GetID() id.PlayerID { return p.ID }
@@ -169,7 +168,7 @@ func (p *Player) Respawn(respawnPos int) error {
 // ========== Buff Management ==========
 
 // AddBuff adds a buff to the player.
-func (p *Player) AddBuff(buffInstance *buff.Buff) error {
+func (p *Player) AddBuff(buffInstance *Buff) error {
 	if buffInstance == nil {
 		return errors.New("buff cannot be nil")
 	}
@@ -202,7 +201,7 @@ func (p *Player) HasBuff(buffType constants.BuffType) bool {
 }
 
 // GetBuff gets the buff of specified type.
-func (p *Player) GetBuff(buffType constants.BuffType) *buff.Buff {
+func (p *Player) GetBuff(buffType constants.BuffType) *Buff {
 	for _, b := range p.ActiveBuffs {
 		if b.Type == buffType {
 			return b
@@ -212,8 +211,8 @@ func (p *Player) GetBuff(buffType constants.BuffType) *buff.Buff {
 }
 
 // TickBuffs updates all buff durations, returns expired buffs.
-func (p *Player) TickBuffs() []*buff.Buff {
-	var expired []*buff.Buff
+func (p *Player) TickBuffs() []*Buff {
+	var expired []*Buff
 	for i := len(p.ActiveBuffs) - 1; i >= 0; i-- {
 		if !p.ActiveBuffs[i].TickDuration() {
 			expired = append(expired, p.ActiveBuffs[i])
@@ -238,7 +237,7 @@ func (p *Player) ClearNegativeBuffs() int {
 // ========== Item Management ==========
 
 // AddItem adds an item to inventory.
-func (p *Player) AddItem(itemInstance *item.Item) error {
+func (p *Player) AddItem(itemInstance *Item) error {
 	if itemInstance == nil {
 		return errors.New("item cannot be nil")
 	}
@@ -247,7 +246,7 @@ func (p *Player) AddItem(itemInstance *item.Item) error {
 }
 
 // RemoveItem removes an item from inventory.
-func (p *Player) RemoveItem(itemID id.ItemID) (*item.Item, error) {
+func (p *Player) RemoveItem(itemID id.ItemID) (*Item, error) {
 	for i, it := range p.Inventory {
 		if it.ID.Equal(itemID.ID) {
 			removed := p.Inventory[i]
@@ -259,7 +258,7 @@ func (p *Player) RemoveItem(itemID id.ItemID) (*item.Item, error) {
 }
 
 // GetItem gets an item by ID.
-func (p *Player) GetItem(itemID id.ItemID) *item.Item {
+func (p *Player) GetItem(itemID id.ItemID) *Item {
 	for _, it := range p.Inventory {
 		if it.ID.Equal(itemID.ID) {
 			return it
@@ -316,9 +315,9 @@ func (p *Player) IncrementFireCounter() int {
 
 // Clone clones the player (used for testing).
 func (p *Player) Clone() *Player {
-	inventory := make([]*item.Item, len(p.Inventory))
+	inventory := make([]*Item, len(p.Inventory))
 	for i, it := range p.Inventory {
-		inventory[i] = &item.Item{
+		inventory[i] = &Item{
 			Type:     it.Type,
 			ID:       it.ID,
 			Usable:   it.Usable,
@@ -326,9 +325,9 @@ func (p *Player) Clone() *Player {
 		}
 	}
 
-	buffs := make([]*buff.Buff, len(p.ActiveBuffs))
+	buffs := make([]*Buff, len(p.ActiveBuffs))
 	for i, b := range p.ActiveBuffs {
-		buffs[i] = &buff.Buff{
+		buffs[i] = &Buff{
 			Type:            b.Type,
 			ID:              b.ID,
 			Duration:        b.Duration,

@@ -6,9 +6,9 @@ import (
 
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/engine"
+	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
-	"github.com/b1tAction/paradiced/pkg/event"
 	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
@@ -206,40 +206,31 @@ func TestStateContextWithMapEngine(t *testing.T) {
 	game := engine.NewGame(id.NewGameID(), 0)
 	ctx := NewStateContext().WithGame(game)
 
-	// Test WithMapEngine sets adapter on HSM
-	mockEngine := &mockMapEngineAdapter{length: 100}
-	ctx = ctx.WithMapEngine(mockEngine)
-	if ctx.GetMapEngine() != mockEngine {
-		t.Error("WithMapEngine should set adapter on HSM")
+	// Test WithMapEngine sets MapEngine on HSM
+	mapEngine := gamemap.NewMapEngine(100)
+	ctx = ctx.WithMapEngine(mapEngine)
+	if ctx.GetMapEngine() != mapEngine {
+		t.Error("WithMapEngine should set MapEngine on HSM")
 	}
 }
 
-// ========== Mock Adapters for Testing ==========
+// ========== Mock Broadcast Adapter for Testing ==========
 
-type mockEventBusAdapter struct{}
+type mockBroadcastAdapter struct{}
 
-func (m *mockEventBusAdapter) Publish(phase constants.Phase, playerID string, ctx *event.Context) []*event.Decision {
+func (m *mockBroadcastAdapter) BroadcastStateSync(state interface{}) error { return nil }
+func (m *mockBroadcastAdapter) BroadcastTurnSync(turn interface{}) error  { return nil }
+func (m *mockBroadcastAdapter) SendDecision(playerID string, decision interface{}) error {
 	return nil
 }
-func (m *mockEventBusAdapter) Subscribe(phase constants.Phase, ownerID id.PlayerID, sourceID, sourceType string, decision *event.Decision) id.SubscriptionID {
-	return id.NewSubscriptionID()
+func (m *mockBroadcastAdapter) SendAvailable(playerID string, available interface{}) error {
+	return nil
 }
-func (m *mockEventBusAdapter) Unsubscribe(subID id.SubscriptionID) bool           { return false }
-func (m *mockEventBusAdapter) UnsubscribeBySource(sourceID string) int { return 0 }
-func (m *mockEventBusAdapter) UnsubscribeByOwner(ownerID string) int   { return 0 }
-func (m *mockEventBusAdapter) GetSubscriptionCount() int               { return 0 }
-func (m *mockEventBusAdapter) Clear()                                  {}
-
-type mockMapEngineAdapter struct {
-	length int
+func (m *mockBroadcastAdapter) BroadcastMiniGameStart(start interface{}) error { return nil }
+func (m *mockBroadcastAdapter) BroadcastMiniGameResult(result interface{}) error {
+	return nil
 }
-
-func (m *mockMapEngineAdapter) GetLength() int                            { return m.length }
-func (m *mockMapEngineAdapter) GetCell(pos int) (*gamemap.MapCell, error) { return nil, nil }
-func (m *mockMapEngineAdapter) CalculatePath(startPos int, steps int) (*gamemap.PathResult, error) {
-	return nil, nil
+func (m *mockBroadcastAdapter) BroadcastGameOver(over interface{}) error  { return nil }
+func (m *mockBroadcastAdapter) SendFullSync(playerID string, state, turn interface{}) error {
+	return nil
 }
-func (m *mockMapEngineAdapter) GetLastCheckpoint(pos int) int                        { return 0 }
-func (m *mockMapEngineAdapter) SetCellType(pos int, cellType gamemap.CellType) error { return nil }
-func (m *mockMapEngineAdapter) ActivateFog(pos int) error                            { return nil }
-func (m *mockMapEngineAdapter) IsFogActivated(pos int) bool                          { return false }

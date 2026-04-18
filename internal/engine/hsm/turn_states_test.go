@@ -24,14 +24,13 @@ func TestTurnUpkeepState_Enter_NormalFlow(t *testing.T) {
 	game.AddPlayer(player)
 
 	mapEngine := gamemap.NewMapEngine(100)
-	mapAdapter := NewMapEngineWrapper(mapEngine)
 
 	state := NewTurnUpkeepState()
 	ctx := NewStateContext().
 		WithGame(game).
 		WithPlayer(player).
-		WithMapEngine(mapAdapter).
-		WithBus(NewEventBusWrapper(game.Bus))
+		WithMapEngine(mapEngine).
+		WithBus(game.Bus)
 
 	// Execute
 	state.Enter(ctx)
@@ -59,7 +58,7 @@ func TestTurnUpkeepState_Enter_SkipTurn(t *testing.T) {
 	ctx := NewStateContext().
 		WithGame(game).
 		WithPlayer(player).
-		WithBus(NewEventBusWrapper(game.Bus))
+		WithBus(game.Bus)
 
 	// Execute
 	state.Enter(ctx)
@@ -88,14 +87,13 @@ func TestTurnUpkeepState_Enter_DeadPlayer(t *testing.T) {
 	mapEngine := gamemap.NewMapEngine(100)
 	configs := map[int]gamemap.CellType{30: gamemap.CellTypeCheckpoint}
 	mapEngine.GenerateLinearMap(configs)
-	mapAdapter := NewMapEngineWrapper(mapEngine)
-
+	
 	state := NewTurnUpkeepState()
 	ctx := NewStateContext().
 		WithGame(game).
 		WithPlayer(player).
-		WithMapEngine(mapAdapter).
-		WithBus(NewEventBusWrapper(game.Bus))
+		WithMapEngine(mapEngine).
+		WithBus(game.Bus)
 
 	// Execute
 	state.Enter(ctx)
@@ -146,7 +144,7 @@ func TestMainActionState_Enter(t *testing.T) {
 	ctx := NewStateContext().
 		WithGame(game).
 		WithPlayer(player).
-		WithBus(NewEventBusWrapper(game.Bus))
+		WithBus(game.Bus)
 
 	state.Enter(ctx)
 
@@ -248,14 +246,13 @@ func TestTurnMovingState_Enter_FellDown(t *testing.T) {
 	mapEngine := gamemap.NewMapEngine(100)
 	configs := map[int]gamemap.CellType{25: gamemap.CellTypeFragile}
 	mapEngine.GenerateLinearMap(configs)
-	mapAdapter := NewMapEngineWrapper(mapEngine)
-
+	
 	state := NewTurnMovingState()
 	ctx := NewStateContext().
 		WithGame(game).
 		WithPlayer(player).
-		WithMapEngine(mapAdapter).
-		WithBus(NewEventBusWrapper(game.Bus))
+		WithMapEngine(mapEngine).
+		WithBus(game.Bus)
 	ctx.SetInt(KeyDiceSteps, 5)
 
 	state.Enter(ctx)
@@ -325,14 +322,13 @@ func TestTurnLandedState_Enter(t *testing.T) {
 	mapEngine := gamemap.NewMapEngine(100)
 	configs := map[int]gamemap.CellType{30: gamemap.CellTypeCheckpoint}
 	mapEngine.GenerateLinearMap(configs)
-	mapAdapter := NewMapEngineWrapper(mapEngine)
-
+	
 	state := NewTurnLandedState()
 	ctx := NewStateContext().
 		WithGame(game).
 		WithPlayer(player).
-		WithMapEngine(mapAdapter).
-		WithBus(NewEventBusWrapper(game.Bus))
+		WithMapEngine(mapEngine).
+		WithBus(game.Bus)
 
 	state.Enter(ctx)
 
@@ -367,7 +363,7 @@ func TestTurnEventState_Enter(t *testing.T) {
 	ctx := NewStateContext().
 		WithGame(game).
 		WithPlayer(player).
-		WithBus(NewEventBusWrapper(game.Bus))
+		WithBus(game.Bus)
 
 	state.Enter(ctx)
 
@@ -402,7 +398,7 @@ func TestTurnEndState_Enter(t *testing.T) {
 	ctx := NewStateContext().
 		WithGame(game).
 		WithPlayer(player).
-		WithBus(NewEventBusWrapper(game.Bus))
+		WithBus(game.Bus)
 
 	state.Enter(ctx)
 
@@ -428,7 +424,7 @@ func TestTurnEndState_Enter_TickBuffs(t *testing.T) {
 	ctx := NewStateContext().
 		WithGame(game).
 		WithPlayer(player).
-		WithBus(NewEventBusWrapper(game.Bus))
+		WithBus(game.Bus)
 
 	state.Enter(ctx)
 
@@ -453,7 +449,7 @@ func TestTurnEndState_Enter_FactionCharging(t *testing.T) {
 	ctx := NewStateContext().
 		WithGame(game).
 		WithPlayer(player).
-		WithBus(NewEventBusWrapper(game.Bus))
+		WithBus(game.Bus)
 
 	state.Enter(ctx)
 

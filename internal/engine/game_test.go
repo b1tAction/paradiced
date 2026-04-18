@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/b1tAction/paradiced/internal/core"
+	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
-	"github.com/b1tAction/paradiced/pkg/event"
 	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
@@ -51,12 +51,21 @@ func TestNewGameWithSeed(t *testing.T) {
 	game1 := NewGame(id.NewGameID(), 42)
 	game2 := NewGame(id.NewGameID(), 42)
 
+	// Create a test pool
+	pool := &rng.EvaluatedItemPool{
+		Items: []rng.EvaluatedItem{
+			{Type: "event_a", Eval: constants.EvaluationExcellent},
+			{Type: "event_b", Eval: constants.EvaluationGood},
+			{Type: "event_c", Eval: constants.EvaluationMildGood},
+		},
+	}
+
 	// Same seed should produce same draw sequence
-	et1 := game1.Draw.DrawEvent(rng.PoolTypeGood, 4)
-	et2 := game2.Draw.DrawEvent(rng.PoolTypeGood, 4)
+	et1 := game1.Draw.DrawFromPool(pool, rng.PoolTypeGood, 4)
+	et2 := game2.Draw.DrawFromPool(pool, rng.PoolTypeGood, 4)
 
 	if et1 != et2 {
-		t.Errorf("Same seed should produce same draw: %s vs %s", string(et1), string(et2))
+		t.Errorf("Same seed should produce same draw: %s vs %s", et1, et2)
 	}
 }
 
@@ -253,7 +262,7 @@ func TestGameSubscribeBuff(t *testing.T) {
 	game.SubscribeBuff(player, buff)
 
 	// 验证订阅已创建
-	config := core.GetBuffHandlerConfig(constants.BuffTypeCurse)
+	config := GetBuffHandlerConfig(constants.BuffTypeCurse)
 	for _, phase := range config.GetPhases() {
 		if phase.NeedsSubscription() {
 			if game.Bus.GetSubscriptionCount() != 1 {
@@ -277,7 +286,7 @@ func TestGameSubscribePassiveBuff(t *testing.T) {
 	game.SubscribeBuff(player, buff)
 
 	// 离火现在需要订阅 BeforeTurn（每4回合检查）
-	config := core.GetBuffHandlerConfig(constants.BuffTypeFire)
+	config := GetBuffHandlerConfig(constants.BuffTypeFire)
 	for _, phase := range config.GetPhases() {
 		if phase.NeedsSubscription() {
 			if len(buff.SubscriptionIDs) == 0 {
@@ -327,7 +336,7 @@ func TestGameSubscribeBuffByPlayerAdd(t *testing.T) {
 	}
 
 	// 离火现在使用 BeforeTurn，需要订阅
-	config := core.GetBuffHandlerConfig(constants.BuffTypeFire)
+	config := GetBuffHandlerConfig(constants.BuffTypeFire)
 	for _, phase := range config.GetPhases() {
 		if phase.NeedsSubscription() {
 			// BeforeTurn 需要订阅
@@ -351,7 +360,7 @@ func TestGameSubscribeItem(t *testing.T) {
 	game.SubscribeItem(player, item)
 
 	// 验证订阅已创建
-	config := core.GetItemHandlerConfig(constants.ItemTypeDiceUpgrade)
+	config := GetItemHandlerConfig(constants.ItemTypeDiceUpgrade)
 	if config.Phase.NeedsSubscription() {
 		if game.Bus.GetSubscriptionCount() != 1 {
 			t.Errorf("Subscription count = %d, expected 1", game.Bus.GetSubscriptionCount())
@@ -373,7 +382,7 @@ func TestGameSubscribeAnyTimeItem(t *testing.T) {
 	game.SubscribeItem(player, item)
 
 	// AnyTime 道具不需要订阅（主动触发）
-	config := core.GetItemHandlerConfig(constants.ItemTypeReverseClock)
+	config := GetItemHandlerConfig(constants.ItemTypeReverseClock)
 	if config.Phase == constants.PhaseAnyTime {
 		if item.SubscriptionID != "" {
 			t.Error("AnyTime Item should not have SubscriptionID")
@@ -458,8 +467,8 @@ func TestGameMixedSubscriptions(t *testing.T) {
 func TestGameCreateBuffDecision(t *testing.T) {
 	game := NewGame(id.NewGameID(), 0)
 	buff := core.NewBuff(constants.BuffTypeCurse, 3)
-	def := core.GetBuffDefinition(constants.BuffTypeCurse)
-	config := core.GetBuffHandlerConfig(constants.BuffTypeCurse)
+	def := GetBuffDefinition(constants.BuffTypeCurse)
+	config := GetBuffHandlerConfig(constants.BuffTypeCurse)
 
 	decision := game.createBuffDecision(buff, def, config)
 
@@ -478,8 +487,8 @@ func TestGameCreateBuffDecision(t *testing.T) {
 func TestGameCreateItemDecision(t *testing.T) {
 	game := NewGame(id.NewGameID(), 0)
 	item := core.NewItem(constants.ItemTypeDiceUpgrade)
-	def := core.GetItemDefinition(constants.ItemTypeDiceUpgrade)
-	config := core.GetItemHandlerConfig(constants.ItemTypeDiceUpgrade)
+	def := GetItemDefinition(constants.ItemTypeDiceUpgrade)
+	config := GetItemHandlerConfig(constants.ItemTypeDiceUpgrade)
 
 	decision := game.createItemDecision(item, def, config)
 

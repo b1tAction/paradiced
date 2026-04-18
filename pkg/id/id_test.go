@@ -272,3 +272,325 @@ func TestPlayerIDJSONRoundtrip(t *testing.T) {
 func stringsContains(s, substr string) bool {
 	return len(s) >= len(substr) && s[:len(substr)] == substr
 }
+
+// ========== Parse Functions Tests ==========
+
+func TestParsePlayerID(t *testing.T) {
+	original := NewPlayerID()
+	uuidStr := original.UUID()
+
+	// Parse pure UUID
+	parsed, err := ParsePlayerID(uuidStr)
+	if err != nil {
+		t.Errorf("ParsePlayerID pure UUID failed: %v", err)
+	}
+	if parsed.UUID() != uuidStr {
+		t.Errorf("Parsed UUID mismatch: %s vs %s", parsed.UUID(), uuidStr)
+	}
+
+	// Parse prefixed format
+	parsed2, err := ParsePlayerID("player-" + uuidStr)
+	if err != nil {
+		t.Errorf("ParsePlayerID prefixed failed: %v", err)
+	}
+	if parsed2.UUID() != uuidStr {
+		t.Errorf("Parsed2 UUID mismatch: %s vs %s", parsed2.UUID(), uuidStr)
+	}
+}
+
+func TestParsePlayerIDInvalid(t *testing.T) {
+	_, err := ParsePlayerID("invalid")
+	if err == nil {
+		t.Error("ParsePlayerID with invalid should return error")
+	}
+}
+
+func TestMustParsePlayerIDPanics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("MustParsePlayerID with invalid should panic")
+		}
+	}()
+	MustParsePlayerID("invalid")
+}
+
+func TestZeroPlayerID(t *testing.T) {
+	zero := ZeroPlayerID()
+	if !zero.IsZero() {
+		t.Error("ZeroPlayerID should be zero")
+	}
+	if zero.IsValid() {
+		t.Error("ZeroPlayerID should not be valid")
+	}
+}
+
+func TestPlayerIDUnmarshalJSON(t *testing.T) {
+	uuidStr := "0194fdc2-fa2f-7cc3-95c0-18c0c013c0be"
+	jsonStr := `"` + uuidStr + `"`
+
+	var id PlayerID
+	err := json.Unmarshal([]byte(jsonStr), &id)
+	if err != nil {
+		t.Errorf("PlayerID UnmarshalJSON failed: %v", err)
+	}
+	if id.UUID() != uuidStr {
+		t.Errorf("PlayerID UnmarshalJSON UUID = %s, expected %s", id.UUID(), uuidStr)
+	}
+	// Check prefix is set correctly
+	if !stringsContains(id.String(), "player-") {
+		t.Errorf("PlayerID String should contain 'player-', got %s", id.String())
+	}
+}
+
+func TestParseBuffID(t *testing.T) {
+	original := NewBuffID()
+	uuidStr := original.UUID()
+
+	parsed, err := ParseBuffID(uuidStr)
+	if err != nil {
+		t.Errorf("ParseBuffID failed: %v", err)
+	}
+	if parsed.UUID() != uuidStr {
+		t.Errorf("Parsed UUID mismatch: %s vs %s", parsed.UUID(), uuidStr)
+	}
+}
+
+func TestMustParseBuffIDPanics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("MustParseBuffID with invalid should panic")
+		}
+	}()
+	MustParseBuffID("invalid")
+}
+
+func TestZeroBuffID(t *testing.T) {
+	zero := ZeroBuffID()
+	if !zero.IsZero() {
+		t.Error("ZeroBuffID should be zero")
+	}
+}
+
+func TestBuffIDUnmarshalJSON(t *testing.T) {
+	uuidStr := "0194fdc2-fa2f-7cc3-95c0-18c0c013c0be"
+	var id BuffID
+	err := json.Unmarshal([]byte(`"`+uuidStr+`"`), &id)
+	if err != nil {
+		t.Errorf("BuffID UnmarshalJSON failed: %v", err)
+	}
+	if id.UUID() != uuidStr {
+		t.Errorf("BuffID UUID mismatch: %s vs %s", id.UUID(), uuidStr)
+	}
+}
+
+func TestParseItemID(t *testing.T) {
+	original := NewItemID()
+	uuidStr := original.UUID()
+
+	parsed, err := ParseItemID(uuidStr)
+	if err != nil {
+		t.Errorf("ParseItemID failed: %v", err)
+	}
+	if parsed.UUID() != uuidStr {
+		t.Errorf("Parsed UUID mismatch")
+	}
+}
+
+func TestMustParseItemIDPanics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("MustParseItemID with invalid should panic")
+		}
+	}()
+	MustParseItemID("invalid")
+}
+
+func TestZeroItemID(t *testing.T) {
+	zero := ZeroItemID()
+	if !zero.IsZero() {
+		t.Error("ZeroItemID should be zero")
+	}
+}
+
+func TestItemIDUnmarshalJSON(t *testing.T) {
+	uuidStr := "0194fdc2-fa2f-7cc3-95c0-18c0c013c0be"
+	var id ItemID
+	err := json.Unmarshal([]byte(`"`+uuidStr+`"`), &id)
+	if err != nil {
+		t.Errorf("ItemID UnmarshalJSON failed: %v", err)
+	}
+	if id.UUID() != uuidStr {
+		t.Errorf("ItemID UUID mismatch")
+	}
+}
+
+func TestParseGameID(t *testing.T) {
+	original := NewGameID()
+	uuidStr := original.UUID()
+
+	parsed, err := ParseGameID(uuidStr)
+	if err != nil {
+		t.Errorf("ParseGameID failed: %v", err)
+	}
+	if parsed.UUID() != uuidStr {
+		t.Errorf("Parsed UUID mismatch")
+	}
+}
+
+func TestMustParseGameIDPanics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("MustParseGameID with invalid should panic")
+		}
+	}()
+	MustParseGameID("invalid")
+}
+
+func TestZeroGameID(t *testing.T) {
+	zero := ZeroGameID()
+	if !zero.IsZero() {
+		t.Error("ZeroGameID should be zero")
+	}
+}
+
+func TestGameIDUnmarshalJSON(t *testing.T) {
+	uuidStr := "0194fdc2-fa2f-7cc3-95c0-18c0c013c0be"
+	var id GameID
+	err := json.Unmarshal([]byte(`"`+uuidStr+`"`), &id)
+	if err != nil {
+		t.Errorf("GameID UnmarshalJSON failed: %v", err)
+	}
+	if id.UUID() != uuidStr {
+		t.Errorf("GameID UUID mismatch")
+	}
+}
+
+func TestParseSubscriptionID(t *testing.T) {
+	original := NewSubscriptionID()
+	uuidStr := original.UUID()
+
+	parsed, err := ParseSubscriptionID(uuidStr)
+	if err != nil {
+		t.Errorf("ParseSubscriptionID failed: %v", err)
+	}
+	if parsed.UUID() != uuidStr {
+		t.Errorf("Parsed UUID mismatch")
+	}
+}
+
+func TestMustParseSubscriptionIDPanics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("MustParseSubscriptionID with invalid should panic")
+		}
+	}()
+	MustParseSubscriptionID("invalid")
+}
+
+func TestZeroSubscriptionID(t *testing.T) {
+	zero := ZeroSubscriptionID()
+	if !zero.IsZero() {
+		t.Error("ZeroSubscriptionID should be zero")
+	}
+}
+
+func TestSubscriptionIDUnmarshalJSON(t *testing.T) {
+	uuidStr := "0194fdc2-fa2f-7cc3-95c0-18c0c013c0be"
+	var id SubscriptionID
+	err := json.Unmarshal([]byte(`"`+uuidStr+`"`), &id)
+	if err != nil {
+		t.Errorf("SubscriptionID UnmarshalJSON failed: %v", err)
+	}
+	if id.UUID() != uuidStr {
+		t.Errorf("SubscriptionID UUID mismatch")
+	}
+}
+
+func TestParseDecisionID(t *testing.T) {
+	original := NewDecisionID()
+	uuidStr := original.UUID()
+
+	parsed, err := ParseDecisionID(uuidStr)
+	if err != nil {
+		t.Errorf("ParseDecisionID failed: %v", err)
+	}
+	if parsed.UUID() != uuidStr {
+		t.Errorf("Parsed UUID mismatch")
+	}
+}
+
+func TestMustParseDecisionIDPanics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("MustParseDecisionID with invalid should panic")
+		}
+	}()
+	MustParseDecisionID("invalid")
+}
+
+func TestZeroDecisionID(t *testing.T) {
+	zero := ZeroDecisionID()
+	if !zero.IsZero() {
+		t.Error("ZeroDecisionID should be zero")
+	}
+}
+
+func TestDecisionIDUnmarshalJSON(t *testing.T) {
+	uuidStr := "0194fdc2-fa2f-7cc3-95c0-18c0c013c0be"
+	var id DecisionID
+	err := json.Unmarshal([]byte(`"`+uuidStr+`"`), &id)
+	if err != nil {
+		t.Errorf("DecisionID UnmarshalJSON failed: %v", err)
+	}
+	if id.UUID() != uuidStr {
+		t.Errorf("DecisionID UUID mismatch")
+	}
+}
+
+func TestNewEventID(t *testing.T) {
+	id := NewEventID()
+	if !stringsContains(id.String(), "event-") {
+		t.Errorf("EventID.String() should contain 'event-', got %s", id.String())
+	}
+}
+
+func TestParseEventID(t *testing.T) {
+	original := NewEventID()
+	uuidStr := original.UUID()
+
+	parsed, err := ParseEventID(uuidStr)
+	if err != nil {
+		t.Errorf("ParseEventID failed: %v", err)
+	}
+	if parsed.UUID() != uuidStr {
+		t.Errorf("Parsed UUID mismatch")
+	}
+}
+
+func TestMustParseEventIDPanics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("MustParseEventID with invalid should panic")
+		}
+	}()
+	MustParseEventID("invalid")
+}
+
+func TestZeroEventID(t *testing.T) {
+	zero := ZeroEventID()
+	if !zero.IsZero() {
+		t.Error("ZeroEventID should be zero")
+	}
+}
+
+func TestEventIDUnmarshalJSON(t *testing.T) {
+	uuidStr := "0194fdc2-fa2f-7cc3-95c0-18c0c013c0be"
+	var id EventID
+	err := json.Unmarshal([]byte(`"`+uuidStr+`"`), &id)
+	if err != nil {
+		t.Errorf("EventID UnmarshalJSON failed: %v", err)
+	}
+	if id.UUID() != uuidStr {
+		t.Errorf("EventID UUID mismatch")
+	}
+}

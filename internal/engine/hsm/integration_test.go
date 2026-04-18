@@ -5,12 +5,11 @@ import (
 	"testing"
 
 	"github.com/b1tAction/paradiced/internal/core"
-	"github.com/b1tAction/paradiced/internal/core/buff"
 	"github.com/b1tAction/paradiced/internal/engine"
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
+	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
-	"github.com/b1tAction/paradiced/pkg/event"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
 	"github.com/b1tAction/paradiced/pkg/id"
 )
@@ -32,8 +31,8 @@ func TestTurnFlow_GameLog_Integration(t *testing.T) {
 	game.AddPlayer(player)
 
 	// Setup HSM adapters
-	busAdapter := NewEventBusWrapper(game.Bus)
-	mapAdapter := NewMapEngineWrapper(mapEngine)
+	busAdapter := game.Bus
+	mapAdapter := mapEngine
 
 	// Create TurnUpkeep state
 	upkeepState := NewTurnUpkeepState()
@@ -70,18 +69,18 @@ func TestTurnFlow_BuffEffect_GameLog(t *testing.T) {
 	game.AddPlayer(player)
 
 	// Add Divine buff (神眷: LP+1 each turn)
-	divineBuff := buff.NewBuff(constants.BuffTypeDivine, 3)
+	divineBuff := core.NewBuff(constants.BuffTypeDivine, 3)
 	player.AddBuff(divineBuff)
 
 	// Subscribe buff to EventBus
 	game.SubscribeBuff(player, divineBuff)
 
 	// Create ActionContext for executing Actions
-	mapAdapter := NewMapEngineWrapper(mapEngine)
+	mapAdapter := mapEngine
 	actionCtx := engineaction.NewActionContext(
-		NewGameWrapper(game),
+		game,
 		game.Bus,
-		NewProtocolMapEngineWrapper(mapAdapter),
+		mapAdapter,
 		game.Draw,
 	)
 
@@ -120,11 +119,11 @@ func TestTurnFlow_Respawn_GameLog(t *testing.T) {
 	game.Log.StartTurn(1, 0, player.ID.UUID())
 
 	// Create ActionContext
-	mapAdapter := NewMapEngineWrapper(mapEngine)
+	mapAdapter := mapEngine
 	actionCtx := engineaction.NewActionContext(
-		NewGameWrapper(game),
+		game,
 		game.Bus,
-		NewProtocolMapEngineWrapper(mapAdapter),
+		mapAdapter,
 		game.Draw,
 	)
 
@@ -187,11 +186,11 @@ func TestTurnFlow_Damage_GameLog(t *testing.T) {
 	game.Log.StartTurn(1, 0, player.ID.UUID())
 
 	// Create ActionContext
-	mapAdapter := NewMapEngineWrapper(mapEngine)
+	mapAdapter := mapEngine
 	actionCtx := engineaction.NewActionContext(
-		NewGameWrapper(game),
+		game,
 		game.Bus,
-		NewProtocolMapEngineWrapper(mapAdapter),
+		mapAdapter,
 		game.Draw,
 	)
 
@@ -245,20 +244,20 @@ func TestTurnFlow_CompleteTurn(t *testing.T) {
 	game.AddPlayer(player)
 
 	// Add Divine buff
-	divineBuff := buff.NewBuff(constants.BuffTypeDivine, 3)
+	divineBuff := core.NewBuff(constants.BuffTypeDivine, 3)
 	player.AddBuff(divineBuff)
 	game.SubscribeBuff(player, divineBuff)
 
-	mapAdapter := NewMapEngineWrapper(mapEngine)
+	mapAdapter := mapEngine
 
 	// === Step 1: Start Turn ===
 	game.Log.StartTurn(1, 0, player.ID.UUID())
 
 	// === Step 2: BeforeTurn Phase ===
 	actionCtx := engineaction.NewActionContext(
-		NewGameWrapper(game),
+		game,
 		game.Bus,
-		NewProtocolMapEngineWrapper(mapAdapter),
+		mapAdapter,
 		game.Draw,
 	)
 
@@ -383,11 +382,11 @@ func TestTurnFlow_Interrupt_Respawn(t *testing.T) {
 	game.Log.StartTurn(1, 0, player.ID.UUID())
 
 	// Create ActionContext
-	mapAdapter := NewMapEngineWrapper(mapEngine)
+	mapAdapter := mapEngine
 	actionCtx := engineaction.NewActionContext(
-		NewGameWrapper(game),
+		game,
 		game.Bus,
-		NewProtocolMapEngineWrapper(mapAdapter),
+		mapAdapter,
 		game.Draw,
 	)
 
@@ -436,11 +435,11 @@ func TestDerivedActions_FromHandler(t *testing.T) {
 	game.Log.StartTurn(1, 0, player.ID.UUID())
 
 	// Create ActionContext
-	mapAdapter := NewMapEngineWrapper(mapEngine)
+	mapAdapter := mapEngine
 	actionCtx := engineaction.NewActionContext(
-		NewGameWrapper(game),
+		game,
 		game.Bus,
-		NewProtocolMapEngineWrapper(mapAdapter),
+		mapAdapter,
 		game.Draw,
 	)
 

@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/b1tAction/paradiced/internal/core"
+	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
-	"github.com/b1tAction/paradiced/pkg/event"
 	"github.com/b1tAction/paradiced/pkg/id"
 )
 
@@ -13,9 +13,9 @@ import (
 
 func TestAllBuffsHaveHandlerConfig(t *testing.T) {
 	// All Buffs should have HandlerConfig registered
-	allBuffs := core.GetAllBuffTypes()
+	allBuffs := GetAllBuffTypes()
 	for _, bt := range allBuffs {
-		config := core.GetBuffHandlerConfig(bt)
+		config := GetBuffHandlerConfig(bt)
 		if config == nil {
 			t.Errorf("BuffType(%s) should have HandlerConfig", bt)
 		}
@@ -24,9 +24,9 @@ func TestAllBuffsHaveHandlerConfig(t *testing.T) {
 
 func TestAllBuffsHaveHandler(t *testing.T) {
 	// All Buffs should have Handler set
-	allBuffs := core.GetAllBuffTypes()
+	allBuffs := GetAllBuffTypes()
 	for _, bt := range allBuffs {
-		if !core.HasBuffHandler(bt) {
+		if !HasBuffHandler(bt) {
 			t.Errorf("BuffType(%s) should have Handler", bt)
 		}
 	}
@@ -52,7 +52,7 @@ func TestBuffHandlerConfigPhases(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		config := core.GetBuffHandlerConfig(tt.buffType)
+		config := GetBuffHandlerConfig(tt.buffType)
 		if config == nil {
 			t.Errorf("BuffType(%s) has no HandlerConfig", tt.buffType)
 			continue
@@ -84,7 +84,7 @@ func TestFireBuffHandlerBehavior(t *testing.T) {
 	initialLP := player.LP
 
 	// Get Fire handler config
-	config := core.GetBuffHandlerConfig(constants.BuffTypeFire)
+	config := GetBuffHandlerConfig(constants.BuffTypeFire)
 	if config == nil {
 		t.Fatal("Fire should have HandlerConfig")
 	}
@@ -130,7 +130,7 @@ func TestFireBuffHandlerNonBeforeTurnPhase(t *testing.T) {
 	})
 	ctx := event.NewContext(player)
 
-	config := core.GetBuffHandlerConfig(constants.BuffTypeFire)
+	config := GetBuffHandlerConfig(constants.BuffTypeFire)
 	handler := config.Handler
 
 	// Execute in other Phase should be ineffective
@@ -153,7 +153,7 @@ func TestCurseBuffHandlerBehavior(t *testing.T) {
 	})
 	player.LP = 5
 
-	config := core.GetBuffHandlerConfig(constants.BuffTypeCurse)
+	config := GetBuffHandlerConfig(constants.BuffTypeCurse)
 	if config == nil {
 		t.Fatal("Curse should have HandlerConfig")
 	}
@@ -183,7 +183,7 @@ func TestDivineBuffHandlerBehavior(t *testing.T) {
 	})
 	player.LP = 3
 
-	config := core.GetBuffHandlerConfig(constants.BuffTypeDivine)
+	config := GetBuffHandlerConfig(constants.BuffTypeDivine)
 	if config == nil {
 		t.Fatal("Divine should have HandlerConfig")
 	}
@@ -213,7 +213,7 @@ func TestRainBuffHandlerBehavior(t *testing.T) {
 	})
 	player.HP = 6
 
-	config := core.GetBuffHandlerConfig(constants.BuffTypeRain)
+	config := GetBuffHandlerConfig(constants.BuffTypeRain)
 	if config == nil {
 		t.Fatal("Rain should have HandlerConfig")
 	}
@@ -257,7 +257,7 @@ func TestCorruptBuffHandlerBehavior(t *testing.T) {
 	})
 	player.HP = 6
 
-	config := core.GetBuffHandlerConfig(constants.BuffTypeCorrupt)
+	config := GetBuffHandlerConfig(constants.BuffTypeCorrupt)
 	if config == nil {
 		t.Fatal("Corrupt should have HandlerConfig")
 	}
@@ -294,7 +294,7 @@ func TestLostBuffHandlerBehavior(t *testing.T) {
 		ID: id.NewPlayerID(),
 	})
 
-	config := core.GetBuffHandlerConfig(constants.BuffTypeLost)
+	config := GetBuffHandlerConfig(constants.BuffTypeLost)
 	if config == nil {
 		t.Fatal("Lost should have HandlerConfig")
 	}
@@ -324,7 +324,7 @@ func TestLostBuffHandlerOtherPhase(t *testing.T) {
 		ID: id.NewPlayerID(),
 	})
 
-	config := core.GetBuffHandlerConfig(constants.BuffTypeLost)
+	config := GetBuffHandlerConfig(constants.BuffTypeLost)
 	handler := config.Handler
 
 	ctx := event.NewContext(player)
@@ -346,7 +346,7 @@ func TestHiddenBuffHandlerBehavior(t *testing.T) {
 		ID: id.NewPlayerID(),
 	})
 
-	config := core.GetBuffHandlerConfig(constants.BuffTypeHidden)
+	config := GetBuffHandlerConfig(constants.BuffTypeHidden)
 	if config == nil {
 		t.Fatal("Hidden should have HandlerConfig")
 	}
@@ -386,7 +386,7 @@ func TestExorcismBuffHandlerBehavior(t *testing.T) {
 		ID: id.NewPlayerID(),
 	})
 
-	config := core.GetBuffHandlerConfig(constants.BuffTypeExorcism)
+	config := GetBuffHandlerConfig(constants.BuffTypeExorcism)
 	if config == nil {
 		t.Fatal("Exorcism should have HandlerConfig")
 	}
@@ -418,7 +418,7 @@ func TestPoisonBuffHandlerBehavior(t *testing.T) {
 		ID: id.NewPlayerID(),
 	})
 
-	config := core.GetBuffHandlerConfig(constants.BuffTypePoison)
+	config := GetBuffHandlerConfig(constants.BuffTypePoison)
 	if config == nil {
 		t.Fatal("Poison should have HandlerConfig")
 	}

@@ -5,8 +5,6 @@ package net
 import (
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/internal/core"
-	"github.com/b1tAction/paradiced/internal/core/buff"
-	"github.com/b1tAction/paradiced/internal/core/item"
 	"github.com/b1tAction/paradiced/internal/engine"
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
 	"github.com/b1tAction/paradiced/pkg/constants"
@@ -58,8 +56,6 @@ func (b *Builder) BuildStateSync() *pkgnet.StateSync {
 }
 
 // BuildTurnSync builds a turn sync message with all log entries.
-// Client loops through entries and plays animations sequentially.
-// No conversion needed - directly uses GameLog entries.
 func (b *Builder) BuildTurnSync() *pkgnet.TurnSync {
 	entries := b.GetCurrentTurnEntries()
 
@@ -105,18 +101,12 @@ func (b *Builder) BuildPlayer(p *core.Player) pkgnet.Player {
 }
 
 // BuildBuffs builds buff sync data from active buffs.
-// Includes display name from definition.
-func (b *Builder) BuildBuffs(activeBuffs []*buff.Buff) []pkgnet.Buff {
+func (b *Builder) BuildBuffs(activeBuffs []*core.Buff) []pkgnet.Buff {
 	result := make([]pkgnet.Buff, len(activeBuffs))
 	for i, bf := range activeBuffs {
-		def := buff.GetBuffDefinition(bf.Type)
-		name := ""
-		if def != nil {
-			name = def.Name
-		}
 		result[i] = pkgnet.Buff{
 			Type:     string(bf.Type),
-			Name:     name,
+			Name:     engine.GetBuffName(bf.Type),
 			Duration: bf.Duration,
 		}
 	}
@@ -124,49 +114,34 @@ func (b *Builder) BuildBuffs(activeBuffs []*buff.Buff) []pkgnet.Buff {
 }
 
 // BuildItems builds item sync data from inventory.
-// Includes display name from definition.
-func (b *Builder) BuildItems(inventory []*item.Item) []pkgnet.Item {
+func (b *Builder) BuildItems(inventory []*core.Item) []pkgnet.Item {
 	result := make([]pkgnet.Item, len(inventory))
 	for i, it := range inventory {
-		def := item.GetItemDefinition(it.Type)
-		name := ""
-		if def != nil {
-			name = def.Name
-		}
 		result[i] = pkgnet.Item{
 			ID:   it.ID.UUID(),
 			Type: string(it.Type),
-			Name: name,
+			Name: engine.GetItemName(it.Type),
 		}
 	}
 	return result
 }
 
 // BuildAvailable builds available actions for the current player.
-// Includes PhaseAnyTime items and faction skill availability.
 func (b *Builder) BuildAvailable(player *core.Player) *pkgnet.Available {
-	// Build items with names
 	usableItems := make([]pkgnet.Item, 0)
 	for _, it := range player.Inventory {
 		if it.Usable {
-			def := item.GetItemDefinition(it.Type)
-			name := ""
-			if def != nil {
-				name = def.Name
-			}
 			usableItems = append(usableItems, pkgnet.Item{
 				ID:   it.ID.UUID(),
 				Type: string(it.Type),
-				Name: name,
+				Name: engine.GetItemName(it.Type),
 			})
 		}
 	}
 
-	// Check faction skill availability
 	canUseSkill := false
 	switch player.Faction {
 	case constants.FactionQingLong, constants.FactionXuanWu:
-		// 青龙行迹 / 玄武镇厄: requires charge count >= 1
 		canUseSkill = player.GetChargeCount() >= 1
 	}
 

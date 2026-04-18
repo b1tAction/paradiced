@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/b1tAction/paradiced/internal/core"
-	"github.com/b1tAction/paradiced/internal/core/buff"
-	"github.com/b1tAction/paradiced/internal/core/item"
 	"github.com/b1tAction/paradiced/internal/engine"
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
@@ -162,7 +160,7 @@ func TestBuildBuffsWithName(t *testing.T) {
 	builder, _, _ := newTestBuilder()
 
 	player := newTestPlayer(constants.FactionQingLong)
-	divineBuff := buff.NewBuff(constants.BuffTypeDivine, 3)
+	divineBuff := core.NewBuff(constants.BuffTypeDivine, 3)
 	player.AddBuff(divineBuff)
 
 	buffs := builder.BuildBuffs(player.ActiveBuffs)
@@ -185,7 +183,7 @@ func TestBuildItemsWithName(t *testing.T) {
 	builder, _, _ := newTestBuilder()
 
 	player := newTestPlayer(constants.FactionQingLong)
-	anyDoorItem := item.NewItem(constants.ItemTypeAnyDoor)
+	anyDoorItem := core.NewItem(constants.ItemTypeAnyDoor)
 	player.AddItem(anyDoorItem)
 
 	items := builder.BuildItems(player.Inventory)
@@ -205,7 +203,7 @@ func TestBuildAvailable(t *testing.T) {
 	builder, game, hsmInstance := newTestBuilder()
 
 	player := newTestPlayer(constants.FactionQingLong)
-	anyDoorItem := item.NewItem(constants.ItemTypeAnyDoor)
+	anyDoorItem := core.NewItem(constants.ItemTypeAnyDoor)
 	anyDoorItem.Usable = true
 	player.AddItem(anyDoorItem)
 	game.AddPlayer(player)

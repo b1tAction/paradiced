@@ -6,7 +6,7 @@ import (
 
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/engine"
-	"github.com/b1tAction/paradiced/pkg/event"
+	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/pkg/id"
 )
 

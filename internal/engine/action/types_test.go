@@ -4,9 +4,8 @@ import (
 	"testing"
 
 	"github.com/b1tAction/paradiced/internal/core"
-	"github.com/b1tAction/paradiced/internal/core/buff"
+	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
-	"github.com/b1tAction/paradiced/pkg/event"
 	"github.com/b1tAction/paradiced/pkg/id"
 )
 
@@ -291,8 +290,8 @@ func TestAddBuffAction(t *testing.T) {
 
 func TestRemoveBuffAction(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
-	player.AddBuff(buff.NewBuff(constants.BuffTypeCurse, 2))
-	player.AddBuff(buff.NewBuff(constants.BuffTypeDivine, 3))
+	player.AddBuff(core.NewBuff(constants.BuffTypeCurse, 2))
+	player.AddBuff(core.NewBuff(constants.BuffTypeDivine, 3))
 
 	if len(player.ActiveBuffs) != 2 {
 		t.Error("Setup: player should have 2 buffs")
@@ -344,8 +343,8 @@ func TestTeleportAction(t *testing.T) {
 func TestStealBuffAction(t *testing.T) {
 	target := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	source := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
-	target.AddBuff(buff.NewBuff(constants.BuffTypeCurse, 2))
-	target.AddBuff(buff.NewBuff(constants.BuffTypeDivine, 3))
+	target.AddBuff(core.NewBuff(constants.BuffTypeCurse, 2))
+	target.AddBuff(core.NewBuff(constants.BuffTypeDivine, 3))
 
 	action := NewStealBuffAction(target, source, "Faction_BaiHu")
 
@@ -613,5 +612,407 @@ func TestRespawnActionPreTriggerPhase(t *testing.T) {
 	// RespawnAction now has PhasePreRespawn for interception
 	if action.PreTriggerPhase() != constants.PhasePreRespawn {
 		t.Errorf("RespawnAction PreTriggerPhase should be PhasePreRespawn, got %s", string(action.PreTriggerPhase()))
+	}
+}
+
+// ========== ModifyLPAction Full Coverage Tests ==========
+
+func TestModifyLPActionFull(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.LP = 5
+
+	action := NewModifyLPAction(player, 1, "Buff_Divine")
+
+	// Test all methods
+	if action.Type() != ActionModifyLP {
+		t.Errorf("Type should be ActionModifyLP, got %s", action.Type())
+	}
+	if action.Source() != "Buff_Divine" {
+		t.Errorf("Source should be Buff_Divine, got %s", action.Source())
+	}
+	if action.Target() != player.ID.UUID() {
+		t.Errorf("Target mismatch")
+	}
+	if action.PreTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PreTriggerPhase should be PhaseAnyTime, got %s", action.PreTriggerPhase())
+	}
+	if action.PostTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PostTriggerPhase should be PhaseAnyTime, got %s", action.PostTriggerPhase())
+	}
+
+	ctx := NewActionContext(nil, nil, nil, nil)
+	action.Execute(ctx)
+
+	entry := action.LogEntry()
+	if entry.ActionType != "modify_lp" {
+		t.Errorf("Log ActionType should be modify_lp, got %s", entry.ActionType)
+	}
+	if entry.Delta != 1 {
+		t.Errorf("Log delta should be 1, got %d", entry.Delta)
+	}
+}
+
+func TestModifyLPActionZeroAmount(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.LP = 5
+
+	action := NewModifyLPAction(player, 0, "Test")
+
+	ctx := NewActionContext(nil, nil, nil, nil)
+	action.Execute(ctx)
+
+	// Zero amount should not change LP
+	if player.LP != 5 {
+		t.Errorf("LP should remain 5, got %d", player.LP)
+	}
+}
+
+// ========== MoveAction Full Coverage Tests ==========
+
+func TestMoveActionFull(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.Position = 10
+
+	action := NewMoveAction(player, 5, "DiceRoll")
+
+	// Test all methods
+	if action.Type() != ActionMove {
+		t.Errorf("Type should be ActionMove, got %s", action.Type())
+	}
+	if action.Source() != "DiceRoll" {
+		t.Errorf("Source should be DiceRoll, got %s", action.Source())
+	}
+	if action.Target() != player.ID.UUID() {
+		t.Errorf("Target mismatch")
+	}
+	if action.PreTriggerPhase() != constants.PhasePreMove {
+		t.Errorf("PreTriggerPhase should be PhasePreMove, got %s", action.PreTriggerPhase())
+	}
+	if action.PostTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PostTriggerPhase should be PhaseAnyTime, got %s", action.PostTriggerPhase())
+	}
+	if !action.CanModify() {
+		t.Error("MoveAction should be modifiable when Steps != 0")
+	}
+}
+
+func TestMoveActionOvertook(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	other := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+
+	action := NewMoveAction(player, 5, "DiceRoll")
+
+	// Initially no overtaken players
+	if action.Overtook(other) {
+		t.Error("Should not have overtaken initially")
+	}
+
+	// Add overtaken player
+	action.Overtaken = []*core.Player{other}
+
+	if !action.Overtook(other) {
+		t.Error("Should have overtaken the other player")
+	}
+}
+
+// ========== HealAction Full Coverage Tests ==========
+
+func TestHealActionFull(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 100})
+	player.HP = 50
+
+	action := NewHealAction(player, 30, "Buff_Rain")
+
+	// Test all methods
+	if action.Type() != ActionHeal {
+		t.Errorf("Type should be ActionHeal, got %s", action.Type())
+	}
+	if action.Source() != "Buff_Rain" {
+		t.Errorf("Source should be Buff_Rain, got %s", action.Source())
+	}
+	if action.Target() != player.ID.UUID() {
+		t.Errorf("Target mismatch")
+	}
+	if action.PreTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PreTriggerPhase should be PhaseAnyTime, got %s", action.PreTriggerPhase())
+	}
+	if action.PostTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PostTriggerPhase should be PhaseAnyTime, got %s", action.PostTriggerPhase())
+	}
+
+	ctx := NewActionContext(nil, nil, nil, nil)
+	action.Execute(ctx)
+
+	entry := action.LogEntry()
+	if entry.ActionType != "heal" {
+		t.Errorf("Log ActionType should be heal, got %s", entry.ActionType)
+	}
+}
+
+func TestHealActionZeroAmount(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 100})
+	player.HP = 50
+
+	action := NewHealAction(player, 0, "Test")
+
+	ctx := NewActionContext(nil, nil, nil, nil)
+	action.Execute(ctx)
+
+	// Zero amount should not change HP
+	if player.HP != 50 {
+		t.Errorf("HP should remain 50, got %d", player.HP)
+	}
+}
+
+// ========== AddBuffAction Full Coverage Tests ==========
+
+func TestAddBuffActionFull(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+
+	action := NewAddBuffAction(player, constants.BuffTypeDivine, 3, "Event_Gift")
+
+	// Test all methods
+	if action.Type() != ActionAddBuff {
+		t.Errorf("Type should be ActionAddBuff, got %s", action.Type())
+	}
+	if action.Source() != "Event_Gift" {
+		t.Errorf("Source should be Event_Gift, got %s", action.Source())
+	}
+	if action.Target() != player.ID.UUID() {
+		t.Errorf("Target mismatch")
+	}
+	if action.PreTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PreTriggerPhase should be PhaseAnyTime, got %s", action.PreTriggerPhase())
+	}
+	if action.PostTriggerPhase() != constants.PhaseOnBuffApplied {
+		t.Errorf("PostTriggerPhase should be PhaseOnBuffApplied, got %s", action.PostTriggerPhase())
+	}
+
+	ctx := NewActionContext(nil, nil, nil, nil)
+	action.Execute(ctx)
+
+	entry := action.LogEntry()
+	if entry.ActionType != "add_buff" {
+		t.Errorf("Log ActionType should be add_buff, got %s", entry.ActionType)
+	}
+}
+
+// ========== RemoveBuffAction Full Coverage Tests ==========
+
+func TestRemoveBuffActionFull(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.AddBuff(core.NewBuff(constants.BuffTypeCurse, 2))
+
+	action := NewRemoveBuffAction(player, constants.BuffTypeCurse, "Manual")
+
+	// Test all methods
+	if action.Type() != ActionRemoveBuff {
+		t.Errorf("Type should be ActionRemoveBuff, got %s", action.Type())
+	}
+	if action.Source() != "Manual" {
+		t.Errorf("Source should be Manual, got %s", action.Source())
+	}
+	if action.Target() != player.ID.UUID() {
+		t.Errorf("Target mismatch")
+	}
+	if action.PreTriggerPhase() != constants.PhaseOnBuffRemoved {
+		t.Errorf("PreTriggerPhase should be PhaseOnBuffRemoved, got %s", action.PreTriggerPhase())
+	}
+	if action.PostTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PostTriggerPhase should be PhaseAnyTime, got %s", action.PostTriggerPhase())
+	}
+
+	ctx := NewActionContext(nil, nil, nil, nil)
+	action.Execute(ctx)
+
+	entry := action.LogEntry()
+	if entry.ActionType != "remove_buff" {
+		t.Errorf("Log ActionType should be remove_buff, got %s", entry.ActionType)
+	}
+}
+
+// ========== TeleportAction Full Coverage Tests ==========
+
+func TestTeleportActionFull(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.Position = 5
+
+	action := NewTeleportAction(player, 20, "Item_Door")
+
+	// Test all methods
+	if action.Type() != ActionTeleport {
+		t.Errorf("Type should be ActionTeleport, got %s", action.Type())
+	}
+	if action.Source() != "Item_Door" {
+		t.Errorf("Source should be Item_Door, got %s", action.Source())
+	}
+	if action.Target() != player.ID.UUID() {
+		t.Errorf("Target mismatch")
+	}
+	if action.PreTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PreTriggerPhase should be PhaseAnyTime, got %s", action.PreTriggerPhase())
+	}
+	if action.PostTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PostTriggerPhase should be PhaseAnyTime, got %s", action.PostTriggerPhase())
+	}
+
+	ctx := NewActionContext(nil, nil, nil, nil)
+	action.Execute(ctx)
+
+	entry := action.LogEntry()
+	if entry.ActionType != "teleport" {
+		t.Errorf("Log ActionType should be teleport, got %s", entry.ActionType)
+	}
+}
+
+// ========== StealBuffAction Full Coverage Tests ==========
+
+func TestStealBuffActionFull(t *testing.T) {
+	target := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	source := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	target.AddBuff(core.NewBuff(constants.BuffTypeDivine, 3))
+
+	action := NewStealBuffAction(target, source, "Faction_BaiHu")
+
+	// Test all methods
+	if action.Type() != ActionStealBuff {
+		t.Errorf("Type should be ActionStealBuff, got %s", action.Type())
+	}
+	if action.Source() != "Faction_BaiHu" {
+		t.Errorf("Source should be Faction_BaiHu, got %s", action.Source())
+	}
+	if action.Target() != target.ID.UUID() {
+		t.Errorf("Target mismatch")
+	}
+	if action.PreTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PreTriggerPhase should be PhaseAnyTime, got %s", action.PreTriggerPhase())
+	}
+	if action.PostTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PostTriggerPhase should be PhaseAnyTime, got %s", action.PostTriggerPhase())
+	}
+
+	ctx := NewActionContext(nil, nil, nil, nil)
+	action.Execute(ctx)
+
+	entry := action.LogEntry()
+	if entry.ActionType != "steal_buff" {
+		t.Errorf("Log ActionType should be steal_buff, got %s", entry.ActionType)
+	}
+}
+
+// ========== DrawEventAction Tests ==========
+
+func TestDrawEventAction(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+
+	action := NewDrawEventAction(player, "EventCard")
+
+	// Test all methods
+	if action.Type() != ActionDrawEvent {
+		t.Errorf("Type should be ActionDrawEvent, got %s", action.Type())
+	}
+	if !action.CanModify() {
+		t.Error("DrawEventAction should be modifiable")
+	}
+	if action.Source() != "EventCard" {
+		t.Errorf("Source should be EventCard, got %s", action.Source())
+	}
+	if action.Target() != player.ID.UUID() {
+		t.Errorf("Target mismatch")
+	}
+	if action.PreTriggerPhase() != constants.PhasePreEvent {
+		t.Errorf("PreTriggerPhase should be PhasePreEvent, got %s", action.PreTriggerPhase())
+	}
+	if action.PostTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PostTriggerPhase should be PhaseAnyTime, got %s", action.PostTriggerPhase())
+	}
+
+	// Execute without DrawEngine (placeholder)
+	ctx := NewActionContext(nil, nil, nil, nil)
+	action.Execute(ctx)
+
+	entry := action.LogEntry()
+	if entry.ActionType != "draw_event" {
+		t.Errorf("Log ActionType should be draw_event, got %s", entry.ActionType)
+	}
+}
+
+// ========== FellDownAction Full Coverage Tests ==========
+
+func TestFellDownActionFull(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.HP = 10
+
+	action := NewFellDownAction(player, 30, 1, "FragileCell")
+
+	// Test all methods
+	if action.Type() != ActionFellDown {
+		t.Errorf("Type should be ActionFellDown, got %s", action.Type())
+	}
+	if action.Source() != "FragileCell" {
+		t.Errorf("Source should be FragileCell, got %s", action.Source())
+	}
+	if action.Target() != player.ID.UUID() {
+		t.Errorf("Target mismatch")
+	}
+	if action.PreTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PreTriggerPhase should be PhaseAnyTime, got %s", action.PreTriggerPhase())
+	}
+	if action.PostTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PostTriggerPhase should be PhaseAnyTime, got %s", action.PostTriggerPhase())
+	}
+
+	ctx := NewActionContext(nil, nil, nil, nil)
+	action.Execute(ctx)
+
+	entry := action.LogEntry()
+	if entry.ActionType != "fell_down" {
+		t.Errorf("Log ActionType should be fell_down, got %s", entry.ActionType)
+	}
+}
+
+func TestFellDownActionZeroDamage(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.HP = 10
+
+	action := NewFellDownAction(player, 30, 0, "FragileCell")
+
+	ctx := NewActionContext(nil, nil, nil, nil)
+	action.Execute(ctx)
+
+	// Zero damage should not change HP
+	if player.HP != 10 {
+		t.Errorf("HP should remain 10, got %d", player.HP)
+	}
+}
+
+// ========== RespawnAction Full Coverage Tests ==========
+
+func TestRespawnActionFull(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.IsDead = true
+
+	action := NewRespawnAction(player, 50, "DeathRespawn")
+
+	// Test all methods
+	if action.Type() != ActionRespawn {
+		t.Errorf("Type should be ActionRespawn, got %s", action.Type())
+	}
+	if action.Source() != "DeathRespawn" {
+		t.Errorf("Source should be DeathRespawn, got %s", action.Source())
+	}
+	if action.Target() != player.ID.UUID() {
+		t.Errorf("Target mismatch")
+	}
+	if action.PostTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PostTriggerPhase should be PhaseAnyTime, got %s", action.PostTriggerPhase())
+	}
+
+	ctx := NewActionContext(nil, nil, nil, nil)
+	action.Execute(ctx)
+
+	entry := action.LogEntry()
+	if entry.ActionType != "respawn" {
+		t.Errorf("Log ActionType should be respawn, got %s", entry.ActionType)
 	}
 }

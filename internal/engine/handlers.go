@@ -4,15 +4,15 @@ package engine
 import (
 	"github.com/b1tAction/paradiced/internal/core"
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
+	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
-	"github.com/b1tAction/paradiced/pkg/event"
 )
 
 // ========== Buff Action Creation ==========
 
 // createBuffAction creates an Action closure when Buff triggers.
 // Uses BuffHandlerConfig.Handler for effect execution.
-func createBuffAction(buffInstance *core.Buff, def *core.BuffDefinition, config *core.BuffHandlerConfig, phase constants.Phase, player *core.Player) func(ctx *event.Context) {
+func createBuffAction(buffInstance *core.Buff, def *core.BuffDefinition, config *BuffHandlerConfig, phase constants.Phase, player *core.Player) func(ctx *event.Context) {
 	return func(ctx *event.Context) {
 		// Get ActionContext from event.Context (set by caller before Publish)
 		actionCtxVal, ok := ctx.Get("action_context")
@@ -36,7 +36,7 @@ func createBuffAction(buffInstance *core.Buff, def *core.BuffDefinition, config 
 
 // createItemAction creates an Action closure when Item triggers.
 // Uses ItemHandlerConfig.Handler for effect execution.
-func createItemAction(itemInstance *core.Item, def *core.ItemDefinition, config *core.ItemHandlerConfig, player *core.Player) func(ctx *event.Context) {
+func createItemAction(itemInstance *core.Item, def *core.ItemDefinition, config *ItemHandlerConfig, player *core.Player) func(ctx *event.Context) {
 	return func(ctx *event.Context) {
 		// Get ActionContext from event.Context
 		actionCtxVal, ok := ctx.Get("action_context")

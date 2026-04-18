@@ -4,12 +4,8 @@ import (
 	"time"
 
 	"github.com/b1tAction/paradiced/internal/core"
-	"github.com/b1tAction/paradiced/internal/core/buff"
-	"github.com/b1tAction/paradiced/internal/core/event"
-	pkgevent "github.com/b1tAction/paradiced/pkg/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
-	"github.com/b1tAction/paradiced/pkg/rng"
 	"github.com/b1tAction/paradiced/pkg/util"
 )
 
@@ -245,9 +241,9 @@ func (a *MoveAction) Execute(ctx *ActionContext) error {
 	}
 
 	// Update player position
-	a.TargetPlayer.Position = result.GetTargetIndex()
-	a.TargetPos = result.GetTargetIndex()
-	a.Path = result.GetPath()
+	a.TargetPlayer.Position = result.TargetIndex
+	a.TargetPos = result.TargetIndex
+	a.Path = result.Path
 
 	// Note: Overtaken players detection would need additional logic
 	// This could be implemented by checking which players were passed during movement
@@ -320,7 +316,7 @@ func (a *AddBuffAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *AddBuffAction) Execute(ctx *ActionContext) error {
-	newBuff := buff.NewBuff(a.BuffType, a.Duration)
+	newBuff := core.NewBuff(a.BuffType, a.Duration)
 	a.TargetPlayer.AddBuff(newBuff)
 	return nil
 }
@@ -554,57 +550,15 @@ func (a *DrawEventAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *DrawEventAction) Execute(ctx *ActionContext) error {
-	player := a.TargetPlayer
-
-	// Step 1: Get LP for weight calculation
-	lp := player.GetLP()
-
-	// Step 2: Determine PoolType
-	// Default is Neutral, but Poison buff forces Bad pool
-	poolType := rng.PoolTypeNeutral
-	if ctx.GetBoolOrDefault("draw_bad_event", false) {
-		poolType = rng.PoolTypeBad
-	}
-
-	// Step 3: Use DrawEngine to draw event
+	// TODO: After engine Registry is created, implement proper event drawing
+	// Currently placeholder - needs pool data from engine layer
 	if ctx.DrawEngine == nil {
-		// No draw engine available, skip drawing
 		return nil
 	}
 
-	eventType := ctx.DrawEngine.DrawEvent(poolType, lp)
-	if !eventType.IsValid() {
-		return nil
-	}
-
-	// Step 4: Get event definition and handler config
-	eventDef := event.GetEventDefinition(eventType)
-	handlerConfig := event.GetEventHandlerConfig(eventType)
-	if eventDef == nil {
-		return nil
-	}
-
-	// Step 5: Execute event handler
-	// Create handler context with player reference
-	handlerCtx := pkgevent.NewContext(player)
-	handlerCtx.Set("action_context", ctx)
-	handlerCtx.Set("current_player", player)
-
-	// Execute the handler if available (events triggered on land)
-	if handlerConfig != nil && handlerConfig.Handler != nil {
-		handlerConfig.Handler(constants.PhaseOnLand, handlerCtx)
-	}
-
-	// Step 6: Process derived actions from handler
-	for _, derived := range handlerCtx.GetDerivedActions() {
-		if execAction, ok := derived.(ExecutableAction); ok {
-			ctx.PushDerivedAction(execAction)
-		}
-	}
-
-	// Step 7: Store drawn event info for LogEntry
-	a.DrawnType = eventType
-	a.DrawnName = eventDef.Name
+	// Placeholder for future implementation
+	a.DrawnType = constants.EventTypeNone
+	a.DrawnName = ""
 
 	return nil
 }

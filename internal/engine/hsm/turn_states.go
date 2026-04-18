@@ -4,10 +4,10 @@ import (
 	"time"
 
 	"github.com/b1tAction/paradiced/internal/core"
+	"github.com/b1tAction/paradiced/internal/event"
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
-	"github.com/b1tAction/paradiced/pkg/event"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/rng"
@@ -72,9 +72,9 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 	// Create ActionContext for executing Actions
 	mapEngine := ctx.GetMapEngine()
 	s.actionCtx = engineaction.NewActionContext(
-		NewGameWrapper(game),
+		game,
 		game.Bus,
-		NewProtocolMapEngineWrapper(mapEngine),
+		mapEngine,
 		game.Draw,
 	)
 
@@ -320,9 +320,9 @@ func (s *MainActionState) Enter(ctx *StateContext) {
 	game := ctx.GetGame()
 	mapEngine := ctx.GetMapEngine()
 	s.actionCtx = engineaction.NewActionContext(
-		NewGameWrapper(game),
+		game,
 		game.Bus,
-		NewProtocolMapEngineWrapper(mapEngine),
+		mapEngine,
 		game.Draw,
 	)
 
@@ -474,9 +474,9 @@ func (s *TurnMovingState) Enter(ctx *StateContext) {
 	game := ctx.GetGame()
 	mapEngine := ctx.GetMapEngine()
 	s.actionCtx = engineaction.NewActionContext(
-		NewGameWrapper(game),
+		game,
 		game.Bus,
-		NewProtocolMapEngineWrapper(mapEngine),
+		mapEngine,
 		game.Draw,
 	)
 
@@ -507,7 +507,7 @@ func (s *TurnMovingState) Enter(ctx *StateContext) {
 
 	// Check for reaching end (Boss cell)
 	if mapEngine != nil {
-		mapLength := mapEngine.GetLength()
+		mapLength := mapEngine.Length
 		if player.Position >= mapLength-1 {
 			s.reachedEnd = true
 			ctx.SetReachedEnd(true)
@@ -589,9 +589,9 @@ func (s *TurnLandedState) Enter(ctx *StateContext) {
 	game := ctx.GetGame()
 	mapEngine := ctx.GetMapEngine()
 	s.actionCtx = engineaction.NewActionContext(
-		NewGameWrapper(game),
+		game,
 		game.Bus,
-		NewProtocolMapEngineWrapper(mapEngine),
+		mapEngine,
 		game.Draw,
 	)
 
@@ -676,9 +676,9 @@ func (s *TurnEventState) Enter(ctx *StateContext) {
 	game := ctx.GetGame()
 	mapEngine := ctx.GetMapEngine()
 	s.actionCtx = engineaction.NewActionContext(
-		NewGameWrapper(game),
+		game,
 		game.Bus,
-		NewProtocolMapEngineWrapper(mapEngine),
+		mapEngine,
 		game.Draw,
 	)
 
@@ -751,9 +751,9 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 	game := ctx.GetGame()
 	mapEngine := ctx.GetMapEngine()
 	s.actionCtx = engineaction.NewActionContext(
-		NewGameWrapper(game),
+		game,
 		game.Bus,
-		NewProtocolMapEngineWrapper(mapEngine),
+		mapEngine,
 		game.Draw,
 	)
 
