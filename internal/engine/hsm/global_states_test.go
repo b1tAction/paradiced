@@ -19,8 +19,8 @@ func TestStateMatchInit(t *testing.T) {
 	game := engine.NewGame(id.NewGameID(), 0)
 	ctx := NewStateContext().WithHSM(NewHSM(game))
 	state.Enter(ctx)
-	if !ctx.Success {
-		t.Error("Enter should set Success = true")
+	if ctx.Error != nil {
+		t.Errorf("Enter should succeed, got error: %v", ctx.Error)
 	}
 	if !ctx.GetBoolOrDefault(KeyInitialized, false) {
 		t.Error("Enter should set initialized metadata")
@@ -149,7 +149,8 @@ func TestStateTurnLoop(t *testing.T) {
 	game.AddPlayer(core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()}))
 	game.AddPlayer(core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()}))
 
-	ctx := NewStateContext().WithHSM(NewHSM(game))
+	hsmInst := NewHSM(game)
+	ctx := NewStateContext().WithHSM(hsmInst)
 
 	state.Enter(ctx)
 
@@ -159,16 +160,23 @@ func TestStateTurnLoop(t *testing.T) {
 	if state.currentPlayerIndex != 0 {
 		t.Errorf("currentPlayerIndex should be 0, got %d", state.currentPlayerIndex)
 	}
-
-	nextID := state.Update(ctx)
-	if nextID != StateNone {
-		t.Errorf("Update should return StateNone while in loop, got %s", nextID.String())
+	if !state.pendingTurnStart {
+		t.Error("pendingTurnStart should be true after Enter")
 	}
 
-	// Start first player turn
-	nextID = state.StartPlayerTurn(ctx)
+	// First Update should auto-start first player turn
+	nextID := state.Update(ctx)
 	if nextID != StateTurnUpkeep {
-		t.Errorf("StartPlayerTurn should return TurnUpkeep, got %s", nextID.String())
+		t.Errorf("First Update should return TurnUpkeep, got %s", nextID.String())
+	}
+	if state.pendingTurnStart {
+		t.Error("pendingTurnStart should be false after Update")
+	}
+
+	// After first turn started, Update should return StateNone
+	nextID = state.Update(ctx)
+	if nextID != StateNone {
+		t.Errorf("Update should return StateNone after first turn started, got %s", nextID.String())
 	}
 
 	state.OnTurnComplete(ctx)
@@ -270,8 +278,8 @@ func TestStateGameOver(t *testing.T) {
 	if state.winner == nil {
 		t.Error("winner should be set")
 	}
-	if !ctx.Success {
-		t.Error("Success should be true")
+	if ctx.Error != nil {
+		t.Errorf("Enter should succeed, got error: %v", ctx.Error)
 	}
 	if !ctx.GetBoolOrDefault(KeyGameOver, false) {
 		t.Error("game_over should be true")

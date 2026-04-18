@@ -88,10 +88,13 @@ func TestNewPlayerZhuQue(t *testing.T) {
 	}
 
 	player := NewPlayer(config)
-	// ZhuQue player should have Fire buff
-	if !player.HasBuff(constants.BuffTypeFire) {
-		t.Error("ZhuQue player should have Fire buff initially")
+	// Note: ZhuQue Fire buff is now added by game.InitializePlayerFactionBuffs()
+	// during match initialization, not in NewPlayer. This keeps core layer pure.
+	// The test here verifies player creation works for ZhuQue faction.
+	if player.Faction != constants.FactionZhuQue {
+		t.Error("Player faction should be ZhuQue")
 	}
+	// Fire buff will be added later via engine layer
 }
 
 func TestNewPlayerDefaultConfig(t *testing.T) {
@@ -475,18 +478,9 @@ func TestGetItem(t *testing.T) {
 
 // ========== Faction Skill Tests ==========
 
-func TestTriggerFactionSkillZhuQue(t *testing.T) {
-	player := NewPlayer(PlayerConfig{
-		ID:      id.NewPlayerID(),
-		Faction: constants.FactionZhuQue,
-		MaxLP:   5,
-	})
-
-	// ZhuQue passive is Fire buff, added on creation
-	if !player.HasBuff(constants.BuffTypeFire) {
-		t.Error("ZhuQue should have Fire buff")
-	}
-}
+// Note: ZhuQue Fire buff is now added by game.InitializePlayerFactionBuffs()
+// during match initialization, not in NewPlayer. This keeps core layer pure.
+// Fire buff behavior tests are in engine package.
 
 // Note: faction passive skill trigger logic moved to engine package,
 // handled via EventBus + Decision system.

@@ -257,22 +257,30 @@ func TestGameSubscribeBuffByPlayerAdd(t *testing.T) {
 	playerID := id.NewPlayerID()
 	player := core.NewPlayer(core.PlayerConfig{
 		ID:      playerID,
-		Faction: constants.FactionZhuQue, // 朱雀初始携带离火 Buff
+		Faction: constants.FactionZhuQue, // ZhuQue faction
 	})
 
-	// 朱雀玩家初始有离火 Buff（永久被动）
+	// Add player to game (no Fire buff yet - added by InitializePlayerFactionBuffs)
 	game.AddPlayer(player)
 
-	// 验证玩家有离火 Buff
-	if !player.HasBuff(constants.BuffTypeFire) {
-		t.Error("ZhuQue player should have Fire buff")
+	// Verify player has no Fire buff initially (core layer is pure)
+	if player.HasBuff(constants.BuffTypeFire) {
+		t.Error("Player should not have Fire buff before InitializePlayerFactionBuffs")
 	}
 
-	// 离火现在使用 BeforeTurn，需要订阅
+	// Initialize faction buffs (adds ZhuQue Fire buff)
+	game.InitializePlayerFactionBuffs(player)
+
+	// Verify player now has Fire buff
+	if !player.HasBuff(constants.BuffTypeFire) {
+		t.Error("ZhuQue player should have Fire buff after InitializePlayerFactionBuffs")
+	}
+
+	// Fire buff should be subscribed to BeforeTurn
 	config := GetBuffHandlerConfig(constants.BuffTypeFire)
 	for _, phase := range config.GetPhases() {
 		if phase.NeedsSubscription() {
-			// BeforeTurn 需要订阅
+			// BeforeTurn needs subscription
 			if game.Bus.GetSubscriptionCount() != 1 {
 				t.Errorf("Fire Buff should subscribe to BeforeTurn, count = %d", game.Bus.GetSubscriptionCount())
 			}

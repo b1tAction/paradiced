@@ -67,11 +67,6 @@ func NewPlayer(config PlayerConfig) *Player {
 		Metadata:    util.NewMetadata(),
 	}
 
-	// ZhuQue朱雀 faction starts with Fire离火 buff
-	if config.Faction == constants.FactionZhuQue {
-		player.AddBuff(NewBuff(constants.BuffTypeFire, -1))
-	}
-
 	return player
 }
 

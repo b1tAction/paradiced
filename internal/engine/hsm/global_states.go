@@ -2,6 +2,7 @@ package hsm
 
 import (
 	"github.com/b1tAction/paradiced/internal/core"
+	"github.com/b1tAction/paradiced/internal/gamemap"
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/b1tAction/paradiced/pkg/rng"
@@ -40,14 +41,63 @@ func NewMatchInitState() *MatchInitState {
 }
 
 func (s *MatchInitState) Enter(ctx *StateContext) {
-	// Initialize match:
-	// 1. Generate map
-	// 2. Assign player factions
-	// 3. ZhuQue players get Fire buff
-	// 4. Initialize EventBus subscriptions
+	game := ctx.GetGame()
+	mapEngine := ctx.GetMapEngine()
 
-	ctx.Success = true
+	if game == nil {
+		ctx.Error = NewStateError(StateMatchInit, "game is nil")
+		return
+	}
+
+	// 1. Generate map - configure special cells
+	if mapEngine != nil {
+		cellConfigs := generateDefaultMapConfig(mapEngine.Length)
+		if err := mapEngine.GenerateLinearMap(cellConfigs); err != nil {
+			ctx.Error = NewStateError(StateMatchInit, err.Error())
+			return
+		}
+	}
+
+	// 2. Initialize faction-specific buffs for all players
+	// Uses ApplyBuffToPlayer for complete lifecycle (AddBuff + Subscribe + Broadcast)
+	for _, player := range game.Players {
+		game.InitializePlayerFactionBuffs(player)
+	}
+
+	// 3. Broadcast initial state sync
+	if ctx.Broadcast != nil && ctx.Builder != nil {
+		stateSync := ctx.Builder.BuildStateSync()
+		ctx.Broadcast.BroadcastStateSync(stateSync)
+	}
+
 	ctx.SetBool(KeyInitialized, true)
+}
+
+// generateDefaultMapConfig creates default map cell configurations.
+// Fragile cells every 15 positions, Fog cells every 10 positions,
+// Checkpoint every 25 positions, Boss cell at end.
+func generateDefaultMapConfig(length int) map[int]gamemap.CellType {
+	configs := make(map[int]gamemap.CellType)
+
+	// Fog cells (迷雾) - every 10 positions
+	for i := 10; i < length-10; i += 10 {
+		configs[i] = gamemap.CellTypeFog
+	}
+
+	// Fragile cells (易碎) - every 15 positions
+	for i := 15; i < length-15; i += 15 {
+		configs[i] = gamemap.CellTypeFragile
+	}
+
+	// Checkpoint cells (检查点) - every 25 positions
+	for i := 25; i < length-25; i += 25 {
+		configs[i] = gamemap.CellTypeCheckpoint
+	}
+
+	// Boss cell at end
+	configs[length-1] = gamemap.CellTypeBoss
+
+	return configs
 }
 
 func (s *MatchInitState) Update(ctx *StateContext) StateID {
@@ -162,8 +212,6 @@ func (s *RoundPrepState) Enter(ctx *StateContext) {
 	// round=1 is the first round, round++ happens when round completes
 	// Use HSM's round counter via context
 	_ = ctx.GetRound() // Current round (1 for first round)
-
-	ctx.Success = true
 }
 
 func (s *RoundPrepState) Update(ctx *StateContext) StateID {
@@ -183,6 +231,7 @@ type TurnLoopState struct {
 	currentPlayerIndex int
 	turnsCompleted     int
 	reachedEnd         bool
+	pendingTurnStart   bool // Flag to start first player turn
 }
 
 // NewTurnLoopState creates a new TurnLoop state.
@@ -192,17 +241,26 @@ func NewTurnLoopState() *TurnLoopState {
 		currentPlayerIndex: 0,
 		turnsCompleted:     0,
 		reachedEnd:         false,
+		pendingTurnStart:   false,
 	}
 }
 
 func (s *TurnLoopState) Enter(ctx *StateContext) {
-	// Initialize turn queue
-	// First player starts their turn
 	game := ctx.GetGame()
 	players := game.Players
+
+	// Reset state
+	s.currentPlayerIndex = 0
+	s.turnsCompleted = 0
+	s.reachedEnd = false
+
 	if len(players) > 0 {
-		// Set turn index via HSM
+		// Set first player as current turn player
 		ctx.SetTurn(0)
+		ctx.HSM.SetTurnPlayer(players[0])
+
+		// Mark that we need to start first turn (handled in Update)
+		s.pendingTurnStart = true
 	}
 
 	ctx.SetBool(KeyTurnLoopActive, true)
@@ -217,11 +275,16 @@ func (s *TurnLoopState) Update(ctx *StateContext) StateID {
 		return StateBossBattle
 	}
 
-	// Check if turn state should be entered
-	// If not in turn state, enter first turn state
-	// This will be controlled by external game loop calling TurnLoop.StartPlayerTurn()
+	// Auto-start first player turn if pending
+	if s.pendingTurnStart {
+		s.pendingTurnStart = false
+		return s.StartPlayerTurn(ctx)
+	}
 
-	return StateNone // Stay in TurnLoop, wait for turn completion
+	// Stay in TurnLoop, wait for turn completion
+	// TurnEndState.Update() returns StateNone, external controller (MatchLoop)
+	// calls OnTurnComplete and StartPlayerTurn
+	return StateNone
 }
 
 func (s *TurnLoopState) Exit(ctx *StateContext) {
@@ -358,7 +421,6 @@ func (s *GameOverState) Enter(ctx *StateContext) {
 		}
 	}
 
-	ctx.Success = true
 	ctx.SetBool(KeyGameOver, true)
 
 	// Broadcast GameOver to all clients

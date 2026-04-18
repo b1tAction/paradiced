@@ -239,6 +239,25 @@ func (g *Game) UnsubscribeItem(item *core.Item) {
 	g.Bus.UnsubscribeBySource(item.ID.UUID())
 }
 
+// ========== Faction Initialization ==========
+
+// InitializePlayerFactionBuffs adds faction-specific buffs to players.
+// Called during match initialization after EventBus is ready.
+// Uses ApplyBuffToPlayer for complete lifecycle (AddBuff + Subscribe + Broadcast).
+func (g *Game) InitializePlayerFactionBuffs(player *core.Player) {
+	if player == nil {
+		return
+	}
+
+	faction := player.GetFaction()
+	switch faction {
+	case constants.FactionZhuQue:
+		// ZhuQue朱雀: Fire离火 buff (permanent, LP+1 every 4 turns)
+		fireBuff := core.NewBuff(constants.BuffTypeFire, -1)
+		g.ApplyBuffToPlayer(player, fireBuff)
+	}
+}
+
 // ========== Buff Lifecycle Management ==========
 
 // ApplyBuffToPlayer adds Buff to player and handles complete lifecycle.
