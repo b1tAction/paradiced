@@ -14,7 +14,6 @@ services:
       - "26257:26257"
       - "8080:8080"
     healthcheck:
-      # 探针：确保 CockroachDB 完全启动并准备好接受连接
       test: ["CMD", "curl", "-f", "http://localhost:8080/health?ready=1"]
       interval: 3s
       timeout: 3s
@@ -33,12 +32,10 @@ services:
       - "cockroachdb:db"
     depends_on:
       cockroachdb:
-        # 核心修复：等待 cockroachdb 的 healthcheck 通过后再启动 nakama
         condition: service_healthy
     volumes:
       - nakama_data:/nakama/data
       - ./modules:/nakama/modules
-      # 挂载外部配置文件，对应官方 Configuration 文档的最佳实践
       - ./config.yml:/nakama/data/config.yml 
     expose:
       - "7349"

@@ -19,20 +19,24 @@
 ## 启动流程
 
 1) 构建 Paradiced 插件
-
+   ```shell
     make build-plugin
+   ```
 
 2) 启动数据库和 Nakama
-
+    ```shell
     docker compose up --build -d
+    ```
 
 3) 查看服务状态
-
+    ```shell
     docker compose ps
+    ```
 
 4) 查看 Nakama 实时日志
-
+    ```shell
     docker compose logs -f nakama
+    ```
 
 ## 连接
 
@@ -49,6 +53,6 @@ Nakama Console 默认账号（开发环境）：
 
 ## 停止与清理
 
-停止服务（保留数据卷）：
-
-    docker compose down
+```shell
+docker compose down
+```

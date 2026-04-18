@@ -4,14 +4,12 @@ data_dir: "/nakama/data"
 
 # Console configuration (web dashboard)
 console:
-  # Nakama 使用 port 而非 address，且默认是 7351。如果改为 7352，需同步修改 docker-compose 的映射
   port: 7351 
   username: "admin"
   password: "password123"
 
-# Database configuration (CockroachDB)
+# Database configuration
 database:
-  # Nakama 强制要求 address 为 DSN 字符串的数组。不能拆分成 username/password/name
   address: 
     - "root@cockroachdb:26257"
   conn_max_lifetime_ms: 3600000
@@ -35,13 +33,11 @@ session:
 
 # Runtime configuration (Go plugins)
 runtime:
-  # 对应你项目中 fated/cmd/server 编译出的共享库或 Lua 脚本路径
   path: "/nakama/modules" 
 
 # Match configuration
 match:
   join_attempt_timeout_ms: 15000
-  # max_empty_timeout_ms 和 max_match_size 通常在 Go 代码的 match_init 中控制，不在此全局配置
   
 # Logging configuration
 logger:
