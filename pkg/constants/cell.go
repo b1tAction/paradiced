@@ -24,3 +24,22 @@ func (ct CellType) IsSpecial() bool {
 	return ct == CellTypeFragile || ct == CellTypeFog ||
 		ct == CellTypeCheckpoint || ct == CellTypeBoss
 }
+
+// ParseCellType converts a string to CellType.
+// Returns CellTypeNone if the string is not a valid cell type.
+func ParseCellType(s string) CellType {
+	switch s {
+	case "normal":
+		return CellTypeNormal
+	case "fragile":
+		return CellTypeFragile
+	case "fog":
+		return CellTypeFog
+	case "checkpoint":
+		return CellTypeCheckpoint
+	case "boss":
+		return CellTypeBoss
+	default:
+		return CellTypeNone
+	}
+}

@@ -41,3 +41,40 @@ func (et EventType) IsValid() bool {
 		return false
 	}
 }
+
+// ParseEventType converts a string to EventType.
+// Returns EventTypeNone if the string is not a valid event type.
+func ParseEventType(s string) EventType {
+	switch s {
+	case "herb":
+		return EventTypeHerb
+	case "milk_tea":
+		return EventTypeMilkTea
+	case "relic":
+		return EventTypeRelic
+	case "divine_bless":
+		return EventTypeDivineBless
+	case "exchange":
+		return EventTypeExchange
+	case "hidden_buff":
+		return EventTypeHiddenBuff
+	case "taste_test":
+		return EventTypeTasteTest
+	case "mosquito":
+		return EventTypeMosquito
+	case "ghost_hit":
+		return EventTypeGhostHit
+	case "dog_poop":
+		return EventTypeDogPoop
+	case "thief":
+		return EventTypeThief
+	case "curse_buddha":
+		return EventTypeCurseBuddha
+	case "lost_way":
+		return EventTypeLostWay
+	case "thunder":
+		return EventTypeThunder
+	default:
+		return EventTypeNone
+	}
+}

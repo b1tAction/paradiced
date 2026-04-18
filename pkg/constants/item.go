@@ -24,3 +24,20 @@ func (it ItemType) IsValid() bool {
 		return false
 	}
 }
+
+// ParseItemType converts a string to ItemType.
+// Returns ItemTypeNone if the string is not a valid item type.
+func ParseItemType(s string) ItemType {
+	switch s {
+	case "reverse_clock":
+		return ItemTypeReverseClock
+	case "any_door":
+		return ItemTypeAnyDoor
+	case "dice_swap":
+		return ItemTypeDiceSwap
+	case "dice_upgrade":
+		return ItemTypeDiceUpgrade
+	default:
+		return ItemTypeNone
+	}
+}

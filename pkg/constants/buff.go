@@ -46,3 +46,30 @@ func (bt BuffType) IsNegative() bool {
 	return bt == BuffTypeCurse || bt == BuffTypeLost ||
 		bt == BuffTypeCorrupt || bt == BuffTypePoison
 }
+
+// ParseBuffType converts a string to BuffType.
+// Returns BuffTypeNone if the string is not a valid buff type.
+func ParseBuffType(s string) BuffType {
+	switch s {
+	case "curse":
+		return BuffTypeCurse
+	case "lost":
+		return BuffTypeLost
+	case "corrupt":
+		return BuffTypeCorrupt
+	case "poison":
+		return BuffTypePoison
+	case "hidden":
+		return BuffTypeHidden
+	case "divine":
+		return BuffTypeDivine
+	case "rain":
+		return BuffTypeRain
+	case "exorcism":
+		return BuffTypeExorcism
+	case "fire":
+		return BuffTypeFire
+	default:
+		return BuffTypeNone
+	}
+}
