@@ -68,6 +68,7 @@ func (a *DamageAction) Execute(ctx *ActionContext) error {
 
 func (a *DamageAction) LogEntry() gamelog.LogEntry {
 	metadata := util.NewMetadata()
+	metadata.SetInt("hp_change", -a.Amount)
 	metadata.SetString("blocked_by", a.BlockedBy)
 	metadata.SetBool("piercing", a.IsPiercing)
 
@@ -76,7 +77,6 @@ func (a *DamageAction) LogEntry() gamelog.LogEntry {
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
-		Delta:      -a.Amount,
 		Source:     a.SourceID,
 		Metadata:   metadata,
 	}
@@ -125,13 +125,16 @@ func (a *HealAction) Execute(ctx *ActionContext) error {
 }
 
 func (a *HealAction) LogEntry() gamelog.LogEntry {
+	metadata := util.NewMetadata()
+	metadata.SetInt("hp_change", a.Amount)
+
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
-		Delta:      a.Amount,
 		Source:     a.SourceID,
+		Metadata:   metadata,
 	}
 }
 
@@ -179,13 +182,16 @@ func (a *ModifyLPAction) Execute(ctx *ActionContext) error {
 }
 
 func (a *ModifyLPAction) LogEntry() gamelog.LogEntry {
+	metadata := util.NewMetadata()
+	metadata.SetInt("lp_change", a.Amount)
+
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
-		Delta:      a.Amount,
 		Source:     a.SourceID,
+		Metadata:   metadata,
 	}
 }
 
@@ -258,13 +264,13 @@ func (a *MoveAction) LogEntry() gamelog.LogEntry {
 	metadata.SetInt("start_pos", a.TargetPlayer.Position-a.Steps) // Approximate start
 	metadata.SetInt("end_pos", a.TargetPos)
 	metadata.Set("path", a.Path)
+	metadata.SetInt("steps", a.Steps)
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
-		Delta:      a.Steps,
 		Source:     a.SourceID,
 		Metadata:   metadata,
 	}
@@ -324,13 +330,13 @@ func (a *AddBuffAction) Execute(ctx *ActionContext) error {
 func (a *AddBuffAction) LogEntry() gamelog.LogEntry {
 	metadata := util.NewMetadata()
 	metadata.SetString("buff_type", string(a.BuffType))
+	metadata.SetInt("duration", a.Duration)
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
-		Delta:      a.Duration,
 		Source:     a.SourceID,
 		Metadata:   metadata,
 	}
@@ -383,7 +389,6 @@ func (a *RemoveBuffAction) LogEntry() gamelog.LogEntry {
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
-		Delta:      0,
 		Source:     a.SourceID,
 		Metadata:   metadata,
 	}
@@ -438,7 +443,6 @@ func (a *TeleportAction) LogEntry() gamelog.LogEntry {
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
-		Delta:      a.TargetPos,
 		Source:     a.SourceID,
 		Metadata:   metadata,
 	}
@@ -509,7 +513,6 @@ func (a *StealBuffAction) LogEntry() gamelog.LogEntry {
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
-		Delta:      0,
 		Source:     a.SourceID,
 		Metadata:   metadata,
 	}
@@ -569,7 +572,6 @@ func (a *DrawEventAction) LogEntry() gamelog.LogEntry {
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
-		Delta:      0,
 		Source:     a.SourceID,
 		Metadata:   util.NewMetadata(),
 	}
@@ -633,7 +635,6 @@ func (a *RespawnAction) LogEntry() gamelog.LogEntry {
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
-		Delta:      0,
 		Source:     a.SourceID,
 		Metadata:   metadata,
 	}
@@ -686,13 +687,13 @@ func (a *FellDownAction) Execute(ctx *ActionContext) error {
 func (a *FellDownAction) LogEntry() gamelog.LogEntry {
 	metadata := util.NewMetadata()
 	metadata.SetInt("position", a.Position)
+	metadata.SetInt("hp_change", -a.Damage)
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
-		Delta:      -a.Damage,
 		Source:     a.SourceID,
 		Metadata:   metadata,
 	}
