@@ -229,6 +229,20 @@ type FullSync struct {
 	Turn *TurnSync `json:"turn"`
 }
 
+// ActionRejected notifies client that their action was rejected.
+// Sent when client sends invalid request (wrong player, invalid state, etc).
+type ActionRejected struct {
+	// OpCode is the rejected operation code.
+	OpCode OpCode `json:"op_code"`
+
+	// Reason explains why the action was rejected.
+	// Common values: "not_current_player", "invalid_state", "item_not_found", "skill_not_ready"
+	Reason string `json:"reason"`
+
+	// Message is a human-readable error message for debugging.
+	Message string `json:"message"`
+}
+
 // NewLogEntry creates a simple log entry for protocol testing.
 // For production use, use gamelog.NewActionEntry instead.
 func NewLogEntry(actionType string, target string, source string) gamelog.LogEntry {

@@ -44,6 +44,10 @@ const (
 	// Data: StateSync (complete snapshot) + TurnSync (current turn actions)
 	OpFullSync OpCode = 8
 
+	// OpActionRejected notifies client that their action was rejected.
+	// Data: ActionRejected (includes reason and original opcode)
+	OpActionRejected OpCode = 9
+
 	// ========== Client -> Server Messages ==========
 
 	// OpRollDice requests dice roll calculation from server.
@@ -70,18 +74,19 @@ const (
 // String returns the opcode name for logging and debugging.
 func (op OpCode) String() string {
 	names := map[OpCode]string{
-		OpStateSync:           "state_sync",
-		OpTurnSync:            "turn_sync",
-		OpDecisionRequest:     "decision_request",
-		OpAvailable:           "available",
-		OpMiniGameStart:       "mini_game_start",
-		OpMiniGameResult:      "mini_game_result",
-		OpGameOver:            "game_over",
-		OpFullSync:            "full_sync",
-		OpRollDice:            "roll_dice",
-		OpUseItem:             "use_item",
-		OpUseSkill:            "use_skill",
-		OpUserChoice:          "user_choice",
+		OpStateSync:            "state_sync",
+		OpTurnSync:             "turn_sync",
+		OpDecisionRequest:      "decision_request",
+		OpAvailable:            "available",
+		OpMiniGameStart:        "mini_game_start",
+		OpMiniGameResult:       "mini_game_result",
+		OpGameOver:             "game_over",
+		OpFullSync:             "full_sync",
+		OpActionRejected:       "action_rejected",
+		OpRollDice:             "roll_dice",
+		OpUseItem:              "use_item",
+		OpUseSkill:             "use_skill",
+		OpUserChoice:           "user_choice",
 		OpMiniGameResultSubmit: "mini_game_result_submit",
 	}
 	if name, ok := names[op]; ok {

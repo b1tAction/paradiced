@@ -78,8 +78,17 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **Builder interface**: Abstract interface for building protocol sync messages (implemented in internal/net)
 - **BroadcastAdapter**: Broadcast abstraction for client communication
 - **OpCode**: Message operation codes (Server→Client: 1-99, Client→Server: 100+)
+  - Server→Client: OpStateSync(1), OpTurnSync(2), OpDecisionRequest(3), OpAvailable(4), OpMiniGameStart(5), OpMiniGameResult(6), OpGameOver(7), OpFullSync(8), OpActionRejected(9)
+  - Client→Server: OpRollDice(100), OpUseItem(101), OpUseSkill(102), OpUserChoice(103), OpMiniGameResultSubmit(104)
 - **StateSync/TurnSync**: Complete state and turn synchronization structures
 - **Decision**: User confirmation request structure
+- **ActionRejected**: Action rejection notification (new - for client feedback)
+
+#### CLI Tool (`internal/cli`)
+- **playtest run**: Run single automated playtest (2-4 players)
+- **playtest soak**: Run multiple rounds for stability testing
+- **AutoPlayPlayer**: Automated player with default strategies (roll dice, choose first option)
+- **Test reports**: JSON output with success rate, duration, message count
 
 #### GameLog System (`pkg/gamelog`)
 - **EntryType**: Alias to constants.EntryType - log entry types (action, state, mini_game, boss, decision)
@@ -247,3 +256,6 @@ GOMODCACHE=/app/.gomodcache go test ./...
 - [pkg/rng/README.md](pkg/rng/README.md) - RNG engine and dice system
 - [internal/engine/hsm/README.md](internal/engine/hsm/README.md) - HSM state machine
 - [internal/engine/action/README.md](internal/engine/action/README.md) - Action implementation
+- [internal/net/README.md](internal/net/README.md) - Sync data builder
+- [internal/nakama/README.md](internal/nakama/README.md) - Nakama Match Handler
+- [internal/cli/README.md](internal/cli/README.md) - CLI testing tool
