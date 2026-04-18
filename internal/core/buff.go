@@ -11,19 +11,17 @@ import (
 
 // Buff represents a buff instance attached to a player.
 type Buff struct {
-	Type            constants.BuffType `json:"type"`
-	ID              id.BuffID          `json:"id"` // Buff instance ID (UUID v7)
-	Duration        int                `json:"duration"`    // Remaining duration (-1 for permanent)
-	SubscriptionIDs []string           `json:"subscription_ids"` // EventBus subscription IDs (UUID strings)
+	Type     constants.BuffType `json:"type"`
+	ID       id.BuffID          `json:"id"` // Buff instance ID (UUID v7)
+	Duration int                `json:"duration"` // Remaining duration (-1 for permanent)
 }
 
 // NewBuff creates a new Buff instance with auto-generated UUID v7 ID.
 func NewBuff(buffType constants.BuffType, duration int) *Buff {
 	return &Buff{
-		Type:            buffType,
-		ID:              id.NewBuffID(),
-		Duration:        duration,
-		SubscriptionIDs: make([]string, 0),
+		Type:     buffType,
+		ID:       id.NewBuffID(),
+		Duration: duration,
 	}
 }
 
@@ -31,10 +29,9 @@ func NewBuff(buffType constants.BuffType, duration int) *Buff {
 // Used for testing and special cases where ID needs to be controlled.
 func NewBuffWithID(buffType constants.BuffType, buffID id.BuffID, duration int) *Buff {
 	return &Buff{
-		Type:            buffType,
-		ID:              buffID,
-		Duration:        duration,
-		SubscriptionIDs: make([]string, 0),
+		Type:     buffType,
+		ID:       buffID,
+		Duration: duration,
 	}
 }
 

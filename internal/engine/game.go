@@ -187,19 +187,11 @@ func (g *Game) createItemDecision(item *core.Item, def *core.ItemDefinition, con
 // SubscribeBuff subscribes when player gets a new Buff.
 // Uses BuffHandlerConfig for Phases/Priority/NeedConfirm.
 func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
-	// Prevent duplicate subscriptions
-	if len(buff.SubscriptionIDs) > 0 {
-		return
-	}
-
 	def := GetBuffDefinition(buff.Type)
 	config := GetBuffHandlerConfig(buff.Type)
 	if def == nil || config == nil {
 		return
 	}
-
-	// Initialize SubscriptionIDs list
-	buff.SubscriptionIDs = make([]string, 0)
 
 	// Create subscription for each Phase
 	for _, phase := range config.GetPhases() {
@@ -217,9 +209,8 @@ func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
 		// Create Decision with Priority from config
 		decision := g.createBuffDecisionWithAction(buff, def, config, action)
 
-		// Register with EventBus
-		subID := g.Bus.Subscribe(phase, player.ID, buff.ID.UUID(), "buff", decision)
-		buff.SubscriptionIDs = append(buff.SubscriptionIDs, subID.UUID())
+		// Register with EventBus using buff.ID.UUID() as sourceID
+		g.Bus.Subscribe(phase, player.ID, buff.ID.UUID(), "buff", decision)
 	}
 }
 
@@ -237,15 +228,9 @@ func (g *Game) createBuffDecisionWithAction(buff *core.Buff, def *core.BuffDefin
 }
 
 // UnsubscribeBuff unsubscribes when Buff is removed.
-// Supports multi-subscription unsubscribe: iterates buff.SubscriptionIDs to unsubscribe all.
+// Uses UnsubscribeBySource with buff.ID.UUID() to remove all subscriptions.
 func (g *Game) UnsubscribeBuff(buff *core.Buff) {
-	for _, subIDStr := range buff.SubscriptionIDs {
-		if subIDStr != "" {
-			subID := id.MustParseSubscriptionID(subIDStr)
-			g.Bus.Unsubscribe(subID)
-		}
-	}
-	buff.SubscriptionIDs = make([]string, 0)
+	g.Bus.UnsubscribeBySource(buff.ID.UUID())
 }
 
 // SubscribeItem subscribes when player gets a new Item.
@@ -264,8 +249,8 @@ func (g *Game) SubscribeItem(player *core.Player, item *core.Item) {
 			}
 		}
 		decision := g.createItemDecisionWithAction(item, def, config, action)
-		subID := g.Bus.Subscribe(config.Phase, player.ID, item.ID.UUID(), "item", decision)
-		item.SubscriptionID = subID.UUID()
+		// Register with EventBus using item.ID.UUID() as sourceID
+		g.Bus.Subscribe(config.Phase, player.ID, item.ID.UUID(), "item", decision)
 	}
 }
 
@@ -284,12 +269,9 @@ func (g *Game) createItemDecisionWithAction(item *core.Item, def *core.ItemDefin
 }
 
 // UnsubscribeItem unsubscribes when Item is removed.
+// Uses UnsubscribeBySource with item.ID.UUID() to remove subscription.
 func (g *Game) UnsubscribeItem(item *core.Item) {
-	if item.SubscriptionID != "" {
-		subID := id.MustParseSubscriptionID(item.SubscriptionID)
-		g.Bus.Unsubscribe(subID)
-		item.SubscriptionID = ""
-	}
+	g.Bus.UnsubscribeBySource(item.ID.UUID())
 }
 
 // ========== Buff Lifecycle Management ==========
@@ -353,9 +335,4 @@ func (g *Game) GetActiveBuffCount(playerID id.PlayerID) int {
 		return 0
 	}
 	return len(player.ActiveBuffs)
-}
-
-// GetBuffSubscriptionCount returns Buff's subscription count.
-func (g *Game) GetBuffSubscriptionCount(buff *core.Buff) int {
-	return len(buff.SubscriptionIDs)
 }

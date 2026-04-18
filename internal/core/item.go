@@ -11,11 +11,10 @@ import (
 
 // Item represents an item instance in player's inventory.
 type Item struct {
-	Type           constants.ItemType `json:"type"`
-	ID             id.ItemID          `json:"id"` // Item instance ID (UUID v7)
-	Usable         bool               `json:"usable"`       // Whether item can be used
-	TargetID       string             `json:"target_id"`    // Target player ID (UUID string for protocol)
-	SubscriptionID string             `json:"subscription_id"` // EventBus subscription ID (managed by engine)
+	Type     constants.ItemType `json:"type"`
+	ID       id.ItemID          `json:"id"` // Item instance ID (UUID v7)
+	Usable   bool               `json:"usable"`    // Whether item can be used
+	TargetID string             `json:"target_id"` // Target player ID (UUID string for protocol)
 }
 
 // NewItem creates a new Item instance with auto-generated UUID v7 ID.
@@ -47,23 +46,5 @@ type ItemDefinition struct {
 	EnglishName string               `json:"english_name"`  // English identifier (snake_case)
 	Name        string               `json:"name"`          // Chinese display name
 	Desc        string               `json:"desc"`          // Description text
-	TargetSelf  bool                 `json:"target_self"`   // Can target self
-	TargetOther bool                 `json:"target_other"`  // Can target other player
-	Range       int                  `json:"range"`         // Target range (0 = any distance)
 }
 
-// CanTarget checks if the item can target a specific target type.
-func (d *ItemDefinition) CanTarget(targetSelf bool) bool {
-	if targetSelf {
-		return d.TargetSelf
-	}
-	return d.TargetOther
-}
-
-// IsInRange checks if target is within item's effective range.
-func (d *ItemDefinition) IsInRange(distance int) bool {
-	if d.Range == 0 {
-		return true // 0 means any distance
-	}
-	return distance <= d.Range
-}
