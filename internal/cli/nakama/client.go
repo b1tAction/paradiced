@@ -180,7 +180,11 @@ func (sc *SocketClient) Connect(ctx context.Context, session *Session) error {
 		}
 
 		// Skip own echoed messages when sender presence exists.
-		if msg.Presence != nil && sc.session != nil && msg.Presence.UserId == sc.session.UserID {
+		// Check msg.Presence first to avoid nil pointer dereference.
+		if msg.Presence == nil {
+			// System message (e.g., matchmaker matched notification)
+			sc.logger.Debug("收到系统消息（无发送者）", "op_code", msg.OpCode)
+		} else if sc.session != nil && msg.Presence.UserId == sc.session.UserID {
 			return
 		}
 
