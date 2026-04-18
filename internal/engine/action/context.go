@@ -45,7 +45,7 @@ func NewActionContext(game protocol.Game, bus *event.EventBus, mapEngine *gamema
 // 5. Collect derived actions from post-trigger handler
 // 6. Record in global game log
 // 7. Process any derived actions in queue
-func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
+func (ctx *ActionContext) ExecuteAction(action Action) error {
 	// Step 1: PreTrigger phase - interception
 	prePhase := action.PreTriggerPhase()
 	if prePhase != constants.PhaseAnyTime && ctx.EventBus != nil {
@@ -66,7 +66,7 @@ func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
 		if triggerCtx.GetBoolOrDefault("action_blocked", false) {
 			// Action blocked, but still process any derived actions from the interceptor
 			for _, derived := range triggerCtx.GetDerivedActions() {
-				if execAction, ok := derived.(ExecutableAction); ok {
+				if execAction, ok := derived.(Action); ok {
 					ctx.PushDerivedAction(execAction)
 				}
 			}
@@ -75,7 +75,7 @@ func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
 
 		// Step 2: Collect derived actions from PreTrigger handler
 		for _, derived := range triggerCtx.GetDerivedActions() {
-			if execAction, ok := derived.(ExecutableAction); ok {
+			if execAction, ok := derived.(Action); ok {
 				ctx.PushDerivedAction(execAction)
 			}
 		}
@@ -104,7 +104,7 @@ func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
 
 		// Step 5: Collect derived actions from PostTrigger handler
 		for _, derived := range triggerCtx.GetDerivedActions() {
-			if execAction, ok := derived.(ExecutableAction); ok {
+			if execAction, ok := derived.(Action); ok {
 				ctx.PushDerivedAction(execAction)
 			}
 		}
@@ -134,7 +134,7 @@ func (ctx *ActionContext) ProcessQueue() {
 
 // PushDerivedAction adds a derived action to the queue.
 // Used by handlers to generate new actions during interception.
-func (ctx *ActionContext) PushDerivedAction(action ExecutableAction) {
+func (ctx *ActionContext) PushDerivedAction(action Action) {
 	ctx.ActionQueue.Push(action)
 }
 

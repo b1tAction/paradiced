@@ -452,7 +452,7 @@ func TestDerivedActions_FromHandler(t *testing.T) {
 
 	// Collect derived actions into ActionContext queue
 	for _, derived := range triggerCtx.GetDerivedActions() {
-		if execAction, ok := derived.(engineaction.ExecutableAction); ok {
+		if execAction, ok := derived.(engineaction.Action); ok {
 			actionCtx.PushDerivedAction(execAction)
 		}
 	}

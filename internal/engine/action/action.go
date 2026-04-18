@@ -35,12 +35,6 @@ type Action interface {
 	// Used for lifecycle events (e.g., PhaseOnBuffApplied for buff entry effects).
 	// Returns PhaseAnyTime if no post-trigger needed.
 	PostTriggerPhase() constants.Phase
-}
-
-// ExecutableAction extends Action with execution and logging capabilities.
-// Concrete action types implement this interface.
-type ExecutableAction interface {
-	Action // Embed base Action interface
 
 	// Execute performs the action on the game state.
 	// Called after interception phase completes.
