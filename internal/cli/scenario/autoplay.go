@@ -320,6 +320,8 @@ func (p *AutoPlayPlayer) handleMessage(ctx context.Context, msg *nakama.SocketMe
 		p.turnsCompleted++
 		p.mu.Unlock()
 		p.logger.Debug("收到 TurnSync")
+	case nakama.OpActionRejected:
+		p.handleActionRejected(ctx, msg.Data)
 	default:
 		p.logger.Debug("收到未知消息", "op_code", msg.OpCode)
 	}
@@ -462,6 +464,19 @@ func (p *AutoPlayPlayer) handleGameOver(ctx context.Context, data []byte) {
 	case p.gameOverChan <- struct{}{}:
 	default:
 	}
+}
+
+func (p *AutoPlayPlayer) handleActionRejected(ctx context.Context, data []byte) {
+	var rejected model.ActionRejected
+	if err := json.Unmarshal(data, &rejected); err != nil {
+		p.logger.Error("解析 ActionRejected 失败", "error", err)
+		return
+	}
+
+	p.logger.Warn("动作被拒绝",
+		"op_code", rejected.OpCode,
+		"reason", rejected.Reason,
+		"message", rejected.Message)
 }
 
 // GameOverChan returns the channel that receives when game is over.
