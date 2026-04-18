@@ -14,6 +14,10 @@
 | `ProtocolMapEngineWrapper` | hsm/adapter.go | 冗余包装（三层包装最外层） |
 | `hsm.BroadcastAdapter` | hsm/state.go | 与 pkg/net.BroadcastAdapter 重复 |
 | `adapter.go` 整个文件 | hsm/adapter.go | 无需保留 |
+| `createBuffAction` | handlers.go | 内联到 game.go SubscribeBuff |
+| `createItemAction` | handlers.go | 内联到 game.go SubscribeItem |
+| `NewHealAction` 等7个包装函数 | handlers.go | 死代码，完全未使用 |
+| `handlers.go` 整个文件 | handlers.go | 无需保留，逻辑已内联 |
 
 ## 保留内容
 

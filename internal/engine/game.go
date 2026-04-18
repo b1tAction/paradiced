@@ -207,12 +207,11 @@ func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
 			continue
 		}
 
-		// Create closure Action (using handlers.go createBuffAction)
-		buffAction := createBuffAction(buff, def, config, phase, player)
-
-		// Wrap to match event.Option.Action signature
+		// Create handler closure - executes config.Handler
 		action := func(ctx *event.Context) {
-			buffAction(ctx)
+			if config.Handler != nil {
+				config.Handler(phase, ctx)
+			}
 		}
 
 		// Create Decision with Priority from config
@@ -258,10 +257,11 @@ func (g *Game) SubscribeItem(player *core.Player, item *core.Item) {
 		return
 	}
 	if config.Phase.NeedsSubscription() {
-		// Create Item action closure
-		itemAction := createItemAction(item, def, config, player)
+		// Create handler closure - executes config.Handler
 		action := func(ctx *event.Context) {
-			itemAction(ctx)
+			if config.Handler != nil {
+				config.Handler(constants.PhaseItemUsed, ctx)
+			}
 		}
 		decision := g.createItemDecisionWithAction(item, def, config, action)
 		subID := g.Bus.Subscribe(config.Phase, player.ID, item.ID.UUID(), "item", decision)
