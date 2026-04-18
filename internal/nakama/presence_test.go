@@ -111,17 +111,22 @@ func TestHandlePresenceLeave(t *testing.T) {
 		t.Fatalf("HandlePresenceLeave error: %v", err)
 	}
 
-	// Verify player is removed
-	if len(handler.players) != 1 {
-		t.Errorf("players count = %d, want 1", len(handler.players))
+	// Verify player is marked as disconnected (not removed)
+	if len(handler.players) != 2 {
+		t.Errorf("players count = %d, want 2 (disconnected players are kept for rejoin)", len(handler.players))
 	}
 
-	if handler.players["user-001"] != nil {
-		t.Error("user-001 should be removed from players map")
+	if handler.players["user-001"] == nil {
+		t.Error("user-001 should still be in players map (for rejoin)")
 	}
 
-	if len(handler.playerList) != 1 {
-		t.Errorf("playerList count = %d, want 1", len(handler.playerList))
+	if !handler.disconnected["user-001"] {
+		t.Error("user-001 should be marked as disconnected")
+	}
+
+	// playerList should remain unchanged (for turn order)
+	if len(handler.playerList) != 2 {
+		t.Errorf("playerList count = %d, want 2", len(handler.playerList))
 	}
 }
 
@@ -132,6 +137,99 @@ func TestHandlePresenceLeaveNonExisting(t *testing.T) {
 	err := handler.HandlePresenceLeave("user-999")
 	if err != nil {
 		t.Fatalf("HandlePresenceLeave of non-existing player should not error, got: %v", err)
+	}
+}
+
+func TestPlayerReconnect(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	mockDispatcher := NewMockDispatcherAdapter()
+	handler.WithDispatcher(mockDispatcher)
+
+	// Add players and initialize match
+	handler.HandlePresenceJoin("user-001", nil)
+	handler.HandlePresenceJoin("user-002", nil)
+	handler.HandlePresenceJoin("user-003", nil)
+	handler.HandlePresenceJoin("user-004", nil)
+
+	// Verify match is initialized
+	if handler.hsm == nil || !handler.hsm.IsRunning() {
+		t.Fatal("match should be running after 4 players join")
+	}
+
+	// Player disconnects
+	err := handler.HandlePresenceLeave("user-001")
+	if err != nil {
+		t.Fatalf("HandlePresenceLeave error: %v", err)
+	}
+
+	// Verify player is marked disconnected
+	if !handler.disconnected["user-001"] {
+		t.Error("user-001 should be marked as disconnected")
+	}
+
+	// Player reconnects
+	err = handler.HandlePresenceJoin("user-001", nil)
+	if err != nil {
+		t.Fatalf("HandlePresenceJoin reconnect error: %v", err)
+	}
+
+	// Verify player is no longer disconnected
+	if handler.disconnected["user-001"] {
+		t.Error("user-001 should not be marked as disconnected after rejoin")
+	}
+
+	// Verify match is still running
+	if !handler.hsm.IsRunning() {
+		t.Error("match should still be running after reconnect")
+	}
+}
+
+func TestIsPlayerConnected(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+
+	// Add player
+	handler.HandlePresenceJoin("user-001", nil)
+
+	// Player should be connected
+	if !handler.IsPlayerConnected("user-001") {
+		t.Error("user-001 should be connected after join")
+	}
+
+	// Mark player as disconnected directly (without calling HandlePresenceLeave which needs HSM)
+	handler.disconnected["user-001"] = true
+
+	// Player should be disconnected
+	if handler.IsPlayerConnected("user-001") {
+		t.Error("user-001 should be disconnected after leave")
+	}
+
+	// Unknown player should return false
+	if handler.IsPlayerConnected("user-999") {
+		t.Error("unknown player should return false")
+	}
+}
+
+func TestGetConnectedPlayers(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+
+	// Add players
+	handler.HandlePresenceJoin("user-001", nil)
+	handler.HandlePresenceJoin("user-002", nil)
+	handler.HandlePresenceJoin("user-003", nil)
+
+	// All should be connected
+	connected := handler.GetConnectedPlayers()
+	if len(connected) != 3 {
+		t.Errorf("connected players count = %d, want 3", len(connected))
+	}
+
+	// Disconnect one
+	handler.HandlePresenceLeave("user-001")
+
+	// Should have 2 connected
+	connected = handler.GetConnectedPlayers()
+	if len(connected) != 2 {
+		t.Errorf("connected players count = %d, want 2", len(connected))
 	}
 }
 
@@ -155,12 +253,12 @@ func TestHandlePresenceLeaveAllPlayers(t *testing.T) {
 		t.Fatalf("HandlePresenceLeave error: %v", err)
 	}
 
-	// Match should be stopped
+	// Match should be stopped when all players are disconnected
 	if handler.hsm.IsRunning() {
-		t.Error("match should be stopped after all players leave")
+		t.Error("match should be stopped after all players disconnect")
 	}
 
-	// Players should be cleared
+	// Players should be cleared after MatchStop
 	if len(handler.players) != 0 {
 		t.Errorf("players count = %d, want 0", len(handler.players))
 	}

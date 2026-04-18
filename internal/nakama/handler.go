@@ -29,13 +29,17 @@ type NakamaMatchHandler struct {
 	matchID string // Nakama match ID
 
 	// Player tracking
-	players    map[string]*core.Player // userID -> Player mapping
-	playerList []string                // Ordered player list for turn sequence
+	players         map[string]*core.Player // userID -> Player mapping
+	playerList      []string                // Ordered player list for turn sequence
+	disconnected    map[string]bool         // userID -> disconnected status
 
 	// Configuration
 	maxPlayers  int    // Maximum players (default: 4)
 	mapLength   int    // Map length (default: 100)
 	randomSeed  int64  // Random seed for reproducibility
+
+	// Decision tracking (prevent duplicate sends)
+	lastDecisionID string // Last sent decision ID to prevent duplicate sends
 }
 
 // NewNakamaMatchHandler creates a new match handler with configuration.
@@ -56,14 +60,15 @@ func NewNakamaMatchHandler(matchID string, seed int64, maxPlayers int, mapLength
 	}
 
 	return &NakamaMatchHandler{
-		matchID:    matchID,
-		maxPlayers: maxPlayers,
-		mapLength:  mapLength,
-		randomSeed: seed,
-		players:    make(map[string]*core.Player),
-		playerList: make([]string, 0),
-		diceMgr:    rng.NewDiceManager(rngInst),
-		dispatcher: nil, // Set via WithDispatcher or during MatchInit
+		matchID:     matchID,
+		maxPlayers:  maxPlayers,
+		mapLength:   mapLength,
+		randomSeed:  seed,
+		players:     make(map[string]*core.Player),
+		playerList:  make([]string, 0),
+		disconnected: make(map[string]bool),
+		diceMgr:     rng.NewDiceManager(rngInst),
+		dispatcher:  nil, // Set via WithDispatcher or during MatchInit
 	}
 }
 

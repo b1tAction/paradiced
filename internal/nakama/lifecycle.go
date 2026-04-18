@@ -88,10 +88,29 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 		h.hsm.TransitionTo(nextState, ctx)
 	}
 
-	// Handle waiting for decisions
+	// Handle waiting for decisions - send decision request to current player
 	if h.hsm.IsWaiting() {
-		// Send decision request to current player
-		// Decision timeout is handled by HSM
+		decision := h.hsm.GetCurrentDecision()
+		currentPlayer := h.getCurrentPlayer()
+
+		// Only send if we have a decision and haven't sent it yet
+		if decision != nil && currentPlayer != nil {
+			decisionUUID := decision.ID.UUID()
+
+			// Prevent duplicate sends
+			if h.lastDecisionID != decisionUUID {
+				h.lastDecisionID = decisionUUID
+
+				// Build decision request
+				decisionReq := builder.BuildDecisionFromEvent(decision)
+
+				// Send to current player
+				broadcastAdapter.SendDecision(currentPlayer.ID.UUID(), decisionReq)
+			}
+		}
+	} else {
+		// Clear last decision ID when not waiting
+		h.lastDecisionID = ""
 	}
 
 	_ = delta // Delta time not currently used
@@ -111,6 +130,7 @@ func (h *NakamaMatchHandler) MatchStop() error {
 	// Clear resources
 	h.players = make(map[string]*core.Player)
 	h.playerList = make([]string, 0)
+	h.disconnected = make(map[string]bool)
 
 	return nil
 }
