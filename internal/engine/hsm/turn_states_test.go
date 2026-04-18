@@ -139,7 +139,7 @@ func TestMainActionState_Enter(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	game.AddPlayer(player)
 
-	state := NewMainActionState()
+	state := NewMainActionState(45 * time.Second)
 	ctx := NewStateContext().
 		WithHSM(NewHSM(game)).
 		WithPlayer(player)
@@ -155,7 +155,7 @@ func TestMainActionState_Enter(t *testing.T) {
 }
 
 func TestMainActionState_OnRollDice(t *testing.T) {
-	state := NewMainActionState()
+	state := NewMainActionState(45 * time.Second)
 	ctx := NewStateContext()
 
 	state.OnRollDice(ctx, 6)
@@ -207,7 +207,7 @@ func TestMainActionState_Update_Waiting(t *testing.T) {
 }
 
 func TestMainActionState_defaultDiceRoll(t *testing.T) {
-	state := NewMainActionState()
+	state := NewMainActionState(45 * time.Second)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	ctx := NewStateContext().WithPlayer(player)
 
