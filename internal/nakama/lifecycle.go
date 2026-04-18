@@ -43,6 +43,12 @@ func (h *NakamaMatchHandler) MatchInit() error {
 // MatchLoop is called each tick to update game state.
 // Called by Nakama at regular intervals (e.g., every 100ms).
 func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
+	// Check if HSM is initialized
+	if h.hsm == nil {
+		// Match not yet initialized (matchmaker-created match waiting for players)
+		return nil
+	}
+
 	// Check if HSM is running
 	if !h.hsm.IsRunning() {
 		return nil // Match ended or paused
