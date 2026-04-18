@@ -47,6 +47,24 @@ func (dt DiceType) String() string {
 	}
 }
 
+// DiceTypeFromString converts string to DiceType.
+func DiceTypeFromString(s string) DiceType {
+	switch s {
+	case "gold":
+		return DiceTypeGold
+	case "silver":
+		return DiceTypeSilver
+	case "copper":
+		return DiceTypeCopper
+	case "wood":
+		return DiceTypeWood
+	case "normal":
+		return DiceTypeNormal
+	default:
+		return DiceTypeNone
+	}
+}
+
 // IsValid checks if the dice type is valid.
 func (dt DiceType) IsValid() bool {
 	return dt >= DiceTypeGold && dt <= DiceTypeNormal

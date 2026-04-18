@@ -14,22 +14,29 @@ import (
 
 // Builder converts internal game structures to protocol sync data.
 // Used by MatchHandler implementations to build messages for clients.
+// HSM is the single source of truth - Game is accessed via hsm.GetGame().
 type Builder struct {
 	hsm         *hsm.HSM
-	game        *engine.Game
 	turnDiceType rng.DiceType // Current player's dice type (from StateContext)
 }
 
 // NewBuilder creates a new sync data builder.
-func NewBuilder(hsmInstance *hsm.HSM, gameInstance *engine.Game) *Builder {
+// Game is accessed via hsm.GetGame() - no need to pass separately.
+func NewBuilder(hsmInstance *hsm.HSM) *Builder {
 	return &Builder{
-		hsm:  hsmInstance,
-		game: gameInstance,
+		hsm: hsmInstance,
 	}
 }
 
 // SetDiceType sets the current player's dice type for BuildAvailable.
-func (b *Builder) SetDiceType(diceType rng.DiceType) {
+// Accepts string format ("gold", "silver", "copper", "wood") for pkg/net.Builder interface.
+func (b *Builder) SetDiceType(diceType string) {
+	b.turnDiceType = rng.DiceTypeFromString(diceType)
+}
+
+// SetDiceTypeFromRng sets the current player's dice type using rng.DiceType directly.
+// Used internally when dice type is already known as rng.DiceType.
+func (b *Builder) SetDiceTypeFromRng(diceType rng.DiceType) {
 	b.turnDiceType = diceType
 }
 
@@ -75,7 +82,11 @@ func (b *Builder) BuildTurnSync() *pkgnet.TurnSync {
 
 // BuildPlayers builds all player state snapshots.
 func (b *Builder) BuildPlayers() []pkgnet.Player {
-	players := b.game.GetPlayers()
+	game := b.hsm.GetGame()
+	if game == nil {
+		return nil
+	}
+	players := game.GetPlayers()
 	result := make([]pkgnet.Player, len(players))
 	for i, p := range players {
 		result[i] = b.BuildPlayer(p)
@@ -127,7 +138,18 @@ func (b *Builder) BuildItems(inventory []*core.Item) []pkgnet.Item {
 }
 
 // BuildAvailable builds available actions for the current player.
-func (b *Builder) BuildAvailable(player *core.Player) *pkgnet.Available {
+// Implements pkg/net.Builder interface - gets player from HSM.
+func (b *Builder) BuildAvailable() *pkgnet.Available {
+	player := b.hsm.GetTurnPlayer()
+	if player == nil {
+		return nil
+	}
+	return b.BuildAvailableForPlayer(player)
+}
+
+// BuildAvailableForPlayer builds available actions for a specific player.
+// Used internally when player is already known.
+func (b *Builder) BuildAvailableForPlayer(player *core.Player) *pkgnet.Available {
 	usableItems := make([]pkgnet.Item, 0)
 	for _, it := range player.Inventory {
 		if it.Usable {
@@ -171,8 +193,9 @@ func (b *Builder) BuildFullSync() (*pkgnet.StateSync, *pkgnet.TurnSync) {
 
 // GetCurrentTurnEntries returns current turn's log entries.
 func (b *Builder) GetCurrentTurnEntries() []gamelog.LogEntry {
-	if b.game.Log == nil {
+	game := b.hsm.GetGame()
+	if game == nil || game.Log == nil {
 		return nil
 	}
-	return b.game.Log.GetCurrentTurnEntries()
+	return game.Log.GetCurrentTurnEntries()
 }

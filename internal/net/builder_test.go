@@ -22,7 +22,7 @@ func newTestBuilder() (*Builder, *engine.Game, *hsm.HSM) {
 	hsm.RegisterGlobalStates(hsmInstance)
 	hsm.RegisterTurnStates(hsmInstance)
 	hsm.RegisterInterruptStates(hsmInstance)
-	return NewBuilder(hsmInstance, game), game, hsmInstance
+	return NewBuilder(hsmInstance), game, hsmInstance
 }
 
 // Helper function to create a player
@@ -211,8 +211,8 @@ func TestBuildAvailable(t *testing.T) {
 	game.AddPlayer(player)
 	hsmInstance.SetTurnPlayer(player)
 
-	builder.SetDiceType(rng.DiceTypeGold)
-	available := builder.BuildAvailable(player)
+	builder.SetDiceTypeFromRng(rng.DiceTypeGold)
+	available := builder.BuildAvailableForPlayer(player)
 
 	if len(available.Items) != 1 {
 		t.Errorf("len(available.Items) = %d, want 1", len(available.Items))
@@ -234,8 +234,8 @@ func TestBuildAvailableWithCharge(t *testing.T) {
 	game.AddPlayer(player)
 	hsmInstance.SetTurnPlayer(player)
 
-	builder.SetDiceType(rng.DiceTypeGold)
-	available := builder.BuildAvailable(player)
+	builder.SetDiceTypeFromRng(rng.DiceTypeGold)
+	available := builder.BuildAvailableForPlayer(player)
 
 	if available.CanUseSkill != true {
 		t.Errorf("available.CanUseSkill = %v, want true (charge >= 1)", available.CanUseSkill)

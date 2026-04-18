@@ -22,8 +22,8 @@ func TestNewStateContext(t *testing.T) {
 	if ctx.Decisions == nil {
 		t.Error("Decisions should be initialized")
 	}
-	if !ctx.Success {
-		t.Error("Success should be true by default")
+	if ctx.Error != nil {
+		t.Error("Error should be nil by default (success)")
 	}
 }
 
@@ -45,12 +45,9 @@ func TestStateContextWithMethods(t *testing.T) {
 	}
 
 	// Test WithPhase
-	ctx = ctx.WithPhase(constants.PhaseBeforeTurn, 10)
+	ctx = ctx.WithPhase(constants.PhaseBeforeTurn)
 	if ctx.Phase != constants.PhaseBeforeTurn {
 		t.Error("Phase not set correctly")
-	}
-	if ctx.PhaseData != 10 {
-		t.Error("PhaseData not set correctly")
 	}
 
 	// Test WithDiceSteps (stored in Metadata)
@@ -74,7 +71,7 @@ func TestStateContextWithMethods(t *testing.T) {
 	// Test WithDecision
 	decision := event.NewDecision("test", nil)
 	ctx = ctx.WithDecision(decision)
-	if ctx.Decision != decision {
+	if ctx.GetDecision() != decision {
 		t.Error("Decision not set correctly")
 	}
 }
@@ -171,7 +168,7 @@ func TestStateContextClear(t *testing.T) {
 	ctx.SetInt(KeyDiceSteps, 10)
 	ctx.SetBool(KeySkipTurn, true)
 	ctx.SetBool(KeyFellDown, true)
-	ctx.Success = false
+	ctx.Error = NewStateError(StateNone, "test error")
 
 	ctx.Clear()
 
@@ -184,8 +181,8 @@ func TestStateContextClear(t *testing.T) {
 	if ctx.IsFellDown() {
 		t.Error("FellDown should be reset to false")
 	}
-	if !ctx.Success {
-		t.Error("Success should be reset to true")
+	if ctx.Error != nil {
+		t.Error("Error should be reset to nil")
 	}
 }
 

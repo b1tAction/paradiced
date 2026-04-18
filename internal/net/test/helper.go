@@ -39,7 +39,7 @@ func NewTestHelper(seed int64) *TestHelper {
 	return &TestHelper{
 		game:        game,
 		hsm:         hsmInstance,
-		builder:     internalnet.NewBuilder(hsmInstance, game),
+		builder:     internalnet.NewBuilder(hsmInstance),
 		diceMgr:     rng.NewDiceManager(game.RNG),
 		mockAdapter: pkgnet.NewMockBroadcastAdapter(),
 		broadcasts:  make([]pkgnet.Message, 0),
@@ -107,9 +107,9 @@ func (h *TestHelper) BuildTurnSync() *pkgnet.TurnSync {
 
 // BuildAvailable builds available actions for a player.
 func (h *TestHelper) BuildAvailable(diceType rng.DiceType) *pkgnet.Available {
-	h.builder.SetDiceType(diceType)
+	h.builder.SetDiceTypeFromRng(diceType)
 	if player := h.hsm.GetTurnPlayer(); player != nil {
-		return h.builder.BuildAvailable(player)
+		return h.builder.BuildAvailableForPlayer(player)
 	}
 	return nil
 }
@@ -136,7 +136,7 @@ func (h *TestHelper) GetMockAdapter() *pkgnet.MockBroadcastAdapter {
 
 // SetDiceType sets the current player's dice type.
 func (h *TestHelper) SetDiceType(diceType rng.DiceType) {
-	h.builder.SetDiceType(diceType)
+	h.builder.SetDiceTypeFromRng(diceType)
 }
 
 // SimulateStateTransition simulates entering a new state and captures broadcasts.

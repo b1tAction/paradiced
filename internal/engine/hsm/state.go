@@ -3,12 +3,11 @@ package hsm
 import (
 	"time"
 
-	pkgnet "github.com/b1tAction/paradiced/pkg/net"
-
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/engine"
 	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/internal/gamemap"
+	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/rng"
 	"github.com/b1tAction/paradiced/pkg/util"
@@ -78,13 +77,15 @@ type StateContext struct {
 	// Broadcast adapter for client communication (set by HSM)
 	Broadcast pkgnet.BroadcastAdapter
 
+	// ========== Builder ==========
+	// Builder for constructing protocol sync messages (interface from pkg/net)
+	Builder pkgnet.Builder
+
 	// ========== Phase Triggering ==========
-	Phase     constants.Phase // Current phase to trigger
-	PhaseData interface{}     // Additional phase data (e.g., damage amount, dice steps)
+	Phase constants.Phase // Current phase to trigger
 
 	// ========== Decision Handling ==========
-	Decision  *event.Decision   // Pending decision requiring user input
-	Decisions []*event.Decision // List of pending decisions
+	Decisions []*event.Decision // List of pending decisions (single decision is length-1 list)
 
 	// ========== Timing ==========
 	Timeout   time.Duration // Timeout duration for waiting states
@@ -94,8 +95,7 @@ type StateContext struct {
 	Stack *StateStack // Reference to interrupt stack
 
 	// ========== Execution Result ==========
-	Success bool  // Whether state execution succeeded
-	Error   error // Error if state execution failed
+	Error error // Error if state execution failed (nil means success)
 }
 
 // NewStateContext creates a new StateContext with default values.
@@ -103,7 +103,6 @@ func NewStateContext() *StateContext {
 	return &StateContext{
 		Metadata:  util.NewMetadata(),
 		Decisions: make([]*event.Decision, 0),
-		Success:   true,
 	}
 }
 
@@ -188,12 +187,19 @@ func (ctx *StateContext) WithBroadcast(adapter pkgnet.BroadcastAdapter) *StateCo
 	return ctx
 }
 
+// ========== Builder Setup ==========
+
+// WithBuilder sets the Builder for constructing protocol sync messages.
+func (ctx *StateContext) WithBuilder(builder pkgnet.Builder) *StateContext {
+	ctx.Builder = builder
+	return ctx
+}
+
 // ========== Phase Setup ==========
 
-// WithPhase sets the phase and optional data.
-func (ctx *StateContext) WithPhase(phase constants.Phase, data interface{}) *StateContext {
+// WithPhase sets the phase.
+func (ctx *StateContext) WithPhase(phase constants.Phase) *StateContext {
 	ctx.Phase = phase
-	ctx.PhaseData = data
 	return ctx
 }
 
@@ -223,9 +229,11 @@ func (ctx *StateContext) GetTargetPos() int {
 
 // ========== Decision Setup ==========
 
-// WithDecision sets a pending decision.
+// WithDecision adds a single pending decision to the list.
 func (ctx *StateContext) WithDecision(decision *event.Decision) *StateContext {
-	ctx.Decision = decision
+	if decision != nil {
+		ctx.Decisions = append(ctx.Decisions, decision)
+	}
 	return ctx
 }
 
@@ -233,6 +241,14 @@ func (ctx *StateContext) WithDecision(decision *event.Decision) *StateContext {
 func (ctx *StateContext) WithDecisions(decisions []*event.Decision) *StateContext {
 	ctx.Decisions = decisions
 	return ctx
+}
+
+// GetDecision returns the first pending decision (if any).
+func (ctx *StateContext) GetDecision() *event.Decision {
+	if len(ctx.Decisions) > 0 {
+		return ctx.Decisions[0]
+	}
+	return nil
 }
 
 // ========== Timing Setup ==========
@@ -312,11 +328,8 @@ func (ctx *StateContext) GetDiceType(playerID string) rng.DiceType {
 // Clear resets the context to default values.
 func (ctx *StateContext) Clear() {
 	ctx.Phase = ""
-	ctx.PhaseData = nil
-	ctx.Decision = nil
 	ctx.Decisions = make([]*event.Decision, 0)
 	ctx.Timeout = 0
-	ctx.Success = true
 	ctx.Error = nil
 	ctx.Metadata.Clear()
 }
