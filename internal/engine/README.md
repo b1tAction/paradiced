@@ -13,33 +13,37 @@
 - Buff生命周期管理（Apply/Remove）
 - Action系统集成
 
-### Handlers
+### Registry
 
-EventHandler 策略注册表，实现定制化的 Buff 效果：
+Buff/Item/Event Registry 管理定义和效果处理器：
 
-- 朱雀离火：每4回合 LP+1
-- 其他 Buff 的默认处理逻辑
+- BuffRegistry：Buff 定义 + HandlerConfig + handlers
+- ItemRegistry：Item 定义 + HandlerConfig + handlers
+- EventRegistry：Event 定义 + HandlerConfig + handlers
 - 所有效果通过 Action 系统执行
 
 ## 文件结构
 
 ```
 internal/engine/
-├── game.go           # Game 实例和 EventBus 管理
-├── handlers.go       # EventHandler 策略注册表，Action系统集成
-├── game_test.go      # Game 单元测试
-├── handlers_test.go  # Handlers 单元测试
-└── action/           # Action 子包
-    ├── action.go     # ExecutableAction 接口定义
-    ├── types.go      # 具体Action类型实现
-    ├── context.go    # ActionContext 执行上下文
-    ├── queue.go      # Queue 衍生动作队列
-    ├── turn_event_log.go # TurnEventLog 事件日志
-    └── types_test.go # Action 类型测试
-└── hsm/              # 分层状态机子包
-    ├── state.go      # State 接口和全局状态
-    ├── context.go    # StateContext
-    └── state_test.go # HSM 测试
+├── game.go            # Game 实例和 EventBus 管理
+├── buff_registry.go   # Buff Registry + handlers
+├── item_registry.go   # Item Registry + handlers
+├── event_registry.go  # Event Registry + handlers
+├── game_test.go       # Game 单元测试
+├── buff_registry_test.go # Buff Registry 单元测试
+├── item_registry_test.go # Item Registry 单元测试
+├── event_registry_test.go # Event Registry 单元测试
+└── action/            # Action 子包
+    ├── action.go      # ExecutableAction 接口定义
+    ├── types.go       # 具体Action类型实现
+    ├── context.go     # ActionContext 执行上下文
+    ├── queue.go       # Queue 衍生动作队列
+    └── types_test.go  # Action 类型测试
+└── hsm/               # 分层状态机子包
+    ├── state.go       # State 接口和全局状态
+    ├── context.go     # StateContext
+    └── state_test.go  # HSM 测试
 ```
 
 ## Action 系统集成

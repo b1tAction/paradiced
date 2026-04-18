@@ -56,7 +56,9 @@ internal/core/
 
 internal/engine/
 ├── game.go           # Game实例（EventBus/玩家管理/订阅，ApplyBuffToPlayer/RemoveBuffFromPlayer，GameLog）
-├── handlers.go       # Action创建辅助函数
+├── buff_registry.go  # Buff Registry + HandlerConfig + handlers
+├── item_registry.go  # Item Registry + HandlerConfig + handlers
+├── event_registry.go # Event Registry + HandlerConfig + handlers
 ├── action/           # Action系统实现（DamageAction、HealAction、RespawnAction等）
 │   ├── action.go     # ExecutableAction接口
 │   ├── types.go      # 具体Action类型实现
