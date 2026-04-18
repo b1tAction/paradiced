@@ -10,6 +10,7 @@ import (
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
 	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/id"
+	"github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
@@ -147,4 +148,11 @@ func (h *NakamaMatchHandler) GetTurn() int {
 // GetMatchID returns the match ID.
 func (h *NakamaMatchHandler) GetMatchID() string {
 	return h.matchID
+}
+
+// sendActionRejected sends an action rejection notification to a player.
+// Returns the original error to allow easy integration in handler functions.
+func (h *NakamaMatchHandler) sendActionRejected(playerID string, rejected net.ActionRejected) error {
+	adapter := NewNakamaBroadcastAdapter(h)
+	return adapter.SendActionRejected(playerID, &rejected)
 }

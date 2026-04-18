@@ -10,6 +10,26 @@ import (
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 )
 
+// HandleMessageWithOp processes incoming messages using Nakama envelope opcode first.
+// This is the primary path for realtime match data where opcode is provided by transport.
+func (h *NakamaMatchHandler) HandleMessageWithOp(sender string, opCode int64, data []byte) error {
+	switch opCode {
+	case int64(pkgnet.OpRollDice):
+		return h.handleRollDice(sender)
+	case int64(pkgnet.OpUseItem):
+		return h.handleUseItem(sender, data)
+	case int64(pkgnet.OpUseSkill):
+		return h.handleUseSkill(sender)
+	case int64(pkgnet.OpUserChoice):
+		return h.handleUserChoice(sender, data)
+	case int64(pkgnet.OpMiniGameResultSubmit):
+		return h.handleMiniGameResult(sender, data)
+	}
+
+	// Fallback to payload-based routing for compatibility with older message format.
+	return h.HandleMessage(sender, data)
+}
+
 // Message types for client requests (not defined in pkg/net, define here)
 // These are the request structures for client messages.
 
@@ -80,18 +100,39 @@ func (h *NakamaMatchHandler) handleRollDice(sender string) error {
 	// Get current player
 	player := h.GetPlayer(sender)
 	if player == nil {
-		return nil // Unknown player
+		// Unknown player - send rejection
+		return h.sendActionRejected(sender, pkgnet.ActionRejected{
+			OpCode:  pkgnet.OpRollDice,
+			Reason:  "player_not_found",
+			Message: "未知玩家",
+		})
 	}
 
 	// Check if player is current turn player
-	if h.getCurrentPlayer() != player {
-		return nil // Not current player's turn
+	currentPlayer := h.getCurrentPlayer()
+	if currentPlayer == nil {
+		return h.sendActionRejected(sender, pkgnet.ActionRejected{
+			OpCode:  pkgnet.OpRollDice,
+			Reason:  "no_current_player",
+			Message: "当前没有回合玩家",
+		})
+	}
+	if player != currentPlayer {
+		return h.sendActionRejected(sender, pkgnet.ActionRejected{
+			OpCode:  pkgnet.OpRollDice,
+			Reason:  "not_current_player",
+			Message: "当前不是你的回合",
+		})
 	}
 
 	// Check if in MainAction state
 	currentState := h.hsm.GetCurrentStateID()
 	if currentState != hsm.StateMainAction {
-		return nil // Not in MainAction state
+		return h.sendActionRejected(sender, pkgnet.ActionRejected{
+			OpCode:  pkgnet.OpRollDice,
+			Reason:  "invalid_state",
+			Message: "当前状态不能掷骰子",
+		})
 	}
 
 	// Roll dice using dice manager
@@ -122,17 +163,37 @@ func (h *NakamaMatchHandler) handleUseItem(sender string, data []byte) error {
 	// Get current player
 	player := h.GetPlayer(sender)
 	if player == nil {
-		return nil // Unknown player
+		return h.sendActionRejected(sender, pkgnet.ActionRejected{
+			OpCode:  pkgnet.OpUseItem,
+			Reason:  "player_not_found",
+			Message: "未知玩家",
+		})
 	}
 
 	// Check if player is current turn player
-	if h.getCurrentPlayer() != player {
-		return nil // Not current player's turn
+	currentPlayer := h.getCurrentPlayer()
+	if currentPlayer == nil {
+		return h.sendActionRejected(sender, pkgnet.ActionRejected{
+			OpCode:  pkgnet.OpUseItem,
+			Reason:  "no_current_player",
+			Message: "当前没有回合玩家",
+		})
+	}
+	if player != currentPlayer {
+		return h.sendActionRejected(sender, pkgnet.ActionRejected{
+			OpCode:  pkgnet.OpUseItem,
+			Reason:  "not_current_player",
+			Message: "当前不是你的回合",
+		})
 	}
 
 	// Check if in MainAction state
 	if h.hsm.GetCurrentStateID() != hsm.StateMainAction {
-		return nil // Not in MainAction state
+		return h.sendActionRejected(sender, pkgnet.ActionRejected{
+			OpCode:  pkgnet.OpUseItem,
+			Reason:  "invalid_state",
+			Message: "当前状态不能使用道具",
+		})
 	}
 
 	// Find item in player's inventory
@@ -145,7 +206,11 @@ func (h *NakamaMatchHandler) handleUseItem(sender string, data []byte) error {
 	}
 
 	if !found {
-		return nil // Item not found
+		return h.sendActionRejected(sender, pkgnet.ActionRejected{
+			OpCode:  pkgnet.OpUseItem,
+			Reason:  "item_not_found",
+			Message: "道具不存在",
+		})
 	}
 
 	// Create builder for context
@@ -167,17 +232,37 @@ func (h *NakamaMatchHandler) handleUseSkill(sender string) error {
 	// Get current player
 	player := h.GetPlayer(sender)
 	if player == nil {
-		return nil // Unknown player
+		return h.sendActionRejected(sender, pkgnet.ActionRejected{
+			OpCode:  pkgnet.OpUseSkill,
+			Reason:  "player_not_found",
+			Message: "未知玩家",
+		})
 	}
 
 	// Check if player is current turn player
-	if h.getCurrentPlayer() != player {
-		return nil // Not current player's turn
+	currentPlayer := h.getCurrentPlayer()
+	if currentPlayer == nil {
+		return h.sendActionRejected(sender, pkgnet.ActionRejected{
+			OpCode:  pkgnet.OpUseSkill,
+			Reason:  "no_current_player",
+			Message: "当前没有回合玩家",
+		})
+	}
+	if player != currentPlayer {
+		return h.sendActionRejected(sender, pkgnet.ActionRejected{
+			OpCode:  pkgnet.OpUseSkill,
+			Reason:  "not_current_player",
+			Message: "当前不是你的回合",
+		})
 	}
 
 	// Check if player has charge available
 	if player.GetChargeCount() < 1 {
-		return nil // No charge available
+		return h.sendActionRejected(sender, pkgnet.ActionRejected{
+			OpCode:  pkgnet.OpUseSkill,
+			Reason:  "skill_not_ready",
+			Message: "技能充能不足",
+		})
 	}
 
 	// Notify HSM about skill usage
@@ -200,7 +285,11 @@ func (h *NakamaMatchHandler) handleUserChoice(sender string, data []byte) error 
 	// Get current player
 	player := h.GetPlayer(sender)
 	if player == nil {
-		return nil // Unknown player
+		return h.sendActionRejected(sender, pkgnet.ActionRejected{
+			OpCode:  pkgnet.OpUserChoice,
+			Reason:  "player_not_found",
+			Message: "未知玩家",
+		})
 	}
 
 	// Create state context for HSM

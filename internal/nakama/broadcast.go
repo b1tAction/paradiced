@@ -20,6 +20,29 @@ func NewNakamaBroadcastAdapter(handler *NakamaMatchHandler) *NakamaBroadcastAdap
 	}
 }
 
+// resolveRecipientUserID maps an input identifier to Nakama userID.
+// The input may already be a userID, or an internal player ID (core.Player.ID).
+func (a *NakamaBroadcastAdapter) resolveRecipientUserID(playerID string) string {
+	if a == nil || a.handler == nil {
+		return playerID
+	}
+
+	// Already a known Nakama userID.
+	if _, ok := a.handler.players[playerID]; ok {
+		return playerID
+	}
+
+	// Try mapping internal player ID -> userID.
+	for userID, p := range a.handler.players {
+		if p != nil && p.ID.UUID() == playerID {
+			return userID
+		}
+	}
+
+	// Fallback to input for tests/mocks.
+	return playerID
+}
+
 // BroadcastStateSync broadcasts state sync to all players.
 func (a *NakamaBroadcastAdapter) BroadcastStateSync(state *net.StateSync) error {
 	if a.handler.dispatcher == nil {
@@ -54,12 +77,14 @@ func (a *NakamaBroadcastAdapter) SendDecision(playerID string, decision *net.Dec
 		return nil // No dispatcher set
 	}
 
+	userID := a.resolveRecipientUserID(playerID)
+
 	data, err := json.Marshal(decision)
 	if err != nil {
 		return err
 	}
 
-	return a.handler.dispatcher.SendMessage(playerID, int64(net.OpDecisionRequest), data)
+	return a.handler.dispatcher.SendMessage(userID, int64(net.OpDecisionRequest), data)
 }
 
 // SendAvailable sends available actions to a specific player.
@@ -68,12 +93,14 @@ func (a *NakamaBroadcastAdapter) SendAvailable(playerID string, available *net.A
 		return nil // No dispatcher set
 	}
 
+	userID := a.resolveRecipientUserID(playerID)
+
 	data, err := json.Marshal(available)
 	if err != nil {
 		return err
 	}
 
-	return a.handler.dispatcher.SendMessage(playerID, int64(net.OpAvailable), data)
+	return a.handler.dispatcher.SendMessage(userID, int64(net.OpAvailable), data)
 }
 
 // BroadcastMiniGameStart broadcasts mini-game start notification.
@@ -124,6 +151,8 @@ func (a *NakamaBroadcastAdapter) SendFullSync(playerID string, state *net.StateS
 		return nil // No dispatcher set
 	}
 
+	userID := a.resolveRecipientUserID(playerID)
+
 	// Send state sync and turn sync in one message
 	fullSync := map[string]interface{}{
 		"state_sync": state,
@@ -135,5 +164,21 @@ func (a *NakamaBroadcastAdapter) SendFullSync(playerID string, state *net.StateS
 		return err
 	}
 
-	return a.handler.dispatcher.SendMessage(playerID, int64(net.OpFullSync), data)
+	return a.handler.dispatcher.SendMessage(userID, int64(net.OpFullSync), data)
+}
+
+// SendActionRejected sends action rejection notification to a specific player.
+func (a *NakamaBroadcastAdapter) SendActionRejected(playerID string, rejected *net.ActionRejected) error {
+	if a.handler.dispatcher == nil {
+		return nil // No dispatcher set
+	}
+
+	userID := a.resolveRecipientUserID(playerID)
+
+	data, err := json.Marshal(rejected)
+	if err != nil {
+		return err
+	}
+
+	return a.handler.dispatcher.SendMessage(userID, int64(net.OpActionRejected), data)
 }
