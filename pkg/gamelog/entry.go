@@ -23,35 +23,31 @@ type LogEntry struct {
 	ActionType string `json:"action_type,omitempty"`
 	// Target is the player ID affected by this event.
 	Target string `json:"target,omitempty"`
-	// Delta is the change amount (negative for damage/LP loss, positive for heal/LP gain).
-	Delta int `json:"delta,omitempty"`
 	// Source is the source identifier (Buff ID, Item ID, Event ID).
 	Source string `json:"source,omitempty"`
-	// Metadata contains additional data with type-safe access and JSON serialization.
+	// Metadata contains action-specific data with type-safe access and JSON serialization.
 	Metadata *util.Metadata `json:"metadata,omitempty"`
 }
 
 // NewActionEntry creates a new LogEntry for an Action execution.
-func NewActionEntry(actionType string, target string, delta int, source string) LogEntry {
+func NewActionEntry(actionType string, target string, source string) LogEntry {
 	return LogEntry{
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeAction,
 		ActionType: actionType,
 		Target:     target,
-		Delta:      delta,
 		Source:     source,
 		Metadata:   util.NewMetadata(),
 	}
 }
 
 // NewActionEntryWithMetadata creates a new LogEntry with pre-populated metadata.
-func NewActionEntryWithMetadata(actionType string, target string, delta int, source string, metadata *util.Metadata) LogEntry {
+func NewActionEntryWithMetadata(actionType string, target string, source string, metadata *util.Metadata) LogEntry {
 	return LogEntry{
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeAction,
 		ActionType: actionType,
 		Target:     target,
-		Delta:      delta,
 		Source:     source,
 		Metadata:   metadata,
 	}

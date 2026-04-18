@@ -15,7 +15,6 @@ type GameEvent struct {
 	Type       constants.EventType   `json:"type"`
 	ID         id.EventID            `json:"id"` // Event instance ID (UUID v7)
 	TargetID   string                `json:"target_id"` // Target player ID (UUID string)
-	Executed   bool                  `json:"executed"`  // Whether event has been executed
 }
 
 // NewGameEvent creates a new GameEvent instance with auto-generated UUID v7 ID.
@@ -23,7 +22,6 @@ func NewGameEvent(eventType constants.EventType) *GameEvent {
 	return &GameEvent{
 		Type:     eventType,
 		ID:       id.NewEventID(),
-		Executed: false,
 	}
 }
 

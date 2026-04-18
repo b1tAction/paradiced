@@ -331,7 +331,6 @@ func (p *Player) Clone() *Player {
 			Type:            b.Type,
 			ID:              b.ID,
 			Duration:        b.Duration,
-			Charge:          b.Charge,
 			SubscriptionIDs: make([]string, 0),
 		}
 	}

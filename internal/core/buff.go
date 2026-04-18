@@ -14,7 +14,6 @@ type Buff struct {
 	Type            constants.BuffType `json:"type"`
 	ID              id.BuffID          `json:"id"` // Buff instance ID (UUID v7)
 	Duration        int                `json:"duration"`    // Remaining duration (-1 for permanent)
-	Charge          int                `json:"charge"`      // Charge count (for faction skills)
 	SubscriptionIDs []string           `json:"subscription_ids"` // EventBus subscription IDs (UUID strings)
 }
 
@@ -24,7 +23,6 @@ func NewBuff(buffType constants.BuffType, duration int) *Buff {
 		Type:            buffType,
 		ID:              id.NewBuffID(),
 		Duration:        duration,
-		Charge:          0,
 		SubscriptionIDs: make([]string, 0),
 	}
 }
@@ -36,14 +34,13 @@ func NewBuffWithID(buffType constants.BuffType, buffID id.BuffID, duration int) 
 		Type:            buffType,
 		ID:              buffID,
 		Duration:        duration,
-		Charge:          0,
 		SubscriptionIDs: make([]string, 0),
 	}
 }
 
 // IsActive checks if the buff is still active.
 func (b *Buff) IsActive() bool {
-	return b.Duration > 0 || b.Duration == -1 || b.Charge > 0
+	return b.Duration > 0 || b.Duration == -1
 }
 
 // TickDuration decrements duration and returns whether buff is still active.
