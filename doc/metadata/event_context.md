@@ -2,7 +2,7 @@
 
 `event.Context.Metadata` 用于 Handler 之间传递意图信号，**不发送给客户端**。
 
-**位置**：`pkg/event/context.go`
+**位置**：`internal/event/context.go`
 
 **可见性**：内部（仅后端使用）
 
@@ -80,8 +80,8 @@ func ExecuteHPChange(ctx *ActionContext, target *Player) {
 ### Buff Handler（隐匿）
 
 ```go
-// internal/core/buff/init.go
-func hiddenHandler(ctx *event.Context, player protocol.Player) {
+// internal/engine/buff_registry.go
+func hiddenHandler(phase constants.Phase, ctx *event.Context) {
     // 阻挡所有伤害和事件
     ctx.SetBool("action_blocked", true)
     ctx.SetString("blocked_by", "Buff_Hidden")
@@ -94,8 +94,8 @@ func hiddenHandler(ctx *event.Context, player protocol.Player) {
 ### Buff Handler（甘霖）
 
 ```go
-// internal/core/buff/init.go
-func rainHandler(ctx *event.Context, player protocol.Player) {
+// internal/engine/buff_registry.go
+func rainHandler(phase constants.Phase, ctx *event.Context) {
     // 获取计数器
     counter, _ := ctx.GetInt("buff_turn_counter")
     counter++
@@ -104,7 +104,7 @@ func rainHandler(ctx *event.Context, player protocol.Player) {
     // 每2回合触发HP+1
     if counter >= 2 {
         ctx.SetInt("hp_change", 1)
-        ctx.AddDerivedAction(NewHealAction(player.GetID(), 1, "Buff_Rain"))
+        // engine层通过 ctx.AddDerivedAction 添加派生Action
         ctx.SetInt("buff_turn_counter", 0) // 重置
     }
 }
@@ -113,11 +113,10 @@ func rainHandler(ctx *event.Context, player protocol.Player) {
 ### Event Handler
 
 ```go
-// internal/core/event/init.go
-func herbHandler(ctx *event.Context, player protocol.Player) {
+// internal/engine/event_registry.go
+func herbHandler(phase constants.Phase, ctx *event.Context) {
     // 采集草药：HP+1
     ctx.SetInt("hp_change", 1)
-    ctx.AddDerivedAction(NewHealAction(player.GetID(), 1, "Event_Herb"))
 }
 ```
 
@@ -158,8 +157,8 @@ func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
 
 ## 相关文档
 
-- [pkg/event/README.md](../../pkg/event/README.md) - EventBus系统
+- [internal/event/README.md](../../internal/core/README.md) - EventBus系统
 - [doc/internal/event_bus_system.md](../internal/event_bus_system.md) - EventBus设计文档
-- [internal/core/buff/init.go](../../internal/core/buff/init.go) - Buff Handler实现
-- [internal/core/event/init.go](../../internal/core/event/init.go) - Event Handler实现
-- [internal/core/item/init.go](../../internal/core/item/init.go) - Item Handler实现
+- [internal/engine/buff_registry.go](../../internal/engine/buff_registry.go) - Buff Handler实现
+- [internal/engine/event_registry.go](../../internal/engine/event_registry.go) - Event Handler实现
+- [internal/engine/item_registry.go](../../internal/engine/item_registry.go) - Item Handler实现

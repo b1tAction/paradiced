@@ -20,14 +20,11 @@ EventBus + Decision 系统是《派乐代》游戏的统一触发机制框架，
 pkg/constants/
 ├── phase.go          # Phase枚举定义（触发时机）
 
-pkg/event/
+internal/event/
 ├── bus.go            # EventBus结构和方法
 ├── decision.go       # Decision和Option结构
 ├── context.go        # Context结构
-├── bus_test.go       # 单元测试
-
-pkg/handler/
-├── handler.go        # EffectHandler统一签名
+├── event_test.go     # 单元测试
 
 pkg/gamelog/
 ├── entry.go          # EntryType枚举、LogEntry结构（使用util.Metadata）
@@ -39,20 +36,11 @@ pkg/action/
 ├── action.go         # ActionType（string类型，snake_case命名）、Action接口
 
 internal/core/
-├── buff/
-│   ├── buff.go       # Buff系统（Definition + HandlerConfig + Registry）
-│   ├── init.go       # init() + registerAllBuffs() + handlers
-│   ├── buff_test.go  # 单元测试
-├── event/
-│   ├── event.go      # Event系统（Definition + HandlerConfig + Registry）
-│   ├── init.go       # init() + registerAllEvents() + handlers
-│   ├── event_test.go # 单元测试
-├── item/
-│   ├── item.go       # Item系统（Definition + HandlerConfig + Registry）
-│   ├── init.go       # init() + registerAllItems() + handlers
-│   ├── item_test.go  # 单元测试
+├── buff.go           # Buff结构 + BuffDefinition（静态元数据）
+├── item.go           # Item结构 + ItemDefinition（静态元数据）
+├── game_event.go     # GameEvent结构 + EventDefinition（静态元数据）
 ├── player.go         # Player结构（HP/LP/Buffs/Items）
-├── init.go           # 统一入口（重导出）
+├── player_test.go    # 单元测试
 
 internal/engine/
 ├── game.go           # Game实例（EventBus/玩家管理/订阅，ApplyBuffToPlayer/RemoveBuffFromPlayer，GameLog）
@@ -232,22 +220,20 @@ func handleDivineBuff(phase constants.Phase, ctx *event.Context) {
         return
     }
     // 直接修改 LP（无需 Action）
-    player, ok := ctx.Player.(protocol.PlayerLite)
-    if ok {
-        player.ModifyLP(1)
+    if ctx.Player != nil {
+        ctx.Player.ModifyLP(1)
     }
 }
 
 // 离火Buff：朱雀被动，每4回合LP+1
 func handleZhuQueFire(phase constants.Phase, ctx *event.Context) {
-    player, ok := ctx.Player.(protocol.PlayerLite)
-    if !ok {
+    if ctx.Player == nil {
         return
     }
-    newCount := player.IncrementFireCounter()
+    newCount := ctx.Player.IncrementFireCounter()
     if newCount >= 4 {
-        player.ModifyLP(1)
-        player.SetFireCounter(0)
+        ctx.Player.ModifyLP(1)
+        ctx.Player.SetFireCounter(0)
     }
 }
 ```
@@ -285,9 +271,9 @@ func handleZhuQueFire(phase constants.Phase, ctx *event.Context) {
 
 ### 测试覆盖率统计
 ```
-pkg/event:       91.9% statements
-internal/core:   93.4% statements
-internal/engine: 91.8% statements
+internal/event:    91.9% statements
+internal/core:     93.4% statements
+internal/engine:   91.8% statements
 ```
 
 ## 后续扩展

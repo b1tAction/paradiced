@@ -132,5 +132,5 @@ ActionContext.Metadata 主要用于存储临时上下文数据：
 ## 相关文档
 
 - [internal/engine/action/README.md](../../internal/engine/action/README.md) - Action系统文档
-- [pkg/event/context.go](../../pkg/event/context.go) - EventBus Context
+- [internal/event/context.go](../../internal/event/context.go) - EventBus Context
 - [internal/engine/action/context.go](../../internal/engine/action/context.go) - ActionContext实现
