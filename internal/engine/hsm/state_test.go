@@ -29,7 +29,7 @@ func TestNewStateContext(t *testing.T) {
 
 func TestStateContextWithMethods(t *testing.T) {
 	game := engine.NewGame(id.NewGameID(), 0)
-	ctx := NewStateContext().WithGame(game)
+	ctx := NewStateContext().WithHSM(NewHSM(game))
 	if ctx.GetGame() != game {
 		t.Error("Game not set correctly")
 	}
@@ -189,28 +189,30 @@ func TestStateContextClear(t *testing.T) {
 	}
 }
 
-func TestStateContextWithBus(t *testing.T) {
+// TestStateContextWithHSM tests WithHSM pattern.
+func TestStateContextWithHSM(t *testing.T) {
 	game := engine.NewGame(id.NewGameID(), 0)
-
-	// Test WithGame creates adapter
-	ctx := NewStateContext().WithGame(game)
-	if ctx.GetBus() == nil {
-		t.Error("WithGame should create Bus adapter")
+	hsmInst := NewHSM(game)
+	ctx := NewStateContext().WithHSM(hsmInst)
+	if ctx.GetGame() != game {
+		t.Error("Game not accessible via HSM")
 	}
-
-	// Note: WithBus no longer stores directly, it uses HSM
-	// This test behavior has changed with the new architecture
+	if ctx.GetBus() == nil {
+		t.Error("Bus should be accessible via HSM")
+	}
 }
 
 func TestStateContextWithMapEngine(t *testing.T) {
 	game := engine.NewGame(id.NewGameID(), 0)
-	ctx := NewStateContext().WithGame(game)
+	hsmInst := NewHSM(game)
+	ctx := NewStateContext().WithHSM(hsmInst)
 
-	// Test WithMapEngine sets MapEngine on HSM
+	// Test SetMapEngine on HSM
 	mapEngine := gamemap.NewMapEngine(100)
-	ctx = ctx.WithMapEngine(mapEngine)
+	hsmInst.SetMapEngine(mapEngine)
+
 	if ctx.GetMapEngine() != mapEngine {
-		t.Error("WithMapEngine should set MapEngine on HSM")
+		t.Error("GetMapEngine should return MapEngine set on HSM")
 	}
 }
 

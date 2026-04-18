@@ -436,7 +436,7 @@ func TestHSMOnUserChoice(t *testing.T) {
 	hsm.TransitionTo(StateTurnUpkeep, nil)
 
 	// Simulate decision by setting up interrupt stack
-	ctx := NewStateContext().WithGame(game).WithPlayer(player)
+	ctx := NewStateContext().WithHSM(NewHSM(game)).WithPlayer(player)
 	ctx.StartTime = time.Now()
 	hsm.stack.Push(&mockState{id: StateTurnUpkeep}, ctx)
 

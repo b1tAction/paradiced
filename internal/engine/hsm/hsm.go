@@ -269,7 +269,7 @@ func (hsm *HSM) transitionGlobal(target State, ctx *StateContext) error {
 	hsm.stateEnterTime = time.Now()
 
 	if ctx == nil {
-		ctx = NewStateContext().WithGame(hsm.game)
+		ctx = NewStateContext().WithHSM(hsm)
 	}
 	ctx.StartTime = hsm.stateEnterTime
 	target.Enter(ctx)
@@ -304,7 +304,7 @@ func (hsm *HSM) transitionTurn(target State, ctx *StateContext) error {
 	hsm.stateEnterTime = time.Now()
 
 	if ctx == nil {
-		ctx = NewStateContext().WithGame(hsm.game).WithPlayer(hsm.turnPlayer)
+		ctx = NewStateContext().WithHSM(hsm).WithPlayer(hsm.turnPlayer)
 	}
 	ctx.StartTime = hsm.stateEnterTime
 	target.Enter(ctx)
@@ -356,7 +356,7 @@ func (hsm *HSM) PushInterrupt(currentState State, ctx *StateContext) error {
 	}
 
 	waitCtx := NewStateContext().
-		WithGame(hsm.game).
+		WithHSM(hsm).
 		WithPlayer(hsm.turnPlayer).
 		WithDecisions(ctx.Decisions).
 		WithTimeout(ctx.Timeout).
@@ -492,7 +492,7 @@ func (hsm *HSM) OnUserChoice(choice int, ctx *StateContext) error {
 
 	// Execute decision action
 	if ctx == nil {
-		ctx = NewStateContext().WithGame(hsm.game).WithPlayer(hsm.turnPlayer)
+		ctx = NewStateContext().WithHSM(hsm).WithPlayer(hsm.turnPlayer)
 	}
 	hsm.decision.Execute(choice, event.NewContext(nil))
 
@@ -554,7 +554,7 @@ func (hsm *HSM) OnRollDice(steps int, ctx *StateContext) error {
 
 	// Create context if not provided
 	if ctx == nil {
-		ctx = NewStateContext().WithGame(hsm.game).WithPlayer(hsm.turnPlayer)
+		ctx = NewStateContext().WithHSM(hsm).WithPlayer(hsm.turnPlayer)
 	}
 
 	// Call OnRollDice on the turn state if it implements RollDiceHandler
@@ -582,7 +582,7 @@ func (hsm *HSM) OnUseItem(itemID string, ctx *StateContext) error {
 
 	// Create context if not provided
 	if ctx == nil {
-		ctx = NewStateContext().WithGame(hsm.game).WithPlayer(hsm.turnPlayer)
+		ctx = NewStateContext().WithHSM(hsm).WithPlayer(hsm.turnPlayer)
 	}
 
 	// Call OnUseItem on the turn state if it implements UseItemHandler

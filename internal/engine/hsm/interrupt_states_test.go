@@ -24,7 +24,7 @@ func TestWaitDecisionState_Enter(t *testing.T) {
 
 	state := NewWaitDecisionState().WithDecision(decision)
 	ctx := NewStateContext().
-		WithGame(game).
+		WithHSM(NewHSM(game)).
 		WithPlayer(player)
 
 	state.Enter(ctx)
@@ -65,7 +65,7 @@ func TestWaitDecisionState_Enter_ContextDecision(t *testing.T) {
 
 	state := NewWaitDecisionState()
 	ctx := NewStateContext().
-		WithGame(game).
+		WithHSM(NewHSM(game)).
 		WithPlayer(player).
 		WithDecision(decision)
 
@@ -179,7 +179,7 @@ func TestWaitDecisionState_ExecuteOption(t *testing.T) {
 	game.AddPlayer(player)
 
 	state := NewWaitDecisionState().WithDecision(decision)
-	ctx := NewStateContext().WithGame(game).WithPlayer(player)
+	ctx := NewStateContext().WithHSM(NewHSM(game)).WithPlayer(player)
 
 	state.Enter(ctx)
 	state.executeOption(ctx, 0)

@@ -30,17 +30,13 @@ func TestTurnFlow_GameLog_Integration(t *testing.T) {
 	player.Position = 10
 	game.AddPlayer(player)
 
-	// Setup HSM adapters
-	busAdapter := game.Bus
-	mapAdapter := mapEngine
-
 	// Create TurnUpkeep state
 	upkeepState := NewTurnUpkeepState()
+	hsmInst := NewHSM(game)
+	hsmInst.SetMapEngine(mapEngine)
 	ctx := NewStateContext().
-		WithGame(game).
-		WithPlayer(player).
-		WithBus(busAdapter).
-		WithMapEngine(mapAdapter)
+		WithHSM(hsmInst).
+		WithPlayer(player)
 
 	// Execute Enter
 	upkeepState.Enter(ctx)

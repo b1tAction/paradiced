@@ -184,7 +184,7 @@ func (h *NakamaMatchHandler) handleUserChoice(sender string, data []byte) error 
 
 	// Create state context for HSM
 	ctx := hsm.NewStateContext().
-		WithGame(h.game).
+		WithHSM(h.hsm).
 		WithPlayer(player)
 
 	// Notify HSM about user choice

@@ -115,30 +115,6 @@ func (ctx *StateContext) WithHSM(hsm *HSM) *StateContext {
 	return ctx
 }
 
-// WithGame sets game reference via HSM (backward compatibility).
-// Creates HSM wrapper if HSM is nil.
-func (ctx *StateContext) WithGame(game *engine.Game) *StateContext {
-	if ctx.HSM == nil && game != nil {
-		ctx.HSM = NewHSM(game)
-	}
-	return ctx
-}
-
-// WithBus sets EventBus directly (backward compatibility).
-func (ctx *StateContext) WithBus(bus *event.EventBus) *StateContext {
-	// Store in HSM if available, otherwise ignore
-	// This is for backward compatibility only
-	return ctx
-}
-
-// WithMapEngine sets MapEngine directly (backward compatibility).
-func (ctx *StateContext) WithMapEngine(engine *gamemap.MapEngine) *StateContext {
-	if ctx.HSM != nil {
-		ctx.HSM.SetMapEngine(engine)
-	}
-	return ctx
-}
-
 // ========== Convenience Access Methods ==========
 
 // GetGame returns the game instance via HSM.

@@ -26,11 +26,11 @@ func TestTurnUpkeepState_Enter_NormalFlow(t *testing.T) {
 	mapEngine := gamemap.NewMapEngine(100)
 
 	state := NewTurnUpkeepState()
+	hsmInst := NewHSM(game)
+	hsmInst.SetMapEngine(mapEngine)
 	ctx := NewStateContext().
-		WithGame(game).
-		WithPlayer(player).
-		WithMapEngine(mapEngine).
-		WithBus(game.Bus)
+		WithHSM(hsmInst).
+		WithPlayer(player)
 
 	// Execute
 	state.Enter(ctx)
@@ -56,9 +56,8 @@ func TestTurnUpkeepState_Enter_SkipTurn(t *testing.T) {
 
 	state := NewTurnUpkeepState()
 	ctx := NewStateContext().
-		WithGame(game).
-		WithPlayer(player).
-		WithBus(game.Bus)
+		WithHSM(NewHSM(game)).
+		WithPlayer(player)
 
 	// Execute
 	state.Enter(ctx)
@@ -89,11 +88,11 @@ func TestTurnUpkeepState_Enter_DeadPlayer(t *testing.T) {
 	mapEngine.GenerateLinearMap(configs)
 	
 	state := NewTurnUpkeepState()
+	hsmInst := NewHSM(game)
+	hsmInst.SetMapEngine(mapEngine)
 	ctx := NewStateContext().
-		WithGame(game).
-		WithPlayer(player).
-		WithMapEngine(mapEngine).
-		WithBus(game.Bus)
+		WithHSM(hsmInst).
+		WithPlayer(player)
 
 	// Execute
 	state.Enter(ctx)
@@ -142,9 +141,8 @@ func TestMainActionState_Enter(t *testing.T) {
 
 	state := NewMainActionState()
 	ctx := NewStateContext().
-		WithGame(game).
-		WithPlayer(player).
-		WithBus(game.Bus)
+		WithHSM(NewHSM(game)).
+		WithPlayer(player)
 
 	state.Enter(ctx)
 
@@ -248,11 +246,11 @@ func TestTurnMovingState_Enter_FellDown(t *testing.T) {
 	mapEngine.GenerateLinearMap(configs)
 	
 	state := NewTurnMovingState()
+	hsmInst := NewHSM(game)
+	hsmInst.SetMapEngine(mapEngine)
 	ctx := NewStateContext().
-		WithGame(game).
-		WithPlayer(player).
-		WithMapEngine(mapEngine).
-		WithBus(game.Bus)
+		WithHSM(hsmInst).
+		WithPlayer(player)
 	ctx.SetInt(KeyDiceSteps, 5)
 
 	state.Enter(ctx)
@@ -324,11 +322,11 @@ func TestTurnLandedState_Enter(t *testing.T) {
 	mapEngine.GenerateLinearMap(configs)
 	
 	state := NewTurnLandedState()
+	hsmInst := NewHSM(game)
+	hsmInst.SetMapEngine(mapEngine)
 	ctx := NewStateContext().
-		WithGame(game).
-		WithPlayer(player).
-		WithMapEngine(mapEngine).
-		WithBus(game.Bus)
+		WithHSM(hsmInst).
+		WithPlayer(player)
 
 	state.Enter(ctx)
 
@@ -361,9 +359,8 @@ func TestTurnEventState_Enter(t *testing.T) {
 
 	state := NewTurnEventState()
 	ctx := NewStateContext().
-		WithGame(game).
-		WithPlayer(player).
-		WithBus(game.Bus)
+		WithHSM(NewHSM(game)).
+		WithPlayer(player)
 
 	state.Enter(ctx)
 
@@ -396,9 +393,8 @@ func TestTurnEndState_Enter(t *testing.T) {
 
 	state := NewTurnEndState()
 	ctx := NewStateContext().
-		WithGame(game).
-		WithPlayer(player).
-		WithBus(game.Bus)
+		WithHSM(NewHSM(game)).
+		WithPlayer(player)
 
 	state.Enter(ctx)
 
@@ -422,9 +418,8 @@ func TestTurnEndState_Enter_TickBuffs(t *testing.T) {
 
 	state := NewTurnEndState()
 	ctx := NewStateContext().
-		WithGame(game).
-		WithPlayer(player).
-		WithBus(game.Bus)
+		WithHSM(NewHSM(game)).
+		WithPlayer(player)
 
 	state.Enter(ctx)
 
@@ -447,9 +442,8 @@ func TestTurnEndState_Enter_FactionCharging(t *testing.T) {
 
 	state := NewTurnEndState()
 	ctx := NewStateContext().
-		WithGame(game).
-		WithPlayer(player).
-		WithBus(game.Bus)
+		WithHSM(NewHSM(game)).
+		WithPlayer(player)
 
 	state.Enter(ctx)
 

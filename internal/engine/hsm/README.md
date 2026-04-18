@@ -67,20 +67,24 @@ type State interface {
 
 StateContext 提供状态执行的上下文数据，包含：
 - **Metadata**: 嵌入的元数据存储（类型安全的键值对）
-- **Game**: 游戏实例引用
+- **HSM**: HSM实例引用（单一真相来源）
 - **Player**: 当前玩家引用
-- **Bus**: EventBus适配器
-- **MapEngine**: 地图引擎适配器
 - **Phase/PhaseData**: 阶段触发数据
 - **Decision/Decisions**: 待处理决策
 - **Stack**: 状态栈引用
 
+通过 HSM 可以访问 Game、Bus、MapEngine：
+- `ctx.GetGame()` → 通过 HSM 获取游戏数据
+- `ctx.GetBus()` → 通过 HSM 获取 EventBus
+- `ctx.GetMapEngine()` → 通过 HSM 获取地图引擎
+
 ```go
+// 使用 WithHSM 模式（单一真相来源）
+hsmInst := NewHSM(game)
+hsmInst.SetMapEngine(mapEngine)
 ctx := NewStateContext().
-    WithGame(game).
-    WithPlayer(player).
-    WithMapEngine(mapAdapter).
-    WithBus(busAdapter)
+    WithHSM(hsmInst).
+    WithPlayer(player)
 
 // 使用 Metadata 方法
 ctx.SetInt(KeyDiceSteps, 5)
@@ -153,7 +157,7 @@ RegisterTurnStates(hsm)
 RegisterInterruptStates(hsm)
 
 // 启动 HSM
-ctx := NewStateContext().WithGame(game)
+ctx := NewStateContext().WithHSM(hsm)
 hsm.Start(StateMatchInit, ctx)
 
 // 更新循环

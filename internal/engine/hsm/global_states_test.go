@@ -17,7 +17,7 @@ func TestStateMatchInit(t *testing.T) {
 	}
 
 	game := engine.NewGame(id.NewGameID(), 0)
-	ctx := NewStateContext().WithGame(game)
+	ctx := NewStateContext().WithHSM(NewHSM(game))
 	state.Enter(ctx)
 	if !ctx.Success {
 		t.Error("Enter should set Success = true")
@@ -48,7 +48,7 @@ func TestStateRoundMiniGame(t *testing.T) {
 	game.AddPlayer(core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()}))
 	game.AddPlayer(core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()}))
 
-	ctx := NewStateContext().WithGame(game)
+	ctx := NewStateContext().WithHSM(NewHSM(game))
 	state.Enter(ctx)
 
 	if state.totalPlayers != 3 {
@@ -99,7 +99,7 @@ func TestStateRoundPrep(t *testing.T) {
 	game.AddPlayer(p3)
 	game.AddPlayer(p4)
 
-	ctx := NewStateContext().WithGame(game)
+	ctx := NewStateContext().WithHSM(NewHSM(game))
 	ctx.SetMiniGameRank(p1.ID.UUID(), 1)
 	ctx.SetMiniGameRank(p2.ID.UUID(), 2)
 	ctx.SetMiniGameRank(p3.ID.UUID(), 3)
@@ -149,7 +149,7 @@ func TestStateTurnLoop(t *testing.T) {
 	game.AddPlayer(core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()}))
 	game.AddPlayer(core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()}))
 
-	ctx := NewStateContext().WithGame(game)
+	ctx := NewStateContext().WithHSM(NewHSM(game))
 
 	state.Enter(ctx)
 
@@ -218,7 +218,7 @@ func TestStateBossBattle(t *testing.T) {
 	triggerPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	game.AddPlayer(triggerPlayer)
 
-	ctx := NewStateContext().WithGame(game)
+	ctx := NewStateContext().WithHSM(NewHSM(game))
 	ctx.SetString(KeyBossTrigger, triggerPlayer.ID.UUID())
 
 	state.Enter(ctx)
@@ -262,7 +262,7 @@ func TestStateGameOver(t *testing.T) {
 	winnerPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	game.AddPlayer(winnerPlayer)
 
-	ctx := NewStateContext().WithGame(game)
+	ctx := NewStateContext().WithHSM(NewHSM(game))
 	ctx.SetString(KeyWinner, winnerPlayer.ID.UUID())
 
 	state.Enter(ctx)
@@ -356,14 +356,14 @@ func TestHSMGlobalStateFlow(t *testing.T) {
 
 	RegisterGlobalStates(hsm)
 
-	ctx := NewStateContext().WithGame(game)
+	ctx := NewStateContext().WithHSM(NewHSM(game))
 	err := hsm.Start(StateMatchInit, ctx)
 	if err != nil {
 		t.Fatalf("Start failed: %v", err)
 	}
 
 	// Stop HSM with proper context
-	hsm.Stop(NewStateContext().WithGame(game))
+	hsm.Stop(NewStateContext().WithHSM(NewHSM(game)))
 	if hsm.IsRunning() {
 		t.Error("HSM should not be running after Stop")
 	}
@@ -375,7 +375,7 @@ func TestTurnLoopAllPlayersComplete(t *testing.T) {
 	game.AddPlayer(core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()}))
 	game.AddPlayer(core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()}))
 
-	ctx := NewStateContext().WithGame(game)
+	ctx := NewStateContext().WithHSM(NewHSM(game))
 
 	state.Enter(ctx)
 

@@ -168,7 +168,7 @@ func (a *NakamaBroadcastAdapter) SendFullSync(playerID string, state *net.StateS
 
 ### HSM 集成
 
-StateContext 持有 BroadcastAdapter，状态可直接广播：
+StateContext 持有 HSM 引用和 BroadcastAdapter，状态可直接广播：
 
 ```go
 // lifecycle.go - MatchInit
@@ -176,9 +176,12 @@ func (h *NakamaMatchHandler) MatchInit() error {
     // 创建广播适配器
     broadcastAdapter := NewNakamaBroadcastAdapter(h)
 
-    // 创建 StateContext
+    // 设置地图引擎
+    h.hsm.SetMapEngine(h.mapEngine)
+
+    // 创建 StateContext（使用 WithHSM 模式）
     ctx := hsm.NewStateContext().
-        WithGame(h.game).
+        WithHSM(h.hsm).
         WithBroadcast(broadcastAdapter)
 
     // 启动 HSM
