@@ -158,8 +158,10 @@ func (s *RoundPrepState) Enter(ctx *StateContext) {
 		ctx.SetDiceType(player.ID.UUID(), rng.RankToDiceType(rank))
 	}
 
-	// Increment round counter
-	game.State.Round++
+	// Note: round counter is NOT incremented here
+	// round=1 is the first round, round++ happens when round completes
+	// Use HSM's round counter via context
+	_ = ctx.GetRound() // Current round (1 for first round)
 
 	ctx.Success = true
 }
@@ -199,7 +201,8 @@ func (s *TurnLoopState) Enter(ctx *StateContext) {
 	game := ctx.GetGame()
 	players := game.Players
 	if len(players) > 0 {
-		game.State.Turn = 0
+		// Set turn index via HSM
+		ctx.SetTurn(0)
 	}
 
 	ctx.SetBool(KeyTurnLoopActive, true)
@@ -235,11 +238,15 @@ func (s *TurnLoopState) StartPlayerTurn(ctx *StateContext) StateID {
 		// All players completed, next round
 		s.currentPlayerIndex = 0
 		s.turnsCompleted = 0
+
+		// Increment round counter for next round
+		ctx.IncrementRound()
+
 		return StateRoundMiniGame
 	}
 
-	// Set current player
-	game.State.Turn = s.currentPlayerIndex
+	// Set current player turn index via HSM
+	ctx.SetTurn(s.currentPlayerIndex)
 
 	// Transition to TurnUpkeep (first turn state)
 	return StateTurnUpkeep

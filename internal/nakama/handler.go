@@ -122,12 +122,20 @@ func (h *NakamaMatchHandler) GetPlayer(userID string) *core.Player {
 	return h.players[userID]
 }
 
-// GetGameState returns the current game state.
-func (h *NakamaMatchHandler) GetGameState() *engine.GameState {
-	if h.game == nil {
-		return nil
+// GetRound returns the current round number (from HSM).
+func (h *NakamaMatchHandler) GetRound() int {
+	if h.hsm == nil {
+		return 0
 	}
-	return h.game.State
+	return h.hsm.GetRound()
+}
+
+// GetTurn returns the current turn index (from HSM).
+func (h *NakamaMatchHandler) GetTurn() int {
+	if h.hsm == nil {
+		return 0
+	}
+	return h.hsm.GetTurn()
 }
 
 // GetMatchID returns the match ID.

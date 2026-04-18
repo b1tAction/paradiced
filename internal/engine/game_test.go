@@ -27,23 +27,16 @@ func TestNewGame(t *testing.T) {
 	if game.Players == nil {
 		t.Error("Game.Players should not be nil")
 	}
-	if game.State == nil {
-		t.Error("Game.State should not be nil")
-	}
+	// Round/Turn state is now managed by HSM, not stored in Game
+	// Game only stores data (Players, Log, Bus, RNG, Draw)
 	if game.RNG == nil {
 		t.Error("Game.RNG should not be nil")
 	}
 	if game.Draw == nil {
 		t.Error("Game.Draw should not be nil")
 	}
-	if game.State.Round != 1 {
-		t.Errorf("Initial Round = %d, expected 1", game.State.Round)
-	}
-	if game.State.Turn != 0 {
-		t.Errorf("Initial Turn = %d, expected 0", game.State.Turn)
-	}
-	if game.State.CurrentPhase != "init" {
-		t.Errorf("Initial Phase = %s, expected init", game.State.CurrentPhase)
+	if game.Log == nil {
+		t.Error("Game.Log should not be nil")
 	}
 }
 
@@ -191,63 +184,9 @@ func TestGameGetPlayer(t *testing.T) {
 	}
 }
 
-func TestGameGetCurrentPlayer(t *testing.T) {
-	game := NewGame(id.NewGameID(), 0)
-	playerID1 := id.NewPlayerID()
-	playerID2 := id.NewPlayerID()
-	player1 := core.NewPlayer(core.PlayerConfig{ID: playerID1})
-	player2 := core.NewPlayer(core.PlayerConfig{ID: playerID2})
 
-	game.AddPlayer(player1)
-	game.AddPlayer(player2)
 
-	current := game.GetCurrentPlayer()
-	if current == nil {
-		t.Error("GetCurrentPlayer should not return nil")
-	}
-	if current.ID != playerID1 {
-		t.Errorf("Current player.ID = %s, expected %s (Turn=0)", current.ID.UUID(), playerID1.UUID())
-	}
 
-	// 切换回合
-	game.NextTurn()
-	current = game.GetCurrentPlayer()
-	if current.ID != playerID2 {
-		t.Errorf("After NextTurn, current player.ID = %s, expected %s", current.ID.UUID(), playerID2.UUID())
-	}
-}
-
-func TestGameNextTurn(t *testing.T) {
-	game := NewGame(id.NewGameID(), 0)
-	for i := 1; i <= 3; i++ {
-		player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
-		game.AddPlayer(player)
-	}
-
-	// Turn 0 -> 1
-	game.NextTurn()
-	if game.State.Turn != 1 {
-		t.Errorf("Turn = %d, expected 1", game.State.Turn)
-	}
-	if game.State.Round != 1 {
-		t.Errorf("Round should still be 1")
-	}
-
-	// Turn 1 -> 2
-	game.NextTurn()
-	if game.State.Turn != 2 {
-		t.Errorf("Turn = %d, expected 2", game.State.Turn)
-	}
-
-	// Turn 2 -> 0 (wrap around, Round increases)
-	game.NextTurn()
-	if game.State.Turn != 0 {
-		t.Errorf("Turn = %d, expected 0 (wrap around)", game.State.Turn)
-	}
-	if game.State.Round != 2 {
-		t.Errorf("Round = %d, expected 2 (increased after wrap)", game.State.Round)
-	}
-}
 
 // ========== Buff Subscription Tests ==========
 

@@ -81,9 +81,9 @@ func (h *NakamaMatchHandler) HandlePresenceLeave(userID string) error {
 		// Broadcast player disconnect to others
 		broadcast := NewNakamaBroadcastAdapter(h)
 		stateSync := &net.StateSync{
-			GlobalState: h.game.State.CurrentPhase,
-			Round:       h.game.State.Round,
-			Turn:        h.game.State.Turn,
+			GlobalState: h.hsm.GetGlobalStateID().String(),
+			Round:       h.hsm.GetRound(),
+			Turn:        h.hsm.GetTurn(),
 			// Update players list
 		}
 		broadcast.BroadcastStateSync(stateSync)

@@ -96,7 +96,7 @@ func (h *NakamaMatchHandler) getCurrentPlayer() *core.Player {
 		return nil
 	}
 
-	turnIndex := h.game.State.Turn
+	turnIndex := h.hsm.GetTurn()
 	if turnIndex >= 0 && turnIndex < len(h.game.Players) {
 		return h.game.Players[turnIndex]
 	}

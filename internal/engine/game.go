@@ -15,27 +15,21 @@ import (
 )
 
 // Game is the game instance, containing EventBus and all players.
+// Round/Turn state is managed by HSM (single source of truth).
+// Game only stores data, not state.
 type Game struct {
 	ID      id.GameID         `json:"id"`
 	Bus     *event.EventBus   `json:"bus"`
 	Players []*core.Player    `json:"players"`
-	State   *GameState        `json:"state"`
 	RNG     *rand.Rand        `json:"-"`   // Game unique random source
 	Draw    *rng.DrawEngine   `json:"-"`   // Draw engine for random draws
 	Log     *gamelog.GameLog  `json:"log"` // Global game log for playback
 	mutex   sync.RWMutex
 }
 
-// GameState represents game state.
-type GameState struct {
-	Round        int    `json:"round"`         // Current round
-	Turn         int    `json:"turn"`          // Current turn (player index)
-	CurrentPhase string `json:"current_phase"` // Current phase
-	Waiting      bool   `json:"waiting"`       // Waiting for user decision
-}
-
 // NewGame creates a new game instance.
 // seed: random seed (0 for auto-generated from current time)
+// Note: Round/Turn state is managed by HSM, not stored in Game.
 func NewGame(gameID id.GameID, seed int64) *Game {
 	rngSource := seed
 	if rngSource == 0 {
@@ -47,7 +41,6 @@ func NewGame(gameID id.GameID, seed int64) *Game {
 		ID:      gameID,
 		Bus:     event.NewEventBus(gameID.UUID()),
 		Players: make([]*core.Player, 0),
-		State:   &GameState{Round: 1, Turn: 0, CurrentPhase: "init", Waiting: false},
 		RNG:     rngInst,
 		Draw:    rng.NewDrawEngine(rngInst),
 		Log:     gamelog.NewGameLog(),
@@ -90,22 +83,6 @@ func (g *Game) GetPlayer(playerID id.PlayerID) *core.Player {
 	return nil
 }
 
-// GetCurrentPlayer returns the current turn player.
-func (g *Game) GetCurrentPlayer() *core.Player {
-	g.mutex.RLock()
-	defer g.mutex.RUnlock()
-
-	if g.State.Turn < len(g.Players) {
-		return g.Players[g.State.Turn]
-	}
-	return nil
-}
-
-// GetCurrentPlayerInterface returns current player as interface{} (for protocol.Game).
-func (g *Game) GetCurrentPlayerInterface() interface{} {
-	return g.GetCurrentPlayer()
-}
-
 // GetPlayerInterface returns player by ID as interface{} (for protocol.Game).
 func (g *Game) GetPlayerInterface(playerID id.PlayerID) interface{} {
 	return g.GetPlayer(playerID)
@@ -132,18 +109,6 @@ func (g *Game) GetPlayers() []*core.Player {
 // Implements protocol.Game interface.
 func (g *Game) GetGameLog() *gamelog.GameLog {
 	return g.Log
-}
-
-// NextTurn advances to next player's turn.
-func (g *Game) NextTurn() {
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
-
-	g.State.Turn++
-	if g.State.Turn >= len(g.Players) {
-		g.State.Turn = 0
-		g.State.Round++
-	}
 }
 
 // subscribePlayerEffects subscribes player's Buff and Item effects.

@@ -113,13 +113,17 @@ func TestNakamaMatchHandlerGetPlayer(t *testing.T) {
 	}
 }
 
-func TestNakamaMatchHandlerGetGameState(t *testing.T) {
+func TestNakamaMatchHandlerGetRoundTurn(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Before initialization
-	state := handler.GetGameState()
-	if state != nil {
-		t.Error("GetGameState should return nil before initialization")
+	round := handler.GetRound()
+	turn := handler.GetTurn()
+	if round != 0 {
+		t.Errorf("GetRound should return 0 before HSM init, got %d", round)
+	}
+	if turn != 0 {
+		t.Errorf("GetTurn should return 0 before HSM init, got %d", turn)
 	}
 
 	// Add player first
@@ -132,19 +136,15 @@ func TestNakamaMatchHandlerGetGameState(t *testing.T) {
 	}
 
 	// After initialization
-	state = handler.GetGameState()
-	if state == nil {
-		t.Fatal("GetGameState should return state after initialization")
+	round = handler.GetRound()
+	turn = handler.GetTurn()
+	// HSM starts with round=1, turn=0
+	if round != 1 {
+		t.Errorf("Round should be 1 after init, got %d", round)
 	}
 
-	// Note: MatchInit auto-transitions to RoundMiniGame, which may increment Round
-	// We just verify state is non-nil and has valid values
-	if state.Round < 0 {
-		t.Errorf("Round should be >= 0, got %d", state.Round)
-	}
-
-	if state.Turn < 0 {
-		t.Errorf("Turn should be >= 0, got %d", state.Turn)
+	if handler.GetTurn() < 0 {
+		t.Errorf("Turn should be >= 0, got %d", handler.GetTurn())
 	}
 }
 

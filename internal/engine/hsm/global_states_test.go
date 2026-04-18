@@ -120,8 +120,8 @@ func TestStateRoundPrep(t *testing.T) {
 		t.Error("Rank 4 should get wood dice")
 	}
 
-	if game.State.Round != 2 {
-		t.Errorf("Round should be incremented to 2 (started at 1), got %d", game.State.Round)
+	if ctx.GetRound() != 1 {
+		t.Errorf("Round should be 1 (first round, no increment in RoundPrep anymore), got %d", ctx.GetRound())
 	}
 
 	// Verify dice types set correctly

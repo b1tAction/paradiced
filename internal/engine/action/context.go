@@ -14,14 +14,16 @@ import (
 // ActionContext provides context for action execution.
 // Contains references to game engine, event bus, and map engine for executing actions.
 // Embeds util.Metadata for extensible type-safe key-value storage.
+// CurrentPlayer is set by HSM when creating the context (from HSM.GetTurnPlayer()).
 type ActionContext struct {
 	*util.Metadata // Embedded for extensible storage
 
-	Game        protocol.Game      // Game instance (interface to avoid circular dependency with engine)
-	EventBus    *event.EventBus    // EventBus for interception (nil if no interception)
-	MapEngine   *gamemap.MapEngine // MapEngine for movement calculation (direct type)
-	DrawEngine  *rng.DrawEngine    // DrawEngine for random draws (events, buffs, items)
-	ActionQueue *Queue             // Queue for derived actions
+	Game         protocol.Game      // Game instance (interface to avoid circular dependency with engine)
+	EventBus     *event.EventBus    // EventBus for interception (nil if no interception)
+	MapEngine    *gamemap.MapEngine // MapEngine for movement calculation (direct type)
+	DrawEngine   *rng.DrawEngine    // DrawEngine for random draws (events, buffs, items)
+	ActionQueue  *Queue             // Queue for derived actions
+	CurrentPlayer *core.Player      // Current player (set by HSM, nil if not in turn)
 }
 
 // NewActionContext creates a new ActionContext with required components.
@@ -33,7 +35,26 @@ func NewActionContext(game protocol.Game, bus *event.EventBus, mapEngine *gamema
 		MapEngine:   mapEngine,
 		DrawEngine:  drawEngine,
 		ActionQueue: NewQueue(),
+		CurrentPlayer: nil, // Set separately via SetCurrentPlayer
 	}
+}
+
+// NewActionContextWithPlayer creates a new ActionContext with current player.
+func NewActionContextWithPlayer(game protocol.Game, bus *event.EventBus, mapEngine *gamemap.MapEngine, drawEngine *rng.DrawEngine, player *core.Player) *ActionContext {
+	return &ActionContext{
+		Metadata:     util.NewMetadata(),
+		Game:         game,
+		EventBus:     bus,
+		MapEngine:    mapEngine,
+		DrawEngine:   drawEngine,
+		ActionQueue:  NewQueue(),
+		CurrentPlayer: player,
+	}
+}
+
+// SetCurrentPlayer sets the current player for trigger context.
+func (ctx *ActionContext) SetCurrentPlayer(player *core.Player) {
+	ctx.CurrentPlayer = player
 }
 
 // ExecuteAction executes an action with interception support.
@@ -50,12 +71,8 @@ func (ctx *ActionContext) ExecuteAction(action Action) error {
 	prePhase := action.PreTriggerPhase()
 	if prePhase != constants.PhaseAnyTime && ctx.EventBus != nil {
 		// Create context for interception
-		// GetCurrentPlayer returns interface{} from protocol.Game, need type assertion
-		currentPlayer, ok := ctx.Game.GetCurrentPlayerInterface().(*core.Player)
-		if !ok || currentPlayer == nil {
-			currentPlayer = nil
-		}
-		triggerCtx := event.NewContext(currentPlayer)
+		// Use CurrentPlayer set by HSM (from HSM.GetTurnPlayer())
+		triggerCtx := event.NewContext(ctx.CurrentPlayer)
 		triggerCtx.Set("current_action", action)
 		triggerCtx.Set("action_context", ctx)
 
@@ -91,11 +108,7 @@ func (ctx *ActionContext) ExecuteAction(action Action) error {
 	postPhase := action.PostTriggerPhase()
 	if postPhase != constants.PhaseAnyTime && ctx.EventBus != nil {
 		// Create context for post-trigger
-		currentPlayer, ok := ctx.Game.GetCurrentPlayerInterface().(*core.Player)
-		if !ok || currentPlayer == nil {
-			currentPlayer = nil
-		}
-		triggerCtx := event.NewContext(currentPlayer)
+		triggerCtx := event.NewContext(ctx.CurrentPlayer)
 		triggerCtx.Set("current_action", action)
 		triggerCtx.Set("action_context", ctx)
 

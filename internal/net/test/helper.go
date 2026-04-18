@@ -162,8 +162,9 @@ func (h *TestHelper) WaitForDecision(playerID string, decision *pkgnet.Decision)
 
 // AdvanceTurn advances the game to the next player's turn.
 func (h *TestHelper) AdvanceTurn() {
-	h.game.NextTurn()
-	h.hsm.SetTurnPlayer(h.game.GetCurrentPlayer())
+	// Use HSM's NextTurnPlayer to advance turn
+	newPlayer := h.hsm.NextTurnPlayer()
+	h.hsm.SetTurnPlayer(newPlayer)
 }
 
 // Now returns current time for test assertions.

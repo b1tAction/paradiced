@@ -48,8 +48,8 @@ func (b *Builder) BuildStateSync() *pkgnet.StateSync {
 		GlobalState: globalState.String(),
 		TurnState:   turnState.String(),
 		TurnPlayer:  turnPlayerID,
-		Round:       b.game.State.Round,
-		Turn:        b.game.State.Turn,
+		Round:       b.hsm.GetRound(),
+		Turn:        b.hsm.GetTurn(),
 		Paused:      b.hsm.IsPaused(),
 		Players:     b.BuildPlayers(),
 	}
@@ -66,8 +66,8 @@ func (b *Builder) BuildTurnSync() *pkgnet.TurnSync {
 	}
 
 	return &pkgnet.TurnSync{
-		Round:   b.game.State.Round,
-		Turn:    b.game.State.Turn,
+		Round:   b.hsm.GetRound(),
+		Turn:    b.hsm.GetTurn(),
 		Player:  playerID,
 		Entries: entries,
 	}

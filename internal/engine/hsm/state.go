@@ -165,6 +165,37 @@ func (ctx *StateContext) GetMapEngine() *gamemap.MapEngine {
 	return ctx.HSM.GetMapEngine()
 }
 
+// GetRound returns the current round number via HSM.
+func (ctx *StateContext) GetRound() int {
+	if ctx.HSM == nil {
+		return 0
+	}
+	return ctx.HSM.GetRound()
+}
+
+// GetTurn returns the current turn (player index) via HSM.
+func (ctx *StateContext) GetTurn() int {
+	if ctx.HSM == nil {
+		return 0
+	}
+	return ctx.HSM.GetTurn()
+}
+
+// IncrementRound increments the round counter via HSM.
+func (ctx *StateContext) IncrementRound() {
+	if ctx.HSM != nil {
+		ctx.HSM.IncrementRound()
+	}
+}
+
+// SetTurn sets the current turn index via HSM.
+// HSM is the single source of truth for turn state.
+func (ctx *StateContext) SetTurn(turn int) {
+	if ctx.HSM != nil {
+		ctx.HSM.turn = turn
+	}
+}
+
 // ========== Player Setup ==========
 
 // WithPlayer sets the player (direct type).

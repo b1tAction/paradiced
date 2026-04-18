@@ -508,9 +508,16 @@ func (hsm *HSM) SetTurnPlayer(player *core.Player) {
 }
 
 // NextTurnPlayer advances to the next player in turn queue.
+// Returns the new turn player.
 func (hsm *HSM) NextTurnPlayer() *core.Player {
-	hsm.game.NextTurn()
-	hsm.turnPlayer = hsm.game.GetCurrentPlayer()
+	// Use HSM's own turn management
+	hsm.NextTurn()
+	// Get new current player
+	if hsm.turn < len(hsm.game.Players) {
+		hsm.turnPlayer = hsm.game.Players[hsm.turn]
+	} else {
+		hsm.turnPlayer = nil
+	}
 	return hsm.turnPlayer
 }
 

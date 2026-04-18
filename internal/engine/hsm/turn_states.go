@@ -66,7 +66,7 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 	// Start turn log segment
 	game := ctx.GetGame()
 	if game != nil && game.Log != nil {
-		game.Log.StartTurn(game.State.Round, game.State.Turn, player.ID.UUID())
+		game.Log.StartTurn(ctx.GetRound(), ctx.GetTurn(), player.ID.UUID())
 	}
 
 	// Create ActionContext for executing Actions
@@ -133,7 +133,7 @@ func (s *TurnUpkeepState) broadcastStateSync(ctx *StateContext) {
 // buildStateSync creates StateSync from context data.
 func buildStateSync(ctx *StateContext) *pkgnet.StateSync {
 	game := ctx.GetGame()
-	globalState := game.State.CurrentPhase // Use CurrentPhase as global state
+	globalState := ctx.HSM.GetGlobalStateID().String() // Use CurrentPhase as global state
 	turnState := "" // Will be set by current turn state
 
 	var turnPlayerID string
@@ -162,8 +162,8 @@ func buildStateSync(ctx *StateContext) *pkgnet.StateSync {
 		GlobalState: globalState,
 		TurnState:   turnState,
 		TurnPlayer:  turnPlayerID,
-		Round:       game.State.Round,
-		Turn:        game.State.Turn,
+		Round:       ctx.GetRound(),
+		Turn:        ctx.GetTurn(),
 		Paused:      false,
 		Players:     players,
 	}
@@ -251,8 +251,8 @@ func buildTurnSync(ctx *StateContext) *pkgnet.TurnSync {
 	}
 
 	return &pkgnet.TurnSync{
-		Round:   game.State.Round,
-		Turn:    game.State.Turn,
+		Round:   ctx.GetRound(),
+		Turn:    ctx.GetTurn(),
 		Player:  playerID,
 		Entries: entries,
 	}
