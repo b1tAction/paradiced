@@ -5,7 +5,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"time"
 
+	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/heroiclabs/nakama-common/runtime"
 )
 
@@ -24,16 +26,11 @@ type NakamaMatchHandlerAdapter struct {
 	logger    runtime.Logger
 	db        *sql.DB
 	nk        runtime.NakamaModule
-	matchID   string
-	seed      int64
 }
 
-// NewNakamaMatchHandlerAdapter creates a new adapter.
-func NewNakamaMatchHandlerAdapter(matchID string, seed int64) *NakamaMatchHandlerAdapter {
-	return &NakamaMatchHandlerAdapter{
-		matchID: matchID,
-		seed:    seed,
-	}
+// NewNakamaMatchHandlerAdapter creates a new adapter with optional config.
+func NewNakamaMatchHandlerAdapter() *NakamaMatchHandlerAdapter {
+	return &NakamaMatchHandlerAdapter{}
 }
 
 // MatchInit implements runtime.Match.MatchInit.
@@ -43,21 +40,43 @@ func (a *NakamaMatchHandlerAdapter) MatchInit(ctx context.Context, logger runtim
 	a.db = db
 	a.nk = nk
 
+	// Generate match ID and seed
+	matchID := id.NewGameID().UUID()
+	seed := time.Now().UnixNano()
+	if seedParam, ok := params["seed"].(int64); ok {
+		seed = seedParam
+	}
+
 	// Extract config from params
 	maxPlayers := 4
 	mapLength := 100
 	if mp, ok := params["max_players"].(int); ok {
 		maxPlayers = mp
 	}
+	if mp, ok := params["max_players"].(float64); ok {
+		maxPlayers = int(mp)
+	}
 	if ml, ok := params["map_length"].(int); ok {
 		mapLength = ml
 	}
+	if ml, ok := params["map_length"].(float64); ok {
+		mapLength = int(ml)
+	}
 
 	// Create handler
-	a.handler = NewNakamaMatchHandler(a.matchID, a.seed, maxPlayers, mapLength)
+	a.handler = NewNakamaMatchHandler(matchID, seed, maxPlayers, mapLength)
 
-	// Return state, tick rate (10 = 100ms), empty label
-	return a.handler, 10, ""
+	// Build match label (JSON format for match queries)
+	label := map[string]interface{}{
+		"max_players": maxPlayers,
+		"game":        "paradiced",
+	}
+	labelJSON, _ := json.Marshal(label)
+
+	logger.Info("Paradiced match initialized: match_id=%s, seed=%d, max_players=%d, map_length=%d", matchID, seed, maxPlayers, mapLength)
+
+	// Return state, tick rate (10 = 100ms per tick), label
+	return a.handler, 10, string(labelJSON)
 }
 
 // MatchJoinAttempt implements runtime.Match.MatchJoinAttempt.
@@ -71,7 +90,20 @@ func (a *NakamaMatchHandlerAdapter) MatchJoinAttempt(ctx context.Context, logger
 		return state, false, "match is full"
 	}
 
+	// Check if match is already running (4 players joined and game started)
+	if handler.hsm != nil && handler.hsm.IsRunning() {
+		// Allow rejoin for disconnected players
+		if handler.players[presence.GetUserId()] != nil && handler.disconnected[presence.GetUserId()] {
+			return state, true, "rejoin allowed"
+		}
+		// Reject new players after game started
+		if handler.players[presence.GetUserId()] == nil {
+			return state, false, "game already in progress"
+		}
+	}
+
 	// Allow join
+	logger.Debug("Player join attempt accepted: user_id=%s", presence.GetUserId())
 	return state, true, ""
 }
 
@@ -80,16 +112,34 @@ func (a *NakamaMatchHandlerAdapter) MatchJoinAttempt(ctx context.Context, logger
 func (a *NakamaMatchHandlerAdapter) MatchJoin(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, presences []runtime.Presence) interface{} {
 	handler := state.(*NakamaMatchHandler)
 
+	// Build presence list for dispatcher
+	presenceList := make([]runtime.Presence, 0)
+	for _, id := range handler.playerList {
+		if !handler.disconnected[id] {
+			rd, ok := handler.dispatcher.(*RealDispatcherAdapter)
+			if ok && rd != nil {
+				p := rd.GetPresence(id)
+				if p != nil {
+					presenceList = append(presenceList, p)
+				}
+			}
+		}
+	}
+	// Add new presences
+	presenceList = append(presenceList, presences...)
+
 	// Update dispatcher
-	realDispatcher := NewRealDispatcherAdapter(ctx, dispatcher, presences)
+	realDispatcher := NewRealDispatcherAdapter(ctx, dispatcher, presenceList)
 	handler.WithDispatcher(realDispatcher)
 
 	// Handle each joining presence
 	for _, p := range presences {
 		userID := p.GetUserId()
-		// Extract metadata from presence if available
+		// Extract faction from metadata
 		metadata := make(map[string]string)
-		// Note: Nakama presence metadata handling may differ
+		// Note: Nakama join metadata can be passed via presence properties
+		// For now, we use empty metadata and default faction
+		logger.Debug("Player joined: user_id=%s", userID)
 		handler.HandlePresenceJoin(userID, metadata)
 		realDispatcher.UpdatePresence(p)
 	}
@@ -112,6 +162,7 @@ func (a *NakamaMatchHandlerAdapter) MatchLeave(ctx context.Context, logger runti
 
 	// Handle each leaving presence
 	for _, p := range presences {
+		logger.Debug("Player left: user_id=%s", p.GetUserId())
 		handler.HandlePresenceLeave(p.GetUserId())
 	}
 
@@ -127,9 +178,9 @@ func (a *NakamaMatchHandlerAdapter) MatchLoop(ctx context.Context, logger runtim
 	presences := make([]runtime.Presence, 0)
 	for _, id := range handler.playerList {
 		if !handler.disconnected[id] {
-			realDispatcher, ok := handler.dispatcher.(*RealDispatcherAdapter)
-			if ok && realDispatcher != nil {
-				p := realDispatcher.GetPresence(id)
+			rd, ok := handler.dispatcher.(*RealDispatcherAdapter)
+			if ok && rd != nil {
+				p := rd.GetPresence(id)
 				if p != nil {
 					presences = append(presences, p)
 				}
@@ -144,11 +195,19 @@ func (a *NakamaMatchHandlerAdapter) MatchLoop(ctx context.Context, logger runtim
 	for _, msg := range messages {
 		userID := msg.GetUserId() // MatchData extends Presence
 		data := msg.GetData()
+		opCode := msg.GetOpCode()
+		logger.Debug("Received message: user_id=%s, op_code=%d, data_len=%d", userID, opCode, len(data))
 		handler.HandleMessage(userID, data)
 	}
 
-	// Run match loop
-	handler.MatchLoop(0) // delta time not used, tick rate controls timing
+	// Run match loop (delta time not used, tick rate controls timing)
+	handler.MatchLoop(0)
+
+	// If HSM stopped, return nil to end match
+	if handler.hsm != nil && !handler.hsm.IsRunning() {
+		logger.Info("Match ended: match_id=%s", handler.matchID)
+		return nil
+	}
 
 	return state
 }
@@ -157,6 +216,7 @@ func (a *NakamaMatchHandlerAdapter) MatchLoop(ctx context.Context, logger runtim
 // Called when match is shutting down.
 func (a *NakamaMatchHandlerAdapter) MatchTerminate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, graceSeconds int) interface{} {
 	handler := state.(*NakamaMatchHandler)
+	logger.Info("Match terminating: match_id=%s, grace_seconds=%d", handler.matchID, graceSeconds)
 	handler.MatchStop()
 	return nil // Return nil to indicate match ended
 }
@@ -172,10 +232,19 @@ func (a *NakamaMatchHandlerAdapter) MatchSignal(ctx context.Context, logger runt
 		switch signal.Type {
 		case "pause":
 			// Pause match logic if needed
+			a.logger.Debug("Received pause signal")
 		case "resume":
 			// Resume match logic if needed
+			a.logger.Debug("Received resume signal")
 		}
 	}
 
 	return state, "" // Return state and empty response
+}
+
+// matchLabel returns JSON label for match queries.
+type matchLabel struct {
+	MaxPlayers int    `json:"max_players"`
+	Game       string `json:"game"`
+	Status     string `json:"status"`
 }

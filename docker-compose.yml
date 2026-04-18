@@ -1,0 +1,63 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: paradiced-postgres
+    environment:
+      POSTGRES_DB: nakama
+      POSTGRES_USER: nakama
+      POSTGRES_PASSWORD: nakama
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nakama -d nakama"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nakama:
+    image: heroiclabs/nakama:3.19.0
+    container_name: paradiced-nakama
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NAKAMA_CONFIG: /nakama/config.yml
+    volumes:
+      # Plugin modules directory
+      - ./modules:/nakama/modules
+      # Configuration file
+      - ./config.yml:/nakama/config.yml
+      # Nakama data
+      - nakama-data:/nakama/data
+    ports:
+      # API port (for client connections)
+      - "7350:7350"
+      # HTTP API port
+      - "7351:7351"
+      # gRPC port
+      - "7349:7349"
+      # Console port (web dashboard)
+      - "7352:7352"
+    command:
+      - "/nakama/nakama"
+      - "--config=/nakama/config.yml"
+      - "--runtime.path=/nakama/modules"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:7351/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
+    driver: local
+  nakama-data:
+    driver: local
+
+networks:
+  default:
+    name: paradiced-network
