@@ -152,8 +152,8 @@ func TestDamageAction(t *testing.T) {
 	if entry.ActionType != "damage" {
 		t.Errorf("Log ActionType should be damage, got %s", entry.ActionType)
 	}
-	if entry.Delta != -20 {
-		t.Errorf("Log delta should be -20, got %d", entry.Delta)
+	if entry.Metadata.GetIntOrDefault("hp_change", 0) != -20 {
+		t.Errorf("Log delta should be -20, got %d", entry.Metadata.GetIntOrDefault("hp_change", 0))
 	}
 }
 
@@ -217,8 +217,8 @@ func TestHealAction(t *testing.T) {
 	}
 
 	entry := action.LogEntry()
-	if entry.Delta != 30 {
-		t.Errorf("Log delta should be 30, got %d", entry.Delta)
+	if entry.Metadata.GetIntOrDefault("hp_change", 0) != 30 {
+		t.Errorf("Log delta should be 30, got %d", entry.Metadata.GetIntOrDefault("hp_change", 0))
 	}
 }
 
@@ -457,8 +457,8 @@ func TestFellDownAction(t *testing.T) {
 	if entry.ActionType != "fell_down" {
 		t.Errorf("Log ActionType should be fell_down, got %s", entry.ActionType)
 	}
-	if entry.Delta != -1 {
-		t.Errorf("Log delta should be -1, got %d", entry.Delta)
+	if entry.Metadata.GetIntOrDefault("hp_change", 0) != -1 {
+		t.Errorf("Log delta should be -1, got %d", entry.Metadata.GetIntOrDefault("hp_change", 0))
 	}
 }
 
@@ -647,8 +647,8 @@ func TestModifyLPActionFull(t *testing.T) {
 	if entry.ActionType != "modify_lp" {
 		t.Errorf("Log ActionType should be modify_lp, got %s", entry.ActionType)
 	}
-	if entry.Delta != 1 {
-		t.Errorf("Log delta should be 1, got %d", entry.Delta)
+	if entry.Metadata.GetIntOrDefault("lp_change", 0) != 1 {
+		t.Errorf("Log lp_change should be 1, got %d", entry.Metadata.GetIntOrDefault("lp_change", 0))
 	}
 }
 

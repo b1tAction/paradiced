@@ -64,12 +64,14 @@ func TestBuildTurnSync(t *testing.T) {
 	game.Log.StartTurn(1, 0, player.ID.UUID())
 
 	// Add some log entries
-	entry1 := gamelog.NewActionEntry("modify_lp", player.ID.UUID(), 1, "Buff_Divine")
+	meta1 := util.NewMetadata()
+	meta1.SetInt("lp_change", 1)
+	entry1 := gamelog.NewActionEntryWithMetadata("modify_lp", player.ID.UUID(), "Buff_Divine", meta1)
 	game.Log.AddEntry(entry1)
 
 	meta := util.NewMetadata()
 	meta.Set("path", []int{10, 11, 12, 13, 14, 15})
-	entry2 := gamelog.NewActionEntryWithMetadata("move", player.ID.UUID(), 0, "DiceRoll", meta)
+	entry2 := gamelog.NewActionEntryWithMetadata("move", player.ID.UUID(), "DiceRoll", meta)
 	game.Log.AddEntry(entry2)
 
 	turnSync := builder.BuildTurnSync()
@@ -83,8 +85,8 @@ func TestBuildTurnSync(t *testing.T) {
 	if turnSync.Entries[0].ActionType != "modify_lp" {
 		t.Errorf("turnSync.Entries[0].ActionType = %s, want modify_lp", turnSync.Entries[0].ActionType)
 	}
-	if turnSync.Entries[0].Delta != 1 {
-		t.Errorf("turnSync.Entries[0].Delta = %d, want 1", turnSync.Entries[0].Delta)
+	if turnSync.Entries[0].Metadata.GetIntOrDefault("lp_change", 0) != 1 {
+		t.Errorf("turnSync.Entries[0].lp_change = %d, want 1", turnSync.Entries[0].Metadata.GetIntOrDefault("lp_change", 0))
 	}
 	if turnSync.Entries[1].ActionType != "move" {
 		t.Errorf("turnSync.Entries[1].ActionType = %s, want move", turnSync.Entries[1].ActionType)
@@ -106,7 +108,7 @@ func TestBuildTurnSyncWithMetadata(t *testing.T) {
 	meta.SetInt("dice_steps", 3)
 	meta.SetString("dice_type", "silver")
 
-	entry := gamelog.NewActionEntryWithMetadata("move", player.ID.UUID(), 0, "DiceRoll", meta)
+	entry := gamelog.NewActionEntryWithMetadata("move", player.ID.UUID(), "DiceRoll", meta)
 	game.Log.AddEntry(entry)
 
 	turnSync := builder.BuildTurnSync()
@@ -248,7 +250,7 @@ func TestBuildFullSync(t *testing.T) {
 	hsmInstance.SetTurnPlayer(player)
 
 	game.Log.StartTurn(1, 0, player.ID.UUID())
-	game.Log.AddEntry(gamelog.NewActionEntry("heal", player.ID.UUID(), 1, "Test"))
+	game.Log.AddEntry(gamelog.NewActionEntry("heal", player.ID.UUID(), "Test"))
 
 	stateSync, turnSync := builder.BuildFullSync()
 
@@ -302,7 +304,7 @@ func TestGetCurrentTurnEntries(t *testing.T) {
 
 	// Start turn and add entries
 	game.Log.StartTurn(1, 0, player.ID.UUID())
-	game.Log.AddEntry(gamelog.NewActionEntry("damage", player.ID.UUID(), -1, "Test"))
+	game.Log.AddEntry(gamelog.NewActionEntry("damage", player.ID.UUID(), "Test"))
 
 	entries = builder.GetCurrentTurnEntries()
 	if len(entries) != 1 {

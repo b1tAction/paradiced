@@ -220,8 +220,8 @@ func TestTurnFlow_Damage_GameLog(t *testing.T) {
 	if damageEntry == nil {
 		t.Error("Should have damage entry in GameLog")
 	} else {
-		if damageEntry.Delta != -2 {
-			t.Errorf("Damage delta should be -2, got %d", damageEntry.Delta)
+		if damageEntry.Metadata.GetIntOrDefault("hp_change", 0) != -2 {
+			t.Errorf("Damage hp_change should be -2, got %d", damageEntry.Metadata.GetIntOrDefault("hp_change", 0))
 		}
 		if damageEntry.Source != "Event_Trap" {
 			t.Errorf("Damage source should be Event_Trap, got %s", damageEntry.Source)
@@ -311,8 +311,8 @@ func TestTurnFlow_CompleteTurn(t *testing.T) {
 	}
 
 	if moveEntry != nil {
-		if moveEntry.Delta != 5 {
-			t.Errorf("Move delta should be 5, got %d", moveEntry.Delta)
+		if moveEntry.Metadata.GetIntOrDefault("steps", 0) != 5 {
+			t.Errorf("Move steps should be 5, got %d", moveEntry.Metadata.GetIntOrDefault("steps", 0))
 		}
 		if moveEntry.Source != "DiceRoll" {
 			t.Errorf("Move source should be DiceRoll, got %s", moveEntry.Source)
@@ -329,8 +329,8 @@ func TestTurnFlow_CompleteTurn(t *testing.T) {
 	}
 
 	if damageEntry != nil {
-		if damageEntry.Delta != -1 {
-			t.Errorf("Damage delta should be -1, got %d", damageEntry.Delta)
+		if damageEntry.Metadata.GetIntOrDefault("hp_change", 0) != -1 {
+			t.Errorf("Damage hp_change should be -1, got %d", damageEntry.Metadata.GetIntOrDefault("hp_change", 0))
 		}
 	}
 
@@ -474,14 +474,14 @@ func TestDerivedActions_FromHandler(t *testing.T) {
 	for _, entry := range entries {
 		if entry.ActionType == "heal" {
 			hasHeal = true
-			if entry.Delta != 2 {
-				t.Errorf("Heal delta should be 2, got %d", entry.Delta)
+			if entry.Metadata.GetIntOrDefault("hp_change", 0) != 2 {
+				t.Errorf("Heal hp_change should be 2, got %d", entry.Metadata.GetIntOrDefault("hp_change", 0))
 			}
 		}
 		if entry.ActionType == "modify_lp" {
 			hasModifyLP = true
-			if entry.Delta != 1 {
-				t.Errorf("ModifyLP delta should be 1, got %d", entry.Delta)
+			if entry.Metadata.GetIntOrDefault("lp_change", 0) != 1 {
+				t.Errorf("ModifyLP lp_change should be 1, got %d", entry.Metadata.GetIntOrDefault("lp_change", 0))
 			}
 		}
 	}
@@ -506,9 +506,9 @@ func TestGameLog_JSON_Output(t *testing.T) {
 	game.Log.StartTurn(1, 0, player.ID.UUID())
 
 	// Add various entries
-	game.Log.AddEntry(gamelog.NewActionEntry("modify_lp", player.ID.UUID(), 1, "Buff_Divine"))
-	game.Log.AddEntry(gamelog.NewActionEntry("move", player.ID.UUID(), 5, "DiceRoll"))
-	game.Log.AddEntry(gamelog.NewActionEntry("damage", player.ID.UUID(), -2, "Event_Trap"))
+	game.Log.AddEntry(gamelog.NewActionEntry("modify_lp", player.ID.UUID(), "Buff_Divine"))
+	game.Log.AddEntry(gamelog.NewActionEntry("move", player.ID.UUID(), "DiceRoll"))
+	game.Log.AddEntry(gamelog.NewActionEntry("damage", player.ID.UUID(), "Event_Trap"))
 
 	game.Log.EndTurn()
 

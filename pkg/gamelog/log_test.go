@@ -35,7 +35,7 @@ func TestStartTurnEndTurn(t *testing.T) {
 	}
 
 	// Add entry during turn
-	entry := NewActionEntry("Damage", "player1", -5, "Event_Trap")
+	entry := NewActionEntry("Damage", "player1", "Event_Trap")
 	log.AddEntry(entry)
 
 	entries := log.GetCurrentTurnEntries()
@@ -75,7 +75,7 @@ func TestAddEntryWithoutActiveTurn(t *testing.T) {
 	log := NewGameLog()
 
 	// Add entry without starting turn - should be discarded
-	entry := NewActionEntry("Damage", "player1", -5, "Event_Trap")
+	entry := NewActionEntry("Damage", "player1", "Event_Trap")
 	log.AddEntry(entry)
 
 	if log.Len() != 0 {
@@ -89,14 +89,14 @@ func TestMultipleTurns(t *testing.T) {
 	// Turn 1
 	log.StartTurn(1, 0, "player1")
 	metadata1 := util.NewMetadata().SetInt("steps", 5)
-	entry1 := NewActionEntryWithMetadata("Move", "player1", 5, "DiceRoll", metadata1)
+	entry1 := NewActionEntryWithMetadata("Move", "player1", "DiceRoll", metadata1)
 	log.AddEntry(entry1)
 	log.EndTurn()
 
 	// Turn 2
 	log.StartTurn(1, 1, "player2")
-	log.AddEntry(NewActionEntry("Damage", "player2", -3, "Event_Trap"))
-	log.AddEntry(NewActionEntry("Heal", "player2", 2, "Buff_Rain"))
+	log.AddEntry(NewActionEntry("Damage", "player2", "Event_Trap"))
+	log.AddEntry(NewActionEntry("Heal", "player2", "Buff_Rain"))
 	log.EndTurn()
 
 	// Check segments
@@ -125,11 +125,11 @@ func TestGetSegment(t *testing.T) {
 	log := NewGameLog()
 
 	log.StartTurn(1, 0, "player1")
-	log.AddEntry(NewActionEntry("Move", "player1", 5, "DiceRoll"))
+	log.AddEntry(NewActionEntry("Move", "player1", "DiceRoll"))
 	log.EndTurn()
 
 	log.StartTurn(2, 0, "player1")
-	log.AddEntry(NewActionEntry("Damage", "player1", -2, "Event_Trap"))
+	log.AddEntry(NewActionEntry("Damage", "player1", "Event_Trap"))
 	log.EndTurn()
 
 	// Get segment for round 1, turn 0
@@ -162,7 +162,7 @@ func TestToJSON(t *testing.T) {
 
 	log.StartTurn(1, 0, "player1")
 	metadata := util.NewMetadata().SetInt("steps", 5)
-	entry := NewActionEntryWithMetadata("Move", "player1", 5, "DiceRoll", metadata)
+	entry := NewActionEntryWithMetadata("Move", "player1", "DiceRoll", metadata)
 	log.AddEntry(entry)
 	log.EndTurn()
 
@@ -190,7 +190,7 @@ func TestClear(t *testing.T) {
 	log := NewGameLog()
 
 	log.StartTurn(1, 0, "player1")
-	log.AddEntry(NewActionEntry("Move", "player1", 5, "DiceRoll"))
+	log.AddEntry(NewActionEntry("Move", "player1", "DiceRoll"))
 	log.EndTurn()
 
 	if log.Len() != 1 {
@@ -248,8 +248,8 @@ func TestLogStateTransition(t *testing.T) {
 // ========== LogEntry Tests ==========
 
 func TestNewActionEntry(t *testing.T) {
-	metadata := util.NewMetadata().SetBool("piercing", true)
-	entry := NewActionEntryWithMetadata("Damage", "player1", -5, "Event_Trap", metadata)
+	metadata := util.NewMetadata().SetBool("piercing", true).SetInt("hp_change", -5)
+	entry := NewActionEntryWithMetadata("Damage", "player1", "Event_Trap", metadata)
 
 	if entry.Type != constants.EntryTypeAction {
 		t.Errorf("Type should be action, got %s", entry.Type)
@@ -260,8 +260,8 @@ func TestNewActionEntry(t *testing.T) {
 	if entry.Target != "player1" {
 		t.Errorf("Target should be player1, got %s", entry.Target)
 	}
-	if entry.Delta != -5 {
-		t.Errorf("Delta should be -5, got %d", entry.Delta)
+	if entry.Metadata.GetIntOrDefault("hp_change", 0) != -5 {
+		t.Errorf("hp_change should be -5, got %d", entry.Metadata.GetIntOrDefault("hp_change", 0))
 	}
 	if entry.Source != "Event_Trap" {
 		t.Errorf("Source should be Event_Trap, got %s", entry.Source)
@@ -300,7 +300,7 @@ func TestNewStateEntry(t *testing.T) {
 
 func TestLogEntryJSONSerialization(t *testing.T) {
 	metadata := util.NewMetadata().SetInt("checkpoint_pos", 50)
-	entry := NewActionEntryWithMetadata("Respawn", "player1", 0, "DeathRespawn", metadata)
+	entry := NewActionEntryWithMetadata("Respawn", "player1", "DeathRespawn", metadata)
 
 	data, err := json.Marshal(entry)
 	if err != nil {
@@ -355,8 +355,8 @@ func TestNewTurnSegment(t *testing.T) {
 func TestTurnSegmentAddEntry(t *testing.T) {
 	seg := NewTurnSegment(1, 0, "player1")
 
-	seg.AddEntry(NewActionEntry("Move", "player1", 5, "DiceRoll"))
-	seg.AddEntry(NewActionEntry("Damage", "player1", -2, "Event_Trap"))
+	seg.AddEntry(NewActionEntry("Move", "player1", "DiceRoll"))
+	seg.AddEntry(NewActionEntry("Damage", "player1", "Event_Trap"))
 
 	if seg.Len() != 2 {
 		t.Errorf("Should have 2 entries, got %d", seg.Len())
@@ -393,7 +393,7 @@ func TestGameLogConcurrentAccess(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func(idx int) {
 			log.StartTurn(1, idx, "player"+string(rune('0'+idx)))
-			log.AddEntry(NewActionEntry("Move", "player"+string(rune('0'+idx)), idx, "DiceRoll"))
+			log.AddEntry(NewActionEntry("Move", "player"+string(rune('0'+idx)), "DiceRoll"))
 			log.EndTurn()
 			done <- true
 		}(i)
