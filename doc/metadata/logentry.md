@@ -1,6 +1,6 @@
 # LogEntry.Metadata 契约
 
-`gamelog.LogEntry.Metadata` 存储Action效果详情，通过 `TurnSync.Actions` 发送给客户端渲染。
+`gamelog.LogEntry.Metadata` 存储Action效果详情，通过 `TurnSync.Entries` 发送给客户端渲染。
 
 **位置**：`pkg/gamelog/entry.go`
 
@@ -10,23 +10,33 @@
 
 ## 客户端使用说明
 
-客户端根据 `action.type` 判断应解析哪些 metadata 字段：
+客户端根据 `action_type` 判断应解析哪些 metadata 字段：
 
 ```typescript
 // 客户端渲染逻辑
-for (const action of turnSync.actions) {
-    switch (action.type) {
+for (const entry of turnSync.entries) {
+    switch (entry.action_type) {
         case "damage":
-            if (action.blocked_by) {
-                // 显示阻挡来源：action.blocked_by
+            const hpChange = entry.metadata?.hp_change || 0;
+            if (entry.metadata?.blocked_by) {
+                // 显示阻挡来源：entry.metadata.blocked_by
             }
-            if (action.piercing) {
+            if (entry.metadata?.piercing) {
                 // 显示穿透效果图标
             }
+            playDamageAnimation(entry.target, hpChange);
+            break;
+        case "heal":
+            const hpChange = entry.metadata?.hp_change || 0;
+            playHealAnimation(entry.target, hpChange);
+            break;
+        case "modify_lp":
+            const lpChange = entry.metadata?.lp_change || 0;
+            playLPChangeAnimation(entry.target, lpChange);
             break;
         case "move":
-            // action.path 包含完整移动路径
-            playMoveAnimation(action.target, action.path);
+            const path = entry.metadata?.path || [];
+            playMoveAnimation(entry.target, path);
             break;
         // ... 其他类型
     }
@@ -47,7 +57,7 @@ for (const action of turnSync.actions) {
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
-| `delta` | int | 是 | HP变化值（负数，存储在LogEntry.Delta） | 显示伤害数值动画 |
+| `hp_change` | int | 是 | HP变化值（负数） | 显示伤害数值动画 |
 | `blocked_by` | string | 否 | 阻挡来源Buff名称 | 显示"被XX阻挡"提示 |
 | `piercing` | bool | 否 | 是否穿透防御 | 显示穿透效果图标 |
 
@@ -55,18 +65,19 @@ for (const action of turnSync.actions) {
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
-| `delta` | int | 是 | HP变化值（正数，存储在LogEntry.Delta） | 显示恢复数值动画 |
+| `hp_change` | int | 是 | HP变化值（正数） | 显示恢复数值动画 |
 
 ### modify_lp 类型
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
-| `delta` | int | 是 | LP变化值（存储在LogEntry.Delta） | 显示LP变化动画 |
+| `lp_change` | int | 是 | LP变化值 | 显示LP变化动画 |
 
 ### move 类型
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
+| `steps` | int | 是 | 移动步数 | 显示步数 |
 | `start_pos` | int | 是 | 移动起点位置 | 内部计算 |
 | `end_pos` | int | 是 | 移动终点位置 | 内部计算 |
 | `path` | []int | 是 | 移动路径（格子索引列表） | 播放移动动画 |
@@ -78,7 +89,7 @@ for (const action of turnSync.actions) {
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
 | `buff_type` | string | 是 | Buff类型标识 | 显示Buff图标 |
-| `duration` | int | 是 | 持续回合数（存储在LogEntry.Delta） | 显示持续时间（-1表示永久） |
+| `duration` | int | 是 | 持续回合数 | 显示持续时间（-1表示永久） |
 
 ### remove_buff 类型
 
@@ -112,7 +123,7 @@ for (const action of turnSync.actions) {
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
 | `position` | int | 是 | 落坑位置 | 落坑动画位置 |
-| `delta` | int | 是 | 坠落伤害（存储在LogEntry.Delta） | 显示坠落伤害 |
+| `hp_change` | int | 是 | 坠落伤害（负数） | 显示坠落伤害 |
 
 ### respawn 类型
 
@@ -139,78 +150,72 @@ for (const action of turnSync.actions) {
 ## TypeScript 类型定义
 
 ```typescript
-interface Action {
-    type: string;
-    target: string;
-    source: string;
-    
-    // damage/heal/modify_lp (stored in delta field)
-    delta?: number;
-    
-    // damage
-    blocked_by?: string;
-    piercing?: boolean;
-    
-    // move
-    start_pos?: number;
-    end_pos?: number;
-    path?: number[];
-    
-    // add_buff/remove_buff
-    buff_type?: string;
-    
-    // draw_event
-    event_type?: string;
-    event_name?: string;
-    
-    // teleport
-    from_pos?: number;
-    to_pos?: number;
-    
-    // fell_down/respawn
-    position?: number;
-    checkpoint_pos?: number;
-    
-    // steal_buff
-    stolen_by?: string;
-    
-    // state
-    from_state?: string;
-    to_state?: string;
+interface LogEntry {
+    timestamp: string;
+    type: string;  // "action" | "state"
+    action_type?: string;
+    target?: string;
+    source?: string;
+    metadata?: {
+        // 语义明确的数值字段（替代旧的 delta）
+        hp_change?: number;    // damage/heal/fell_down: HP变化
+        lp_change?: number;    // modify_lp: LP变化
+        duration?: number;     // add_buff: Buff持续时间
+        steps?: number;        // move: 移动步数
+
+        // damage
+        blocked_by?: string;
+        piercing?: boolean;
+
+        // move
+        start_pos?: number;
+        end_pos?: number;
+        path?: number[];
+
+        // add_buff/remove_buff
+        buff_type?: string;
+
+        // draw_event
+        event_type?: string;
+        event_name?: string;
+
+        // teleport
+        from_pos?: number;
+        to_pos?: number;
+
+        // fell_down/respawn
+        position?: number;
+        checkpoint_pos?: number;
+
+        // steal_buff
+        stolen_by?: string;
+
+        // state
+        from?: string;
+        to?: string;
+    };
 }
 ```
 
 ---
 
-## Builder 映射
+## Go Action 实现
 
-`internal/net/builder.go` 的 `buildAction()` 方法将 LogEntry.Metadata 字段映射到 `pkg/net.Action` 展平字段：
+`internal/engine/action/types.go` 中各 Action 的 `LogEntry()` 方法设置语义明确的 Metadata 字段：
 
-```go
-func (b *Builder) buildAction(entry gamelog.LogEntry) pkgnet.Action {
-    action := pkgnet.Action{
-        Type:   string(entry.ActionType),
-        Target: entry.Target,
-        Source: entry.Source,
-    }
-    
-    // 从 Metadata 提取并展平到 Action 字段
-    switch entry.ActionType {
-    case "move":
-        action.Path = metadataGetIntSlice(meta, "path")
-        action.StartPos = metadataGetInt(meta, "start_pos")
-        action.EndPos = metadataGetInt(meta, "end_pos")
-    case "add_buff":
-        action.BuffType = metadataGetString(meta, "buff_type")
-    // ... 其他类型
-    }
-}
-```
+| Action | Metadata 字段 | 示例 |
+|--------|--------------|------|
+| DamageAction | `hp_change: -amount` | `hp_change: -5` |
+| HealAction | `hp_change: amount` | `hp_change: 3` |
+| ModifyLPAction | `lp_change: amount` | `lp_change: 1` |
+| MoveAction | `steps: steps`, `start_pos`, `end_pos`, `path` | `steps: 5` |
+| AddBuffAction | `buff_type`, `duration: duration` | `duration: 3` |
+| FellDownAction | `position`, `hp_change: -damage` | `hp_change: -10` |
 
 ---
 
 ## 相关文档
 
 - [pkg/gamelog/README.md](../../pkg/gamelog/README.md) - GameLog系统
-- [doc/internal/net_protocol.md](../internal/net_protocol.md) - 网络协议设计
-- [pkg/net/README.md](../../pkg/net/README.md) - pkg/net协议层
+- [pkg/net/sync.go](../../pkg/net/sync.go) - TurnSync契约注释
+- [internal/engine/action/README.md](../../internal/engine/action/README.md) - Action实现
