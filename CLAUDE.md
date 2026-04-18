@@ -172,6 +172,11 @@ GOMODCACHE=/app/.gomodcache go test ./...
 - `docs(scope): description` - Documentation update
 - `chore(scope): description` - Maintenance tasks
 
+### Git Operations
+- **禁止使用 `git add .` 或 `git add -A`**：每次提交必须明确指定具体文件
+- 正确做法：`git add file1.go file2.go && git commit -m "..."`
+- 先 `git status` 查看改动，按改动方向分批提交
+
 ## Metadata Contracts
 
 **重要**：项目中多个类型嵌入 `util.Metadata`，所有字段使用必须遵循契约文档。
