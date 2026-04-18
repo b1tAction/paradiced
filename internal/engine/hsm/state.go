@@ -3,10 +3,13 @@ package hsm
 import (
 	"time"
 
+	pkgnet "github.com/b1tAction/paradiced/pkg/net"
+
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/engine"
+	"github.com/b1tAction/paradiced/internal/event"
+	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
-	"github.com/b1tAction/paradiced/pkg/event"
 	"github.com/b1tAction/paradiced/pkg/rng"
 	"github.com/b1tAction/paradiced/pkg/util"
 )
@@ -73,7 +76,7 @@ type StateContext struct {
 
 	// ========== Broadcast Adapter ==========
 	// Broadcast adapter for client communication (set by HSM)
-	Broadcast BroadcastAdapter
+	Broadcast pkgnet.BroadcastAdapter
 
 	// ========== Phase Triggering ==========
 	Phase     constants.Phase // Current phase to trigger
@@ -121,15 +124,15 @@ func (ctx *StateContext) WithGame(game *engine.Game) *StateContext {
 	return ctx
 }
 
-// WithBus sets EventBus adapter directly (backward compatibility).
-func (ctx *StateContext) WithBus(bus EventBusAdapter) *StateContext {
+// WithBus sets EventBus directly (backward compatibility).
+func (ctx *StateContext) WithBus(bus *event.EventBus) *StateContext {
 	// Store in HSM if available, otherwise ignore
 	// This is for backward compatibility only
 	return ctx
 }
 
-// WithMapEngine sets MapEngine adapter directly (backward compatibility).
-func (ctx *StateContext) WithMapEngine(engine MapEngineAdapter) *StateContext {
+// WithMapEngine sets MapEngine directly (backward compatibility).
+func (ctx *StateContext) WithMapEngine(engine *gamemap.MapEngine) *StateContext {
 	if ctx.HSM != nil {
 		ctx.HSM.SetMapEngine(engine)
 	}
@@ -146,16 +149,16 @@ func (ctx *StateContext) GetGame() *engine.Game {
 	return ctx.HSM.GetGame()
 }
 
-// GetBus returns the EventBus adapter via HSM.
-func (ctx *StateContext) GetBus() EventBusAdapter {
+// GetBus returns the EventBus via HSM.
+func (ctx *StateContext) GetBus() *event.EventBus {
 	if ctx.HSM == nil {
 		return nil
 	}
 	return ctx.HSM.GetBus()
 }
 
-// GetMapEngine returns the MapEngine adapter via HSM.
-func (ctx *StateContext) GetMapEngine() MapEngineAdapter {
+// GetMapEngine returns the MapEngine via HSM.
+func (ctx *StateContext) GetMapEngine() *gamemap.MapEngine {
 	if ctx.HSM == nil {
 		return nil
 	}
@@ -173,7 +176,7 @@ func (ctx *StateContext) WithPlayer(player *core.Player) *StateContext {
 // ========== Broadcast Setup ==========
 
 // WithBroadcast sets the Broadcast adapter for client communication.
-func (ctx *StateContext) WithBroadcast(adapter BroadcastAdapter) *StateContext {
+func (ctx *StateContext) WithBroadcast(adapter pkgnet.BroadcastAdapter) *StateContext {
 	ctx.Broadcast = adapter
 	return ctx
 }
@@ -309,34 +312,4 @@ func (ctx *StateContext) Clear() {
 	ctx.Success = true
 	ctx.Error = nil
 	ctx.Metadata.Clear()
-}
-
-// ========== BroadcastAdapter Interface ==========
-
-// BroadcastAdapter defines the interface for broadcasting messages to clients.
-// HSM and StateContext use this interface to send sync messages.
-type BroadcastAdapter interface {
-	// BroadcastStateSync broadcasts state sync to all players.
-	BroadcastStateSync(state interface{}) error
-
-	// BroadcastTurnSync broadcasts turn action list to all players.
-	BroadcastTurnSync(turn interface{}) error
-
-	// SendDecision sends a decision request to a specific player.
-	SendDecision(playerID string, decision interface{}) error
-
-	// SendAvailable sends available actions to a specific player.
-	SendAvailable(playerID string, available interface{}) error
-
-	// BroadcastMiniGameStart broadcasts mini-game start notification.
-	BroadcastMiniGameStart(start interface{}) error
-
-	// BroadcastMiniGameResult broadcasts mini-game ranking results.
-	BroadcastMiniGameResult(result interface{}) error
-
-	// BroadcastGameOver broadcasts game end notification.
-	BroadcastGameOver(over interface{}) error
-
-	// SendFullSync sends complete state to a reconnecting player.
-	SendFullSync(playerID string, state, turn interface{}) error
 }

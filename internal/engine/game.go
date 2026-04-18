@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/b1tAction/paradiced/internal/core"
+	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
-	"github.com/b1tAction/paradiced/pkg/event"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
 	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/b1tAction/paradiced/pkg/rng"
@@ -101,6 +101,26 @@ func (g *Game) GetCurrentPlayer() *core.Player {
 	return nil
 }
 
+// GetCurrentPlayerInterface returns current player as interface{} (for protocol.Game).
+func (g *Game) GetCurrentPlayerInterface() interface{} {
+	return g.GetCurrentPlayer()
+}
+
+// GetPlayerInterface returns player by ID as interface{} (for protocol.Game).
+func (g *Game) GetPlayerInterface(playerID id.PlayerID) interface{} {
+	return g.GetPlayer(playerID)
+}
+
+// GetPlayersInterface returns all players as []interface{} (for protocol.Game).
+func (g *Game) GetPlayersInterface() []interface{} {
+	players := g.GetPlayers()
+	result := make([]interface{}, len(players))
+	for i, p := range players {
+		result[i] = p
+	}
+	return result
+}
+
 // GetPlayers returns all players in the game.
 func (g *Game) GetPlayers() []*core.Player {
 	g.mutex.RLock()
@@ -138,7 +158,7 @@ func (g *Game) subscribePlayerEffects(player *core.Player) {
 }
 
 // createBuffDecision creates a Decision for Buff using handler config.
-func (g *Game) createBuffDecision(buff *core.Buff, def *core.BuffDefinition, config *core.BuffHandlerConfig) *event.Decision {
+func (g *Game) createBuffDecision(buff *core.Buff, def *core.BuffDefinition, config *BuffHandlerConfig) *event.Decision {
 	desc := def.Desc
 	if config.NeedConfirm {
 		return event.NewDecision(desc, []event.Option{
@@ -151,7 +171,7 @@ func (g *Game) createBuffDecision(buff *core.Buff, def *core.BuffDefinition, con
 }
 
 // createItemDecision creates a Decision for Item using handler config.
-func (g *Game) createItemDecision(item *core.Item, def *core.ItemDefinition, config *core.ItemHandlerConfig) *event.Decision {
+func (g *Game) createItemDecision(item *core.Item, def *core.ItemDefinition, config *ItemHandlerConfig) *event.Decision {
 	desc := def.Desc
 	if config.NeedConfirm {
 		return event.NewDecision(desc, []event.Option{
@@ -172,8 +192,8 @@ func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
 		return
 	}
 
-	def := core.GetBuffDefinition(buff.Type)
-	config := core.GetBuffHandlerConfig(buff.Type)
+	def := GetBuffDefinition(buff.Type)
+	config := GetBuffHandlerConfig(buff.Type)
 	if def == nil || config == nil {
 		return
 	}
@@ -205,7 +225,7 @@ func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
 }
 
 // createBuffDecisionWithAction creates a Buff Decision with Action using handler config.
-func (g *Game) createBuffDecisionWithAction(buff *core.Buff, def *core.BuffDefinition, config *core.BuffHandlerConfig, action func(ctx *event.Context)) *event.Decision {
+func (g *Game) createBuffDecisionWithAction(buff *core.Buff, def *core.BuffDefinition, config *BuffHandlerConfig, action func(ctx *event.Context)) *event.Decision {
 	desc := def.Desc
 	if config.NeedConfirm {
 		return event.NewDecision(desc, []event.Option{
@@ -232,8 +252,8 @@ func (g *Game) UnsubscribeBuff(buff *core.Buff) {
 // SubscribeItem subscribes when player gets a new Item.
 // Uses ItemHandlerConfig for Phase/Priority/NeedConfirm.
 func (g *Game) SubscribeItem(player *core.Player, item *core.Item) {
-	def := core.GetItemDefinition(item.Type)
-	config := core.GetItemHandlerConfig(item.Type)
+	def := GetItemDefinition(item.Type)
+	config := GetItemHandlerConfig(item.Type)
 	if def == nil || config == nil {
 		return
 	}
@@ -250,7 +270,7 @@ func (g *Game) SubscribeItem(player *core.Player, item *core.Item) {
 }
 
 // createItemDecisionWithAction creates an Item Decision with Action using handler config.
-func (g *Game) createItemDecisionWithAction(item *core.Item, def *core.ItemDefinition, config *core.ItemHandlerConfig, action func(ctx *event.Context)) *event.Decision {
+func (g *Game) createItemDecisionWithAction(item *core.Item, def *core.ItemDefinition, config *ItemHandlerConfig, action func(ctx *event.Context)) *event.Decision {
 	desc := def.Desc
 	if config.NeedConfirm {
 		return event.NewDecision(desc, []event.Option{

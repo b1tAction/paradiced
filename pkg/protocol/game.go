@@ -10,8 +10,8 @@ import (
 // Note: Uses interface{} for Player return types to avoid circular dependency.
 // Concrete implementations return their specific Player types.
 type Game interface {
-	GetCurrentPlayer() interface{}
-	GetPlayer(id id.PlayerID) interface{}
-	GetPlayers() []interface{}
+	GetCurrentPlayerInterface() interface{}
+	GetPlayerInterface(id id.PlayerID) interface{}
+	GetPlayersInterface() []interface{}
 	GetGameLog() *gamelog.GameLog // Get the global game log for playback
 }

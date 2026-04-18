@@ -7,9 +7,9 @@ import (
 
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/engine"
-	"github.com/b1tAction/paradiced/pkg/event"
+	"github.com/b1tAction/paradiced/internal/event"
+	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/id"
-	"github.com/b1tAction/paradiced/pkg/protocol"
 )
 
 // HSM is the main Hierarchical State Machine structure.
@@ -34,9 +34,9 @@ type HSM struct {
 	factory StateFactory      // State factory for creating instances
 
 	// ========== Core References ==========
-	game      *engine.Game      // Game instance (single source of truth)
-	bus       EventBusAdapter   // EventBus adapter (derived from game)
-	mapEngine MapEngineAdapter  // MapEngine adapter (set externally)
+	game      *engine.Game       // Game instance (single source of truth)
+	bus       *event.EventBus    // EventBus (derived from game)
+	mapEngine *gamemap.MapEngine // MapEngine (set externally)
 
 	// ========== Timing ==========
 	lastUpdate     time.Time // Last update timestamp
@@ -49,17 +49,13 @@ type HSM struct {
 
 // NewHSM creates a new HSM instance.
 func NewHSM(game *engine.Game) *HSM {
-	var busAdapter EventBusAdapter
-	if game != nil && game.Bus != nil {
-		busAdapter = NewEventBusWrapper(game.Bus)
-	}
 	return &HSM{
 		globalStateID: StateNone,
 		turnStateID:   StateNone,
 		stack:         NewStateStack(),
 		states:        make(map[StateID]State),
 		game:          game,
-		bus:           busAdapter,
+		bus:           game.Bus,
 		running:       false,
 		paused:        false,
 	}
@@ -142,26 +138,19 @@ func (hsm *HSM) GetGame() *engine.Game {
 	return hsm.game
 }
 
-// GetBus returns the EventBus adapter.
-func (hsm *HSM) GetBus() EventBusAdapter {
+// GetBus returns the EventBus (direct type).
+func (hsm *HSM) GetBus() *event.EventBus {
 	return hsm.bus
 }
 
-// GetMapEngine returns the MapEngine adapter.
-func (hsm *HSM) GetMapEngine() MapEngineAdapter {
+// GetMapEngine returns the MapEngine (direct type).
+func (hsm *HSM) GetMapEngine() *gamemap.MapEngine {
 	return hsm.mapEngine
 }
 
-// SetMapEngine sets the MapEngine adapter.
-func (hsm *HSM) SetMapEngine(engine MapEngineAdapter) {
+// SetMapEngine sets the MapEngine (direct type).
+func (hsm *HSM) SetMapEngine(engine *gamemap.MapEngine) {
 	hsm.mapEngine = engine
-}
-
-// GetBroadcast returns a protocol.Broadcast interface.
-// Creates NakamaBroadcastAdapter if needed (placeholder for now).
-func (hsm *HSM) GetBroadcast() protocol.Broadcast {
-	// Placeholder - actual implementation in Nakama integration
-	return nil
 }
 
 // GetCurrentStateID returns the currently active state ID.

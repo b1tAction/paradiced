@@ -1,8 +1,10 @@
 package action
 
 import (
+	"github.com/b1tAction/paradiced/internal/core"
+	"github.com/b1tAction/paradiced/internal/event"
+	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
-	"github.com/b1tAction/paradiced/pkg/event"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
 	"github.com/b1tAction/paradiced/pkg/protocol"
 	"github.com/b1tAction/paradiced/pkg/rng"
@@ -15,15 +17,15 @@ import (
 type ActionContext struct {
 	*util.Metadata // Embedded for extensible storage
 
-	Game        protocol.Game      // Game instance (interface to avoid circular dependency)
+	Game        protocol.Game      // Game instance (interface to avoid circular dependency with engine)
 	EventBus    *event.EventBus    // EventBus for interception (nil if no interception)
-	MapEngine   protocol.MapEngine // MapEngine for movement calculation
+	MapEngine   *gamemap.MapEngine // MapEngine for movement calculation (direct type)
 	DrawEngine  *rng.DrawEngine    // DrawEngine for random draws (events, buffs, items)
 	ActionQueue *Queue             // Queue for derived actions
 }
 
 // NewActionContext creates a new ActionContext with required components.
-func NewActionContext(game protocol.Game, bus *event.EventBus, mapEngine protocol.MapEngine, drawEngine *rng.DrawEngine) *ActionContext {
+func NewActionContext(game protocol.Game, bus *event.EventBus, mapEngine *gamemap.MapEngine, drawEngine *rng.DrawEngine) *ActionContext {
 	return &ActionContext{
 		Metadata:    util.NewMetadata(),
 		Game:        game,
@@ -48,7 +50,12 @@ func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
 	prePhase := action.PreTriggerPhase()
 	if prePhase != constants.PhaseAnyTime && ctx.EventBus != nil {
 		// Create context for interception
-		triggerCtx := event.NewContext(ctx.Game.GetCurrentPlayer())
+		// GetCurrentPlayer returns interface{} from protocol.Game, need type assertion
+		currentPlayer, ok := ctx.Game.GetCurrentPlayerInterface().(*core.Player)
+		if !ok || currentPlayer == nil {
+			currentPlayer = nil
+		}
+		triggerCtx := event.NewContext(currentPlayer)
 		triggerCtx.Set("current_action", action)
 		triggerCtx.Set("action_context", ctx)
 
@@ -84,7 +91,11 @@ func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
 	postPhase := action.PostTriggerPhase()
 	if postPhase != constants.PhaseAnyTime && ctx.EventBus != nil {
 		// Create context for post-trigger
-		triggerCtx := event.NewContext(ctx.Game.GetCurrentPlayer())
+		currentPlayer, ok := ctx.Game.GetCurrentPlayerInterface().(*core.Player)
+		if !ok || currentPlayer == nil {
+			currentPlayer = nil
+		}
+		triggerCtx := event.NewContext(currentPlayer)
 		triggerCtx.Set("current_action", action)
 		triggerCtx.Set("action_context", ctx)
 
@@ -135,5 +146,8 @@ func (ctx *ActionContext) Clear() {
 
 // GetGameLog returns the global game log (helper method).
 func (ctx *ActionContext) GetGameLog() *gamelog.GameLog {
+	if ctx.Game == nil {
+		return nil
+	}
 	return ctx.Game.GetGameLog()
 }

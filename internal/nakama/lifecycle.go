@@ -21,14 +21,11 @@ func (h *NakamaMatchHandler) MatchInit() error {
 	// Create broadcast adapter
 	broadcastAdapter := NewNakamaBroadcastAdapter(h)
 
-	// Create map engine adapter for HSM
-	mapAdapter := hsm.NewMapEngineWrapper(h.mapEngine)
-
-	// Create state context for HSM
+	// Create state context for HSM (using direct types)
 	ctx := hsm.NewStateContext().
 		WithGame(h.game).
-		WithBus(hsm.NewEventBusWrapper(h.game.Bus)).
-		WithMapEngine(mapAdapter).
+		WithBus(h.game.Bus).
+		WithMapEngine(h.mapEngine).
 		WithBroadcast(broadcastAdapter)
 
 	// Start HSM - enters MatchInit state
@@ -45,13 +42,13 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 		return nil // Match ended or paused
 	}
 
-	// Create state context with current player
+	// Create state context with current player (using direct types)
 	currentPlayer := h.getCurrentPlayer()
 	ctx := hsm.NewStateContext().
 		WithGame(h.game).
 		WithPlayer(currentPlayer).
-		WithBus(hsm.NewEventBusWrapper(h.game.Bus)).
-		WithMapEngine(hsm.NewMapEngineWrapper(h.mapEngine)).
+		WithBus(h.game.Bus).
+		WithMapEngine(h.mapEngine).
 		WithBroadcast(NewNakamaBroadcastAdapter(h))
 
 	// Update HSM
