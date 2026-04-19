@@ -1,7 +1,7 @@
 # Paradiced - Makefile for building and running Nakama server
 
-# Go module cache
-GOMODCACHE ?= /app/.gomodcache
+# Go module cache (use local path for development)
+GOMODCACHE ?= $(shell pwd)/.gomodcache
 
 # Build output
 PLUGIN_NAME ?= paradiced-server
