@@ -260,6 +260,7 @@ GOMODCACHE=${workdir}/.gomodcache go test ./...
 ```
 
 ### Commit Convention
+Git Commit信息必须使用英文提交
 
 - `feat(scope): description` - New feature
 - `refactor(scope): description` - Code refactoring
