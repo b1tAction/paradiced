@@ -16,13 +16,12 @@ internal/cli/
 ├── README.md           # 本文件
 ├── command/
 │   ├── root.go         # 根命令定义
-│   ├── playtest.go     # playtest 命令（run/soak）
-│   └── ...
+│   └── playtest.go     # playtest 命令（run/soak）
 ├── model/
 │   └── message.go      # CLI 协议消息类型定义
 ├── nakama/
 │   ├── client.go       # Nakama HTTP 客户端
-│   └── socket.go       # Nakama WebSocket 客户端
+│   └── client_test.go  # 单元测试
 ├── scenario/
 │   └── autoplay.go     # 自动化对局场景
 └── report/
@@ -113,8 +112,8 @@ CLI 需要覆盖以下服务端 OpCode（1-99）：
 | OpCode | 名称 | 数据类型 | 处理状态 |
 |--------|------|----------|----------|
 | 100 | `OpRollDice` | `RollDice` | ✅ 已实现 |
-| 101 | `OpUseItem` | `UseItem` | ⏳ 待实现 |
-| 102 | `OpUseSkill` | `UseSkill` | ⏳ 待实现 |
+| 101 | `OpUseItem` | `UseItem` | ✅ 已实现 |
+| 102 | `OpUseSkill` | `UseSkill` | ✅ 已实现 |
 | 103 | `OpUserChoice` | `UserChoice` | ✅ 已实现 |
 | 104 | `OpMiniGameResultSubmit` | `MiniGameResultSubmit` | ✅ 已实现 |
 
@@ -263,6 +262,9 @@ type Available struct {
 # 运行 CLI 相关测试
 go test ./internal/cli/... -v
 
+# 运行客户端单元测试
+go test ./internal/cli/nakama/... -v
+
 # 运行协议模型测试
 go test ./internal/cli/model/... -v
 ```
@@ -304,12 +306,19 @@ go test ./internal/cli/model/... -v
 
 ## 待办事项
 
-1. ⏳ 实现 `OpMiniGameResult` 处理
-2. ⏳ 实现 `OpFullSync` 处理（断线重连测试）
-3. ⏳ 实现道具使用测试（`OpUseItem`）
-4. ⏳ 实现阵营技能测试（`OpUseSkill`）
-5. ⏳ 改进小游戏排名策略（确保唯一性）
-6. ⏳ 添加 ActionRejected 处理
+已完成事项：
+1. ✅ 实现 `OpMiniGameResult` 处理
+2. ✅ 实现 `OpFullSync` 处理（断线重连测试）
+3. ✅ 实现道具使用测试（`OpUseItem`）
+4. ✅ 实现阵营技能测试（`OpUseSkill`）
+5. ✅ 改进小游戏排名策略（确保唯一性）
+6. ✅ 添加 ActionRejected 处理
+7. ✅ 添加客户端并发发送消息保护（sync.Mutex）
+
+待办事项：
+1. ⏳ 添加更多单元测试覆盖 scenario 包
+2. ⏳ 实现测试报告生成（JSON 输出）
+3. ⏳ 添加自定义策略支持（通过配置文件）
 
 ## 相关文档
 
