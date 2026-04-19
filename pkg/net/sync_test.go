@@ -14,14 +14,14 @@ import (
 
 func TestStateSyncJSON(t *testing.T) {
 	sync := &StateSync{
-		GlobalState: "turn_loop",
-		TurnState:   "main_action",
-		TurnPlayer:  "player-abc123",
-		Round:       1,
-		Turn:        0,
-		Paused:      false,
+		GlobalState:   "turn_loop",
+		TurnState:     "main_action",
+		CurrentPlayerID: "player-abc123",
+		Round:         1,
+		Turn:          0,
+		Paused:        false,
 		Players: []Player{
-			{UserID: "player-abc123", Faction: "qing_long", Position: 10, HP: 6, LP: 5},
+			{PlayerID: "player-abc123", Faction: "qing_long", Position: 10, HP: 6, LP: 5},
 		},
 	}
 
@@ -39,8 +39,8 @@ func TestStateSyncJSON(t *testing.T) {
 	if !strings.Contains(jsonStr, `"turn_state"`) {
 		t.Error("JSON should contain 'turn_state' field")
 	}
-	if !strings.Contains(jsonStr, `"turn_player"`) {
-		t.Error("JSON should contain 'turn_player' field")
+	if !strings.Contains(jsonStr, `"current_player_id"`) {
+		t.Error("JSON should contain 'current_player_id' field")
 	}
 	if !strings.Contains(jsonStr, `"players"`) {
 		t.Error("JSON should contain 'players' field")
@@ -56,10 +56,10 @@ func TestTurnSyncWithLogEntries(t *testing.T) {
 	entry2 := gamelog.NewActionEntryWithMetadata("move", "player-abc123", "DiceRoll", entry2Meta)
 
 	sync := &TurnSync{
-		Round:   1,
-		Turn:    0,
-		Player:  "player-abc123",
-		Entries: []gamelog.LogEntry{entry1, entry2},
+		Round:             1,
+		Turn:              0,
+		CurrentPlayerID:   "player-abc123",
+		Entries:           []gamelog.LogEntry{entry1, entry2},
 	}
 
 	jsonBytes, err := json.Marshal(sync)
@@ -88,10 +88,10 @@ func TestTurnSyncWithLogEntries(t *testing.T) {
 
 func TestTurnSyncJSONFieldNames(t *testing.T) {
 	sync := &TurnSync{
-		Round:   1,
-		Turn:    0,
-		Player:  "player-abc123",
-		Entries: []gamelog.LogEntry{},
+		Round:           1,
+		Turn:            0,
+		CurrentPlayerID: "player-abc123",
+		Entries:         []gamelog.LogEntry{},
 	}
 
 	jsonBytes, err := json.Marshal(sync)
@@ -256,7 +256,7 @@ func TestItemWithName(t *testing.T) {
 
 func TestPlayerWithBuffsAndItems(t *testing.T) {
 	player := Player{
-		UserID:      "player-001",
+		PlayerID:    "player-001",
 		Faction:     "zhu_que",
 		Position:    25,
 		HP:          6,
@@ -276,8 +276,8 @@ func TestPlayerWithBuffsAndItems(t *testing.T) {
 	if err != nil {
 		t.Fatalf("json.Unmarshal() error: %v", err)
 	}
-	if parsed.UserID != "player-001" {
-		t.Errorf("parsed.UserID = %s, want player-001", parsed.UserID)
+	if parsed.PlayerID != "player-001" {
+		t.Errorf("parsed.PlayerID = %s, want player-001", parsed.PlayerID)
 	}
 	if len(parsed.Buffs) != 1 {
 		t.Errorf("len(parsed.Buffs) = %d, want 1", len(parsed.Buffs))
@@ -350,7 +350,7 @@ func TestGameOver(t *testing.T) {
 	over := GameOver{
 		WinnerID: "player-001",
 		Stats: []PlayerStats{
-			{UserID: "player-001", RoundsWon: 3, EventsDrawn: 5, ItemsUsed: 2},
+			{PlayerID: "player-001", RoundsWon: 3, EventsDrawn: 5, ItemsUsed: 2},
 		},
 	}
 
@@ -398,19 +398,19 @@ func TestAvailableWithItems(t *testing.T) {
 
 func TestFullSync(t *testing.T) {
 	stateSync := &StateSync{
-		GlobalState: "turn_loop",
-		TurnState:   "main_action",
-		TurnPlayer:  "player-001",
-		Round:       1,
-		Turn:        0,
-		Players:     []Player{{UserID: "player-001", Faction: "qing_long"}},
+		GlobalState:     "turn_loop",
+		TurnState:       "main_action",
+		CurrentPlayerID: "player-001",
+		Round:           1,
+		Turn:            0,
+		Players:         []Player{{PlayerID: "player-001", Faction: "qing_long"}},
 	}
 
 	turnSync := &TurnSync{
-		Round:   1,
-		Turn:    0,
-		Player:  "player-001",
-		Entries: []gamelog.LogEntry{gamelog.NewActionEntry("damage", "player-001", "Test")},
+		Round:             1,
+		Turn:              0,
+		CurrentPlayerID:   "player-001",
+		Entries:           []gamelog.LogEntry{gamelog.NewActionEntry("damage", "player-001", "Test")},
 	}
 
 	fullSync := &FullSync{

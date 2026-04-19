@@ -48,8 +48,8 @@ func TestBuildStateSync(t *testing.T) {
 	if len(stateSync.Players) != 1 {
 		t.Errorf("len(stateSync.Players) = %d, want 1", len(stateSync.Players))
 	}
-	if stateSync.Players[0].UserID != player.ID.UUID() {
-		t.Errorf("stateSync.Players[0].UserID = %s, want %s", stateSync.Players[0].UserID, player.ID.UUID())
+	if stateSync.Players[0].PlayerID != player.ID.UUID() {
+		t.Errorf("stateSync.Players[0].PlayerID = %s, want %s", stateSync.Players[0].PlayerID, player.ID.UUID())
 	}
 }
 

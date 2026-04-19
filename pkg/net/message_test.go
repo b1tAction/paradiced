@@ -43,11 +43,11 @@ func TestNewMessageWithNilData(t *testing.T) {
 
 func TestParseData(t *testing.T) {
 	original := &StateSync{
-		GlobalState: "turn_loop",
-		TurnState:   "main_action",
-		TurnPlayer:  "player-abc123",
-		Round:       1,
-		Turn:        0,
+		GlobalState:     "turn_loop",
+		TurnState:       "main_action",
+		CurrentPlayerID: "player-abc123",
+		Round:           1,
+		Turn:            0,
 	}
 	msg, err := NewMessage(OpStateSync, original)
 	if err != nil {
@@ -65,8 +65,8 @@ func TestParseData(t *testing.T) {
 	if parsed.TurnState != "main_action" {
 		t.Errorf("parsed.TurnState = %s, want main_action", parsed.TurnState)
 	}
-	if parsed.TurnPlayer != "player-abc123" {
-		t.Errorf("parsed.TurnPlayer = %s, want player-abc123", parsed.TurnPlayer)
+	if parsed.CurrentPlayerID != "player-abc123" {
+		t.Errorf("parsed.CurrentPlayerID = %s, want player-abc123", parsed.CurrentPlayerID)
 	}
 	if parsed.Round != 1 {
 		t.Errorf("parsed.Round = %d, want 1", parsed.Round)

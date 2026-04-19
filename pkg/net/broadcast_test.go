@@ -34,10 +34,10 @@ func TestMockBroadcastAdapterTurnSync(t *testing.T) {
 	entry := gamelog.NewActionEntry("damage", "player-001", "Cell_Fragile")
 
 	turnSync := &TurnSync{
-		Round:   1,
-		Turn:    0,
-		Player:  "player-001",
-		Entries: []gamelog.LogEntry{entry},
+		Round:             1,
+		Turn:              0,
+		CurrentPlayerID:   "player-001",
+		Entries:           []gamelog.LogEntry{entry},
 	}
 
 	err := mock.BroadcastTurnSync(turnSync)
@@ -47,8 +47,8 @@ func TestMockBroadcastAdapterTurnSync(t *testing.T) {
 	if len(mock.TurnSyncs) != 1 {
 		t.Errorf("len(mock.TurnSyncs) = %d, want 1", len(mock.TurnSyncs))
 	}
-	if mock.TurnSyncs[0].Player != "player-001" {
-		t.Errorf("mock.TurnSyncs[0].Player = %s, want player-001", mock.TurnSyncs[0].Player)
+	if mock.TurnSyncs[0].CurrentPlayerID != "player-001" {
+		t.Errorf("mock.TurnSyncs[0].CurrentPlayerID = %s, want player-001", mock.TurnSyncs[0].CurrentPlayerID)
 	}
 	if len(mock.TurnSyncs[0].Entries) != 1 {
 		t.Errorf("len(mock.TurnSyncs[0].Entries) = %d, want 1", len(mock.TurnSyncs[0].Entries))
@@ -169,7 +169,7 @@ func TestMockBroadcastAdapterFullSync(t *testing.T) {
 	mock := NewMockBroadcastAdapter()
 
 	stateSync := &StateSync{GlobalState: "turn_loop"}
-	turnSync := &TurnSync{Round: 1, Player: "player-001"}
+	turnSync := &TurnSync{Round: 1, CurrentPlayerID: "player-001"}
 
 	err := mock.SendFullSync("player-001", stateSync, turnSync)
 	if err != nil {

@@ -16,10 +16,10 @@ func TestBroadcastStateSync(t *testing.T) {
 	broadcastAdapter := NewNakamaBroadcastAdapter(handler)
 
 	stateSync := &net.StateSync{
-		GlobalState: "turn_loop",
-		Round:       1,
-		Turn:        0,
-		TurnPlayer:  "player-001",
+		GlobalState:   "turn_loop",
+		Round:         1,
+		Turn:          0,
+		CurrentPlayerID: "player-001",
 	}
 
 	err := broadcastAdapter.BroadcastStateSync(stateSync)
@@ -62,10 +62,10 @@ func TestBroadcastTurnSync(t *testing.T) {
 
 	entry := gamelog.NewActionEntry("damage", "player-001", "Cell_Fragile")
 	turnSync := &net.TurnSync{
-		Round:   1,
-		Turn:    0,
-		Player:  "player-001",
-		Entries: []gamelog.LogEntry{entry},
+		Round:             1,
+		Turn:              0,
+		CurrentPlayerID:   "player-001",
+		Entries:           []gamelog.LogEntry{entry},
 	}
 
 	err := broadcastAdapter.BroadcastTurnSync(turnSync)
@@ -90,8 +90,8 @@ func TestBroadcastTurnSync(t *testing.T) {
 		t.Fatalf("ParseBroadcastData error: %v", err)
 	}
 
-	if parsed.Player != "player-001" {
-		t.Errorf("parsed.Player = %s, want player-001", parsed.Player)
+	if parsed.CurrentPlayerID != "player-001" {
+		t.Errorf("parsed.CurrentPlayerID = %s, want player-001", parsed.CurrentPlayerID)
 	}
 }
 
@@ -295,7 +295,7 @@ func TestSendFullSync(t *testing.T) {
 	broadcastAdapter := NewNakamaBroadcastAdapter(handler)
 
 	stateSync := &net.StateSync{GlobalState: "turn_loop", Round: 1}
-	turnSync := &net.TurnSync{Round: 1, Player: "player-001"}
+	turnSync := &net.TurnSync{Round: 1, CurrentPlayerID: "player-001"}
 
 	err := broadcastAdapter.SendFullSync("player-001", stateSync, turnSync)
 	if err != nil {
