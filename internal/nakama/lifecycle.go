@@ -129,6 +129,10 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 					h.logger.Debug("MatchLoop: starting next player turn", "next_state", nextState.String())
 				}
 				h.hsm.TransitionTo(nextState, ctx)
+
+				// Re-get current player after turn change
+				currentPlayer = h.getCurrentPlayer()
+				ctx.Player = currentPlayer
 			}
 		}
 	}

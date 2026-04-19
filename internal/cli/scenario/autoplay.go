@@ -105,8 +105,8 @@ func runNakamaPlay(ctx context.Context, client *nakama.Client, config ScenarioCo
 			return result, fmt.Errorf("failed to connect socket %d: %w", i+1, err)
 		}
 
-		// Create autoplay player
-		players[i] = NewAutoPlayPlayer(socketClients[i], playerID, logger)
+		// Create autoplay player with session UserID (UUID format) for turn matching
+		players[i] = NewAutoPlayPlayer(socketClients[i], session.UserID, logger)
 
 		// Set matchmaker handler BEFORE adding to matchmaker
 		socketClients[i].SetMatchmakerMatchedHandler(func(ctx context.Context, msg *nakama.MatchmakerMatchedMsg) {
@@ -277,7 +277,8 @@ func runNakamaPlay(ctx context.Context, client *nakama.Client, config ScenarioCo
 // AutoPlayPlayer represents an automated player.
 type AutoPlayPlayer struct {
 	socket           SocketClientAdapter
-	userID           string
+	userID           string // Nakama UserID (UUID format) for identifying self in Players array
+	playerID         string // Game PlayerID (UUID format), extracted from StateSync
 	logger           *nakama.Logger
 	msgChan          <-chan *nakama.SocketMessage
 	gameOverChan     chan struct{}
@@ -285,6 +286,7 @@ type AutoPlayPlayer struct {
 	messagesReceived int
 	turnsCompleted   int
 	globalState      string
+	currentPlayerID  string // Current player ID from StateSync (PlayerID format)
 	currentDecision  *model.Decision
 	lastErr          error
 	rejections       int
@@ -292,6 +294,7 @@ type AutoPlayPlayer struct {
 }
 
 // NewAutoPlayPlayer creates a new autoplay player.
+// The playerID will be extracted from StateSync.Players array by matching UserID.
 func NewAutoPlayPlayer(socket *nakama.SocketClient, userID string, logger *nakama.Logger) *AutoPlayPlayer {
 	return &AutoPlayPlayer{
 		socket:       socket,
@@ -391,13 +394,27 @@ func (p *AutoPlayPlayer) handleStateSync(ctx context.Context, data []byte) {
 
 	p.mu.Lock()
 	p.globalState = stateSync.GlobalState
+	p.currentPlayerID = stateSync.CurrentPlayerID
+
+	// Find own PlayerID from Players array by matching ClientID
+	// ClientID is injected by NakamaBroadcastAdapter for client-side turn matching
+	for _, player := range stateSync.Players {
+		if player.ClientID == p.userID {
+			// Found own player, store PlayerID for turn checking
+			p.playerID = player.PlayerID
+			p.logger.Info("Found own player", "player_id", p.playerID, "client_id", p.userID)
+			break
+		}
+	}
 	p.mu.Unlock()
 
 	p.logger.Info("Received state sync",
 		"global", stateSync.GlobalState,
 		"turn", stateSync.TurnState,
 		"round", stateSync.Round,
-		"players", len(stateSync.Players))
+		"current_player_id", stateSync.CurrentPlayerID,
+		"players", len(stateSync.Players),
+		"my_player_id", p.playerID)
 }
 
 func (p *AutoPlayPlayer) handleAvailable(ctx context.Context, data []byte) {
@@ -405,6 +422,19 @@ func (p *AutoPlayPlayer) handleAvailable(ctx context.Context, data []byte) {
 	if err := json.Unmarshal(data, &available); err != nil {
 		p.logger.Error("Failed to parse Available", "error", err)
 		return
+	}
+
+	p.mu.RLock()
+	currentPlayerID := p.currentPlayerID
+	myPlayerID := p.playerID
+	p.mu.RUnlock()
+
+	// Available is a server-targeted prompt for the current player.
+	// Do not perform local turn gating here, to avoid race-induced false negatives.
+	if currentPlayerID != "" && myPlayerID != "" && currentPlayerID != myPlayerID {
+		p.logger.Debug("Turn mismatch on Available, still proceeding",
+			"my_player_id", myPlayerID,
+			"current_player_id", currentPlayerID)
 	}
 
 	p.logger.Info("Received available actions",
@@ -448,11 +478,14 @@ func (p *AutoPlayPlayer) handleAvailable(ctx context.Context, data []byte) {
 
 	// Default: roll dice
 	p.logger.Info("Auto strategy: roll dice")
+	p.logger.Debug("Sending RollDice message", "ctx", ctx)
 	if err := p.socket.SendMessage(ctx, nakama.OpRollDice, model.RollDice{}); err != nil {
 		p.logger.Error("Failed to send RollDice", "error", err)
 		p.mu.Lock()
 		p.lastErr = err
 		p.mu.Unlock()
+	} else {
+		p.logger.Info("RollDice message sent successfully")
 	}
 }
 
@@ -503,10 +536,11 @@ func (p *AutoPlayPlayer) handleMiniGameStart(ctx context.Context, data []byte) {
 		maxRank = 2
 	}
 
-	// Find current player's index in the players list
+	// Find current player's index in the players list using userID
+	// MiniGameStart.Players contains Nakama UserIDs
 	playerIndex := 0
-	for i, playerID := range start.Players {
-		if playerID == p.userID {
+	for i, uid := range start.Players {
+		if uid == p.userID {
 			playerIndex = i
 			break
 		}
@@ -543,7 +577,7 @@ func (p *AutoPlayPlayer) handleGameOver(ctx context.Context, data []byte) {
 	// Print stats
 	for _, stat := range gameOver.Stats {
 		p.logger.Info("Player stats",
-			"user_id", stat.UserID,
+			"player_id", stat.PlayerID,
 			"rounds_won", stat.RoundsWon,
 			"events_drawn", stat.EventsDrawn,
 			"items_used", stat.ItemsUsed)
@@ -565,7 +599,8 @@ func (p *AutoPlayPlayer) handleMiniGameResult(ctx context.Context, data []byte) 
 
 	p.logger.Info("Received mini-game result")
 	for _, entry := range result.Rankings {
-		if entry.PlayerID == p.userID {
+		// Rankings use PlayerID (game internal ID), need to match with playerID
+		if entry.PlayerID == p.playerID {
 			p.logger.Info("My mini-game rank", "rank", entry.Rank)
 		}
 	}
@@ -706,7 +741,7 @@ func runStandalonePlay(ctx context.Context, client nakama.IClient, config Scenar
 			return result, fmt.Errorf("failed to connect socket %d: %w", i+1, err)
 		}
 
-		// Create autoplay player
+		// Create autoplay player with playerID as userID for standalone mode
 		players[i] = NewAutoPlayPlayerStandalone(socketClients[i], playerID, logger)
 	}
 

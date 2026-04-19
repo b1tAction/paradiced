@@ -301,6 +301,13 @@ func (h *NakamaMatchHandler) handleUseSkill(sender string) error {
 	if ctx.Builder != nil {
 		stateSync := ctx.Builder.BuildStateSync()
 		ctx.Broadcast.BroadcastStateSync(stateSync)
+
+		// Re-send Available to current player (still in MainAction state)
+		// Set dice type from context before building available
+		diceType := ctx.GetDiceType(player.ID.UUID())
+		ctx.Builder.SetDiceType(diceType.String())
+		available := ctx.Builder.BuildAvailable()
+		ctx.Broadcast.SendAvailable(player.ID.UUID(), available)
 	}
 
 	logger.logResponse("OpUseSkill", sender, "skill used successfully")

@@ -21,8 +21,9 @@ type StateSync struct {
 	// Values: "turn_upkeep", "main_action", "turn_moving", "turn_landed", "turn_event", "turn_end"
 	TurnState string `json:"turn_state"`
 
-	// TurnPlayer is the user ID of the player whose turn is active.
-	TurnPlayer string `json:"turn_player"`
+	// CurrentPlayerID is the player ID whose turn is active.
+	// Matches core.Player.ID.UUID() format.
+	CurrentPlayerID string `json:"current_player_id"`
 
 	// Round is the current round number.
 	Round int `json:"round"`
@@ -80,8 +81,9 @@ type TurnSync struct {
 	// Turn is the current turn index.
 	Turn int `json:"turn"`
 
-	// Player is the user ID of the turn player.
-	Player string `json:"player"`
+	// CurrentPlayerID is the player ID whose turn is active.
+	// Matches core.Player.ID.UUID() format.
+	CurrentPlayerID string `json:"current_player_id"`
 
 	// Entries contains all log entries for this turn/phase.
 	// Directly uses gamelog.LogEntry (no conversion to Action).
@@ -91,8 +93,16 @@ type TurnSync struct {
 // Player represents a player state snapshot for synchronization.
 // Builder extracts known keys from core.Player.Metadata into typed fields.
 type Player struct {
-	// UserID is the player's unique identifier.
-	UserID string `json:"user_id"`
+	// PlayerID is the player's game internal ID (UUID format).
+	// Matches core.Player.ID.UUID() format.
+	PlayerID string `json:"player_id"`
+
+	// ClientID is the client identifier for client-side self-identification.
+	// For Nakama: equals Nakama session.UserID (UUID format)
+	// For standalone: equals the player's session ID
+	// Security note: ClientID is only an identifier, not an authentication token.
+	// The server always extracts the real user ID from the WebSocket connection.
+	ClientID string `json:"client_id"`
 
 	// Faction is the player's faction (snake_case: "qing_long", "zhu_que", "bai_hu", "xuan_wu").
 	Faction string `json:"faction"`
@@ -189,7 +199,8 @@ type MiniGameResult struct {
 
 // RankingEntry represents a single player's mini-game ranking.
 type RankingEntry struct {
-	// PlayerID is the player's user ID.
+	// PlayerID is the player's game internal ID.
+	// Matches core.Player.ID.UUID() format.
 	PlayerID string `json:"player_id"`
 
 	// Rank is the player's ranking (1-4).
@@ -198,7 +209,8 @@ type RankingEntry struct {
 
 // GameOver represents game end notification.
 type GameOver struct {
-	// WinnerID is the winning player's user ID.
+	// WinnerID is the winning player's game internal ID.
+	// Matches core.Player.ID.UUID() format.
 	WinnerID string `json:"winner_id"`
 
 	// Stats contains end-game statistics for all players.
@@ -207,8 +219,9 @@ type GameOver struct {
 
 // PlayerStats represents a player's end-game statistics.
 type PlayerStats struct {
-	// UserID is the player's user ID.
-	UserID string `json:"user_id"`
+	// PlayerID is the player's game internal ID.
+	// Matches core.Player.ID.UUID() format.
+	PlayerID string `json:"player_id"`
 
 	// RoundsWon is the number of rounds won (mini-game ranking 1).
 	RoundsWon int `json:"rounds_won"`

@@ -17,18 +17,19 @@ type Message struct {
 
 // StateSync represents complete game state for synchronization.
 type StateSync struct {
-	GlobalState string   `json:"global_state"`
-	TurnState   string   `json:"turn_state"`
-	TurnPlayer  string   `json:"turn_player"`
-	Round       int      `json:"round"`
-	Turn        int      `json:"turn"`
-	Paused      bool     `json:"paused"`
-	Players     []Player `json:"players"`
+	GlobalState     string   `json:"global_state"`
+	TurnState       string   `json:"turn_state"`
+	CurrentPlayerID string   `json:"current_player_id"` // 当前回合玩家 ID
+	Round           int      `json:"round"`
+	Turn            int      `json:"turn"`
+	Paused          bool     `json:"paused"`
+	Players         []Player `json:"players"`
 }
 
 // Player represents a player state snapshot.
 type Player struct {
-	UserID      string `json:"user_id"`
+	PlayerID    string `json:"player_id"` // 玩家游戏 ID (UUID)
+	ClientID    string `json:"client_id"` // 客户端 ID (用于客户端识别自己)
 	Faction     string `json:"faction"`
 	Position    int    `json:"position"`
 	HP          int    `json:"hp"`
@@ -57,10 +58,10 @@ type Item struct {
 
 // TurnSync represents all events for a turn/phase.
 type TurnSync struct {
-	Round   int                `json:"round"`
-	Turn    int                `json:"turn"`
-	Player  string             `json:"player"`
-	Entries []gamelog.LogEntry `json:"entries"`
+	Round           int                `json:"round"`
+	Turn            int                `json:"turn"`
+	CurrentPlayerID string             `json:"current_player_id"` // 当前回合玩家 ID
+	Entries         []gamelog.LogEntry `json:"entries"`
 }
 
 // Decision represents a decision request sent to client.
@@ -112,7 +113,7 @@ type GameOver struct {
 
 // PlayerStats represents a player's end-game statistics.
 type PlayerStats struct {
-	UserID      string `json:"user_id"`
+	PlayerID    string `json:"player_id"`
 	RoundsWon   int    `json:"rounds_won"`
 	EventsDrawn int    `json:"events_drawn"`
 	ItemsUsed   int    `json:"items_used"`

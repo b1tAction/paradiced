@@ -49,6 +49,20 @@ func (a *NakamaBroadcastAdapter) BroadcastStateSync(state *net.StateSync) error 
 		return nil // No dispatcher set
 	}
 
+	// Inject ClientID into each Player for client-side self-identification
+	// Each client will find themselves in the Players array by matching ClientID
+	if state != nil && a.handler != nil {
+		for i := range state.Players {
+			// Find Nakama userID for this player by matching PlayerID
+			for userID, player := range a.handler.players {
+				if player != nil && player.ID.UUID() == state.Players[i].PlayerID {
+					state.Players[i].ClientID = userID
+					break
+				}
+			}
+		}
+	}
+
 	data, err := json.Marshal(state)
 	if err != nil {
 		return err
@@ -109,6 +123,28 @@ func (a *NakamaBroadcastAdapter) BroadcastMiniGameStart(start *net.MiniGameStart
 		return nil // No dispatcher set
 	}
 
+	// Convert PlayerID to UserID for client-side matching
+	// Clients will match their UserID against this array
+	if start != nil && a.handler != nil {
+		userIDs := make([]string, len(start.Players))
+		for i, playerID := range start.Players {
+			// Find UserID for this PlayerID
+			found := false
+			for userID, player := range a.handler.players {
+				if player != nil && player.ID.UUID() == playerID {
+					userIDs[i] = userID
+					found = true
+					break
+				}
+			}
+			if !found {
+				// Fallback to PlayerID if UserID not found
+				userIDs[i] = playerID
+			}
+		}
+		start.Players = userIDs
+	}
+
 	data, err := json.Marshal(start)
 	if err != nil {
 		return err
@@ -123,6 +159,18 @@ func (a *NakamaBroadcastAdapter) BroadcastMiniGameResult(result *net.MiniGameRes
 		return nil // No dispatcher set
 	}
 
+	// Convert PlayerID to ClientID in rankings for client-side matching
+	if result != nil && a.handler != nil {
+		for i := range result.Rankings {
+			for userID, player := range a.handler.players {
+				if player != nil && player.ID.UUID() == result.Rankings[i].PlayerID {
+					result.Rankings[i].PlayerID = userID
+					break
+				}
+			}
+		}
+	}
+
 	data, err := json.Marshal(result)
 	if err != nil {
 		return err
@@ -135,6 +183,27 @@ func (a *NakamaBroadcastAdapter) BroadcastMiniGameResult(result *net.MiniGameRes
 func (a *NakamaBroadcastAdapter) BroadcastGameOver(over *net.GameOver) error {
 	if a.handler.dispatcher == nil {
 		return nil // No dispatcher set
+	}
+
+	// Convert PlayerID to ClientID for client-side matching
+	if over != nil && a.handler != nil {
+		// Convert WinnerID
+		for userID, player := range a.handler.players {
+			if player != nil && player.ID.UUID() == over.WinnerID {
+				over.WinnerID = userID
+				break
+			}
+		}
+
+		// Convert Stats PlayerIDs
+		for i := range over.Stats {
+			for userID, player := range a.handler.players {
+				if player != nil && player.ID.UUID() == over.Stats[i].PlayerID {
+					over.Stats[i].PlayerID = userID
+					break
+				}
+			}
+		}
 	}
 
 	data, err := json.Marshal(over)

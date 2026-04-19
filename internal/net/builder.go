@@ -47,19 +47,19 @@ func (b *Builder) BuildStateSync() *pkgnet.StateSync {
 	turnState := b.hsm.GetTurnStateID()
 	turnPlayer := b.hsm.GetTurnPlayer()
 
-	var turnPlayerID string
+	var currentPlayerID string
 	if turnPlayer != nil {
-		turnPlayerID = turnPlayer.ID.UUID()
+		currentPlayerID = turnPlayer.ID.UUID()
 	}
 
 	return &pkgnet.StateSync{
-		GlobalState: globalState.String(),
-		TurnState:   turnState.String(),
-		TurnPlayer:  turnPlayerID,
-		Round:       b.hsm.GetRound(),
-		Turn:        b.hsm.GetTurn(),
-		Paused:      b.hsm.IsPaused(),
-		Players:     b.BuildPlayers(),
+		GlobalState:     globalState.String(),
+		TurnState:       turnState.String(),
+		CurrentPlayerID: currentPlayerID,
+		Round:           b.hsm.GetRound(),
+		Turn:            b.hsm.GetTurn(),
+		Paused:          b.hsm.IsPaused(),
+		Players:         b.BuildPlayers(),
 	}
 }
 
@@ -68,16 +68,16 @@ func (b *Builder) BuildTurnSync() *pkgnet.TurnSync {
 	entries := b.GetCurrentTurnEntries()
 
 	player := b.hsm.GetTurnPlayer()
-	playerID := ""
+	currentPlayerID := ""
 	if player != nil {
-		playerID = player.ID.UUID()
+		currentPlayerID = player.ID.UUID()
 	}
 
 	return &pkgnet.TurnSync{
-		Round:   b.hsm.GetRound(),
-		Turn:    b.hsm.GetTurn(),
-		Player:  playerID,
-		Entries: entries,
+		Round:           b.hsm.GetRound(),
+		Turn:            b.hsm.GetTurn(),
+		CurrentPlayerID: currentPlayerID,
+		Entries:         entries,
 	}
 }
 
@@ -98,7 +98,7 @@ func (b *Builder) BuildPlayers() []pkgnet.Player {
 // BuildPlayer builds a single player state snapshot.
 func (b *Builder) BuildPlayer(p *core.Player) pkgnet.Player {
 	return pkgnet.Player{
-		UserID:      p.ID.UUID(),
+		PlayerID:    p.ID.UUID(),
 		Faction:     string(p.Faction),
 		Position:    p.Position,
 		HP:          p.HP,

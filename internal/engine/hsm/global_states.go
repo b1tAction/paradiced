@@ -142,6 +142,7 @@ func (s *RoundMiniGameState) Enter(ctx *StateContext) {
 	ctx.SetBool(KeyWaitingForResults, true)
 
 	// Broadcast MiniGameStart to all clients
+	// Players array uses PlayerID, NakamaBroadcastAdapter will convert to UserID
 	if ctx.Broadcast != nil {
 		playerIDs := make([]string, len(game.Players))
 		for i, p := range game.Players {
@@ -315,6 +316,9 @@ func (s *TurnLoopState) StartPlayerTurn(ctx *StateContext) StateID {
 	// Set current player turn index via HSM
 	ctx.SetTurn(s.currentPlayerIndex)
 
+	// Set current turn player in HSM
+	ctx.HSM.SetTurnPlayer(players[s.currentPlayerIndex])
+
 	// Transition to TurnUpkeep (first turn state)
 	return StateTurnUpkeep
 }
@@ -432,7 +436,7 @@ func (s *GameOverState) Enter(ctx *StateContext) {
 		stats := make([]pkgnet.PlayerStats, len(game.Players))
 		for i, p := range game.Players {
 			stats[i] = pkgnet.PlayerStats{
-				UserID:      p.ID.UUID(),
+				PlayerID:    p.ID.UUID(),
 				RoundsWon:   0, // TODO: track rounds won
 				EventsDrawn: 0, // TODO: track events drawn
 				ItemsUsed:   0, // TODO: track items used

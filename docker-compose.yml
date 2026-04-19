@@ -25,8 +25,16 @@ services:
       - "/bin/sh"
       - "-ecx"
       - >
+        mkdir -p /nakama/logs &&
+        if [ -f /nakama/logs/nakama.log ] && [ -s /nakama/logs/nakama.log ]; then
+          mv /nakama/logs/nakama.log "/nakama/logs/nakama.$$(date +%Y%m%d-%H%M%S).log";
+        fi &&
+        for f in $$(ls -1t /nakama/logs/nakama.*.log 2>/dev/null | sed -n '51,$$p'); do
+          rm -f "$$f";
+        done &&
+        : > /nakama/logs/nakama.log &&
         /nakama/nakama migrate up --database.address root@cockroachdb:26257 &&
-        /nakama/nakama --config /nakama/data/config.yml 2>&1 | tee -a /nakama/logs/nakama.log
+        /nakama/nakama --config /nakama/data/config.yml 2>&1 | tee /nakama/logs/nakama.log
     restart: "no"
     links:
       - "cockroachdb:db"
