@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"sync"
 	"time"
 
@@ -37,6 +36,8 @@ type Result struct {
 	MessagesReceived int           `json:"messages_received"`
 	TurnsCompleted   int           `json:"turns_completed"`
 	GlobalState      string        `json:"global_state"`
+	Rejections       int           `json:"rejections"`
+	LastError        string        `json:"last_error,omitempty"`
 }
 
 // RunAutoPlay runs an autoplay scenario with the given configuration.
@@ -254,6 +255,10 @@ func runNakamaPlay(ctx context.Context, client *nakama.Client, config ScenarioCo
 			result.MessagesReceived = mainPlayer.MessagesReceived()
 			result.TurnsCompleted = mainPlayer.TurnsCompleted()
 			result.GlobalState = "game_over"
+			result.Rejections = mainPlayer.Rejections()
+			if rejection := mainPlayer.LastRejection(); rejection != nil {
+				result.LastError = fmt.Sprintf("ActionRejected: op=%d, reason=%s", rejection.OpCode, rejection.Reason)
+			}
 			return result, nil
 
 		case <-ticker.C:
@@ -282,6 +287,8 @@ type AutoPlayPlayer struct {
 	globalState      string
 	currentDecision  *model.Decision
 	lastErr          error
+	rejections       int
+	lastRejection    *model.ActionRejected
 }
 
 // NewAutoPlayPlayer creates a new autoplay player.
@@ -357,6 +364,10 @@ func (p *AutoPlayPlayer) handleMessage(ctx context.Context, msg *nakama.SocketMe
 		p.handleDecisionRequest(ctx, msg.Data)
 	case nakama.OpMiniGameStart:
 		p.handleMiniGameStart(ctx, msg.Data)
+	case nakama.OpMiniGameResult:
+		p.handleMiniGameResult(ctx, msg.Data)
+	case nakama.OpFullSync:
+		p.handleFullSync(ctx, msg.Data)
 	case nakama.OpGameOver:
 		p.handleGameOver(ctx, msg.Data)
 	case nakama.OpTurnSync:
@@ -401,7 +412,41 @@ func (p *AutoPlayPlayer) handleAvailable(ctx context.Context, data []byte) {
 		"can_use_skill", available.CanUseSkill,
 		"dice_type", available.DiceType)
 
-	// Auto strategy: always roll dice
+	// Auto strategy:
+	// 1. If has items, use first item (for testing item system)
+	// 2. If can use skill, use skill (for testing faction skill system)
+	// 3. Otherwise, roll dice
+
+	if len(available.Items) > 0 {
+		// Use first item
+		item := available.Items[0]
+		p.logger.Info("Auto strategy: use item", "item_id", item.ID, "item_type", item.Type)
+		useItem := model.UseItem{
+			ItemID:   item.ID,
+			TargetID: "", // No target for now
+		}
+		if err := p.socket.SendMessage(ctx, nakama.OpUseItem, useItem); err != nil {
+			p.logger.Error("Failed to send UseItem", "error", err)
+			p.mu.Lock()
+			p.lastErr = err
+			p.mu.Unlock()
+		}
+		return
+	}
+
+	if available.CanUseSkill {
+		// Use faction skill
+		p.logger.Info("Auto strategy: use faction skill")
+		if err := p.socket.SendMessage(ctx, nakama.OpUseSkill, model.UseSkill{}); err != nil {
+			p.logger.Error("Failed to send UseSkill", "error", err)
+			p.mu.Lock()
+			p.lastErr = err
+			p.mu.Unlock()
+		}
+		return
+	}
+
+	// Default: roll dice
 	p.logger.Info("Auto strategy: roll dice")
 	if err := p.socket.SendMessage(ctx, nakama.OpRollDice, model.RollDice{}); err != nil {
 		p.logger.Error("Failed to send RollDice", "error", err)
@@ -467,11 +512,12 @@ func (p *AutoPlayPlayer) handleMiniGameStart(ctx context.Context, data []byte) {
 		}
 	}
 
-	// Use index + 1 as rank (index 0 corresponds to rank 1)
-	// Pre-set random seed for randomness
-	rand.Seed(time.Now().UnixNano() + int64(playerIndex*1000))
-	ranks := rand.Perm(maxRank)
-	myRank := ranks[playerIndex] + 1
+	// Simple strategy: use index + 1 as rank (index 0 -> rank 1, index 1 -> rank 2, etc.)
+	// This ensures all players submit different ranks
+	myRank := playerIndex + 1
+	if myRank > maxRank {
+		myRank = 1 // Wrap around if index exceeds player count
+	}
 
 	submit := model.MiniGameResultSubmit{Rank: myRank}
 	if err := p.socket.SendMessage(ctx, nakama.OpMiniGameResultSubmit, submit); err != nil {
@@ -510,12 +556,51 @@ func (p *AutoPlayPlayer) handleGameOver(ctx context.Context, data []byte) {
 	}
 }
 
+func (p *AutoPlayPlayer) handleMiniGameResult(ctx context.Context, data []byte) {
+	var result model.MiniGameResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		p.logger.Error("Failed to parse MiniGameResult", "error", err)
+		return
+	}
+
+	p.logger.Info("Received mini-game result")
+	for _, entry := range result.Rankings {
+		if entry.PlayerID == p.userID {
+			p.logger.Info("My mini-game rank", "rank", entry.Rank)
+		}
+	}
+}
+
+func (p *AutoPlayPlayer) handleFullSync(ctx context.Context, data []byte) {
+	var stateSync model.StateSync
+	if err := json.Unmarshal(data, &stateSync); err != nil {
+		p.logger.Error("Failed to parse FullSync", "error", err)
+		return
+	}
+
+	p.mu.Lock()
+	p.globalState = stateSync.GlobalState
+	p.mu.Unlock()
+
+	p.logger.Info("Received full sync (reconnection)",
+		"global", stateSync.GlobalState,
+		"turn", stateSync.TurnState,
+		"round", stateSync.Round,
+		"players", len(stateSync.Players))
+}
+
 func (p *AutoPlayPlayer) handleActionRejected(ctx context.Context, data []byte) {
 	var rejected model.ActionRejected
 	if err := json.Unmarshal(data, &rejected); err != nil {
 		p.logger.Error("Failed to parse ActionRejected", "error", err)
 		return
 	}
+
+	// Track rejection statistics
+	p.mu.Lock()
+	p.rejections++
+	p.lastRejection = &rejected
+	p.mu.Unlock()
 
 	p.logger.Warn("Action rejected",
 		"op_code", rejected.OpCode,
@@ -554,6 +639,20 @@ func (p *AutoPlayPlayer) LastError() error {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.lastErr
+}
+
+// Rejections returns the number of action rejections.
+func (p *AutoPlayPlayer) Rejections() int {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.rejections
+}
+
+// LastRejection returns the last action rejection details.
+func (p *AutoPlayPlayer) LastRejection() *model.ActionRejected {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.lastRejection
 }
 
 // runStandalonePlay runs autoplay using standalone WebSocket server.

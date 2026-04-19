@@ -248,6 +248,10 @@ func printSummary(result scenario.Result) {
 	fmt.Printf("Duration: %.2f seconds\n", result.Duration.Seconds())
 	fmt.Printf("Messages Received: %d\n", result.MessagesReceived)
 	fmt.Printf("Turns Completed: %d\n", result.TurnsCompleted)
+	fmt.Printf("Rejections: %d\n", result.Rejections)
+	if result.LastError != "" {
+		fmt.Printf("Last Error: %s\n", result.LastError)
+	}
 	fmt.Println("====================================")
 }
 
