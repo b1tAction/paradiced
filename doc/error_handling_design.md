@@ -66,25 +66,35 @@ err := errors.NewStateExecutionError("TurnUpkeep", "Enter", underlyingErr)
 err := errors.NewActionExecutionError("damage", playerID, "target is dead", underlyingErr)
 ```
 
-### 3.2 internal/engine/hsm - HSM 专用错误类型
+### 3.2 pkg/errors - HSM 错误类型
 
-位于 `internal/engine/hsm/errors.go`，提供 HSM 特定的错误类型：
+`pkg/errors` 包提供 HSM 特定的错误类型：
 
 #### HSMError
 - **用途**: HSM 状态机执行错误，带有状态上下文
 - **字段**: StateID, Layer, Phase, Err, Message
+- **位置**: `pkg/errors/hsm_error.go`
 - **示例**:
 ```go
-err := hsm.NewHSMError(StateTurnUpkeep, 2, "Enter", underlyingErr, "phase execution failed")
+err := errors.NewHSMError("TurnUpkeep", 2, "Enter", underlyingErr, "phase execution failed")
 ```
 
-#### WrapError
+#### WrapHSMError
 - **用途**: 为错误添加 HSM 上下文
 - **示例**:
 ```go
 if err != nil {
-    return hsm.WrapError(err, StateTurnMoving, 2, "Enter", "move action failed")
+    return errors.WrapHSMError(err, "TurnMoving", 2, "Enter", "move action failed")
 }
+```
+
+#### StateError (internal/engine/hsm)
+- **用途**: HSM 状态特定错误
+- **位置**: `internal/engine/hsm/turn_states.go`
+- **说明**: 由于依赖 `StateID` 类型，保留在 hsm 包中
+- **示例**:
+```go
+ctx.Error = hsm.NewStateError(StateTurnUpkeep, "player is nil")
 ```
 
 ### 3.3 StateContext.Error - 状态错误捕获
@@ -128,7 +138,13 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
     // ...
     if err := s.executePhase(ctx); err != nil {
         // 包装错误并设置到上下文
-        ctx.Error = hsm.WrapError(err, StateTurnUpkeep, 2, "Enter", "phase execution failed")
+        ctx.Error = errors.WrapHSMError(err, "TurnUpkeep", 2, "Enter", "phase execution failed")
+        return
+    }
+
+    // 或使用 StateError（简单状态错误）
+    if player == nil {
+        ctx.Error = hsm.NewStateError(StateTurnUpkeep, "player is nil")
         return
     }
 }
@@ -152,11 +168,11 @@ func (h *NakamaMatchHandler) handleRollDice(sender string) error {
     err := h.hsm.OnRollDice(steps, ctx)
     if err != nil {
         // 检查错误类型
-        var hsmErr *hsm.HSMError
+        var hsmErr *errors.HSMError
         if errors.As(err, &hsmErr) {
             // 记录详细的 HSM 错误日志
             logger.logError("OpRollDice", sender, err,
-                "state", hsmErr.StateID.String(),
+                "state", hsmErr.StateID,
                 "layer", hsmErr.Layer,
                 "phase", hsmErr.Phase)
         }
@@ -166,6 +182,14 @@ func (h *NakamaMatchHandler) handleRollDice(sender string) error {
             // 返回 400 级别的错误
             return h.sendActionRejectedWithCode(sender, pkgnet.OpRollDice,
                 constants.ErrInvalidParameter, validationErr.Error())
+        }
+
+        // 检查 StateError
+        var stateErr *hsm.StateError
+        if errors.As(err, &stateErr) {
+            logger.logError("OpRollDice", sender, stateErr)
+            return h.sendActionRejectedWithCode(sender, pkgnet.OpRollDice,
+                constants.ErrInternal, stateErr.Error())
         }
 
         // 默认返回 500 级别错误
