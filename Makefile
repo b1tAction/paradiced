@@ -8,6 +8,10 @@ PLUGIN_NAME ?= paradiced-server
 PLUGIN_OUT ?= ./modules/$(PLUGIN_NAME).so
 PLUGINBUILDER_IMAGE ?= heroiclabs/nakama-pluginbuilder:3.22.0
 
+# CLI build output
+CLI_NAME ?= pdcli
+CLI_OUT ?= ./build/$(CLI_NAME)
+
 # Docker compose file
 DOCKER_COMPOSE ?= docker-compose.yml
 
@@ -29,6 +33,16 @@ build-plugin:
 # Build for development (verify compilation without plugin mode)
 build-dev:
 	GOMODCACHE=$(GOMODCACHE) go build ./...
+
+# Build CLI tool (pdcli) to build/ directory
+build-cli:
+	mkdir -p ./build $(GOMODCACHE)
+	GOMODCACHE=$(GOMODCACHE) go build -o $(CLI_OUT) ./cmd/pdcli
+
+# Build CLI tool with verbose output
+build-cli-verbose:
+	mkdir -p ./build $(GOMODCACHE)
+	GOMODCACHE=$(GOMODCACHE) go build -v -o $(CLI_OUT) ./cmd/pdcli
 
 # Run tests
 test:
@@ -95,5 +109,5 @@ status:
 	docker-compose ps
 
 # Default target
-.PHONY: build-plugin build-dev test test-coverage prepare-modules docker-up docker-down docker-clean docker-logs docker-logs-db docker-logs-all cockroach-admin db-init dev dev-init dev-logs rebuild status
+.PHONY: build-plugin build-dev build-cli build-cli-verbose test test-coverage prepare-modules docker-up docker-down docker-clean docker-logs docker-logs-db docker-logs-all cockroach-admin db-init dev dev-init dev-logs rebuild status
 .DEFAULT_GOAL := build-dev
