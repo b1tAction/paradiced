@@ -1,6 +1,6 @@
 # Package net - 网络消息协议层
 
-本包定义客户端-服务器交互的消息协议，用于 Paradiced 游戏的权威服务器通信。
+本包定义客户端 - 服务器交互的消息协议，用于 Paradiced 游戏的权威服务器通信。
 
 ## 设计目标
 
@@ -8,6 +8,7 @@
 2. **回合同步**：直接使用 GameLog 的 LogEntry 列表（无需转换）
 3. **决策请求**：等待玩家输入（投骰子、使用道具、选择选项）
 4. **断线重连**：支持玩家重新连接后恢复游戏状态
+5. **错误反馈**：通过 ActionRejected 返回标准化错误码
 
 ## 核心设计
 
@@ -34,12 +35,21 @@ type TurnSync struct {
 
 | action_type | metadata fields |
 |-------------|-----------------|
-| `damage` | `blocked_by?: string`, `piercing?: bool` |
-| `move` | `path: []int`, `dice_steps: int`, `dice_type: string` |
-| `add_buff` | `buff_type: string` |
+| `damage` | `hp_change: int`, `blocked_by?: string`, `piercing?: bool` |
+| `heal` | `hp_change: int` |
+| `modify_lp` | `lp_change: int` |
+| `move` | `steps: int`, `start_pos: int`, `end_pos: int`, `path: []int` |
+| `add_buff` | `buff_type: string`, `duration: int` |
+| `remove_buff` | `buff_type: string` |
+| `teleport` | `from_pos: int`, `to_pos: int` |
+| `steal_buff` | `stolen_by: string`, `buff_type: string` |
+| `respawn` | `checkpoint_pos: int` |
+| `fell_down` | `position: int`, `hp_change: int` |
 | `draw_event` | `event_type: string`, `event_name: string` |
+| `dice_roll` | `dice_type: string`, `dice_steps: int` |
+| `state` | `from: string`, `to: string` |
 
-完整契约见：[doc/internal/metadata.md](../../doc/internal/metadata.md)
+完整契约见：[doc/metadata/logentry.md](../../doc/metadata/logentry.md)
 
 ## 架构定位
 
@@ -54,10 +64,10 @@ type TurnSync struct {
 │  - StateSync/TurnSync: 同步数据结构                                │
 │  - Decision: 决策请求结构                                          │
 │  - BroadcastAdapter: 广播抽象接口                                  │
+│  - ActionRejected: 动作拒绝（带错误码）                            │
 ├──────────────────────────────────────────────────────────────────┤
 │                    internal/net 构建层                             │
 │  - Builder: 将内部数据转换为协议数据                                │
-│  - DiceCalculator: 骰子计算（权威服务器）                           │
 ├──────────────────────────────────────────────────────────────────┤
 │                    游戏核心层 (现有)                               │
 │  - HSM: 状态机控制                                                 │
@@ -72,7 +82,7 @@ type TurnSync struct {
 |------|------|
 | `opcode.go` | 消息操作码定义（Server→Client: 1-99, Client→Server: 100+） |
 | `message.go` | 基础消息结构 `Message` |
-| `sync.go` | 状态同步数据结构：`StateSync`, `Player`, `TurnSync`, `ActionRejected`（新增 ErrorCode） |
+| `sync.go` | 状态同步数据结构：`StateSync`, `Player`, `TurnSync`, `ActionRejected` |
 | `decision.go` | 决策请求/回复结构：`Decision`, `Option`, `RollDice`, `UseItem`, `UserChoice` |
 | `broadcast.go` | 广播抽象接口 `BroadcastAdapter` 和测试实现 `MockBroadcastAdapter` |
 
@@ -83,7 +93,7 @@ type TurnSync struct {
 | OpCode | 名称 | 数据类型 | 说明 |
 |--------|------|----------|------|
 | 1 | `OpStateSync` | `StateSync` | 状态同步（进入新状态） |
-| 2 | `OpTurnSync` | `TurnSync` | 回合内Action效果列表 |
+| 2 | `OpTurnSync` | `TurnSync` | 回合内 LogEntry 列表 |
 | 3 | `OpDecisionRequest` | `Decision` | 决策请求 |
 | 4 | `OpAvailable` | `Available` | 可用操作列表 |
 | 5 | `OpMiniGameStart` | `MiniGameStart` | 小游戏开始 |
@@ -112,7 +122,7 @@ type TurnSync struct {
 type StateSync struct {
     GlobalState string    `json:"global_state"`  // "turn_loop", "round_mini_game"
     TurnState   string    `json:"turn_state"`    // "main_action", "turn_moving"
-    TurnPlayer  string    `json:"turn_player"`   // 当前回合玩家ID
+    TurnPlayer  string    `json:"turn_player"`   // 当前回合玩家 ID
     Round       int       `json:"round"`
     Turn        int       `json:"turn"`
     Paused      bool      `json:"paused"`        // 等待决策中
@@ -122,46 +132,18 @@ type StateSync struct {
 
 ### TurnSync
 
-回合内所有效果同步，使用Action列表供客户端顺序渲染：
+回合内所有效果同步，使用 `gamelog.LogEntry` 列表供客户端顺序渲染：
 
 ```go
 type TurnSync struct {
-    Round   int      `json:"round"`
-    Turn    int      `json:"turn"`
-    Player  string   `json:"player"`    // 回合玩家ID
-    Actions []Action `json:"actions"`   // 效果列表（客户端顺序播放）
+    Round   int                `json:"round"`
+    Turn    int                `json:"turn"`
+    Player  string             `json:"player"`    // 回合玩家 ID
+    Entries []gamelog.LogEntry `json:"entries"`   // 直接发送 GameLog
 }
 ```
 
-客户端循环遍历 Actions 数组，按顺序播放每个效果的动画。
-
-### Action
-
-单个效果，所有字段展平便于客户端渲染：
-
-```go
-type Action struct {
-    Type   string `json:"type"`            // "damage", "move", "heal", "add_buff"
-    Target string `json:"target"`          // 目标玩家ID
-    Source string `json:"source"`          // 来源（Buff/Item/Event名称）
-
-    // Type-specific fields (omitempty)
-    Delta       int    `json:"delta,omitempty"`       // HP/LP变化值
-    Path        []int  `json:"path,omitempty"`        // 移动路径
-    BuffType    string `json:"buff_type,omitempty"`   // Buff类型
-    Duration    int    `json:"duration,omitempty"`    // Buff持续时间
-    EventType   string `json:"event_type,omitempty"`  // 事件类型
-    EventName   string `json:"event_name,omitempty"`  // 事件显示名
-    Position    int    `json:"position,omitempty"`    // 位置（teleport/respawn）
-    StolenFrom  string `json:"stolen_from,omitempty"` // 被偷玩家（白虎劫运）
-    StolenBuff  string `json:"stolen_buff,omitempty"` // 被偷Buff类型
-    DiceType    string `json:"dice_type,omitempty"`   // 骰子类型
-    DiceSteps   int    `json:"dice_steps,omitempty"`  // 骰子步数
-    FallDamage  int    `json:"fall_damage,omitempty"` // 落坑伤害
-    FromState   string `json:"from_state,omitempty"`  // 状态转换：原状态
-    ToState     string `json:"to_state,omitempty"`    // 状态转换：新状态
-}
-```
+客户端循环遍历 Entries 数组，按顺序播放每个效果的动画。
 
 ### Player
 
@@ -174,8 +156,8 @@ type Player struct {
     Position    int    `json:"position"`
     HP          int    `json:"hp"`
     LP          int    `json:"lp"`
-    Buffs       []Buff `json:"buffs"`        // 带Name的Buff列表
-    Items       []Item `json:"items"`        // 带Name的Item列表
+    Buffs       []Buff `json:"buffs"`        // 带 Name 的 Buff 列表
+    Items       []Item `json:"items"`        // 带 Name 的 Item 列表
     Charge      int    `json:"charge"`       // 阵营充能数（青龙/玄武）
     FireCounter int    `json:"fire_counter"` // 朱雀火计数
     IsDead      bool   `json:"is_dead"`
@@ -189,11 +171,11 @@ type Player struct {
 type Buff struct {
     Type     string `json:"type"`     // "divine", "curse"
     Name     string `json:"name"`     // "神眷", "诅咒"（从定义获取）
-    Duration int    `json:"duration"` // -1表示永久
+    Duration int    `json:"duration"` // -1 表示永久
 }
 
 type Item struct {
-    ID   string `json:"id"`   // Item实例UUID
+    ID   string `json:"id"`   // Item 实例 UUID
     Type string `json:"type"` // "any_door", "reverse_clock"
     Name string `json:"name"` // "任意门", "反方向的钟"
 }
@@ -201,11 +183,11 @@ type Item struct {
 
 ### Decision
 
-决策请求，带Context标识来源：
+决策请求，带 Context 标识来源：
 
 ```go
 type Decision struct {
-    ID      string   `json:"id"`       // 决策ID
+    ID      string   `json:"id"`       // 决策 ID
     Prompt  string   `json:"prompt"`   // 提示文本
     Context string   `json:"context"`  // 来源标识："Item_AnyDoor", "Buff_Divine"
     Options []Option `json:"options"`  // 选项列表
@@ -214,7 +196,7 @@ type Decision struct {
 }
 
 type Option struct {
-    ID     string `json:"id"`             // 选项ID
+    ID     string `json:"id"`             // 选项 ID
     Label  string `json:"label"`          // 显示文本
     Effect string `json:"effect,omitempty"` // 效果描述
 }
@@ -226,7 +208,7 @@ type Option struct {
 
 ```go
 type Available struct {
-    Items       []Item `json:"items"`         // 可用道具（带Name）
+    Items       []Item `json:"items"`         // 可用道具（带 Name）
     CanUseSkill bool   `json:"can_use_skill"` // 阵营技能可用
     DiceType    string `json:"dice_type"`     // "gold", "silver", "copper", "wood"
 }
@@ -239,7 +221,7 @@ type Available struct {
 ```go
 type MiniGameStart struct {
     GameType string   `json:"game_type"` // "dice_race"
-    Players  []string `json:"players"`   // 参赛玩家ID列表
+    Players  []string `json:"players"`   // 参赛玩家 ID 列表
 }
 
 type MiniGameResult struct {
@@ -291,6 +273,8 @@ type ActionRejected struct {
 - `ErrInvalidState` (1002): 无效状态
 - `ErrPlayerNotFound` (4001): 玩家未找到
 - `ErrItemNotFound` (4002): 道具未找到
+- `ErrInvalidParameter` (1001): 无效参数
+- `ErrConditionNotMet` (1005): 条件未满足
 
 详见 [pkg/constants/README.md](../constants/README.md#ErrorCode---错误码系统)。
 
@@ -308,6 +292,7 @@ type BroadcastAdapter interface {
     BroadcastMiniGameResult(result *MiniGameResult) error
     BroadcastGameOver(over *GameOver) error
     SendFullSync(playerID string, state *StateSync, turn *TurnSync) error
+    SendActionRejected(playerID string, rejected *ActionRejected) error
 }
 ```
 
@@ -322,7 +307,7 @@ mock.BroadcastTurnSync(turnSync)
 
 // 检查捕获的消息
 if mock.StateSyncs[0].GlobalState == "turn_loop" { ... }
-if mock.TurnSyncs[0].Actions[0].Type == "damage" { ... }
+if mock.TurnSyncs[0].Entries[0].ActionType == "damage" { ... }
 
 mock.Clear() // 清空所有捕获的消息
 ```
@@ -332,16 +317,28 @@ mock.Clear() // 清空所有捕获的消息
 ### 创建消息
 
 ```go
-import "pkg/net"
+import (
+    "github.com/b1tAction/paradiced/pkg/net"
+    "github.com/b1tAction/paradiced/pkg/gamelog"
+)
 
 // 创建回合同步消息
 turnSync := &net.TurnSync{
-    Round:   1,
-    Turn:    0,
-    Player:  "player-001",
-    Actions: []net.Action{
-        {Type: "damage", Target: "player-001", Delta: -1, Source: "Cell_Fragile"},
-        {Type: "move", Target: "player-001", Path: []int{10, 11, 12}, Source: "DiceRoll"},
+    Round:  1,
+    Turn:   0,
+    Player: "player-001",
+    Entries: []gamelog.LogEntry{
+        {
+            ActionType: "damage",
+            Target:     "player-001",
+            Delta:      -1,
+            Source:     "Cell_Fragile",
+        },
+        {
+            ActionType: "move",
+            Target:     "player-001",
+            Metadata:   metadata.WithInt("steps", 3),
+        },
     },
 }
 msg, err := net.NewMessage(net.OpTurnSync, turnSync)
@@ -354,13 +351,13 @@ msg, err := net.NewMessage(net.OpTurnSync, turnSync)
 var turnSync net.TurnSync
 err := msg.ParseData(&turnSync)
 
-// 遍历Actions渲染
-for _, action := range turnSync.Actions {
-    switch action.Type {
+// 遍历 Entries 渲染
+for _, entry := range turnSync.Entries {
+    switch entry.ActionType {
     case "damage":
-        // 播放伤害动画，使用action.Delta和action.Source
+        // 播放伤害动画，使用 entry.Delta 和 entry.Source
     case "move":
-        // 播放移动动画，使用action.Path
+        // 播放移动动画，使用 entry.Metadata 中的 path
     }
 }
 ```
@@ -393,16 +390,18 @@ Faction 字段使用 **snake_case** 值：
 
 ## 相关文档
 
-- [internal/net/README.md](../../internal/net/README.md) - 构建器和骰子计算器
+- [internal/net/README.md](../../internal/net/README.md) - 构建器
 - [pkg/protocol/README.md](../protocol/README.md) - 协议接口层
 - [doc/internal/net_protocol.md](../../doc/internal/net_protocol.md) - 协议层完整设计
 - [internal/engine/hsm/README.md](../../internal/engine/hsm/README.md) - HSM 状态机
 - [doc/internal/nakama.md](../../doc/internal/nakama.md) - Nakama Match Handler 集成
 - [internal/nakama/README.md](../../internal/nakama/README.md) - Nakama 包文档
+- [pkg/gamelog/README.md](../gamelog/README.md) - GameLog 系统
+- [doc/metadata/logentry.md](../../doc/metadata/logentry.md) - LogEntry.Metadata 契约
 
 ## Builder 接口
 
-定义在 `pkg/net/builder.go`，用于构建协议同步消息。接口设计避免 internal/engine/hsm 和 internal/net 之间的循环引用：
+定义在 `internal/net/builder.go`，用于构建协议同步消息。接口设计避免 internal/engine/hsm 和 internal/net 之间的循环引用：
 
 ```go
 type Builder interface {

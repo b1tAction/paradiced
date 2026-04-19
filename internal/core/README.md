@@ -90,10 +90,10 @@ player.IncrementFireCounter()
 
 ## Faction 阵营
 
-Faction 类型定义在 `pkg/protocol/player.go`，core 包使用类型别名：
+Faction 类型定义在 `pkg/constants`，core 包直接使用：
 
 ```go
-// pkg/protocol/player.go 定义
+// pkg/constants/faction.go 定义
 type Faction int
 const (
     FactionQingLong Faction = iota
@@ -102,8 +102,7 @@ const (
     FactionXuanWu
 )
 
-// internal/core/faction.go 类型别名
-type Faction = protocol.Faction
+// internal/core 直接使用 constants.Faction
 ```
 
 | 阵营 | 技能 | 描述 |
@@ -115,9 +114,9 @@ type Faction = protocol.Faction
 
 ## 与 protocol 包的关系
 
-- Player 实现 `protocol.Player` 接口
-- Faction 类型定义在 protocol 包
-- Buff Handler 使用 `protocol.PlayerLite` 最小接口
+- Player 实现 `protocol.Player` 接口（如有需要）
+- Faction 类型定义在 constants 包
+- Buff Handler 使用 `constants.Faction`
 
 ## Metadata 契约
 
