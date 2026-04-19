@@ -5,6 +5,7 @@ import (
 
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/errors"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
 	"github.com/b1tAction/paradiced/pkg/util"
 )
@@ -61,9 +62,15 @@ func (a *DamageAction) PostTriggerPhase() constants.Phase {
 
 func (a *DamageAction) Execute(ctx *ActionContext) error {
 	if a.Amount <= 0 {
-		return nil // Already blocked
+		return nil // Already blocked by interception
 	}
-	return a.TargetPlayer.ApplyDamage(a.Amount)
+	if a.TargetPlayer == nil {
+		return errors.NewActionExecutionError("damage", "", "target player is nil", nil)
+	}
+	if err := a.TargetPlayer.ApplyDamage(a.Amount); err != nil {
+		return errors.NewActionExecutionError("damage", a.TargetPlayer.ID.UUID(), "failed to apply damage", err)
+	}
+	return nil
 }
 
 func (a *DamageAction) LogEntry() gamelog.LogEntry {
@@ -119,6 +126,9 @@ func (a *HealAction) PostTriggerPhase() constants.Phase {
 func (a *HealAction) Execute(ctx *ActionContext) error {
 	if a.Amount <= 0 {
 		return nil
+	}
+	if a.TargetPlayer == nil {
+		return errors.NewActionExecutionError("heal", "", "target player is nil", nil)
 	}
 	a.TargetPlayer.Heal(a.Amount)
 	return nil
@@ -236,14 +246,20 @@ func (a *MoveAction) PostTriggerPhase() constants.Phase {
 func (a *MoveAction) Execute(ctx *ActionContext) error {
 	// Movement execution requires MapEngine
 	if ctx.MapEngine == nil {
-		return nil
+		return errors.NewInternalError("MoveAction", "Execute", nil).
+			WithContext("reason", "map engine is nil")
+	}
+	if a.TargetPlayer == nil {
+		return errors.NewActionExecutionError("move", "", "target player is nil", nil)
 	}
 
 	// Calculate path using MapEngine
 	startPos := a.TargetPlayer.Position
 	result, err := ctx.MapEngine.CalculatePath(startPos, a.Steps)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "MoveAction", "CalculatePath").
+			WithContext("start_pos", startPos).
+			WithContext("steps", a.Steps)
 	}
 
 	// Update player position
@@ -485,6 +501,12 @@ func (a *StealBuffAction) PostTriggerPhase() constants.Phase {
 
 func (a *StealBuffAction) Execute(ctx *ActionContext) error {
 	// Steal a random buff from target
+	if a.TargetPlayer == nil {
+		return errors.NewActionExecutionError("steal_buff", "", "target player is nil", nil)
+	}
+	if a.SourcePlayer == nil {
+		return errors.NewActionExecutionError("steal_buff", "", "source player is nil", nil)
+	}
 	if len(a.TargetPlayer.ActiveBuffs) == 0 {
 		return nil // No buffs to steal
 	}
@@ -553,11 +575,14 @@ func (a *DrawEventAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *DrawEventAction) Execute(ctx *ActionContext) error {
+	// Draw event requires DrawEngine
+	if ctx.DrawEngine == nil {
+		return errors.NewInternalError("DrawEventAction", "Execute", nil).
+			WithContext("reason", "draw engine is nil")
+	}
+
 	// TODO: After engine Registry is created, implement proper event drawing
 	// Currently placeholder - needs pool data from engine layer
-	if ctx.DrawEngine == nil {
-		return nil
-	}
 
 	// Placeholder for future implementation
 	a.DrawnType = constants.EventTypeNone
@@ -622,6 +647,9 @@ func (a *RespawnAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *RespawnAction) Execute(ctx *ActionContext) error {
+	if a.TargetPlayer == nil {
+		return errors.NewActionExecutionError("respawn", "", "target player is nil", nil)
+	}
 	a.TargetPlayer.Respawn(a.CheckpointPos)
 	return nil
 }
@@ -677,9 +705,14 @@ func (a *FellDownAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *FellDownAction) Execute(ctx *ActionContext) error {
+	if a.TargetPlayer == nil {
+		return errors.NewActionExecutionError("fell_down", "", "target player is nil", nil)
+	}
 	// Falling damage
 	if a.Damage > 0 {
-		return a.TargetPlayer.ApplyDamage(a.Damage)
+		if err := a.TargetPlayer.ApplyDamage(a.Damage); err != nil {
+			return errors.NewActionExecutionError("fell_down", a.TargetPlayer.ID.UUID(), "failed to apply fall damage", err)
+		}
 	}
 	return nil
 }
