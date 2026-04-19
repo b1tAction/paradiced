@@ -49,39 +49,19 @@ stateSync, turnSync := builder.BuildFullSync()
 
 ## TurnSync 构建
 
-`BuildTurnSync()` 从当前回合的 GameLog 提取所有 LogEntry，转换为 Action 列表：
+`BuildTurnSync()` 从当前回合的 GameLog 提取所有 LogEntry，直接用于协议同步：
 
 ```go
 func (b *Builder) BuildTurnSync() *pkgnet.TurnSync {
     entries := b.GetCurrentTurnEntries()
-    actions := make([]pkgnet.Action, len(entries))
-    for i, entry := range entries {
-        actions[i] = b.buildAction(entry)
-    }
     return &pkgnet.TurnSync{
-        Round:   b.game.State.Round,
-        Turn:    b.game.State.Turn,
-        Player:  playerID,
-        Actions: actions,
+        Round:           b.game.State.Round,
+        Turn:            b.game.State.Turn,
+        CurrentPlayerID: playerID,
+        Entries:         entries,
     }
 }
 ```
-
-### buildAction 字段映射
-
-| ActionType | 提取字段 | 说明 |
-|------------|----------|------|
-| `damage`/`heal`/`modify_lp` | `delta` | HP/LP变化值 |
-| `move` | `path`, `dice_steps`, `dice_type` | 移动路径和骰子信息 |
-| `add_buff` | `buff_type`, `duration` | 添加Buff |
-| `remove_buff` | `buff_type` | 移除Buff |
-| `draw_event` | `event_type`, `event_name` | 抽取事件 |
-| `teleport` | `position` | 传送位置 |
-| `steal_buff` | `stolen_buff`, `stolen_from` | 白虎劫运 |
-| `fell_down` | `position`, `fall_damage` | 落坑 |
-| `respawn` | `position` | 重生位置 |
-| `dice_roll` | `dice_type`, `dice_steps` | 投骰子 |
-| `state` | `from_state`, `to_state` | 状态转换 |
 
 ## Buff/Item Name 提取
 

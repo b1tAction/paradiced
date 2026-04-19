@@ -140,7 +140,7 @@ for (const entry of turnSync.entries) {
 
 ```go
 type Player struct {
-    UserID      string `json:"user_id"`
+    PlayerID    string `json:"player_id"`
     Faction     string `json:"faction"`      // snake_case: "qing_long", "zhu_que"
     Position    int    `json:"position"`
     HP          int    `json:"hp"`
