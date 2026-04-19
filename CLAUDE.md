@@ -62,6 +62,7 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **EntryType**: GameLog entry type (action, state, mini_game, boss, decision)
 - **ActionSource**: Action source identifier (Buff/Item/Event/Faction/System)
 - **Evaluation**: 0-100 scoring system (Bad ≤40, Neutral 41-65, Good >65)
+- **ErrorCode**: Error codes for client-server communication (0=OK, 1xxx=validation, 2xxx=game logic, 3xxx=system, 4xxx=not found)
 - All enums use string type with snake_case values for JSON compatibility
 - **Player**: Interface for player operations (Reader/Writer/Lite variants)
 - **Game**: Interface for game state access, includes GetGameLog()
@@ -82,7 +83,13 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
   - Client→Server: OpRollDice(100), OpUseItem(101), OpUseSkill(102), OpUserChoice(103), OpMiniGameResultSubmit(104)
 - **StateSync/TurnSync**: Complete state and turn synchronization structures
 - **Decision**: User confirmation request structure
-- **ActionRejected**: Action rejection notification (new - for client feedback)
+- **ActionRejected**: Action rejection notification with ErrorCode for client-side error handling
+
+#### Nakama Protocol Layer (`internal/nakama`)
+- **NakamaMatchHandler**: Main match handler with HSM integration
+- **Logger**: Structured logging helper for request/response/rejection tracking (nil-safe)
+- **ErrorCode System**: Standardized error codes (pkg/constants.ErrorCode) for client feedback
+- **Message Handlers**: Handle client requests (roll dice, use item, use skill, etc.) with validation and error reporting
 
 #### CLI Tool (`internal/cli`)
 - **playtest run**: Run single automated playtest (2-4 players)

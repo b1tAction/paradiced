@@ -22,6 +22,7 @@
 | `lifecycle.go` | MatchInit/MatchLoop/MatchStop、addPlayer/assignFactions |
 | `message.go` | HandleMessage 消息路由、各 OpCode 处理器 |
 | `presence.go` | HandlePresenceJoin/Leave、玩家连接管理、断线重连 |
+| `logger.go` | Logger 辅助日志工具、结构化请求/响应/拒绝日志 |
 
 ## DispatcherAdapter 接口
 
@@ -132,38 +133,55 @@ handler.HandleMessage("user-001", data)
 ```go
 // pkg/net/sync.go
 type ActionRejected struct {
-    OpCode  OpCode `json:"op_code"`   // 被拒绝的操作码
-    Reason  string `json:"reason"`    // 拒绝原因
-    Message string `json:"message"`   // 人类可读的错误信息
+    OpCode    OpCode              `json:"op_code"`   // 被拒绝的操作码
+    ErrorCode constants.ErrorCode `json:"error_code"` // 错误码（新增）
+    Reason    string              `json:"reason"`    // 拒绝原因
+    Message   string              `json:"message"`   // 人类可读的错误信息
 }
 ```
 
 **常见拒绝原因**：
 
-| Reason | 说明 | 触发场景 |
-|--------|------|----------|
-| `not_current_player` | 非当前回合玩家 | 其他玩家试图掷骰子/使用道具 |
-| `invalid_state` | 无效的游戏状态 | 在 MainAction 阶段发送 MoveRequest |
-| `item_not_found` | 道具不存在 | 使用不存在的道具 ID |
-| `item_not_usable` | 道具不可用 | 道具已使用过或非 PhaseAnyTime |
-| `skill_not_ready` | 技能未就绪 | 充能不足或技能冷却中 |
-| `invalid_choice` | 无效的决策选择 | 决策 ID 不匹配或选项超出范围 |
+| Reason | ErrorCode | 说明 | 触发场景 |
+|--------|-----------|------|----------|
+| `not_current_player` | `ErrNotCurrentTurn` | 非当前回合玩家 | 其他玩家试图掷骰子/使用道具 |
+| `invalid_state` | `ErrInvalidState` | 无效的游戏状态 | 在 MainAction 阶段发送 MoveRequest |
+| `item_not_found` | `ErrItemNotFound` | 道具不存在 | 使用不存在的道具 ID |
+| `item_not_usable` | `ErrInvalidParameter` | 道具不可用 | 道具已使用过或非 PhaseAnyTime |
+| `skill_not_ready` | `ErrConditionNotMet` | 技能未就绪 | 充能不足或技能冷却中 |
+| `invalid_choice` | `ErrInvalidParameter` | 无效的决策选择 | 决策 ID 不匹配或选项超出范围 |
+| `player_not_found` | `ErrPlayerNotFound` | 玩家不存在 | 未知玩家发送请求 |
+
+**错误码分类**：
+
+| 范围 | 分类 |
+|------|------|
+| `0` | 成功 (ErrOK) |
+| `1001-1999` | 验证错误 (Validation Errors) |
+| `2001-2999` | 游戏逻辑错误 (Game Logic Errors) |
+| `3001-3999` | 系统错误 (System Errors) |
+| `4001-4999` | 未找到错误 (Not Found Errors) |
+
+详见 [pkg/constants/README.md](../../pkg/constants/README.md#ErrorCode---错误码系统)。
 
 **使用示例**：
 
 ```go
 // internal/nakama/message.go
 func (h *NakamaMatchHandler) handleRollDice(sender string) error {
-    player := h.getPlayerByUserID(sender)
-    currentPlayer := h.getCurrentPlayer()
+    logger := nakama.NewLogger(h)
+    logger.logRequest("roll_dice", sender, nil)
 
-    if player != currentPlayer {
-        // 发送拒绝消息
-        return h.sendActionRejected(sender, pkgnet.ActionRejected{
-            OpCode:  pkgnet.OpRollDice,
-            Reason:  "not_current_player",
-            Message: "当前不是你的回合",
-        })
+    player := h.GetPlayer(sender)
+    if player == nil {
+        logger.logReject("roll_dice", sender, constants.ErrPlayerNotFound, "player_not_found", "Unknown player")
+        return h.sendActionRejectedWithCode(sender, pkgnet.OpRollDice, constants.ErrPlayerNotFound, "Unknown player")
+    }
+
+    currentPlayer := h.GetCurrentPlayer()
+    if player.UserID != currentPlayer.UserID {
+        logger.logReject("roll_dice", sender, constants.ErrNotCurrentTurn, "not_current_player", "当前不是你的回合")
+        return h.sendActionRejectedWithCode(sender, pkgnet.OpRollDice, constants.ErrNotCurrentTurn, "当前不是你的回合")
     }
 
     // 正常处理...
@@ -188,37 +206,48 @@ docker logs -f nakama
 
 ```
 INFO [Nakama] MatchInit: match_id=match-001, players=4
+DEBUG [Nakama] [REQ] Processing request: op_code=roll_dice, sender=user-001
 DEBUG [Nakama] handleRollDice: player=user-001, dice_type=gold
 INFO [HSM] State transition: from=main_action, to=turn_moving
 DEBUG [Action] Executing: type=move, target=user-001, steps=5
-INFO [Nakama] BroadcastTurnSync: entries=3, round=1, turn=0
+INFO [Nakama] [BROADCAST] BroadcastTurnSync: entries=3, round=1, turn=0
+WARN [Nakama] [REJ] Request rejected: op_code=roll_dice, error_code=1004, reason=not_current_player
 ```
 
-### 使用 zap 日志记录器
+### Logger 辅助工具
+
+`internal/nakama/logger.go` 提供结构化日志辅助工具：
 
 ```go
-// internal/nakama/logger.go (待实现)
-type Logger struct {
-    *zap.Logger
-    matchID string
-}
+// 创建 Logger
+logger := nakama.NewLogger(h)
 
-func NewLogger(matchID string, verbose bool) *Logger {
-    config := zap.NewDevelopmentConfig()
-    if !verbose {
-        config.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
-    }
-    logger, _ := config.Build()
-    return &Logger{
-        Logger:  logger,
-        matchID: matchID,
-    }
-}
+// 记录请求
+logger.logRequest("roll_dice", sender, data)
 
-func (l *Logger) Info(msg string, fields ...zap.Field) {
-    l.Logger.Info(msg, append([]zap.Field{zap.String("match_id", l.matchID)}, fields...)...)
-}
+// 记录响应
+logger.logResponse("roll_dice", sender, "success")
+
+// 记录拒绝（带错误码）
+logger.logReject("roll_dice", sender, constants.ErrPlayerNotFound, "player_not_found", "Player not found")
+
+// 记录错误
+logger.logError("roll_dice", sender, err)
+
+// 记录状态转换
+logger.logState(sender, "main_action", "turn_moving")
+
+// 记录验证结果
+logger.logValidation(sender, "player_check", true)
+
+// 记录玩家操作
+logger.logPlayer(sender, "roll_dice", "player-001", true)
 ```
+
+Logger 特点：
+- **nil-safe**: 所有方法在 logger 为 nil 时不会 panic
+- **结构化**: 统一的日志格式，便于日志分析
+- **错误码追踪**: 拒绝日志自动包含错误码和 reason
 
 ## NakamaBroadcastAdapter
 

@@ -72,7 +72,7 @@ type TurnSync struct {
 |------|------|
 | `opcode.go` | 消息操作码定义（Server→Client: 1-99, Client→Server: 100+） |
 | `message.go` | 基础消息结构 `Message` |
-| `sync.go` | 状态同步数据结构：`StateSync`, `Player`, `TurnSync`, `Action`, `Available` |
+| `sync.go` | 状态同步数据结构：`StateSync`, `Player`, `TurnSync`, `ActionRejected`（新增 ErrorCode） |
 | `decision.go` | 决策请求/回复结构：`Decision`, `Option`, `RollDice`, `UseItem`, `UserChoice` |
 | `broadcast.go` | 广播抽象接口 `BroadcastAdapter` 和测试实现 `MockBroadcastAdapter` |
 
@@ -90,6 +90,7 @@ type TurnSync struct {
 | 6 | `OpMiniGameResult` | `MiniGameResult` | 小游戏结果广播 |
 | 7 | `OpGameOver` | `GameOver` | 游戏结束 |
 | 8 | `OpFullSync` | `FullSync` | 完整同步（断线重连） |
+| 9 | `OpActionRejected` | `ActionRejected` | 动作拒绝（带错误码） |
 
 ### Client → Server (100+)
 
@@ -261,6 +262,37 @@ type FullSync struct {
     Turn  *TurnSync  `json:"turn"`
 }
 ```
+
+### ActionRejected
+
+动作拒绝通知（新增 ErrorCode 字段）：
+
+```go
+type ActionRejected struct {
+    OpCode    OpCode              `json:"op_code"`
+    ErrorCode constants.ErrorCode `json:"error_code"` // 错误码
+    Reason    string              `json:"reason"`     // 拒绝原因
+    Message   string              `json:"message"`    // 人类可读消息
+}
+```
+
+**错误码分类**：
+
+| 范围 | 分类 |
+|------|------|
+| `0` | 成功 (ErrOK) |
+| `1001-1999` | 验证错误 (Validation Errors) |
+| `2001-2999` | 游戏逻辑错误 (Game Logic Errors) |
+| `3001-3999` | 系统错误 (System Errors) |
+| `4001-4999` | 未找到错误 (Not Found Errors) |
+
+常见错误码：
+- `ErrNotCurrentTurn` (1004): 非当前回合玩家
+- `ErrInvalidState` (1002): 无效状态
+- `ErrPlayerNotFound` (4001): 玩家未找到
+- `ErrItemNotFound` (4002): 道具未找到
+
+详见 [pkg/constants/README.md](../constants/README.md#ErrorCode---错误码系统)。
 
 ## BroadcastAdapter 接口
 

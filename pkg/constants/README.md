@@ -187,6 +187,35 @@ pkg/constants/
 - `EvaluationNeutralThreshold = 65`：中性上限
 - `EvaluationMin = 0`、`EvaluationMax = 100`：范围边界
 
+### ErrorCode - 错误码系统
+
+提供 `ToReason()` 方法用于获取错误原因字符串，供前端进行错误处理。
+
+错误码按范围分类：
+- `0`：成功 (ErrOK)
+- `1001-1999`：验证错误 (Validation Errors)
+- `2001-2999`：游戏逻辑错误 (Game Logic Errors)
+- `3001-3999`：系统错误 (System Errors)
+- `4001-4999`：未找到错误 (Not Found Errors)
+
+| 常量 | 值 | 分类 | Reason | 说明 |
+|------|-----|------|--------|------|
+| `ErrOK` | 0 | OK | `ok` | 成功 |
+| `ErrInvalidParameter` | 1001 | Validation | `invalid_parameter` | 无效参数 |
+| `ErrInvalidState` | 1002 | Validation | `invalid_state` | 无效状态 |
+| `ErrInvalidTiming` | 1003 | Validation | `invalid_timing` | 时机错误 |
+| `ErrNotCurrentTurn` | 1004 | Validation | `not_current_turn` | 非当前回合 |
+| `ErrConditionNotMet` | 1005 | Validation | `condition_not_met` | 条件未满足 |
+| `ErrActionRejected` | 1006 | Validation | `action_rejected` | 行动被拒绝 |
+| `ErrCooldownActive` | 1007 | Validation | `cooldown_active` | 冷却中 |
+| `ErrInternal` | 3001 | System | `internal_error` | 内部错误 |
+| `ErrHSMError` | 3002 | System | `hsm_error` | HSM 错误 |
+| `ErrDispatchFailed` | 3003 | System | `dispatch_failed` | 分发失败 |
+| `ErrPlayerNotFound` | 4001 | Not Found | `player_not_found` | 玩家未找到 |
+| `ErrItemNotFound` | 4002 | Not Found | `item_not_found` | 道具未找到 |
+| `ErrBuffNotFound` | 4003 | Not Found | `buff_not_found` | Buff 未找到 |
+| `ErrMatchNotFound` | 4004 | Not Found | `match_not_found` | 对局未找到 |
+
 ## 迁移状态
 
 | 类型 | 原位置 | 新位置 | 状态 |
@@ -202,6 +231,7 @@ pkg/constants/
 | EntryType | pkg/gamelog | pkg/constants (alias) | ✓ 已完成 |
 | Evaluation | internal/core/types | pkg/constants | ✓ 已完成 |
 | ActionSource | - | pkg/constants | ✓ 已添加 |
+| ErrorCode | internal/nakama | pkg/constants | ✓ 已添加 |
 
 ## Metadata 契约
 
