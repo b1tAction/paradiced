@@ -1,9 +1,11 @@
 package hsm
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/b1tAction/paradiced/internal/event"
+	"github.com/b1tAction/paradiced/pkg/errors"
 )
 
 // ========== Interrupt States (Layer 3) ==========
@@ -79,7 +81,9 @@ func (s *WaitDecisionState) Enter(ctx *StateContext) {
 
 	// Validate decision exists
 	if s.decision == nil {
-		ctx.Error = NewStateError(StateWaitDecision, "no decision to wait for")
+		ctx.Error = errors.WrapHSMError(
+			errors.NewValidationError("decision", nil, "must not be nil"),
+			"WaitDecision", 3, "Enter", "no decision to wait for")
 		return
 	}
 
@@ -137,6 +141,9 @@ func (s *WaitDecisionState) OnUserChoice(ctx *StateContext, choice int) {
 // executeOption executes the selected decision option.
 func (s *WaitDecisionState) executeOption(ctx *StateContext, optionIndex int) {
 	if s.decision == nil || optionIndex >= len(s.decision.Options) {
+		ctx.Error = errors.WrapHSMError(
+			errors.NewValidationError("option_index", optionIndex, "out of range"),
+			"WaitDecision", 3, "executeOption", "invalid option index")
 		return
 	}
 
@@ -145,8 +152,15 @@ func (s *WaitDecisionState) executeOption(ctx *StateContext, optionIndex int) {
 	// Create execution context
 	execCtx := event.NewContext(ctx.Player)
 
-	// Execute option action if defined
+	// Execute option action if defined, with panic recovery
 	if option.Action != nil {
+		defer func() {
+			if r := recover(); r != nil {
+				ctx.Error = errors.WrapHSMError(
+					errors.NewInternalError("WaitDecision", "executeOption", fmt.Errorf("%v", r)),
+					"WaitDecision", 3, "executeOption", "action panicked")
+			}
+		}()
 		option.Action(execCtx)
 	}
 

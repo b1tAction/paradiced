@@ -9,6 +9,7 @@ import (
 	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/errors"
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
@@ -57,7 +58,9 @@ func NewTurnUpkeepState() *TurnUpkeepState {
 func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 	player := ctx.Player
 	if player == nil {
-		ctx.Error = NewStateError(StateTurnUpkeep, "player is nil")
+		ctx.Error = errors.WrapHSMError(
+			errors.NewInternalError("HSM", "TurnUpkeep", nil),
+			"TurnUpkeep", 2, "Enter", "player is nil")
 		return
 	}
 
@@ -81,7 +84,11 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 		if mapEngine != nil {
 			checkpoint := mapEngine.GetLastCheckpoint(player.Position)
 			respawnAction := engineaction.NewRespawnAction(player, checkpoint, "DeathRespawn")
-			s.actionCtx.ExecuteAction(respawnAction)
+			if err := s.actionCtx.ExecuteAction(respawnAction); err != nil {
+				ctx.Error = errors.WrapHSMError(
+					err, "TurnUpkeep", 2, "Enter", "respawn action failed")
+				return
+			}
 		}
 		s.isDead = true
 	}
@@ -190,7 +197,9 @@ func NewMainActionStateDefault() *MainActionState {
 func (s *MainActionState) Enter(ctx *StateContext) {
 	player := ctx.Player
 	if player == nil {
-		ctx.Error = NewStateError(StateMainAction, "player is nil")
+		ctx.Error = errors.WrapHSMError(
+			errors.NewInternalError("HSM", "MainAction", nil),
+			"MainAction", 2, "Enter", "player is nil")
 		return
 	}
 
@@ -360,7 +369,9 @@ func NewTurnMovingState() *TurnMovingState {
 func (s *TurnMovingState) Enter(ctx *StateContext) {
 	player := ctx.Player
 	if player == nil {
-		ctx.Error = NewStateError(StateTurnMoving, "player is nil")
+		ctx.Error = errors.WrapHSMError(
+			errors.NewInternalError("HSM", "TurnMoving", nil),
+			"TurnMoving", 2, "Enter", "player is nil")
 		return
 	}
 
@@ -368,8 +379,11 @@ func (s *TurnMovingState) Enter(ctx *StateContext) {
 	steps := ctx.GetDiceSteps()
 	fmt.Printf("[hsm] TurnMovingState.Enter: dice_steps=%d, player_position=%d\n", steps, player.Position)
 	if steps <= 0 {
-		// Invalid steps, end turn
+		// Invalid steps, set error and end turn
 		fmt.Printf("[hsm] TurnMovingState.Enter: invalid dice steps, ending turn\n")
+		ctx.Error = errors.WrapHSMError(
+			errors.NewValidationError("dice_steps", steps, "must be positive"),
+			"TurnMoving", 2, "Enter", "invalid dice steps")
 		return
 	}
 
@@ -388,9 +402,9 @@ func (s *TurnMovingState) Enter(ctx *StateContext) {
 	moveAction := engineaction.NewMoveAction(player, steps, "DiceRoll")
 
 	// Execute through ActionContext (handles PreTrigger, Execute, PostTrigger)
-	err := s.actionCtx.ExecuteAction(moveAction)
-	if err != nil {
-		ctx.Error = NewStateError(StateTurnMoving, err.Error())
+	if err := s.actionCtx.ExecuteAction(moveAction); err != nil {
+		ctx.Error = errors.WrapHSMError(
+			err, "TurnMoving", 2, "Enter", "move action execution failed")
 		return
 	}
 
@@ -435,9 +449,13 @@ func (s *TurnMovingState) Update(ctx *StateContext) StateID {
 	if s.fellDown {
 		ctx.SetFellDown(true)
 		// Use FellDownAction for falling
-		if s.actionCtx != nil {
+		if s.actionCtx != nil && ctx.Player != nil {
 			fellDownAction := engineaction.NewFellDownAction(ctx.Player, ctx.Player.Position, 1, "FragileCell")
-			s.actionCtx.ExecuteAction(fellDownAction)
+			if err := s.actionCtx.ExecuteAction(fellDownAction); err != nil {
+				ctx.Error = errors.WrapHSMError(
+					err, "TurnMoving", 2, "Update", "fell down action failed")
+				return StateNone // Block state transition
+			}
 		}
 		return StateTurnEnd
 	}
@@ -482,7 +500,9 @@ func NewTurnLandedState() *TurnLandedState {
 func (s *TurnLandedState) Enter(ctx *StateContext) {
 	player := ctx.Player
 	if player == nil {
-		ctx.Error = NewStateError(StateTurnLanded, "player is nil")
+		ctx.Error = errors.WrapHSMError(
+			errors.NewInternalError("HSM", "TurnLanded", nil),
+			"TurnLanded", 2, "Enter", "player is nil")
 		return
 	}
 
@@ -568,7 +588,9 @@ func NewTurnEventState() *TurnEventState {
 func (s *TurnEventState) Enter(ctx *StateContext) {
 	player := ctx.Player
 	if player == nil {
-		ctx.Error = NewStateError(StateTurnEvent, "player is nil")
+		ctx.Error = errors.WrapHSMError(
+			errors.NewInternalError("HSM", "TurnEvent", nil),
+			"TurnEvent", 2, "Enter", "player is nil")
 		return
 	}
 
@@ -587,9 +609,9 @@ func (s *TurnEventState) Enter(ctx *StateContext) {
 	drawAction := engineaction.NewDrawEventAction(player, "CellEvent")
 
 	// Execute through ActionContext
-	err := s.actionCtx.ExecuteAction(drawAction)
-	if err != nil {
-		ctx.Error = NewStateError(StateTurnEvent, err.Error())
+	if err := s.actionCtx.ExecuteAction(drawAction); err != nil {
+		ctx.Error = errors.WrapHSMError(
+			err, "TurnEvent", 2, "Enter", "draw event action failed")
 		return
 	}
 
@@ -641,7 +663,9 @@ func NewTurnEndState() *TurnEndState {
 func (s *TurnEndState) Enter(ctx *StateContext) {
 	player := ctx.Player
 	if player == nil {
-		ctx.Error = NewStateError(StateTurnEnd, "player is nil")
+		ctx.Error = errors.WrapHSMError(
+			errors.NewInternalError("HSM", "TurnEnd", nil),
+			"TurnEnd", 2, "Enter", "player is nil")
 		return
 	}
 
@@ -677,7 +701,11 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 		if mapEngine != nil {
 			checkpoint := mapEngine.GetLastCheckpoint(player.Position)
 			respawnAction := engineaction.NewRespawnAction(player, checkpoint, "AfterTurnRespawn")
-			s.actionCtx.ExecuteAction(respawnAction)
+			if err := s.actionCtx.ExecuteAction(respawnAction); err != nil {
+				ctx.Error = errors.WrapHSMError(
+					err, "TurnEnd", 2, "Enter", "respawn action failed")
+				return
+			}
 		}
 	}
 

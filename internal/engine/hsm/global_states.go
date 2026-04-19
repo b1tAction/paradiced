@@ -3,6 +3,7 @@ package hsm
 import (
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/gamemap"
+	"github.com/b1tAction/paradiced/pkg/errors"
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/b1tAction/paradiced/pkg/rng"
@@ -45,7 +46,9 @@ func (s *MatchInitState) Enter(ctx *StateContext) {
 	mapEngine := ctx.GetMapEngine()
 
 	if game == nil {
-		ctx.Error = NewStateError(StateMatchInit, "game is nil")
+		ctx.Error = errors.WrapHSMError(
+			errors.NewInternalError("HSM", "MatchInit", nil),
+			"MatchInit", 1, "Enter", "game instance is nil")
 		return
 	}
 
@@ -53,7 +56,8 @@ func (s *MatchInitState) Enter(ctx *StateContext) {
 	if mapEngine != nil {
 		cellConfigs := generateDefaultMapConfig(mapEngine.Length)
 		if err := mapEngine.GenerateLinearMap(cellConfigs); err != nil {
-			ctx.Error = NewStateError(StateMatchInit, err.Error())
+			ctx.Error = errors.WrapHSMError(
+				err, "MatchInit", 1, "Enter", "failed to generate map")
 			return
 		}
 	}
