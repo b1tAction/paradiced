@@ -2,10 +2,10 @@
 package core
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/b1tAction/paradiced/pkg/constants"
+	pkgerrors "github.com/b1tAction/paradiced/pkg/errors"
 	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/b1tAction/paradiced/pkg/util"
 )
@@ -96,7 +96,7 @@ func (p *Player) GetFaction() constants.Faction { return p.Faction }
 // Note: Respawn logic is handled by engine package, this only deducts HP.
 func (p *Player) ApplyDamage(amount int) error {
 	if amount < 0 {
-		return errors.New("damage amount cannot be negative")
+		return pkgerrors.NewValidationError("damage_amount", amount, "must be non-negative")
 	}
 
 	// Hidden隐匿 buff grants damage immunity
@@ -117,7 +117,7 @@ func (p *Player) ApplyDamage(amount int) error {
 // Heal restores HP.
 func (p *Player) Heal(amount int) error {
 	if amount < 0 {
-		return errors.New("heal amount cannot be negative")
+		return pkgerrors.NewValidationError("heal_amount", amount, "must be non-negative")
 	}
 	p.HP += amount
 	return nil
@@ -139,7 +139,7 @@ func (p *Player) ModifyLP(amount int) {
 // Move moves the player to a specified position.
 func (p *Player) Move(newPosition int, maxLength int) error {
 	if newPosition < 0 {
-		return errors.New("position cannot be negative")
+		return pkgerrors.NewValidationError("position", newPosition, "must be non-negative")
 	}
 	if newPosition >= maxLength {
 		newPosition = maxLength - 1
@@ -151,7 +151,7 @@ func (p *Player) Move(newPosition int, maxLength int) error {
 // Respawn respawns the player at checkpoint.
 func (p *Player) Respawn(respawnPos int) error {
 	if respawnPos < 0 {
-		return errors.New("respawn position cannot be negative")
+		return pkgerrors.NewValidationError("respawn_pos", respawnPos, "must be non-negative")
 	}
 	p.Position = respawnPos
 	p.HP = DefaultPlayerConfig.MaxHP
@@ -165,7 +165,8 @@ func (p *Player) Respawn(respawnPos int) error {
 // AddBuff adds a buff to the player.
 func (p *Player) AddBuff(buffInstance *Buff) error {
 	if buffInstance == nil {
-		return errors.New("buff cannot be nil")
+		return pkgerrors.NewInternalError("Player", "AddBuff", nil).
+		WithContext("reason", "buff instance is nil")
 	}
 	if p.HasBuff(constants.BuffTypeHidden) && !buffInstance.Type.IsPositive() {
 		return nil
@@ -234,7 +235,8 @@ func (p *Player) ClearNegativeBuffs() int {
 // AddItem adds an item to inventory.
 func (p *Player) AddItem(itemInstance *Item) error {
 	if itemInstance == nil {
-		return errors.New("item cannot be nil")
+		return pkgerrors.NewInternalError("Player", "AddItem", nil).
+		WithContext("reason", "item instance is nil")
 	}
 	p.Inventory = append(p.Inventory, itemInstance)
 	return nil
@@ -249,7 +251,8 @@ func (p *Player) RemoveItem(itemID id.ItemID) (*Item, error) {
 			return removed, nil
 		}
 	}
-	return nil, errors.New("item not found")
+	return nil, pkgerrors.NewInternalError("Player", "RemoveItem", nil).
+		WithContext("reason", "item not found")
 }
 
 // GetItem gets an item by ID.
