@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/b1tAction/paradiced/internal/core"
-	"github.com/b1tAction/paradiced/internal/event"
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
+	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/rng"
@@ -302,20 +302,16 @@ func (s *MainActionState) OnUseItem(ctx *StateContext, itemID string) {
 // defaultDiceRoll returns default dice steps based on dice type.
 // Default values for timeout auto-roll scenarios.
 func (s *MainActionState) defaultDiceRoll(ctx *StateContext) int {
-	// Get current turn player
-	game := ctx.GetGame()
-	if game == nil || len(game.Players) == 0 {
-		return 2 // Default to wood dice steps
+	// Prefer current turn player from HSM; fallback to context player.
+	var turnPlayer *core.Player
+	if ctx.HSM != nil {
+		turnPlayer = ctx.HSM.GetTurnPlayer()
 	}
-
-	// Get current player ID from HSM
-	if ctx.HSM == nil {
-		return 2
-	}
-
-	turnPlayer := ctx.HSM.GetTurnPlayer()
 	if turnPlayer == nil {
-		return 2
+		turnPlayer = ctx.Player
+	}
+	if turnPlayer == nil {
+		return 2 // Default to wood dice steps
 	}
 
 	// Get dice type from context (assigned in RoundPrep)
@@ -778,11 +774,16 @@ type TurnStateFactory struct {
 
 // CreateState creates a turn state by ID.
 func (f *TurnStateFactory) CreateState(id StateID) State {
+	config := f.config
+	if config == nil {
+		config = DefaultHSMConfig()
+	}
+
 	switch id {
 	case StateTurnUpkeep:
 		return NewTurnUpkeepState()
 	case StateMainAction:
-		timeout := f.config.MainActionTimeout
+		timeout := config.MainActionTimeout
 		if timeout == 0 {
 			timeout = 45 * time.Second
 		}
