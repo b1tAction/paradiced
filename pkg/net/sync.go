@@ -235,6 +235,10 @@ type ActionRejected struct {
 	// OpCode is the rejected operation code.
 	OpCode OpCode `json:"op_code"`
 
+	// ErrorCode is the standardized error code for client-side handling.
+	// Defined in pkg/constants/error_code.go
+	ErrorCode constants.ErrorCode `json:"error_code"`
+
 	// Reason explains why the action was rejected.
 	// Common values: "not_current_player", "invalid_state", "item_not_found", "skill_not_ready"
 	Reason string `json:"reason"`

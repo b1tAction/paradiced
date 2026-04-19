@@ -455,3 +455,98 @@ func TestNewLogEntry(t *testing.T) {
 		t.Errorf("entry.Timestamp should be valid and not future")
 	}
 }
+
+func TestActionRejectedWithErrorCode(t *testing.T) {
+	rejected := &ActionRejected{
+		OpCode:    OpRollDice,
+		ErrorCode: constants.ErrPlayerNotFound,
+		Reason:    "player_not_found",
+		Message:   "Unknown player",
+	}
+
+	jsonBytes, err := json.Marshal(rejected)
+	if err != nil {
+		t.Fatalf("json.Marshal() error: %v", err)
+	}
+
+	jsonStr := string(jsonBytes)
+
+	// Verify all fields are present
+	if !strings.Contains(jsonStr, `"op_code"`) {
+		t.Error("JSON should contain 'op_code' field")
+	}
+	if !strings.Contains(jsonStr, `"error_code"`) {
+		t.Error("JSON should contain 'error_code' field")
+	}
+	if !strings.Contains(jsonStr, `"reason"`) {
+		t.Error("JSON should contain 'reason' field")
+	}
+	if !strings.Contains(jsonStr, `"message"`) {
+		t.Error("JSON should contain 'message' field")
+	}
+	if !strings.Contains(jsonStr, `"error_code":4001`) {
+		t.Errorf("JSON should contain error_code value 4001, got: %s", jsonStr)
+	}
+
+	// Deserialize and verify
+	var parsed ActionRejected
+	err = json.Unmarshal(jsonBytes, &parsed)
+	if err != nil {
+		t.Fatalf("json.Unmarshal() error: %v", err)
+	}
+	if parsed.OpCode != OpRollDice {
+		t.Errorf("parsed.OpCode = %v, want OpRollDice", parsed.OpCode)
+	}
+	if parsed.ErrorCode != constants.ErrPlayerNotFound {
+		t.Errorf("parsed.ErrorCode = %v, want ErrPlayerNotFound", parsed.ErrorCode)
+	}
+	if parsed.Reason != "player_not_found" {
+		t.Errorf("parsed.Reason = %s, want player_not_found", parsed.Reason)
+	}
+	if parsed.Message != "Unknown player" {
+		t.Errorf("parsed.Message = %s, want Unknown player", parsed.Message)
+	}
+}
+
+func TestActionRejectedDifferentErrorCodes(t *testing.T) {
+	tests := []struct {
+		name        string
+		errorCode   constants.ErrorCode
+		expectedVal int
+	}{
+		{"ErrOK", constants.ErrOK, 0},
+		{"ErrInvalidParameter", constants.ErrInvalidParameter, 1001},
+		{"ErrInvalidState", constants.ErrInvalidState, 1002},
+		{"ErrNotCurrentTurn", constants.ErrNotCurrentTurn, 1004},
+		{"ErrPlayerNotFound", constants.ErrPlayerNotFound, 4001},
+		{"ErrItemNotFound", constants.ErrItemNotFound, 4002},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rejected := &ActionRejected{
+				OpCode:    OpUseItem,
+				ErrorCode: tt.errorCode,
+				Reason:    tt.errorCode.ToReason(),
+				Message:   "test message",
+			}
+
+			jsonBytes, err := json.Marshal(rejected)
+			if err != nil {
+				t.Fatalf("json.Marshal() error: %v", err)
+			}
+
+			expectedCode := string(rune(tt.expectedVal))
+			_ = expectedCode // avoid unused variable warning
+
+			var parsed ActionRejected
+			err = json.Unmarshal(jsonBytes, &parsed)
+			if err != nil {
+				t.Fatalf("json.Unmarshal() error: %v", err)
+			}
+			if parsed.ErrorCode != tt.errorCode {
+				t.Errorf("parsed.ErrorCode = %v, want %v", parsed.ErrorCode, tt.errorCode)
+			}
+		})
+	}
+}
