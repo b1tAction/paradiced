@@ -290,6 +290,19 @@ func (h *NakamaMatchHandler) handleUseSkill(sender string) error {
 	// Clear charge after use
 	player.SetChargeCount(0)
 
+	// Broadcast state sync to reflect charge change
+	builder := net.NewBuilder(h.hsm)
+	ctx := hsm.NewStateContext().
+		WithHSM(h.hsm).
+		WithPlayer(player).
+		WithBroadcast(NewNakamaBroadcastAdapter(h)).
+		WithBuilder(builder)
+
+	if ctx.Builder != nil {
+		stateSync := ctx.Builder.BuildStateSync()
+		ctx.Broadcast.BroadcastStateSync(stateSync)
+	}
+
 	logger.logResponse("OpUseSkill", sender, "skill used successfully")
 	return nil
 }
@@ -316,6 +329,12 @@ func (h *NakamaMatchHandler) handleUserChoice(sender string, data []byte) error 
 		return h.sendActionRejectedWithCode(sender, pkgnet.OpUserChoice, constants.ErrPlayerNotFound, "Unknown player")
 	}
 
+	// Check if HSM is waiting for decision
+	if !h.hsm.IsWaiting() {
+		logger.logReject("OpUserChoice", sender, constants.ErrInvalidState, "no_pending_decision", "No pending decision")
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpUserChoice, constants.ErrInvalidState, "No pending decision")
+	}
+
 	// Create state context for HSM
 	ctx := hsm.NewStateContext().
 		WithHSM(h.hsm).
@@ -323,7 +342,19 @@ func (h *NakamaMatchHandler) handleUserChoice(sender string, data []byte) error 
 
 	// Notify HSM about user choice
 	h.logDebug("handleUserChoice: calling OnUserChoice", "choice", req.Choice)
-	h.hsm.OnUserChoice(req.Choice, ctx)
+	err := h.hsm.OnUserChoice(req.Choice, ctx)
+	if err != nil {
+		logger.logError("OpUserChoice", sender, err)
+		h.logError("handleUserChoice: OnUserChoice failed", "sender", sender, "error", err)
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpUserChoice, constants.ErrInternal, err.Error())
+	}
+
+	// Check if state execution produced an error
+	if ctx.Error != nil {
+		logger.logError("OpUserChoice", sender, ctx.Error)
+		h.logError("handleUserChoice: state execution failed", "sender", sender, "error", ctx.Error)
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpUserChoice, constants.ErrInternal, ctx.Error.Error())
+	}
 
 	logger.logResponse("OpUserChoice", sender, "choice submitted")
 	_ = req.DecisionID // Placeholder - could be used for validation
@@ -350,8 +381,8 @@ func (h *NakamaMatchHandler) handleMiniGameResult(sender string, data []byte) er
 	player := h.GetPlayer(sender)
 	if player == nil {
 		logger.logValidation(sender, "player_exists", false, "sender", sender)
-		h.logDebug("handleMiniGameResult: unknown player, ignoring", "sender", sender)
-		return nil // Unknown player
+		logger.logReject("OpMiniGameResultSubmit", sender, constants.ErrPlayerNotFound, "player_not_found", "Unknown player")
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpMiniGameResultSubmit, constants.ErrPlayerNotFound, "Unknown player")
 	}
 
 	logger.logValidation(sender, "player_exists", true, "player_id", player.ID.UUID())
@@ -362,8 +393,8 @@ func (h *NakamaMatchHandler) handleMiniGameResult(sender string, data []byte) er
 
 	if globalState != hsm.StateRoundMiniGame {
 		logger.logValidation(sender, "state_check", false, "global_state", globalState.String())
-		h.logWarn("handleMiniGameResult: not in mini-game state, ignoring", "sender", sender, "state", globalState.String())
-		return nil // Not in mini-game state
+		logger.logReject("OpMiniGameResultSubmit", sender, constants.ErrInvalidState, "invalid_state", "Not in mini-game state")
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpMiniGameResultSubmit, constants.ErrInvalidState, "Not in mini-game state")
 	}
 
 	// Create builder for context
@@ -382,9 +413,16 @@ func (h *NakamaMatchHandler) handleMiniGameResult(sender string, data []byte) er
 	if err != nil {
 		logger.logError("OpMiniGameResultSubmit", sender, err)
 		h.logError("handleMiniGameResult: OnMiniGameResult failed", "sender", sender, "error", err)
-		return err
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpMiniGameResultSubmit, constants.ErrInternal, err.Error())
+	}
+
+	// Check if state execution produced an error
+	if ctx.Error != nil {
+		logger.logError("OpMiniGameResultSubmit", sender, ctx.Error)
+		h.logError("handleMiniGameResult: state execution failed", "sender", sender, "error", ctx.Error)
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpMiniGameResultSubmit, constants.ErrInternal, ctx.Error.Error())
 	}
 
 	logger.logResponse("OpMiniGameResultSubmit", sender, "result submitted")
-	return err
+	return nil
 }
