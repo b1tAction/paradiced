@@ -14,8 +14,27 @@ import (
 // InitModule is the entry point called by Nakama when the module is loaded.
 // This function registers all match handlers and hooks.
 func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, initializer runtime.Initializer) error {
+	// Register matchmaker matched callback to create authoritative matches
+	err := initializer.RegisterMatchmakerMatched(func(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, entries []runtime.MatchmakerEntry) (string, error) {
+		// Create authoritative match with matched players
+		matchID, err := nk.MatchCreate(ctx, "paradiced_match", map[string]interface{}{
+			"entries": entries,
+		})
+		if err != nil {
+			logger.Error("Failed to create authoritative match: %v", err)
+			return "", err
+		}
+		logger.Info("Authoritative match created: match_id=%s, players=%d", matchID, len(entries))
+		return matchID, nil
+	})
+
+	if err != nil {
+		logger.Error("Failed to register matchmaker matched callback: %v", err)
+		return err
+	}
+
 	// Register Paradiced match handler
-	err := initializer.RegisterMatch("paradiced_match", func(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule) (runtime.Match, error) {
+	err = initializer.RegisterMatch("paradiced_match", func(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule) (runtime.Match, error) {
 		// Create a new match handler adapter
 		return nakama.NewNakamaMatchHandlerAdapter(), nil
 	})
@@ -26,7 +45,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 	}
 
 	logger.Info("Paradiced match handler registered successfully")
-	log.Printf("[Paradiced] Module initialized - match handler registered")
+	log.Printf("[Paradiced] Module initialized - match handler and matchmaker callback registered")
 
 	return nil
 }

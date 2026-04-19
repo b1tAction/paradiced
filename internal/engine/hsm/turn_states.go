@@ -1,6 +1,7 @@
 package hsm
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/b1tAction/paradiced/internal/core"
@@ -251,6 +252,7 @@ func (s *MainActionState) sendAvailable(ctx *StateContext) {
 func (s *MainActionState) Update(ctx *StateContext) StateID {
 	// Check if dice was rolled
 	if s.diceRolled {
+		fmt.Printf("[hsm] MainActionState.Update: diceRolled=%v, diceSteps=%d\n", s.diceRolled, s.diceSteps)
 		ctx.SetInt(KeyDiceSteps, s.diceSteps)
 		return StateTurnMoving
 	}
@@ -258,7 +260,9 @@ func (s *MainActionState) Update(ctx *StateContext) StateID {
 	// Check timeout
 	if time.Since(s.startTime) > s.timeout {
 		// Auto roll dice (default action)
-		s.OnRollDice(ctx, s.defaultDiceRoll(ctx))
+		steps := s.defaultDiceRoll(ctx)
+		s.OnRollDice(ctx, steps)
+		ctx.SetInt(KeyDiceSteps, steps)
 		return StateTurnMoving
 	}
 
@@ -298,8 +302,24 @@ func (s *MainActionState) OnUseItem(ctx *StateContext, itemID string) {
 // defaultDiceRoll returns default dice steps based on dice type.
 // Default values for timeout auto-roll scenarios.
 func (s *MainActionState) defaultDiceRoll(ctx *StateContext) int {
+	// Get current turn player
+	game := ctx.GetGame()
+	if game == nil || len(game.Players) == 0 {
+		return 2 // Default to wood dice steps
+	}
+
+	// Get current player ID from HSM
+	if ctx.HSM == nil {
+		return 2
+	}
+
+	turnPlayer := ctx.HSM.GetTurnPlayer()
+	if turnPlayer == nil {
+		return 2
+	}
+
 	// Get dice type from context (assigned in RoundPrep)
-	diceType := ctx.GetDiceType(ctx.Player.ID.UUID())
+	diceType := ctx.GetDiceType(turnPlayer.ID.UUID())
 	switch diceType {
 	case rng.DiceTypeGold:
 		return 6 // Gold dice: weighted toward high numbers
@@ -350,8 +370,10 @@ func (s *TurnMovingState) Enter(ctx *StateContext) {
 
 	// Get dice steps
 	steps := ctx.GetDiceSteps()
+	fmt.Printf("[hsm] TurnMovingState.Enter: dice_steps=%d, player_position=%d\n", steps, player.Position)
 	if steps <= 0 {
 		// Invalid steps, end turn
+		fmt.Printf("[hsm] TurnMovingState.Enter: invalid dice steps, ending turn\n")
 		return
 	}
 

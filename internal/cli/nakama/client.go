@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/ascii8/nakama-go"
+	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"nhooyr.io/websocket"
 )
 
 // Logger wraps zap logger for CLI usage.
@@ -50,6 +52,14 @@ type Client struct {
 	config     ClientConfig
 	logger     *Logger
 	httpClient *http.Client
+}
+
+// Ensure Client implements IClient
+var _ IClient = (*Client)(nil)
+
+// CreateSocketClient creates a new socket client.
+func (c *Client) CreateSocketClient() (ISocketClient, error) {
+	return NewSocketClient(c)
 }
 
 // NewClient creates a new Nakama client.
@@ -98,7 +108,7 @@ func (c *Client) Authenticate(ctx context.Context, userID string) (*Session, err
 		return nil, err
 	}
 
-	c.logger.Debug("认证成功", "user_id", account.User.Id)
+	c.logger.Debug("Authentication successful", "user_id", account.User.Id)
 	return &Session{
 		Token:        c.Client.SessionToken(),
 		RefreshToken: c.Client.SessionRefreshToken(),
@@ -118,6 +128,9 @@ type SocketClient struct {
 	closeChan chan struct{}
 	config    ClientConfig
 }
+
+// Ensure SocketClient implements ISocketClient
+var _ ISocketClient = (*SocketClient)(nil)
 
 // SocketMessage represents a received match message.
 type SocketMessage struct {
@@ -183,12 +196,12 @@ func (sc *SocketClient) Connect(ctx context.Context, session *Session) error {
 		// Check msg.Presence first to avoid nil pointer dereference.
 		if msg.Presence == nil {
 			// System message (e.g., matchmaker matched notification)
-			sc.logger.Debug("收到系统消息（无发送者）", "op_code", msg.OpCode)
+			sc.logger.Debug("Received system message (no sender)", "op_code", msg.OpCode)
 		} else if sc.session != nil && msg.Presence.UserId == sc.session.UserID {
 			return
 		}
 
-		sc.logger.Debug("收到匹配消息", "op_code", msg.OpCode)
+		sc.logger.Debug("Received match message", "op_code", msg.OpCode)
 
 		select {
 		case sc.msgChan <- &SocketMessage{
@@ -206,7 +219,7 @@ func (sc *SocketClient) Connect(ctx context.Context, session *Session) error {
 	}
 
 	sc.conn = conn
-	sc.logger.Info("WebSocket 连接成功")
+	sc.logger.Info("WebSocket connection established")
 
 	return nil
 }
@@ -236,7 +249,7 @@ func (sc *SocketClient) CreateMatch(ctx context.Context, name string) (string, e
 	}
 
 	sc.matchID = match.MatchId
-	sc.logger.Info("创建匹配成功", "match_id", sc.matchID)
+	sc.logger.Info("Match created successfully", "match_id", sc.matchID)
 	return sc.matchID, nil
 }
 
@@ -254,11 +267,11 @@ func (sc *SocketClient) JoinMatch(ctx context.Context, matchIDOrToken string) er
 
 	if strings.Count(matchIDOrToken, ".") == 2 {
 		// Likely a JWT token (starts with "eyJ")
-		sc.logger.Debug("使用 Token 加入匹配", "token_len", len(matchIDOrToken))
+		sc.logger.Debug("Joining match with token", "token_len", len(matchIDOrToken))
 		match, err = sc.conn.MatchJoinToken(ctx, matchIDOrToken, nil)
 	} else {
 		// Use as match ID
-		sc.logger.Debug("使用 Match ID 加入匹配", "match_id", matchIDOrToken)
+		sc.logger.Debug("Joining match with ID", "match_id", matchIDOrToken)
 		match, err = sc.conn.MatchJoin(ctx, matchIDOrToken, nil)
 	}
 
@@ -267,7 +280,7 @@ func (sc *SocketClient) JoinMatch(ctx context.Context, matchIDOrToken string) er
 	}
 
 	sc.matchID = match.MatchId
-	sc.logger.Info("加入匹配成功", "match_id", sc.matchID)
+	sc.logger.Info("Joined match successfully", "match_id", sc.matchID)
 	return nil
 }
 
@@ -319,7 +332,7 @@ func (sc *SocketClient) Close() error {
 	if sc.conn != nil {
 		return sc.conn.Close()
 	}
-	sc.logger.Info("WebSocket 连接已关闭")
+	sc.logger.Info("WebSocket connection closed")
 	return nil
 }
 
@@ -352,3 +365,218 @@ const (
 	OpUserChoice           int64 = 103
 	OpMiniGameResultSubmit int64 = 104
 )
+
+// IClient interface for both Nakama and Standalone clients.
+type IClient interface {
+	Authenticate(ctx context.Context, userID string) (*Session, error)
+	CreateSocketClient() (ISocketClient, error)
+	Close() error
+}
+
+// StandaloneClientConfig holds configuration for standalone WebSocket client.
+type StandaloneClientConfig struct {
+	ServerWS string
+	Verbose  bool
+}
+
+// StandaloneClient implements IClient for standalone WebSocket server.
+type StandaloneClient struct {
+	config  StandaloneClientConfig
+	logger  *Logger
+	session *Session
+}
+
+// NewStandaloneClient creates a new standalone WebSocket client.
+func NewStandaloneClient(config StandaloneClientConfig) (*StandaloneClient, error) {
+	logger := NewLogger(config.Verbose)
+
+	// Create a mock session for standalone mode
+	session := &Session{
+		Token:     "standalone-token",
+		UserID:    "", // Will be set per player
+		Username:  "",
+		ExpiresAt: 0,
+	}
+
+	return &StandaloneClient{
+		config:  config,
+		logger:  logger,
+		session: session,
+	}, nil
+}
+
+// Authenticate creates a mock session for standalone mode.
+func (c *StandaloneClient) Authenticate(ctx context.Context, userID string) (*Session, error) {
+	c.session.UserID = userID
+	c.session.Username = userID
+	c.logger.Debug("Authentication successful", "user_id", userID)
+	return c.session, nil
+}
+
+// CreateSocketClient creates a new standalone socket client.
+func (c *StandaloneClient) CreateSocketClient() (ISocketClient, error) {
+	return NewStandaloneSocketClient(c.config, c.logger)
+}
+
+// Close closes the client.
+func (c *StandaloneClient) Close() error {
+	return nil
+}
+
+// ISocketClient interface for socket clients.
+type ISocketClient interface {
+	Connect(ctx context.Context, session *Session) error
+	CreateMatch(ctx context.Context, name string) (string, error)
+	JoinMatch(ctx context.Context, matchIDOrToken string) error
+	SendMessage(ctx context.Context, opCode int64, data any) error
+	MessageChan() <-chan *SocketMessage
+	Close() error
+	SetMatchmakerMatchedHandler(handler func(context.Context, *nakama.MatchmakerMatchedMsg))
+	SetMatchID(matchID string)
+	AddMatchmaker(ctx context.Context, query string, minPlayers, maxPlayers int, props map[string]string, numericProps map[string]float64) (*nakama.MatchmakerTicketMsg, error)
+}
+
+// StandaloneSocketClient wraps standalone WebSocket connection.
+type StandaloneSocketClient struct {
+	conn      *websocket.Conn
+	session   *Session
+	matchID   string
+	logger    *Logger
+	msgChan   chan *SocketMessage
+	closeChan chan struct{}
+	config    StandaloneClientConfig
+}
+
+// Ensure StandaloneSocketClient implements ISocketClient
+var _ ISocketClient = (*StandaloneSocketClient)(nil)
+
+// NewStandaloneSocketClient creates a new standalone socket client.
+func NewStandaloneSocketClient(config StandaloneClientConfig, logger *Logger) (*StandaloneSocketClient, error) {
+	return &StandaloneSocketClient{
+		logger:    logger,
+		msgChan:   make(chan *SocketMessage, 100),
+		closeChan: make(chan struct{}),
+		config:    config,
+	}, nil
+}
+
+// Connect establishes the WebSocket connection to standalone server.
+func (sc *StandaloneSocketClient) Connect(ctx context.Context, session *Session) error {
+	sc.session = session
+
+	// Build WS URL for standalone server
+	wsURL := sc.config.ServerWS
+	if !strings.HasPrefix(wsURL, "ws://") && !strings.HasPrefix(wsURL, "wss://") {
+		wsURL = "ws://" + strings.TrimPrefix(wsURL, "http://")
+	}
+	if !strings.HasSuffix(wsURL, "/ws") {
+		wsURL = wsURL + "/ws"
+	}
+
+	// Add user_id parameter
+	wsURL = fmt.Sprintf("%s?user_id=%s", wsURL, session.UserID)
+
+	sc.logger.Debug("Connecting to standalone WebSocket", "url", wsURL)
+
+	// Dial WebSocket
+	conn, _, err := websocket.Dial(ctx, wsURL, nil)
+	if err != nil {
+		return err
+	}
+
+	sc.conn = conn
+	sc.logger.Info("Standalone WebSocket connection established")
+
+	// Start read loop
+	go sc.readLoop(ctx)
+
+	return nil
+}
+
+// readLoop reads messages from WebSocket.
+func (sc *StandaloneSocketClient) readLoop(ctx context.Context) {
+	for {
+		_, data, err := sc.conn.Read(ctx)
+		if err != nil {
+			if websocket.CloseStatus(err) == websocket.StatusNormalClosure {
+				return
+			}
+			sc.logger.Error("WebSocket read error", "error", err)
+			return
+		}
+
+		select {
+		case sc.msgChan <- &SocketMessage{
+			Data: data,
+		}:
+		case <-sc.closeChan:
+			return
+		}
+	}
+}
+
+// CreateMatch is not used in standalone mode (server handles match creation).
+func (sc *StandaloneSocketClient) CreateMatch(ctx context.Context, name string) (string, error) {
+	// Standalone mode doesn't use matchmaker
+	return "standalone-match", nil
+}
+
+// JoinMatch is not used in standalone mode.
+func (sc *StandaloneSocketClient) JoinMatch(ctx context.Context, matchIDOrToken string) error {
+	sc.matchID = matchIDOrToken
+	return nil
+}
+
+// SendMessage sends a message to the standalone server.
+func (sc *StandaloneSocketClient) SendMessage(ctx context.Context, opCode int64, data any) error {
+	// Wrap data in Message format
+	msg := pkgnet.Message{
+		OpCode:    pkgnet.OpCode(opCode),
+		Timestamp: time.Now().UnixMilli(),
+	}
+
+	// Marshal data to JSON
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	msg.Data = jsonData
+
+	// Marshal full message
+	messageData, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+
+	return sc.conn.Write(ctx, websocket.MessageBinary, messageData)
+}
+
+// AddMatchmaker is not used in standalone mode.
+func (sc *StandaloneSocketClient) AddMatchmaker(ctx context.Context, query string, minPlayers, maxPlayers int, props map[string]string, numericProps map[string]float64) (*nakama.MatchmakerTicketMsg, error) {
+	return nil, fmt.Errorf("matchmaker not available in standalone mode")
+}
+
+// SetMatchmakerMatchedHandler is not used in standalone mode.
+func (sc *StandaloneSocketClient) SetMatchmakerMatchedHandler(handler func(context.Context, *nakama.MatchmakerMatchedMsg)) {
+	// Not used in standalone mode
+}
+
+// SetMatchID sets the current match ID.
+func (sc *StandaloneSocketClient) SetMatchID(matchID string) {
+	sc.matchID = matchID
+}
+
+// MessageChan returns the message channel.
+func (sc *StandaloneSocketClient) MessageChan() <-chan *SocketMessage {
+	return sc.msgChan
+}
+
+// Close closes the standalone socket client.
+func (sc *StandaloneSocketClient) Close() error {
+	close(sc.closeChan)
+	if sc.conn != nil {
+		return sc.conn.Close(websocket.StatusNormalClosure, "")
+	}
+	sc.logger.Info("Standalone WebSocket connection closed")
+	return nil
+}

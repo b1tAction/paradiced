@@ -338,9 +338,14 @@ func (hsm *HSM) transitionTurn(target State, ctx *StateContext) error {
 	hsm.stateEnterTime = time.Now()
 
 	if ctx == nil {
-		ctx = NewStateContext().WithHSM(hsm).WithPlayer(hsm.turnPlayer)
+		ctx = NewStateContext().WithHSM(hsm)
 	}
+	// Always set Player from HSM's turn player
+	ctx.WithPlayer(hsm.turnPlayer)
 	ctx.StartTime = hsm.stateEnterTime
+
+	fmt.Printf("[hsm] transitionTurn: target=%s, dice_steps=%d\n", target.ID().String(), ctx.GetDiceSteps())
+
 	target.Enter(ctx)
 
 	// Check for decisions requiring user input
@@ -600,7 +605,10 @@ func (hsm *HSM) OnRollDice(steps int, ctx *StateContext) error {
 
 	// Trigger update to check for state transition
 	nextID := hsm.turnState.Update(ctx)
+	fmt.Printf("[hsm] OnRollDice: diceRolled=%v, steps=%d, nextID=%s, currentTurnStateID=%s\n",
+		hsm.turnState.(*MainActionState).diceRolled, steps, nextID.String(), hsm.turnStateID.String())
 	if nextID != StateNone && nextID != hsm.turnStateID {
+		fmt.Printf("[hsm] OnRollDice: transitioning to %s\n", nextID.String())
 		return hsm.TransitionTo(nextID, ctx)
 	}
 

@@ -26,7 +26,7 @@ services:
       - "-ecx"
       - >
         /nakama/nakama migrate up --database.address root@cockroachdb:26257 &&
-        exec /nakama/nakama --config /nakama/data/config.yml
+        /nakama/nakama --config /nakama/data/config.yml 2>&1 | tee -a /nakama/logs/nakama.log
     restart: "no"
     links:
       - "cockroachdb:db"
@@ -37,6 +37,7 @@ services:
       - nakama_data:/nakama/data
       - ./modules:/nakama/modules
       - ./config.yml:/nakama/data/config.yml 
+      - ./logs:/nakama/logs
     expose:
       - "7349"
       - "7350"
