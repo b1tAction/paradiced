@@ -70,6 +70,7 @@ func (a *NakamaMatchHandlerAdapter) MatchInit(ctx context.Context, logger runtim
 
 	// Create handler
 	a.handler = NewNakamaMatchHandler(matchID, seed, maxPlayers, mapLength)
+	a.handler.WithLogger(logger)
 
 	// Build match label (JSON format for match queries)
 	label := map[string]interface{}{
@@ -254,7 +255,9 @@ func (a *NakamaMatchHandlerAdapter) MatchLoop(ctx context.Context, logger runtim
 		data := msg.GetData()
 		opCode := msg.GetOpCode()
 		logger.Debug("Received message: user_id=%s, op_code=%d, data_len=%d", userID, opCode, len(data))
-		handler.HandleMessageWithOp(userID, opCode, data)
+		if err := handler.HandleMessageWithOp(userID, opCode, data); err != nil {
+			logger.Error("HandleMessageWithOp error: user_id=%s, op_code=%d, error=%v", userID, opCode, err)
+		}
 	}
 
 	// Run match loop (delta time not used, tick rate controls timing)

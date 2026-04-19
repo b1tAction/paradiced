@@ -9,9 +9,11 @@ import (
 	"github.com/b1tAction/paradiced/internal/engine"
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
 	"github.com/b1tAction/paradiced/internal/gamemap"
+	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
-	"github.com/b1tAction/paradiced/pkg/net"
+	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/rng"
+	"github.com/heroiclabs/nakama-common/runtime"
 )
 
 // NakamaMatchHandler implements the authoritative match handler for Paradiced.
@@ -25,6 +27,9 @@ type NakamaMatchHandler struct {
 
 	// Message dispatcher
 	dispatcher DispatcherAdapter // Dispatcher for sending messages to clients
+
+	// Logger for debug/info/error output
+	logger runtime.Logger // Nakama runtime logger
 
 	// Match identification
 	matchID string // Nakama match ID
@@ -82,6 +87,40 @@ func (h *NakamaMatchHandler) WithDispatcher(dispatcher DispatcherAdapter) *Nakam
 // GetDispatcher returns the current dispatcher.
 func (h *NakamaMatchHandler) GetDispatcher() DispatcherAdapter {
 	return h.dispatcher
+}
+
+// WithLogger sets the logger for debug output.
+func (h *NakamaMatchHandler) WithLogger(logger runtime.Logger) *NakamaMatchHandler {
+	h.logger = logger
+	return h
+}
+
+// logDebug logs a debug message if logger is available.
+func (h *NakamaMatchHandler) logDebug(msg string, keysAndValues ...interface{}) {
+	if h.logger != nil {
+		h.logger.Debug(msg, keysAndValues...)
+	}
+}
+
+// logInfo logs an info message if logger is available.
+func (h *NakamaMatchHandler) logInfo(msg string, keysAndValues ...interface{}) {
+	if h.logger != nil {
+		h.logger.Info(msg, keysAndValues...)
+	}
+}
+
+// logWarn logs a warn message if logger is available.
+func (h *NakamaMatchHandler) logWarn(msg string, keysAndValues ...interface{}) {
+	if h.logger != nil {
+		h.logger.Warn(msg, keysAndValues...)
+	}
+}
+
+// logError logs an error message if logger is available.
+func (h *NakamaMatchHandler) logError(msg string, keysAndValues ...interface{}) {
+	if h.logger != nil {
+		h.logger.Error(msg, keysAndValues...)
+	}
 }
 
 // initializeGame creates the Game instance and HSM.
@@ -150,9 +189,23 @@ func (h *NakamaMatchHandler) GetMatchID() string {
 	return h.matchID
 }
 
-// sendActionRejected sends an action rejection notification to a player.
-// Returns the original error to allow easy integration in handler functions.
-func (h *NakamaMatchHandler) sendActionRejected(playerID string, rejected net.ActionRejected) error {
+// sendActionRejectedWithCode sends an action rejection with a standardized error code.
+// This is the preferred method for sending action rejection responses.
+func (h *NakamaMatchHandler) sendActionRejectedWithCode(playerID string, opCode pkgnet.OpCode, errCode constants.ErrorCode, message string) error {
+	h.logWarn("Action rejected with error code",
+		"player_id", playerID,
+		"op_code", opCode,
+		"error_code", errCode,
+		"reason", errCode.ToReason(),
+		"message", message)
+
+	rejected := pkgnet.ActionRejected{
+		OpCode:    opCode,
+		ErrorCode: errCode,
+		Reason:    errCode.ToReason(),
+		Message:   message,
+	}
+
 	adapter := NewNakamaBroadcastAdapter(h)
 	return adapter.SendActionRejected(playerID, &rejected)
 }

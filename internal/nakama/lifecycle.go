@@ -14,9 +14,22 @@ import (
 // MatchInit initializes the match when created.
 // Called by Nakama when a new match is created.
 func (h *NakamaMatchHandler) MatchInit() error {
+	if h.logger != nil {
+		h.logger.Info("MatchInit: initializing match", "match_id", h.matchID)
+	}
+
 	// Initialize game instance
+	if h.logger != nil {
+		h.logger.Debug("MatchInit: initializing game")
+	}
 	if err := h.initializeGame(); err != nil {
+		if h.logger != nil {
+			h.logger.Error("MatchInit: failed to initialize game", "error", err)
+		}
 		return err
+	}
+	if h.logger != nil {
+		h.logger.Debug("MatchInit: game initialized", "game_id", h.hsm.GetGame().ID)
 	}
 
 	// Create broadcast adapter
@@ -36,6 +49,10 @@ func (h *NakamaMatchHandler) MatchInit() error {
 
 	// Start HSM - enters MatchInit state
 	h.hsm.Start(hsm.StateMatchInit, ctx)
+	if h.logger != nil {
+		h.logger.Debug("MatchInit: starting HSM")
+		h.logger.Info("MatchInit: HSM started", "initial_state", hsm.StateMatchInit.String())
+	}
 
 	return nil
 }
@@ -64,9 +81,27 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 		WithBroadcast(broadcastAdapter).
 		WithBuilder(builder)
 
+	globalStateID := h.hsm.GetGlobalStateID()
+	turnStateID := h.hsm.GetTurnStateID()
+
+	if h.logger != nil {
+		h.logger.Debug("MatchLoop: tick",
+			"global_state", globalStateID.String(),
+			"turn_state", turnStateID.String(),
+			"current_player", func() string {
+				if currentPlayer != nil {
+					return currentPlayer.ID.UUID()
+				}
+				return "none"
+			}())
+	}
+
 	// Handle TurnEnd state - trigger next turn or round
-	if h.hsm.GetGlobalStateID() == hsm.StateTurnLoop &&
-		h.hsm.GetTurnStateID() == hsm.StateTurnEnd {
+	if globalStateID == hsm.StateTurnLoop &&
+		turnStateID == hsm.StateTurnEnd {
+		if h.logger != nil {
+			h.logger.Debug("MatchLoop: handling TurnEnd state")
+		}
 		// Get TurnLoop state
 		globalState := h.hsm.GetGlobalState()
 		turnLoopState, ok := globalState.(*hsm.TurnLoopState)
@@ -77,19 +112,31 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 			// Start next player's turn
 			nextState := turnLoopState.StartPlayerTurn(ctx)
 			if nextState != hsm.StateNone {
+				if h.logger != nil {
+					h.logger.Debug("MatchLoop: starting next player turn", "next_state", nextState.String())
+				}
 				h.hsm.TransitionTo(nextState, ctx)
 			}
 		}
 	}
 
 	// Update HSM
+	if h.logger != nil {
+		h.logger.Debug("MatchLoop: updating HSM")
+	}
 	nextState, err := h.hsm.Update(ctx)
 	if err != nil {
+		if h.logger != nil {
+			h.logger.Error("MatchLoop: HSM update failed", "error", err)
+		}
 		return err
 	}
 
 	// Handle state transitions
 	if nextState != hsm.StateNone {
+		if h.logger != nil {
+			h.logger.Debug("MatchLoop: transitioning to state", "next_state", nextState.String())
+		}
 		// Transition to new state
 		h.hsm.TransitionTo(nextState, ctx)
 	}
@@ -107,6 +154,12 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 			if h.lastDecisionID != decisionUUID {
 				h.lastDecisionID = decisionUUID
 
+				if h.logger != nil {
+					h.logger.Debug("MatchLoop: sending decision request",
+						"decision_id", decisionUUID,
+						"player_id", currentPlayer.ID.UUID())
+				}
+
 				// Build decision request
 				decisionReq := builder.BuildDecisionFromEvent(decision)
 
@@ -116,6 +169,9 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 		}
 	} else {
 		// Clear last decision ID when not waiting
+		if h.lastDecisionID != "" && h.logger != nil {
+			h.logger.Debug("MatchLoop: clearing decision ID (not waiting)")
+		}
 		h.lastDecisionID = ""
 	}
 
@@ -127,17 +183,32 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 // MatchStop terminates the match.
 // Called by Nakama when match ends.
 func (h *NakamaMatchHandler) MatchStop() error {
+	if h.logger != nil {
+		h.logger.Info("MatchStop: terminating match", "match_id", h.matchID)
+	}
+
 	// Create final state context
 	ctx := hsm.NewStateContext().WithHSM(h.hsm)
 
 	// Stop HSM
+	if h.logger != nil {
+		h.logger.Debug("MatchStop: stopping HSM")
+	}
 	h.hsm.Stop(ctx)
 
 	// Clear resources
+	if h.logger != nil {
+		h.logger.Debug("MatchStop: clearing player data",
+			"players_count", len(h.players),
+			"player_list_len", len(h.playerList))
+	}
 	h.players = make(map[string]*core.Player)
 	h.playerList = make([]string, 0)
 	h.disconnected = make(map[string]bool)
 
+	if h.logger != nil {
+		h.logger.Info("MatchStop: match terminated")
+	}
 	return nil
 }
 
@@ -173,6 +244,14 @@ func (h *NakamaMatchHandler) addPlayer(userID string, faction constants.Faction)
 	// Store player
 	h.players[userID] = player
 	h.playerList = append(h.playerList, userID)
+
+	if h.logger != nil {
+		h.logger.Debug("Player added to match",
+			"user_id", userID,
+			"player_id", playerID.UUID(),
+			"faction", faction,
+			"total_players", len(h.playerList))
+	}
 
 	return player
 }
