@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ascii8/nakama-go"
@@ -127,6 +128,7 @@ type SocketClient struct {
 	msgChan   chan *SocketMessage
 	closeChan chan struct{}
 	config    ClientConfig
+	sendMu    sync.Mutex // Protects concurrent MatchDataSend calls
 }
 
 // Ensure SocketClient implements ISocketClient
@@ -292,7 +294,15 @@ func (sc *SocketClient) SendMessage(ctx context.Context, opCode int64, data any)
 		return err
 	}
 
-	return sc.conn.MatchDataSend(ctx, sc.matchID, opCode, jsonData, true, nil)
+	sc.logger.Debug("SendMessage called", "op_code", opCode, "data", string(jsonData), "match_id", sc.matchID)
+
+	// Use mutex to protect concurrent MatchDataSend calls
+	sc.sendMu.Lock()
+	defer sc.sendMu.Unlock()
+
+	err = sc.conn.MatchDataSend(ctx, sc.matchID, opCode, jsonData, true, nil)
+	sc.logger.Debug("MatchDataSend returned", "op_code", opCode, "error", err)
+	return err
 }
 
 // AddMatchmaker adds self to matchmaker and returns the ticket.
@@ -445,6 +455,7 @@ type StandaloneSocketClient struct {
 	msgChan   chan *SocketMessage
 	closeChan chan struct{}
 	config    StandaloneClientConfig
+	sendMu    sync.Mutex // Protects concurrent WebSocket write calls
 }
 
 // Ensure StandaloneSocketClient implements ISocketClient
@@ -547,6 +558,10 @@ func (sc *StandaloneSocketClient) SendMessage(ctx context.Context, opCode int64,
 	if err != nil {
 		return err
 	}
+
+	// Use mutex to protect concurrent WebSocket write calls
+	sc.sendMu.Lock()
+	defer sc.sendMu.Unlock()
 
 	return sc.conn.Write(ctx, websocket.MessageBinary, messageData)
 }
