@@ -37,3 +37,6 @@ go.work.sum
 # .idea/
 # .vscode/
 .claude*
+
+# Logs
+logs/

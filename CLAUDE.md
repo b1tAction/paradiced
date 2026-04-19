@@ -171,16 +171,89 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
   - 不要在 internal/core 或其他包中重导出 constants 的常量
 
 ### Environment
-- **GOMODCACHE**: `/app/.gomodcache` (本地模块缓存位置)
-- 运行测试和构建时需设置: `GOMODCACHE=/app/.gomodcache go test ./...`
+- **GOMODCACHE**: `${workdir}/.gomodcache` (本地模块缓存位置)
+- 运行测试和构建时需设置：`GOMODCACHE=${workdir}/.gomodcache go test ./...`
+
+### Nakama Development (CLI 与 Nakama 协议层对接)
+
+#### Docker Compose 启动服务
+
+项目使用 `docker-compose.yml` 启动 Nakama 服务器和 CockroachDB：
+
+```bash
+# 启动所有服务（CockroachDB + Nakama）
+make docker-up
+
+# 停止服务
+make docker-down
+
+# 停止并清除所有数据（包括 volume）
+make docker-clean
+```
+
+#### 插件开发流程
+
+1. **首次启动 Nakama**：
+```bash
+# 创建 modules 目录
+make prepare-modules
+
+# 启动 Nakama（会自动运行数据库迁移）
+make docker-up
+```
+
+2. **构建并加载插件**：
+```bash
+# 构建插件为共享对象
+make build-plugin
+
+# 重启 Nakama 容器以加载新插件
+docker-compose restart nakama
+```
+
+3. **开发循环（修改代码后）**：
+```bash
+# 一键重建插件并重启 Nakama
+make rebuild
+```
+
+4. **查看日志**：
+```bash
+# 查看 Nakama 日志(推荐、实时输出)
+cat ./logs/nakama.log
+```
+
+```bash
+# 查看 Nakama 日志
+make docker-logs
+
+# 查看 CockroachDB 日志
+make docker-logs-db
+
+# 查看全部日志
+make docker-logs-all
+```
+
+5. **访问管理界面**：
+- Nakama Console: http://localhost:7351 (默认账号/密码：admin/admin)
+- CockroachDB Admin: http://localhost:8080
+
+#### 重要注意事项
+
+- **修改插件后必须重启 Nakama 容器**：Nakama 在启动时加载插件，修改 `modules/*.so` 后需要 `docker-compose restart nakama`
+- **首次启动会自动迁移数据库**：`nakama migrate up` 命令在 entrypoint 中执行
+- **插件构建使用 Nakama PluginBuilder 镜像**：确保本地 Docker 可访问 `heroiclabs/nakama-pluginbuilder:3.22.0`
+- **挂载点**：`./modules:/nakama/modules` 和 `./config.yml:/nakama/data/config.yml`
 
 ### Testing
-Run tests with:
+
+Run tests with: ${workdir}需要替换为当前目录路径：
 ```bash
-GOMODCACHE=/app/.gomodcache go test ./...
+GOMODCACHE=${workdir}/.gomodcache go test ./...
 ```
 
 ### Commit Convention
+
 - `feat(scope): description` - New feature
 - `refactor(scope): description` - Code refactoring
 - `fix(scope): description` - Bug fix
@@ -188,6 +261,7 @@ GOMODCACHE=/app/.gomodcache go test ./...
 - `chore(scope): description` - Maintenance tasks
 
 ### Git Operations
+
 - **禁止使用 `git add .` 或 `git add -A`**：每次提交必须明确指定具体文件
 - 正确做法：`git add file1.go file2.go && git commit -m "..."`
 - 先 `git status` 查看改动，按改动方向分批提交
@@ -202,11 +276,11 @@ GOMODCACHE=/app/.gomodcache go test ./...
 
 | 文件 | 类型 | 可见性 | 说明 |
 |------|------|--------|------|
-| [doc/metadata/logentry.md](doc/metadata/logentry.md) | `gamelog.LogEntry.Metadata` | **客户端可见** | Action效果详情，客户端渲染关键 |
+| [doc/metadata/logentry.md](doc/metadata/logentry.md) | `gamelog.LogEntry.Metadata` | **客户端可见** | Action 效果详情，客户端渲染关键 |
 | [doc/metadata/player.md](doc/metadata/player.md) | `core.Player.Metadata` | **客户端可见** | 玩家动态属性（阵营特定） |
-| [doc/metadata/event_context.md](doc/metadata/event_context.md) | `event.Context.Metadata` | 内部 | EventBus Handler通信 |
-| [doc/metadata/hsm_context.md](doc/metadata/hsm_context.md) | `hsm.StateContext.Metadata` | 内部 | HSM状态机通信 |
-| [doc/metadata/action_context.md](doc/metadata/action_context.md) | `action.ActionContext.Metadata` | 内部 | Action执行上下文 |
+| [doc/metadata/event_context.md](doc/metadata/event_context.md) | `event.Context.Metadata` | 内部 | EventBus Handler 通信 |
+| [doc/metadata/hsm_context.md](doc/metadata/hsm_context.md) | `hsm.StateContext.Metadata` | 内部 | HSM 状态机通信 |
+| [doc/metadata/action_context.md](doc/metadata/action_context.md) | `action.ActionContext.Metadata` | 内部 | Action 执行上下文 |
 
 ### 新增 Metadata 字段时
 

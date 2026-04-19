@@ -38,6 +38,17 @@
     docker compose logs -f nakama
     ```
 
+5) 查看自动落盘日志文件（宿主机）
+    ```shell
+    tail -f ./logs/nakama.log
+    ```
+
+说明：
+
+- `docker-compose.yml` 已挂载 `./logs:/nakama/logs`。
+- Nakama 启动时会自动将运行日志追加写入 `./logs/nakama.log`。
+- 同时仍可使用 `docker compose logs` 进行查看。
+
 ## 连接
 
 - HTTP / WebSocket: http://localhost:7350
