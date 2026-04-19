@@ -17,10 +17,10 @@
 ```go
 // TurnSync 直接包含 gamelog.LogEntry 列表（无需转换为 Action）
 type TurnSync struct {
-    Round   int                `json:"round"`
-    Turn    int                `json:"turn"`
-    Player  string             `json:"player"`
-    Entries []gamelog.LogEntry `json:"entries"` // 直接发送 GameLog
+    Round             int                `json:"round"`
+    Turn              int                `json:"turn"`
+    CurrentPlayerID   string             `json:"current_player_id"` // 当前回合玩家 ID
+    Entries           []gamelog.LogEntry `json:"entries"` // 直接发送 GameLog
 }
 ```
 
@@ -120,13 +120,13 @@ type TurnSync struct {
 
 ```go
 type StateSync struct {
-    GlobalState string    `json:"global_state"`  // "turn_loop", "round_mini_game"
-    TurnState   string    `json:"turn_state"`    // "main_action", "turn_moving"
-    TurnPlayer  string    `json:"turn_player"`   // 当前回合玩家 ID
-    Round       int       `json:"round"`
-    Turn        int       `json:"turn"`
-    Paused      bool      `json:"paused"`        // 等待决策中
-    Players     []Player  `json:"players"`
+    GlobalState     string    `json:"global_state"`  // "turn_loop", "round_mini_game"
+    TurnState       string    `json:"turn_state"`    // "main_action", "turn_moving"
+    CurrentPlayerID string    `json:"current_player_id"`   // 当前回合玩家 ID
+    Round           int       `json:"round"`
+    Turn            int       `json:"turn"`
+    Paused          bool      `json:"paused"`        // 等待决策中
+    Players         []Player  `json:"players"`
 }
 ```
 
@@ -136,10 +136,10 @@ type StateSync struct {
 
 ```go
 type TurnSync struct {
-    Round   int                `json:"round"`
-    Turn    int                `json:"turn"`
-    Player  string             `json:"player"`    // 回合玩家 ID
-    Entries []gamelog.LogEntry `json:"entries"`   // 直接发送 GameLog
+    Round             int                `json:"round"`
+    Turn              int                `json:"turn"`
+    CurrentPlayerID   string             `json:"current_player_id"`    // 回合玩家 ID
+    Entries           []gamelog.LogEntry `json:"entries"`   // 直接发送 GameLog
 }
 ```
 
@@ -151,7 +151,8 @@ type TurnSync struct {
 
 ```go
 type Player struct {
-    UserID      string `json:"user_id"`
+    PlayerID    string `json:"player_id"`   // 玩家游戏内部 ID
+    ClientID    string `json:"client_id"`   // 客户端标识（用于客户端自识别）
     Faction     string `json:"faction"`      // snake_case: "qing_long", "zhu_que"
     Position    int    `json:"position"`
     HP          int    `json:"hp"`
@@ -324,14 +325,13 @@ import (
 
 // 创建回合同步消息
 turnSync := &net.TurnSync{
-    Round:  1,
-    Turn:   0,
-    Player: "player-001",
+    Round:           1,
+    Turn:            0,
+    CurrentPlayerID: "player-001",
     Entries: []gamelog.LogEntry{
         {
             ActionType: "damage",
             Target:     "player-001",
-            Delta:      -1,
             Source:     "Cell_Fragile",
         },
         {
