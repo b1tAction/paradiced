@@ -210,3 +210,65 @@ func Wrapf(err error, component, operation string, format string, args ...any) *
 	}
 	return ctx
 }
+
+// ========== HSM Error Types ==========
+
+// HSMError represents an error that occurred during HSM execution.
+// It wraps the original error with state context for better debugging.
+type HSMError struct {
+	// StateID is the state where the error occurred
+	StateID string
+	// Layer is the state layer (1=Global, 2=Turn, 3=Interrupt)
+	Layer int
+	// Phase is the current phase when error occurred
+	Phase string
+	// Err is the underlying error
+	Err error
+	// Message is an optional additional context
+	Message string
+}
+
+// Error implements the error interface.
+func (e *HSMError) Error() string {
+	if e.Message != "" {
+		return fmt.Sprintf("HSM error in state %s (layer %d, phase %s): %s - %v",
+			e.StateID, e.Layer, e.Phase, e.Message, e.Err)
+	}
+	return fmt.Sprintf("HSM error in state %s (layer %d, phase %s): %v",
+		e.StateID, e.Layer, e.Phase, e.Err)
+}
+
+// Unwrap returns the underlying error for errors.Is/As.
+func (e *HSMError) Unwrap() error {
+	return e.Err
+}
+
+// NewHSMError creates a new HSMError with context.
+func NewHSMError(stateID string, layer int, phase string, err error, message string) *HSMError {
+	return &HSMError{
+		StateID: stateID,
+		Layer:   layer,
+		Phase:   phase,
+		Err:     err,
+		Message: message,
+	}
+}
+
+// WrapHSMError wraps an error with HSM context if it's not already wrapped.
+// Returns nil if err is nil.
+func WrapHSMError(err error, stateID string, layer int, phase string, message string) error {
+	if err == nil {
+		return nil
+	}
+	// Don't wrap if already an HSMError
+	if _, ok := err.(*HSMError); ok {
+		return err
+	}
+	return NewHSMError(stateID, layer, phase, err, message)
+}
+
+// IsHSMError checks if an error is an HSMError.
+func IsHSMError(err error) bool {
+	_, ok := err.(*HSMError)
+	return ok
+}

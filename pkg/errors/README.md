@@ -56,6 +56,31 @@ err := errors.NewActionExecutionError("damage", "player-001", "target is dead", 
 // 输出：action damage on target player-001 failed (target is dead): underlying error
 ```
 
+### HSMError
+
+HSM 状态机执行失败，带有状态上下文信息：
+
+```go
+err := errors.NewHSMError("TurnUpkeep", 2, "Enter", underlyingErr, "phase execution failed")
+// 输出：HSM error in state TurnUpkeep (layer 2, phase Enter): phase execution failed - underlying error
+```
+
+使用 `WrapHSMError` 包装错误：
+
+```go
+err := errors.WrapHSMError(underlyingErr, "TurnMoving", 2, "Enter", "move action failed")
+```
+
+检查是否为 `HSMError`：
+
+```go
+if errors.IsHSMError(err) {
+    // 处理 HSM 错误
+}
+```
+
+注意：`StateError` 类型保留在 `internal/engine/hsm` 包中，因为需要依赖 `StateID` 类型。
+
 ## 使用示例
 
 ### 服务层
@@ -146,16 +171,56 @@ func (s *TurnUpkeepState) Enter(ctx *hsm.StateContext) {
 
 ## 与 HSM 错误系统集成
 
-`internal/engine/hsm` 包有自己的 `HSMError` 和 `StateError` 类型，用于 HSM 特定的错误场景：
+HSM 特定的错误处理：
+
+- **`errors.HSMError`**: 通用的 HSM 错误类型，位于 `pkg/errors`
+- **`hsm.StateError`**: HSM 状态特定错误，位于 `internal/engine/hsm`（依赖 `StateID` 类型）
 
 ```go
-// HSM 层返回 HSMError
-err := hsm.WrapError(underlyingErr, StateTurnUpkeep, 2, "Enter", "phase execution failed")
+// 使用 pkg/errors.HSMError
+err := errors.NewHSMError("TurnUpkeep", 2, "Enter", underlyingErr, "phase execution failed")
 
-// Nakama 层检查并转换为 InternalError
-var hsmErr *hsm.HSMError
+// 或使用 hsm.StateError（需要 import "internal/engine/hsm"）
+import "github.com/b1tAction/paradiced/internal/engine/hsm"
+
+func (s *TurnUpkeepState) Enter(ctx *hsm.StateContext) {
+    player := ctx.Player
+    if player == nil {
+        // StateError 用于简单的状态错误，直接使用 StateID
+        ctx.Error = hsm.NewStateError(hsm.StateTurnUpkeep, "player is nil")
+        return
+    }
+
+    // 执行可能失败的操作
+    if err := s.executePhase(ctx); err != nil {
+        // 使用 pkg/errors.HSMError 包装底层错误
+        ctx.Error = errors.WrapHSMError(err, "TurnUpkeep", 2, "Enter", "phase execution failed")
+        return
+    }
+}
+```
+
+### Nakama 层错误处理
+
+```go
+// Nakama 层检查并转换为 ErrorCode
+var hsmErr *errors.HSMError
 if errors.As(err, &hsmErr) {
-    return errors.Wrap(hsmErr, "HSM", hsmErr.StateID.String())
+    logger.Error("HSM execution failed",
+        "state", hsmErr.StateID,
+        "layer", hsmErr.Layer,
+        "phase", hsmErr.Phase,
+        "error", hsmErr.Err)
+    return h.sendActionRejectedWithCode(sender, opCode,
+        constants.ErrInternal, "HSM execution failed")
+}
+
+// 检查 StateError
+var stateErr *hsm.StateError
+if errors.As(err, &stateErr) {
+    logger.Error("State execution failed",
+        "state", stateErr.StateID.String(),
+        "message", stateErr.Message)
 }
 ```
 

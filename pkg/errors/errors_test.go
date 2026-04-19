@@ -147,6 +147,76 @@ func TestErrorAs(t *testing.T) {
 	}
 }
 
+func TestHSMError(t *testing.T) {
+	// Test basic HSMError
+	err := NewHSMError("TurnUpkeep", 2, "Enter", ErrTest, "phase execution failed")
+
+	if err.Error() != "HSM error in state TurnUpkeep (layer 2, phase Enter): phase execution failed - test error" {
+		t.Errorf("unexpected error message: %s", err.Error())
+	}
+
+	// Test without message
+	errNoMsg := NewHSMError("TurnMoving", 2, "Enter", ErrTest, "")
+	if errNoMsg.Error() != "HSM error in state TurnMoving (layer 2, phase Enter): test error" {
+		t.Errorf("unexpected error message: %s", errNoMsg.Error())
+	}
+
+	// Test Unwrap
+	unwrapped := err.Unwrap()
+	if unwrapped != ErrTest {
+		t.Errorf("expected Unwrap to return ErrTest, got %v", unwrapped)
+	}
+
+	// Test errors.As
+	var hsmErr *HSMError
+	if !As(err, &hsmErr) {
+		t.Error("expected errors.As to return true for HSMError")
+	}
+	if hsmErr.StateID != "TurnUpkeep" {
+		t.Errorf("expected StateID 'TurnUpkeep', got %s", hsmErr.StateID)
+	}
+	if hsmErr.Layer != 2 {
+		t.Errorf("expected Layer 2, got %d", hsmErr.Layer)
+	}
+	if hsmErr.Phase != "Enter" {
+		t.Errorf("expected Phase 'Enter', got %s", hsmErr.Phase)
+	}
+}
+
+func TestWrapHSMError(t *testing.T) {
+	// Test wrapping nil error
+	nilErr := WrapHSMError(nil, "TurnUpkeep", 2, "Enter", "")
+	if nilErr != nil {
+		t.Errorf("expected nil when wrapping nil error, got %v", nilErr)
+	}
+
+	// Test wrapping actual error
+	wrapped := WrapHSMError(ErrTest, "TurnMoving", 2, "Enter", "move failed")
+	if wrapped == nil {
+		t.Fatal("expected non-nil wrapped error")
+	}
+	hsmErr, ok := wrapped.(*HSMError)
+	if !ok {
+		t.Fatal("expected wrapped error to be *HSMError")
+	}
+	if hsmErr.StateID != "TurnMoving" {
+		t.Errorf("expected StateID 'TurnMoving', got %s", hsmErr.StateID)
+	}
+	if hsmErr.Layer != 2 {
+		t.Errorf("expected Layer 2, got %d", hsmErr.Layer)
+	}
+	if hsmErr.Phase != "Enter" {
+		t.Errorf("expected Phase 'Enter', got %s", hsmErr.Phase)
+	}
+
+	// Test don't wrap already HSMError
+	alreadyHSM := NewHSMError("Test", 1, "Enter", ErrTest, "")
+	notWrapped := WrapHSMError(alreadyHSM, "Other", 2, "Exit", "")
+	if notWrapped != alreadyHSM {
+		t.Error("expected WrapHSMError to return same error when already HSMError")
+	}
+}
+
 // ErrTest is a test error for use in tests.
 var ErrTest = &testError{"test error"}
 
@@ -188,6 +258,12 @@ func errorsAs(err error, target interface{}) bool {
 		return false
 	case **ActionExecutionError:
 		if v, ok := err.(*ActionExecutionError); ok {
+			*t = v
+			return true
+		}
+		return false
+	case **HSMError:
+		if v, ok := err.(*HSMError); ok {
 			*t = v
 			return true
 		}
