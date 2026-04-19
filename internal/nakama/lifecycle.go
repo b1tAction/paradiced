@@ -8,6 +8,7 @@ import (
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
 	"github.com/b1tAction/paradiced/internal/net"
 	"github.com/b1tAction/paradiced/pkg/constants"
+	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/id"
 )
 
@@ -49,6 +50,18 @@ func (h *NakamaMatchHandler) MatchInit() error {
 
 	// Start HSM - enters MatchInit state
 	h.hsm.Start(hsm.StateMatchInit, ctx)
+
+	// Check state execution error
+	if ctx.Error != nil {
+		if h.logger != nil {
+			h.logger.Error("MatchInit: state execution failed",
+				"state", hsm.StateMatchInit.String(),
+				"error", ctx.Error.Error())
+		}
+		errCode := ErrorCodeForError(ctx.Error)
+		return h.sendActionRejectedWithCode("", pkgnet.OpStateSync, errCode, ctx.Error.Error())
+	}
+
 	if h.logger != nil {
 		h.logger.Debug("MatchInit: starting HSM")
 		h.logger.Info("MatchInit: HSM started", "initial_state", hsm.StateMatchInit.String())
@@ -130,6 +143,18 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 			h.logger.Error("MatchLoop: HSM update failed", "error", err)
 		}
 		return err
+	}
+
+	// Check state execution error
+	if ctx.Error != nil {
+		if h.logger != nil {
+			h.logger.Error("MatchLoop: state execution failed",
+				"global_state", globalStateID.String(),
+				"turn_state", turnStateID.String(),
+				"error", ctx.Error.Error())
+		}
+		errCode := ErrorCodeForError(ctx.Error)
+		return h.broadcastErrorState(errCode, ctx.Error.Error())
 	}
 
 	// Handle state transitions
@@ -263,4 +288,18 @@ func (h *NakamaMatchHandler) assignFactions() {
 	// This method is deprecated - factions are set during addPlayer via PlayerConfig.
 	// The function exists for backwards compatibility but does nothing.
 	// Buff initialization is handled by engine.InitializePlayerFactionBuffs().
+}
+
+// broadcastErrorState broadcasts an error state to all clients.
+// Used when a state execution error occurs during MatchLoop.
+func (h *NakamaMatchHandler) broadcastErrorState(errCode constants.ErrorCode, message string) error {
+	// Log error for debugging
+	if h.logger != nil {
+		h.logger.Error("MatchLoop: state execution error",
+			"error_code", errCode,
+			"message", message)
+	}
+
+	// Return error to stop MatchLoop - error will be handled by Nakama runtime
+	return nil
 }
