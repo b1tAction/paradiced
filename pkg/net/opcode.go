@@ -48,6 +48,10 @@ const (
 	// Data: ActionRejected (includes reason and original opcode)
 	OpActionRejected OpCode = 9
 
+	// OpWaitingSync broadcasts waiting status to host when players join/leave.
+	// Data: WaitingSync (includes player list, can start status)
+	OpWaitingSync OpCode = 10
+
 	// ========== Client -> Server Messages ==========
 
 	// OpRollDice requests dice roll calculation from server.
@@ -69,6 +73,10 @@ const (
 	// OpMiniGameResultSubmit submits mini-game ranking result (deprecated - server calculates).
 	// Data: MiniGameResultSubmit
 	OpMiniGameResultSubmit OpCode = 104
+
+	// OpStartGame requests host to start the game manually.
+	// Data: StartGame (empty, server validates host and minimum players)
+	OpStartGame OpCode = 105
 )
 
 // String returns the opcode name for logging and debugging.
@@ -83,11 +91,13 @@ func (op OpCode) String() string {
 		OpGameOver:             "game_over",
 		OpFullSync:             "full_sync",
 		OpActionRejected:       "action_rejected",
+		OpWaitingSync:          "waiting_sync",
 		OpRollDice:             "roll_dice",
 		OpUseItem:              "use_item",
 		OpUseSkill:             "use_skill",
 		OpUserChoice:           "user_choice",
 		OpMiniGameResultSubmit: "mini_game_result_submit",
+		OpStartGame:            "start_game",
 	}
 	if name, ok := names[op]; ok {
 		return name

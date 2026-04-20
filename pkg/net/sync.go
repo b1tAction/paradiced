@@ -260,6 +260,46 @@ type ActionRejected struct {
 	Message string `json:"message"`
 }
 
+// WaitingSync represents waiting status before game starts.
+// Broadcast to host when players join/leave in WaitingForHost state.
+type WaitingSync struct {
+	// MatchID is the Nakama match ID.
+	MatchID string `json:"match_id"`
+
+	// HostUserID is the user ID of the host (first player).
+	HostUserID string `json:"host_user_id"`
+
+	// Players contains list of joined players with their factions.
+	Players []WaitingPlayer `json:"players"`
+
+	// PlayerCount is the current number of players.
+	PlayerCount int `json:"player_count"`
+
+	// MinPlayers is the minimum players needed to start (2).
+	MinPlayers int `json:"min_players"`
+
+	// MaxPlayers is the maximum players allowed (4).
+	MaxPlayers int `json:"max_players"`
+
+	// CanStart indicates if game can be started (player_count >= min_players).
+	CanStart bool `json:"can_start"`
+
+	// Message is a human-readable status message.
+	Message string `json:"message"`
+}
+
+// WaitingPlayer represents a player in the waiting room.
+type WaitingPlayer struct {
+	// UserID is the Nakama user ID.
+	UserID string `json:"user_id"`
+
+	// Faction is the player's chosen faction.
+	Faction string `json:"faction"`
+
+	// IsHost indicates if this player is the host.
+	IsHost bool `json:"is_host"`
+}
+
 // NewLogEntry creates a simple log entry for protocol testing.
 // For production use, use gamelog.NewActionEntry instead.
 func NewLogEntry(actionType string, target string, source string) gamelog.LogEntry {
