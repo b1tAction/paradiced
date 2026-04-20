@@ -152,27 +152,33 @@ type Buff struct {
 
 ## Buff生命周期管理
 
-通过 `ApplyBuffToPlayer` 和 `RemoveBuffFromPlayer` 方法管理完整的Buff生命周期：
+通过 `ApplyBuffToPlayer` 和 `RemoveBuffFromPlayer` 方法管理 Buff 的数据层和 EventBus 订阅：
 
 ```go
-// ApplyBuffToPlayer 流程（先订阅，后广播）
+// ApplyBuffToPlayer 流程
 func (g *Game) ApplyBuffToPlayer(player, buff) {
     1. player.AddBuff(buff)      // 底层数据添加
     2. g.SubscribeBuff(player, buff) // 挂载到EventBus
-    3. g.BroadcastBuffApplied(player, buff) // 广播Applied事件
 }
 
-// RemoveBuffFromPlayer 流程（先广播，后取消订阅）
+// RemoveBuffFromPlayer 流程
 func (g *Game) RemoveBuffFromPlayer(player, buff) {
-    1. g.BroadcastBuffRemoved(player, buff) // 广播Removed事件
-    2. g.UnsubscribeBuff(buff)  // 取消订阅
-    3. player.RemoveBuff(buff.Type) // 底层数据移除
+    1. g.UnsubscribeBuff(buff)  // 取消订阅
+    2. player.RemoveBuff(buff.Type) // 底层数据移除
 }
 ```
 
-**关键设计**：
-- Applied：订阅发生在广播之前，Buff可以听到自己的Applied事件
-- Removed：广播发生在取消订阅之前，Buff可以听到自己的removed事件
+**Buff 生命周期 Phase 发布**：
+
+Buff 的生命周期 Phase（`PhasePostBuffApplied`、`PhasePreBuffRemoved`）由 **Action 系统**负责发布：
+
+- `AddBuffAction.PostTriggerPhase()` = `PhasePostBuffApplied` - Buff 添加后发布
+- `RemoveBuffAction.PreTriggerPhase()` = `PhasePreBuffRemoved` - Buff 移除前发布
+
+这确保了：
+- Phase 发布与实际效果执行在同一 ActionContext 中
+- 所有 Buff 生命周期事件通过统一的 Action 执行流程触发
+- GameLog 自动记录 Buff 添加/移除操作
 
 ## EffectHandler策略模式
 
