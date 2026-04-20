@@ -538,3 +538,116 @@ func TestSize(t *testing.T) {
 		t.Errorf("size after delete = %d, expected 1", m.Size())
 	}
 }
+
+// ========== JSON Serialization Tests ==========
+
+func TestMetadataToJSON(t *testing.T) {
+	m := NewMetadata()
+	m.SetInt("count", 10)
+	m.SetString("name", "test")
+	m.SetBool("flag", true)
+
+	// ToJSON returns the values map directly
+	valuesMap := m.ToJSON()
+
+	if valuesMap["count"] != 10 {
+		t.Errorf("count = %v, want 10", valuesMap["count"])
+	}
+	if valuesMap["name"] != "test" {
+		t.Errorf("name = %v, want test", valuesMap["name"])
+	}
+	if valuesMap["flag"] != true {
+		t.Errorf("flag = %v, want true", valuesMap["flag"])
+	}
+}
+
+func TestMetadataFromMap(t *testing.T) {
+	input := map[string]interface{}{
+		"count": 42,
+		"name":  "from_map",
+		"flag":  true,
+	}
+
+	m := FromMap(input)
+
+	if m.GetIntOrDefault("count", 0) != 42 {
+		t.Errorf("count = %d, want 42", m.GetIntOrDefault("count", 0))
+	}
+	if m.GetStringOrDefault("name", "") != "from_map" {
+		t.Errorf("name = %s, want from_map", m.GetStringOrDefault("name", ""))
+	}
+	if !m.GetBoolOrDefault("flag", false) {
+		t.Error("flag should be true")
+	}
+}
+
+func TestMetadataMarshalJSON(t *testing.T) {
+	m := NewMetadata()
+	m.SetInt("value", 100)
+
+	jsonBytes, err := m.MarshalJSON()
+	if err != nil {
+		t.Fatalf("MarshalJSON error: %v", err)
+	}
+
+	// Verify can unmarshal back
+	m2 := NewMetadata()
+	if err := m2.UnmarshalJSON(jsonBytes); err != nil {
+		t.Fatalf("UnmarshalJSON error: %v", err)
+	}
+
+	if m2.GetIntOrDefault("value", 0) != 100 {
+		t.Errorf("value after unmarshal = %d, want 100", m2.GetIntOrDefault("value", 0))
+	}
+}
+
+func TestMetadataUnmarshalJSON(t *testing.T) {
+	m := NewMetadata()
+	jsonStr := `{"key1": "value1", "key2": 42, "key3": true}`
+
+	if err := m.UnmarshalJSON([]byte(jsonStr)); err != nil {
+		t.Fatalf("UnmarshalJSON error: %v", err)
+	}
+
+	if m.GetStringOrDefault("key1", "") != "value1" {
+		t.Errorf("key1 = %s, want value1", m.GetStringOrDefault("key1", ""))
+	}
+	if m.GetIntOrDefault("key2", 0) != 42 {
+		t.Errorf("key2 = %d, want 42", m.GetIntOrDefault("key2", 0))
+	}
+	if !m.GetBoolOrDefault("key3", false) {
+		t.Error("key3 should be true")
+	}
+}
+
+func TestMetadataUnmarshalJSONInvalid(t *testing.T) {
+	m := NewMetadata()
+
+	// Invalid JSON should return error
+	if err := m.UnmarshalJSON([]byte("invalid json")); err == nil {
+		t.Error("UnmarshalJSON should return error for invalid JSON")
+	}
+}
+
+func TestMetadataToJSONEmpty(t *testing.T) {
+	m := NewMetadata()
+
+	valuesMap := m.ToJSON()
+
+	// Empty metadata should produce empty map
+	if len(valuesMap) != 0 {
+		t.Errorf("empty metadata should have 0 keys, got %d", len(valuesMap))
+	}
+}
+
+func TestFromMapNil(t *testing.T) {
+	m := FromMap(nil)
+
+	if m == nil {
+		t.Error("FromMap(nil) should return non-nil Metadata")
+	}
+
+	if m.Size() != 0 {
+		t.Errorf("FromMap(nil) should return empty Metadata, got size %d", m.Size())
+	}
+}
