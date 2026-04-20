@@ -91,6 +91,12 @@ func TestParseIDInvalid(t *testing.T) {
 	if err == nil {
 		t.Error("Parse invalid string should return error")
 	}
+
+	// Empty string
+	_, err = ParseID("test", "")
+	if err == nil {
+		t.Error("Parse empty string should return error")
+	}
 }
 
 func TestMustParseIDPanics(t *testing.T) {
@@ -100,6 +106,15 @@ func TestMustParseIDPanics(t *testing.T) {
 		}
 	}()
 	MustParseID("test", "invalid")
+}
+
+func TestMustParseIDEmptyPanics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("MustParseID with empty string should panic")
+		}
+	}()
+	MustParseID("test", "")
 }
 
 // ========== JSON Tests ==========
@@ -133,6 +148,41 @@ func TestIDUnmarshalJSON(t *testing.T) {
 	}
 }
 
+func TestIDUnmarshalJSONEmpty(t *testing.T) {
+	var id ID
+	id.prefix = "test"
+	err := json.Unmarshal([]byte(`""`), &id)
+	if err != nil {
+		t.Errorf("UnmarshalJSON empty string failed: %v", err)
+	}
+	if !id.IsZero() {
+		t.Error("UnmarshalJSON empty string should result in zero ID")
+	}
+}
+
+func TestIDUnmarshalJSONInvalid(t *testing.T) {
+	var id ID
+	id.prefix = "test"
+
+	// Invalid JSON format (not a string)
+	err := json.Unmarshal([]byte(`123`), &id)
+	if err == nil {
+		t.Error("UnmarshalJSON with number should return error")
+	}
+
+	// Invalid JSON format (object)
+	err = json.Unmarshal([]byte(`{"key":"value"}`), &id)
+	if err == nil {
+		t.Error("UnmarshalJSON with object should return error")
+	}
+
+	// Invalid UUID string
+	err = json.Unmarshal([]byte(`"not-a-uuid"`), &id)
+	if err == nil {
+		t.Error("UnmarshalJSON with invalid UUID should return error")
+	}
+}
+
 func TestIDMarshalJSONZero(t *testing.T) {
 	id := ZeroID("test")
 	data, err := json.Marshal(id)
@@ -141,6 +191,44 @@ func TestIDMarshalJSONZero(t *testing.T) {
 	}
 	if string(data) != `"\"\""` && string(data) != `""` {
 		t.Errorf("MarshalJSON zero = %s, expected empty string", string(data))
+	}
+}
+
+func TestIDStringZero(t *testing.T) {
+	id := ZeroID("test")
+	// Zero ID should return "prefix-nil"
+	s := id.String()
+	if s != "test-nil" {
+		t.Errorf("ZeroID.String() = %s, expected 'test-nil'", s)
+	}
+
+	// Non-zero ID should return "prefix-uuid"
+	id2 := NewID("test")
+	s2 := id2.String()
+	if !stringsContains(s2, "test-") {
+		t.Errorf("NewID.String() should contain 'test-', got %s", s2)
+	}
+	if stringsContains(s2, "nil") {
+		t.Errorf("NewID.String() should not contain 'nil', got %s", s2)
+	}
+}
+
+func TestIDUUIDZero(t *testing.T) {
+	id := ZeroID("test")
+	// Zero ID should return empty string
+	u := id.UUID()
+	if u != "" {
+		t.Errorf("ZeroID.UUID() = %s, expected empty string", u)
+	}
+
+	// Non-zero ID should return 36-char UUID
+	id2 := NewID("test")
+	u2 := id2.UUID()
+	if u2 == "" {
+		t.Error("NewID.UUID() should not be empty")
+	}
+	if len(u2) != 36 {
+		t.Errorf("NewID.UUID() length = %d, expected 36", len(u2))
 	}
 }
 
@@ -342,6 +430,31 @@ func TestPlayerIDUnmarshalJSON(t *testing.T) {
 	}
 }
 
+func TestPlayerIDUnmarshalJSONInvalid(t *testing.T) {
+	var id PlayerID
+
+	// Invalid JSON format (not a string)
+	err := json.Unmarshal([]byte(`123`), &id)
+	if err == nil {
+		t.Error("PlayerID UnmarshalJSON with number should return error")
+	}
+
+	// Empty string
+	err = json.Unmarshal([]byte(`""`), &id)
+	if err != nil {
+		t.Errorf("PlayerID UnmarshalJSON empty string failed: %v", err)
+	}
+	if !id.IsZero() {
+		t.Error("PlayerID UnmarshalJSON empty string should result in zero ID")
+	}
+
+	// Invalid UUID
+	err = json.Unmarshal([]byte(`"not-a-uuid"`), &id)
+	if err == nil {
+		t.Error("PlayerID UnmarshalJSON with invalid UUID should return error")
+	}
+}
+
 func TestParseBuffID(t *testing.T) {
 	original := NewBuffID()
 	uuidStr := original.UUID()
@@ -380,6 +493,25 @@ func TestBuffIDUnmarshalJSON(t *testing.T) {
 	}
 	if id.UUID() != uuidStr {
 		t.Errorf("BuffID UUID mismatch: %s vs %s", id.UUID(), uuidStr)
+	}
+}
+
+func TestBuffIDUnmarshalJSONInvalid(t *testing.T) {
+	var id BuffID
+
+	// Invalid JSON format
+	err := json.Unmarshal([]byte(`123`), &id)
+	if err == nil {
+		t.Error("BuffID UnmarshalJSON with number should return error")
+	}
+
+	// Empty string
+	err = json.Unmarshal([]byte(`""`), &id)
+	if err != nil {
+		t.Errorf("BuffID UnmarshalJSON empty string failed: %v", err)
+	}
+	if !id.IsZero() {
+		t.Error("BuffID UnmarshalJSON empty string should result in zero ID")
 	}
 }
 
@@ -424,6 +556,25 @@ func TestItemIDUnmarshalJSON(t *testing.T) {
 	}
 }
 
+func TestItemIDUnmarshalJSONInvalid(t *testing.T) {
+	var id ItemID
+
+	// Invalid JSON format
+	err := json.Unmarshal([]byte(`123`), &id)
+	if err == nil {
+		t.Error("ItemID UnmarshalJSON with number should return error")
+	}
+
+	// Empty string
+	err = json.Unmarshal([]byte(`""`), &id)
+	if err != nil {
+		t.Errorf("ItemID UnmarshalJSON empty string failed: %v", err)
+	}
+	if !id.IsZero() {
+		t.Error("ItemID UnmarshalJSON empty string should result in zero ID")
+	}
+}
+
 func TestParseGameID(t *testing.T) {
 	original := NewGameID()
 	uuidStr := original.UUID()
@@ -462,6 +613,25 @@ func TestGameIDUnmarshalJSON(t *testing.T) {
 	}
 	if id.UUID() != uuidStr {
 		t.Errorf("GameID UUID mismatch")
+	}
+}
+
+func TestGameIDUnmarshalJSONInvalid(t *testing.T) {
+	var id GameID
+
+	// Invalid JSON format
+	err := json.Unmarshal([]byte(`123`), &id)
+	if err == nil {
+		t.Error("GameID UnmarshalJSON with number should return error")
+	}
+
+	// Empty string
+	err = json.Unmarshal([]byte(`""`), &id)
+	if err != nil {
+		t.Errorf("GameID UnmarshalJSON empty string failed: %v", err)
+	}
+	if !id.IsZero() {
+		t.Error("GameID UnmarshalJSON empty string should result in zero ID")
 	}
 }
 
@@ -506,6 +676,25 @@ func TestSubscriptionIDUnmarshalJSON(t *testing.T) {
 	}
 }
 
+func TestSubscriptionIDUnmarshalJSONInvalid(t *testing.T) {
+	var id SubscriptionID
+
+	// Invalid JSON format
+	err := json.Unmarshal([]byte(`123`), &id)
+	if err == nil {
+		t.Error("SubscriptionID UnmarshalJSON with number should return error")
+	}
+
+	// Empty string
+	err = json.Unmarshal([]byte(`""`), &id)
+	if err != nil {
+		t.Errorf("SubscriptionID UnmarshalJSON empty string failed: %v", err)
+	}
+	if !id.IsZero() {
+		t.Error("SubscriptionID UnmarshalJSON empty string should result in zero ID")
+	}
+}
+
 func TestParseDecisionID(t *testing.T) {
 	original := NewDecisionID()
 	uuidStr := original.UUID()
@@ -544,6 +733,25 @@ func TestDecisionIDUnmarshalJSON(t *testing.T) {
 	}
 	if id.UUID() != uuidStr {
 		t.Errorf("DecisionID UUID mismatch")
+	}
+}
+
+func TestDecisionIDUnmarshalJSONInvalid(t *testing.T) {
+	var id DecisionID
+
+	// Invalid JSON format
+	err := json.Unmarshal([]byte(`123`), &id)
+	if err == nil {
+		t.Error("DecisionID UnmarshalJSON with number should return error")
+	}
+
+	// Empty string
+	err = json.Unmarshal([]byte(`""`), &id)
+	if err != nil {
+		t.Errorf("DecisionID UnmarshalJSON empty string failed: %v", err)
+	}
+	if !id.IsZero() {
+		t.Error("DecisionID UnmarshalJSON empty string should result in zero ID")
 	}
 }
 
@@ -592,5 +800,24 @@ func TestEventIDUnmarshalJSON(t *testing.T) {
 	}
 	if id.UUID() != uuidStr {
 		t.Errorf("EventID UUID mismatch")
+	}
+}
+
+func TestEventIDUnmarshalJSONInvalid(t *testing.T) {
+	var id EventID
+
+	// Invalid JSON format
+	err := json.Unmarshal([]byte(`123`), &id)
+	if err == nil {
+		t.Error("EventID UnmarshalJSON with number should return error")
+	}
+
+	// Empty string
+	err = json.Unmarshal([]byte(`""`), &id)
+	if err != nil {
+		t.Errorf("EventID UnmarshalJSON empty string failed: %v", err)
+	}
+	if !id.IsZero() {
+		t.Error("EventID UnmarshalJSON empty string should result in zero ID")
 	}
 }
