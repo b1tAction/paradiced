@@ -9,11 +9,12 @@ type StateID int
 const (
 	// Global layer states manage the overall game lifecycle
 	StateMatchInit StateID = iota + 100 // 100: Initialize match (map, factions, initial buffs)
-	StateRoundMiniGame                   // 101: Mini-game phase, wait for rankings
-	StateRoundPrep                       // 102: Round preparation, assign dice types
-	StateTurnLoop                        // 103: Turn loop, iterate through player turns
-	StateBossBattle                      // 104: Boss battle when player reaches end
-	StateGameOver                        // 105: Game ended, broadcast winner
+	StateWaitingForHost                  // 101: Wait for host to start game (manual start mode)
+	StateRoundMiniGame                   // 102: Mini-game phase, wait for rankings
+	StateRoundPrep                       // 103: Round preparation, assign dice types
+	StateTurnLoop                        // 104: Turn loop, iterate through player turns
+	StateBossBattle                      // 105: Boss battle when player reaches end
+	StateGameOver                        // 106: Game ended, broadcast winner
 )
 
 // ========== Layer 2: Player Turn States ==========
@@ -45,21 +46,22 @@ const (
 // String returns the string representation of StateID.
 func (s StateID) String() string {
 	names := map[StateID]string{
-		StateMatchInit:     "MatchInit",
-		StateRoundMiniGame: "RoundMiniGame",
-		StateRoundPrep:     "RoundPrep",
-		StateTurnLoop:      "TurnLoop",
-		StateBossBattle:    "BossBattle",
-		StateGameOver:      "GameOver",
-		StateTurnUpkeep:    "TurnUpkeep",
-		StateMainAction:    "MainAction",
-		StateTurnMoving:    "TurnMoving",
-		StateTurnLanded:    "TurnLanded",
-		StateTurnEvent:     "TurnEvent",
-		StateTurnEnd:       "TurnEnd",
-		StateWaitDecision:  "WaitDecision",
-		StateNone:          "None",
-		StateInvalid:       "Invalid",
+		StateMatchInit:      "MatchInit",
+		StateWaitingForHost: "WaitingForHost",
+		StateRoundMiniGame:  "RoundMiniGame",
+		StateRoundPrep:      "RoundPrep",
+		StateTurnLoop:       "TurnLoop",
+		StateBossBattle:     "BossBattle",
+		StateGameOver:       "GameOver",
+		StateTurnUpkeep:     "TurnUpkeep",
+		StateMainAction:     "MainAction",
+		StateTurnMoving:     "TurnMoving",
+		StateTurnLanded:     "TurnLanded",
+		StateTurnEvent:      "TurnEvent",
+		StateTurnEnd:        "TurnEnd",
+		StateWaitDecision:   "WaitDecision",
+		StateNone:           "None",
+		StateInvalid:        "Invalid",
 	}
 	if name, ok := names[s]; ok {
 		return name

@@ -105,13 +105,56 @@ func generateDefaultMapConfig(length int) map[int]gamemap.CellType {
 }
 
 func (s *MatchInitState) Update(ctx *StateContext) StateID {
-	// Auto-transition to MiniGame after initialization
-	return StateRoundMiniGame
+	// Transition to WaitingForHost state (manual start mode)
+	// Host can start game with 2-4 players
+	return StateWaitingForHost
 }
 
 func (s *MatchInitState) Exit(ctx *StateContext) {
 	// Cleanup initialization resources
 	ctx.Delete("initialized")
+}
+
+// WaitingForHostState - Wait for Host to Start State
+// Host can manually start game with 2-4 players.
+
+type WaitingForHostState struct {
+	BaseGlobalState
+	startRequested bool
+}
+
+// KeyStartRequested is used in StateContext to signal game start.
+const KeyStartRequested = "start_requested"
+
+// NewWaitingForHostState creates a new WaitingForHost state.
+func NewWaitingForHostState() *WaitingForHostState {
+	return &WaitingForHostState{
+		BaseGlobalState: BaseGlobalState{id: StateWaitingForHost},
+		startRequested:  false,
+	}
+}
+
+func (s *WaitingForHostState) Enter(ctx *StateContext) {
+	// Nothing to do on enter - waiting is handled by Nakama match handler
+	// which broadcasts WaitingSync to host when players join/leave
+	ctx.SetBool("waiting_for_host", true)
+}
+
+func (s *WaitingForHostState) Update(ctx *StateContext) StateID {
+	// Check if start signal was received via HandleStartGame
+	if ctx.GetBoolOrDefault(KeyStartRequested, false) {
+		// Start game - transition to RoundMiniGame
+		return StateRoundMiniGame
+	}
+
+	// Stay in waiting state
+	return StateNone
+}
+
+func (s *WaitingForHostState) Exit(ctx *StateContext) {
+	// Cleanup waiting state markers
+	ctx.Delete("waiting_for_host")
+	ctx.Delete(KeyStartRequested)
 }
 
 // RoundMiniGameState - Mini-Game Phase State
@@ -475,6 +518,8 @@ func (f *GlobalStateFactory) CreateState(id StateID) State {
 	switch id {
 	case StateMatchInit:
 		return NewMatchInitState()
+	case StateWaitingForHost:
+		return NewWaitingForHostState()
 	case StateRoundMiniGame:
 		return NewRoundMiniGameState()
 	case StateRoundPrep:
@@ -495,6 +540,7 @@ func RegisterGlobalStates(hsm *HSM) error {
 	factory := &GlobalStateFactory{}
 	states := []State{
 		factory.CreateState(StateMatchInit),
+		factory.CreateState(StateWaitingForHost),
 		factory.CreateState(StateRoundMiniGame),
 		factory.CreateState(StateRoundPrep),
 		factory.CreateState(StateTurnLoop),
