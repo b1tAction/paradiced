@@ -179,8 +179,9 @@ func runHost(cmd *cobra.Command, args []string) error {
 
 		case <-checkInterval.C:
 			state := interactivePlayer.GlobalState()
-			// Game started when state transitions from WaitingForHost to RoundMiniGame
-			if state != "" && state != "match_init" && state != "waiting_for_host" {
+			// Game started when state transitions from MatchInit/WaitingForHost to RoundMiniGame
+			// Note: StateID.String() returns PascalCase (e.g., "MatchInit", "WaitingForHost")
+			if state != "" && state != "MatchInit" && state != "WaitingForHost" {
 				if !gameStarted {
 					gameStarted = true
 					fmt.Println("\nGame has started!")
