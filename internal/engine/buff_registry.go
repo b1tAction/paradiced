@@ -360,14 +360,20 @@ func handleZhuQueFire(phase constants.Phase, ctx *event.Context) {
 	if phase != constants.PhaseBeforeTurn {
 		return
 	}
-	if ctx.Player == nil {
+	if ctx == nil || ctx.Player == nil {
 		return
 	}
 
 	newCount := ctx.Player.IncrementFireCounter()
 	if newCount >= 4 {
-		ctx.Player.ModifyLP(1)
+		// Use Action system for LP modification
+		if actionCtx := getActionCtxFromEventCtx(ctx); actionCtx != nil {
+			ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, "Buff_Fire"))
+		} else {
+			ctx.Player.ModifyLP(1)
+		}
 		ctx.Player.SetFireCounter(0)
+		ctx.SetInt("lp_change", 1)
 	}
 }
 
