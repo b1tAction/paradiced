@@ -66,6 +66,7 @@ func (ctx *ActionContext) SetCurrentPlayer(player *core.Player) {
 // 5. Collect derived actions from post-trigger handler
 // 6. Record in global game log
 // 7. Process any derived actions in queue
+// Returns first error from handlers or action execution.
 func (ctx *ActionContext) ExecuteAction(action Action) error {
 	// Step 1: PreTrigger phase - interception
 	prePhase := action.PreTriggerPhase()
@@ -78,6 +79,11 @@ func (ctx *ActionContext) ExecuteAction(action Action) error {
 
 		// Publish to allow Buffs/Items to intercept/modify the action
 		ctx.EventBus.Publish(prePhase, action.Target(), triggerCtx)
+
+		// Check for handler errors
+		if triggerCtx.HasError() {
+			return triggerCtx.FirstError()
+		}
 
 		// Check if action was blocked
 		if triggerCtx.GetBoolOrDefault("action_blocked", false) {
@@ -115,6 +121,11 @@ func (ctx *ActionContext) ExecuteAction(action Action) error {
 		// Publish for buff entry effects, death effects, chain reactions
 		ctx.EventBus.Publish(postPhase, action.Target(), triggerCtx)
 
+		// Check for handler errors
+		if triggerCtx.HasError() {
+			return triggerCtx.FirstError()
+		}
+
 		// Step 5: Collect derived actions from PostTrigger handler
 		for _, derived := range triggerCtx.GetDerivedActions() {
 			if execAction, ok := derived.(Action); ok {
@@ -132,17 +143,23 @@ func (ctx *ActionContext) ExecuteAction(action Action) error {
 	}
 
 	// Step 7: Process derived actions in queue
-	ctx.ProcessQueue()
+	if err := ctx.ProcessQueue(); err != nil {
+		return err
+	}
 
 	return nil
 }
 
 // ProcessQueue executes all actions in the queue.
-func (ctx *ActionContext) ProcessQueue() {
+// Returns first error encountered, or nil if all succeeded.
+func (ctx *ActionContext) ProcessQueue() error {
 	for !ctx.ActionQueue.IsEmpty() {
 		action := ctx.ActionQueue.Pop()
-		ctx.ExecuteAction(action)
+		if err := ctx.ExecuteAction(action); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // PushDerivedAction adds a derived action to the queue.

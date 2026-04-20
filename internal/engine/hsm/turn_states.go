@@ -112,8 +112,19 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 	// Publish PhaseBeforeTurn to trigger Buff effects
 	s.decisions = ctx.GetBus().Publish(constants.PhaseBeforeTurn, player.ID.UUID(), triggerCtx)
 
+	// Check for handler errors
+	if triggerCtx.HasError() {
+		ctx.Error = errors.WrapHSMError(
+			triggerCtx.FirstError(), "TurnUpkeep", 2, "Enter", "PhaseBeforeTurn handler failed")
+		return
+	}
+
 	// Step 4: Bridge and execute derived Actions from handlers
-	runDerived(triggerCtx)
+	if err := runDerived(triggerCtx); err != nil {
+		ctx.Error = errors.WrapHSMError(
+			err, "TurnUpkeep", 2, "Enter", "derived action execution failed")
+		return
+	}
 
 	// Step 5: Check if any decisions need user input
 	if len(s.decisions) > 0 {
@@ -305,8 +316,19 @@ func (s *MainActionState) OnUseItem(ctx *StateContext, itemID string) {
 
 	ctx.GetBus().Publish(constants.PhaseItemUsed, player.ID.UUID(), triggerCtx)
 
+	// Check for handler errors
+	if triggerCtx.HasError() {
+		ctx.Error = errors.WrapHSMError(
+			triggerCtx.FirstError(), "MainAction", 2, "OnUseItem", "PhaseItemUsed handler failed")
+		return
+	}
+
 	// Bridge and process derived actions
-	runDerived(triggerCtx)
+	if err := runDerived(triggerCtx); err != nil {
+		ctx.Error = errors.WrapHSMError(
+			err, "MainAction", 2, "OnUseItem", "derived action execution failed")
+		return
+	}
 }
 
 // defaultDiceRoll returns default dice steps based on dice type.
@@ -532,12 +554,24 @@ func (s *TurnLandedState) Enter(ctx *StateContext) {
 	triggerCtx.Set("position", player.Position)
 
 	s.decisions = ctx.GetBus().Publish(constants.PhaseOnLand, player.ID.UUID(), triggerCtx)
+
+	// Check for handler errors
+	if triggerCtx.HasError() {
+		ctx.Error = errors.WrapHSMError(
+			triggerCtx.FirstError(), "TurnLanded", 2, "Enter", "PhaseOnLand handler failed")
+		return
+	}
+
 	if len(s.decisions) > 0 {
 		ctx.Set(KeyPendingCtx, triggerCtx)
 	}
 
 	// Bridge and process derived actions
-	runDerived(triggerCtx)
+	if err := runDerived(triggerCtx); err != nil {
+		ctx.Error = errors.WrapHSMError(
+			err, "TurnLanded", 2, "Enter", "derived action execution failed")
+		return
+	}
 
 	// Handle special cell types
 	switch s.cellType {
@@ -689,8 +723,19 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 
 	decisions := ctx.GetBus().Publish(constants.PhaseAfterTurn, player.ID.UUID(), triggerCtx)
 
+	// Check for handler errors
+	if triggerCtx.HasError() {
+		ctx.Error = errors.WrapHSMError(
+			triggerCtx.FirstError(), "TurnEnd", 2, "Enter", "PhaseAfterTurn handler failed")
+		return
+	}
+
 	// Bridge and process derived actions (甘霖/腐化 effects)
-	runDerived(triggerCtx)
+	if err := runDerived(triggerCtx); err != nil {
+		ctx.Error = errors.WrapHSMError(
+			err, "TurnEnd", 2, "Enter", "derived action execution failed")
+		return
+	}
 
 	// Tick Buff durations
 	expiredBuffs := player.TickBuffs()

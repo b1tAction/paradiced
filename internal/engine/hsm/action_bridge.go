@@ -45,14 +45,15 @@ func getActionCtx(triggerCtx *event.Context) *engineaction.ActionContext {
 }
 
 // runDerived bridges and executes queued derived actions.
-func runDerived(triggerCtx *event.Context) {
+// Returns first error encountered, or nil if all succeeded.
+func runDerived(triggerCtx *event.Context) error {
 	actionCtx := getActionCtx(triggerCtx)
 	if actionCtx == nil {
-		return
+		return nil
 	}
 
 	queueDerived(triggerCtx, actionCtx)
-	actionCtx.ProcessQueue()
+	return actionCtx.ProcessQueue()
 }
 
 // getPendingCtx returns the pending decision context from state context.
