@@ -94,6 +94,11 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 		WithBroadcast(broadcastAdapter).
 		WithBuilder(builder)
 
+	// Pass persisted flags to StateContext (for HSM state checks)
+	if h.startRequested {
+		ctx.SetBool(hsm.KeyStartRequested, true)
+	}
+
 	globalStateID := h.hsm.GetGlobalStateID()
 	turnStateID := h.hsm.GetTurnStateID()
 

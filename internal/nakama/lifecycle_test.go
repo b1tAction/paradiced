@@ -40,12 +40,12 @@ func TestMatchInit(t *testing.T) {
 		t.Error("HSM should be running after MatchInit")
 	}
 
-	// Note: MatchInit auto-transitions to RoundMiniGame via Update
+	// Note: MatchInit auto-transitions to WaitingForHost via Update
 	// The state may have already transitioned
 	stateID := handler.hsm.GetCurrentStateID()
-	// Valid initial states: MatchInit or RoundMiniGame (after auto-transition)
-	if stateID != hsm.StateMatchInit && stateID != hsm.StateRoundMiniGame {
-		t.Errorf("state = %s, want MatchInit or RoundMiniGame", stateID)
+	// Valid initial states: MatchInit or WaitingForHost (after auto-transition)
+	if stateID != hsm.StateMatchInit && stateID != hsm.StateWaitingForHost {
+		t.Errorf("state = %s, want MatchInit or WaitingForHost", stateID)
 	}
 
 	// Verify map is created

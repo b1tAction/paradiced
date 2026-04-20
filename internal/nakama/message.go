@@ -27,6 +27,8 @@ func (h *NakamaMatchHandler) HandleMessageWithOp(sender string, opCode int64, da
 		return h.handleUserChoice(sender, data)
 	case int64(pkgnet.OpMiniGameResultSubmit):
 		return h.handleMiniGameResult(sender, data)
+	case int64(pkgnet.OpStartGame):
+		return h.handleStartGame(sender)
 	default:
 		h.logWarn("Unknown opcode received", "sender", sender, "op_code", opCode)
 	}
@@ -431,5 +433,42 @@ func (h *NakamaMatchHandler) handleMiniGameResult(sender string, data []byte) er
 	}
 
 	logger.logResponse("OpMiniGameResultSubmit", sender, "result submitted")
+	return nil
+}
+
+// handleStartGame handles start game request from host.
+func (h *NakamaMatchHandler) handleStartGame(sender string) error {
+	logger := NewLogger(h)
+	logger.logRequest("handleStartGame", sender, nil)
+
+	// Validate: only host can start
+	if sender != h.hostUserID {
+		logger.logReject("OpStartGame", sender, constants.ErrConditionNotMet, "not_host", "Only host can start the game")
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpStartGame, constants.ErrConditionNotMet, "Only host can start the game")
+	}
+
+	// Validate: minimum 2 players
+	playerCount := len(h.playerList)
+	if playerCount < 2 {
+		logger.logReject("OpStartGame", sender, constants.ErrConditionNotMet, "not_enough_players", "Need at least 2 players to start")
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpStartGame, constants.ErrConditionNotMet, "Need at least 2 players to start")
+	}
+
+	// Check if in WaitingForHost state
+	globalState := h.hsm.GetGlobalStateID()
+	logger.logState(sender, globalState.String(), hsm.StateWaitingForHost.String())
+
+	if globalState != hsm.StateWaitingForHost {
+		logger.logReject("OpStartGame", sender, constants.ErrInvalidState, "invalid_state", "Not in waiting state")
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpStartGame, constants.ErrInvalidState, "Not in waiting state")
+	}
+
+	h.logInfo("handleStartGame: host starting game", "host", sender, "player_count", playerCount)
+
+	// Signal HSM to start game by setting the start flag in handler
+	// This flag is persisted across MatchLoop ticks
+	h.startRequested = true
+
+	logger.logResponse("OpStartGame", sender, "game starting")
 	return nil
 }

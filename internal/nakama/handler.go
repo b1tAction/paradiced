@@ -39,6 +39,12 @@ type NakamaMatchHandler struct {
 	playerList      []string                // Ordered player list for turn sequence
 	disconnected    map[string]bool         // userID -> disconnected status
 
+	// Host tracking
+	hostUserID string // User ID of the host (first player to join)
+
+	// Start game signal (persisted across MatchLoop ticks)
+	startRequested bool // Set by HandleStartGame, checked in WaitingForHost state
+
 	// Configuration
 	maxPlayers  int    // Maximum players (default: 4)
 	mapLength   int    // Map length (default: 100)
