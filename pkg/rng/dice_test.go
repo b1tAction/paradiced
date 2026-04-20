@@ -233,3 +233,26 @@ func TestDiceTypeToRank(t *testing.T) {
 		}
 	}
 }
+
+func TestDiceTypeFromString(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected DiceType
+	}{
+		{"gold", DiceTypeGold},
+		{"silver", DiceTypeSilver},
+		{"copper", DiceTypeCopper},
+		{"wood", DiceTypeWood},
+		{"normal", DiceTypeNormal},
+		{"invalid", DiceTypeNone},
+		{"", DiceTypeNone},
+		{"GOLD", DiceTypeNone}, // case sensitive
+	}
+
+	for _, tt := range tests {
+		result := DiceTypeFromString(tt.input)
+		if result != tt.expected {
+			t.Errorf("DiceTypeFromString(%s) = %s, want %s", tt.input, result.String(), tt.expected.String())
+		}
+	}
+}
