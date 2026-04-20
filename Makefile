@@ -58,27 +58,27 @@ prepare-modules:
 
 # Start Nakama server with Docker (CockroachDB + Nakama)
 docker-up:
-	docker-compose up -d
+	docker compose up -d
 
 # Stop Nakama server
 docker-down:
-	docker-compose down
+	docker compose down
 
 # Stop and remove all data
 docker-clean:
-	docker-compose down -v
+	docker compose down -v
 
 # View Nakama logs
 docker-logs:
-	docker-compose logs -f nakama
+	docker compose logs -f nakama
 
 # View CockroachDB logs
 docker-logs-db:
-	docker-compose logs -f cockroachdb
+	docker compose logs -f cockroachdb
 
 # View all logs
 docker-logs-all:
-	docker-compose logs -f
+	docker compose logs -f
 
 # CockroachDB admin UI (http://localhost:8080)
 cockroach-admin:
@@ -102,11 +102,11 @@ dev-logs: dev docker-logs
 
 # Rebuild plugin and restart Nakama (hot reload)
 rebuild: build-plugin
-	docker-compose restart nakama
+	docker compose restart nakama
 
 # Check service status
 status:
-	docker-compose ps
+	docker compose ps
 
 # Default target
 .PHONY: build-plugin build-dev build-cli build-cli-verbose test test-coverage prepare-modules docker-up docker-down docker-clean docker-logs docker-logs-db docker-logs-all cockroach-admin db-init dev dev-init dev-logs rebuild status
