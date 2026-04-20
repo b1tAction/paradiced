@@ -19,7 +19,7 @@ func NewLogger(handler *NakamaMatchHandler) *Logger {
 
 // logRequest logs the start of request processing.
 func (l *Logger) logRequest(opCode string, sender string, data interface{}) {
-	if l.handler.logger == nil {
+	if l == nil || l.handler == nil || l.handler.logger == nil {
 		return
 	}
 
@@ -38,7 +38,7 @@ func (l *Logger) logRequest(opCode string, sender string, data interface{}) {
 
 // logResponse logs a successful response.
 func (l *Logger) logResponse(opCode string, sender string, result string) {
-	if l.handler.logger == nil {
+	if l == nil || l.handler == nil || l.handler.logger == nil {
 		return
 	}
 
@@ -50,7 +50,7 @@ func (l *Logger) logResponse(opCode string, sender string, result string) {
 
 // logReject logs a rejected request with error details.
 func (l *Logger) logReject(opCode string, sender string, errCode constants.ErrorCode, reason string, message string) {
-	if l.handler.logger == nil {
+	if l == nil || l.handler == nil || l.handler.logger == nil {
 		return
 	}
 
@@ -64,7 +64,7 @@ func (l *Logger) logReject(opCode string, sender string, errCode constants.Error
 
 // logError logs an error during request processing.
 func (l *Logger) logError(opCode string, sender string, err error) {
-	if l.handler.logger == nil {
+	if l == nil || l.handler == nil || l.handler.logger == nil {
 		return
 	}
 
@@ -76,7 +76,7 @@ func (l *Logger) logError(opCode string, sender string, err error) {
 
 // logState logs state transition information.
 func (l *Logger) logState(sender string, currentState string, expectedState string) {
-	if l.handler.logger == nil {
+	if l == nil || l.handler == nil || l.handler.logger == nil {
 		return
 	}
 
@@ -88,7 +88,7 @@ func (l *Logger) logState(sender string, currentState string, expectedState stri
 
 // logValidation logs validation results.
 func (l *Logger) logValidation(sender string, checkName string, passed bool, details ...interface{}) {
-	if l.handler.logger == nil {
+	if l == nil || l.handler == nil || l.handler.logger == nil {
 		return
 	}
 
@@ -113,7 +113,7 @@ func (l *Logger) logValidation(sender string, checkName string, passed bool, det
 
 // logPlayer logs player-related information.
 func (l *Logger) logPlayer(sender string, action string, playerID string, isCurrent bool) {
-	if l.handler.logger == nil {
+	if l == nil || l.handler == nil || l.handler.logger == nil {
 		return
 	}
 
