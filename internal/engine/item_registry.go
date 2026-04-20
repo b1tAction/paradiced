@@ -3,6 +3,7 @@ package engine
 import (
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/event"
+	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/pkg/constants"
 )
 
@@ -197,28 +198,68 @@ func registerAllItems() {
 
 func createGiveBuffHandler(buffType constants.BuffType, duration int) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) {
+		if ctx == nil || ctx.Player == nil {
+			return
+		}
+
+		// Create AddBuffAction and add to derived actions
+		action := engineaction.NewAddBuffAction(ctx.Player, buffType, duration, "Item_Effect")
+		ctx.AddDerivedAction(action)
+
 		ctx.SetString("give_buff_type", string(buffType))
 		ctx.SetInt("give_buff_duration", duration)
 	}
 }
 
 func handleTeleport(phase constants.Phase, ctx *event.Context) {
+	if ctx == nil || ctx.Player == nil {
+		return
+	}
+
 	targetID, _ := ctx.GetString("target_id")
 	if targetID == "" {
 		return
 	}
+
+	// Get target player position from game context
+	// For now, use stored target position
+	targetPos := ctx.GetIntOrDefault("target_position", 0)
+
+	// Create TeleportAction and add to derived actions
+	action := engineaction.NewTeleportAction(ctx.Player, targetPos, "Item_AnyDoor")
+	ctx.AddDerivedAction(action)
+
 	ctx.SetString("teleport_target", targetID)
 }
 
 func handleDiceSwap(phase constants.Phase, ctx *event.Context) {
+	if ctx == nil || ctx.Player == nil {
+		return
+	}
+
 	targetID, _ := ctx.GetString("target_id")
 	if targetID == "" {
 		return
 	}
+
+	// Set flag for HSM to handle dice swap
 	ctx.SetString("dice_swap_target", targetID)
+
+	// Note: Actual dice swap requires game state access to get other player's dice
+	// This would be implemented in HSM or a dedicated DiceManager
 }
 
 func handleDiceUpgrade(phase constants.Phase, ctx *event.Context) {
+	if ctx == nil || ctx.Player == nil {
+		return
+	}
+
 	currentDice, _ := ctx.GetString("current_dice_type")
 	ctx.SetString("dice_upgrade_from", currentDice)
+
+	// Set flag for HSM to upgrade dice
+	ctx.SetBool("dice_upgrade", true)
+
+	// Note: Actual dice upgrade requires DiceManager access
+	// This would be implemented in HSM or a dedicated DiceManager
 }

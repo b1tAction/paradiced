@@ -112,13 +112,14 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 	// Publish PhaseBeforeTurn to trigger Buff effects
 	s.decisions = ctx.GetBus().Publish(constants.PhaseBeforeTurn, player.ID.UUID(), triggerCtx)
 
-	// Step 4: Execute any derived Actions from handlers
-	s.actionCtx.ProcessQueue()
+	// Step 4: Bridge and execute derived Actions from handlers
+	runDerived(triggerCtx)
 
 	// Step 5: Check if any decisions need user input
 	if len(s.decisions) > 0 {
 		// Will be handled in Update - push WaitDecision if needed
 		ctx.Decisions = s.decisions
+		ctx.Set(KeyPendingCtx, triggerCtx)
 	}
 
 	// Broadcast StateSync after all BeforeTurn effects
@@ -304,8 +305,8 @@ func (s *MainActionState) OnUseItem(ctx *StateContext, itemID string) {
 
 	ctx.GetBus().Publish(constants.PhaseItemUsed, player.ID.UUID(), triggerCtx)
 
-	// Process derived actions
-	s.actionCtx.ProcessQueue()
+	// Bridge and process derived actions
+	runDerived(triggerCtx)
 }
 
 // defaultDiceRoll returns default dice steps based on dice type.
@@ -531,9 +532,12 @@ func (s *TurnLandedState) Enter(ctx *StateContext) {
 	triggerCtx.Set("position", player.Position)
 
 	s.decisions = ctx.GetBus().Publish(constants.PhaseOnLand, player.ID.UUID(), triggerCtx)
+	if len(s.decisions) > 0 {
+		ctx.Set(KeyPendingCtx, triggerCtx)
+	}
 
-	// Process derived actions
-	s.actionCtx.ProcessQueue()
+	// Bridge and process derived actions
+	runDerived(triggerCtx)
 
 	// Handle special cell types
 	switch s.cellType {
@@ -685,8 +689,8 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 
 	decisions := ctx.GetBus().Publish(constants.PhaseAfterTurn, player.ID.UUID(), triggerCtx)
 
-	// Process derived actions (甘霖/腐化 effects)
-	s.actionCtx.ProcessQueue()
+	// Bridge and process derived actions (甘霖/腐化 effects)
+	runDerived(triggerCtx)
 
 	// Tick Buff durations
 	expiredBuffs := player.TickBuffs()
@@ -715,6 +719,7 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 	// Handle decisions if any
 	if len(decisions) > 0 {
 		ctx.Decisions = decisions
+		ctx.Set(KeyPendingCtx, triggerCtx)
 	}
 
 	// End turn log segment

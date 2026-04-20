@@ -2,6 +2,7 @@ package engine
 
 import (
 	"github.com/b1tAction/paradiced/internal/core"
+	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
 )
@@ -234,7 +235,7 @@ func registerAllBuffs() {
 		Desc:        "接下来3回合免疫任意事件、BUFF或道具的影响",
 		Duration:    3,
 	}, &BuffHandlerConfig{
-		Phases:      []constants.Phase{constants.PhasePreDamage},
+		Phases:      []constants.Phase{constants.PhasePreBuffApplied},
 		Priority:    100,
 		NeedConfirm: false,
 		Handler:     handleHiddenImmune,
@@ -305,14 +306,37 @@ func registerAllBuffs() {
 
 func createModifyLPHandler(amount int) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) {
-		if ctx.Player != nil {
-			ctx.Player.ModifyLP(amount)
+		if ctx == nil || ctx.Player == nil {
+			return
 		}
+
+		if actionCtx := getActionCtxFromEventCtx(ctx); actionCtx != nil {
+			source := "Buff_Effect"
+			ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, amount, source))
+			ctx.SetInt("lp_change", amount)
+			return
+		}
+
+		ctx.Player.ModifyLP(amount)
+		ctx.SetInt("lp_change", amount)
 	}
 }
 
 func createModifyHPHandler(amount int) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) {
+		if ctx == nil || ctx.Player == nil || amount == 0 {
+			return
+		}
+
+		if actionCtx := getActionCtxFromEventCtx(ctx); actionCtx != nil {
+			source := "Buff_Effect"
+			if amount > 0 {
+				ctx.AddDerivedAction(engineaction.NewHealAction(ctx.Player, amount, source))
+			} else {
+				ctx.AddDerivedAction(engineaction.NewDamageAction(ctx.Player, -amount, source))
+			}
+		}
+
 		ctx.SetInt("hp_change", amount)
 	}
 }
@@ -352,10 +376,22 @@ func handleLostReverse(phase constants.Phase, ctx *event.Context) {
 		return
 	}
 	ctx.SetBool("reverse_movement", true)
+
+	raw, ok := ctx.Get("current_action")
+	if !ok {
+		return
+	}
+
+	moveAction, ok := raw.(*engineaction.MoveAction)
+	if !ok || moveAction == nil {
+		return
+	}
+
+	moveAction.Steps = -moveAction.Steps
 }
 
 func handleHiddenImmune(phase constants.Phase, ctx *event.Context) {
-	if phase != constants.PhasePreDamage {
+	if phase != constants.PhasePreBuffApplied {
 		return
 	}
 	ctx.SetBool("action_blocked", true)
@@ -374,4 +410,18 @@ func handleExorcismImmunePoison(phase constants.Phase, ctx *event.Context) {
 		return
 	}
 	ctx.SetBool("block_poison_effect", true)
+}
+
+func getActionCtxFromEventCtx(ctx *event.Context) *engineaction.ActionContext {
+	if ctx == nil {
+		return nil
+	}
+
+	raw, ok := ctx.Get("action_context")
+	if !ok {
+		return nil
+	}
+
+	actionCtx, _ := raw.(*engineaction.ActionContext)
+	return actionCtx
 }

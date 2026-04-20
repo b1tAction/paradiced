@@ -32,7 +32,7 @@ type Action interface {
 	PreTriggerPhase() constants.Phase
 
 	// PostTriggerPhase returns the Phase to publish AFTER action execution.
-	// Used for lifecycle events (e.g., PhaseOnBuffApplied for buff entry effects).
+	// Used for lifecycle events (e.g., PhasePostBuffApplied for buff entry effects).
 	// Returns PhaseAnyTime if no post-trigger needed.
 	PostTriggerPhase() constants.Phase
 

@@ -533,10 +533,40 @@ func (hsm *HSM) OnUserChoice(choice int, ctx *StateContext) error {
 	if ctx == nil {
 		ctx = NewStateContext().WithHSM(hsm).WithPlayer(hsm.turnPlayer)
 	}
-	hsm.decision.Execute(choice, event.NewContext(nil))
+
+	execCtx := hsm.resolveDecisionExecutionContext(ctx)
+	hsm.decision.Execute(choice, execCtx)
+	runDerived(execCtx)
+	hsm.clearPendingDecisionEventContext(ctx)
 
 	// Pop interrupt and resume
 	return hsm.PopInterrupt(ctx)
+}
+
+func (hsm *HSM) resolveDecisionExecutionContext(ctx *StateContext) *event.Context {
+	if pending := getPendingCtx(ctx); pending != nil {
+		return pending
+	}
+
+	entry := hsm.stack.Peek()
+	if entry != nil {
+		if pending := getPendingCtx(entry.Context); pending != nil {
+			return pending
+		}
+	}
+
+	return event.NewContext(hsm.turnPlayer)
+}
+
+func (hsm *HSM) clearPendingDecisionEventContext(ctx *StateContext) {
+	if ctx != nil {
+		ctx.Delete(KeyPendingCtx)
+	}
+
+	entry := hsm.stack.Peek()
+	if entry != nil && entry.Context != nil {
+		entry.Context.Delete(KeyPendingCtx)
+	}
 }
 
 // ========== Turn Player Management ==========

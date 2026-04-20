@@ -43,9 +43,9 @@ func NewPiercingDamageAction(target *core.Player, amount int, sourceID string) *
 }
 
 func (a *DamageAction) Type() constants.ActionType { return constants.ActionDamage }
-func (a *DamageAction) CanModify() bool  { return !a.IsPiercing && a.Amount > 0 }
-func (a *DamageAction) Source() string   { return a.SourceID }
-func (a *DamageAction) Target() string   { return a.TargetPlayer.ID.UUID() }
+func (a *DamageAction) CanModify() bool            { return !a.IsPiercing && a.Amount > 0 }
+func (a *DamageAction) Source() string             { return a.SourceID }
+func (a *DamageAction) Target() string             { return a.TargetPlayer.ID.UUID() }
 
 // PreTriggerPhase returns PhasePreDamage for interception by shields/隐匿.
 func (a *DamageAction) PreTriggerPhase() constants.Phase {
@@ -109,9 +109,9 @@ func NewHealAction(target *core.Player, amount int, sourceID string) *HealAction
 }
 
 func (a *HealAction) Type() constants.ActionType { return constants.ActionHeal }
-func (a *HealAction) CanModify() bool  { return a.Amount > 0 }
-func (a *HealAction) Source() string   { return a.SourceID }
-func (a *HealAction) Target() string   { return a.TargetPlayer.ID.UUID() }
+func (a *HealAction) CanModify() bool            { return a.Amount > 0 }
+func (a *HealAction) Source() string             { return a.SourceID }
+func (a *HealAction) Target() string             { return a.TargetPlayer.ID.UUID() }
 
 // PreTriggerPhase returns PhaseAnyTime (healing typically not intercepted).
 func (a *HealAction) PreTriggerPhase() constants.Phase {
@@ -168,9 +168,9 @@ func NewModifyLPAction(target *core.Player, amount int, sourceID string) *Modify
 }
 
 func (a *ModifyLPAction) Type() constants.ActionType { return constants.ActionModifyLP }
-func (a *ModifyLPAction) CanModify() bool  { return false } // LP changes cannot be intercepted
-func (a *ModifyLPAction) Source() string   { return a.SourceID }
-func (a *ModifyLPAction) Target() string   { return a.TargetPlayer.ID.UUID() }
+func (a *ModifyLPAction) CanModify() bool            { return false } // LP changes cannot be intercepted
+func (a *ModifyLPAction) Source() string             { return a.SourceID }
+func (a *ModifyLPAction) Target() string             { return a.TargetPlayer.ID.UUID() }
 
 // PreTriggerPhase returns PhaseAnyTime (LP changes cannot be intercepted).
 func (a *ModifyLPAction) PreTriggerPhase() constants.Phase {
@@ -229,9 +229,9 @@ func NewMoveAction(target *core.Player, steps int, sourceID string) *MoveAction 
 }
 
 func (a *MoveAction) Type() constants.ActionType { return constants.ActionMove }
-func (a *MoveAction) CanModify() bool  { return a.Steps != 0 }
-func (a *MoveAction) Source() string   { return a.SourceID }
-func (a *MoveAction) Target() string   { return a.TargetPlayer.ID.UUID() }
+func (a *MoveAction) CanModify() bool            { return a.Steps != 0 }
+func (a *MoveAction) Source() string             { return a.SourceID }
+func (a *MoveAction) Target() string             { return a.TargetPlayer.ID.UUID() }
 
 // PreTriggerPhase returns PhasePreMove for interception by 迷途.
 func (a *MoveAction) PreTriggerPhase() constants.Phase {
@@ -323,18 +323,18 @@ func NewAddBuffAction(target *core.Player, buffType constants.BuffType, duration
 }
 
 func (a *AddBuffAction) Type() constants.ActionType { return constants.ActionAddBuff }
-func (a *AddBuffAction) CanModify() bool  { return false } // Buff addition cannot be intercepted
-func (a *AddBuffAction) Source() string   { return a.SourceID }
-func (a *AddBuffAction) Target() string   { return a.TargetPlayer.ID.UUID() }
+func (a *AddBuffAction) CanModify() bool            { return false } // Buff addition cannot be intercepted
+func (a *AddBuffAction) Source() string             { return a.SourceID }
+func (a *AddBuffAction) Target() string             { return a.TargetPlayer.ID.UUID() }
 
-// PreTriggerPhase returns PhaseAnyTime (buff addition not intercepted).
+// PreTriggerPhase returns PhasePreBuffApplied.
 func (a *AddBuffAction) PreTriggerPhase() constants.Phase {
-	return constants.PhaseAnyTime
+	return constants.PhasePreBuffApplied
 }
 
-// PostTriggerPhase returns PhaseOnBuffApplied for entry effects/chain reactions.
+// PostTriggerPhase returns PhasePostBuffApplied for entry effects/chain reactions.
 func (a *AddBuffAction) PostTriggerPhase() constants.Phase {
-	return constants.PhaseOnBuffApplied
+	return constants.PhasePostBuffApplied
 }
 
 func (a *AddBuffAction) Execute(ctx *ActionContext) error {
@@ -377,18 +377,18 @@ func NewRemoveBuffAction(target *core.Player, buffType constants.BuffType, sourc
 }
 
 func (a *RemoveBuffAction) Type() constants.ActionType { return constants.ActionRemoveBuff }
-func (a *RemoveBuffAction) CanModify() bool  { return false }
-func (a *RemoveBuffAction) Source() string   { return a.SourceID }
-func (a *RemoveBuffAction) Target() string   { return a.TargetPlayer.ID.UUID() }
+func (a *RemoveBuffAction) CanModify() bool            { return false }
+func (a *RemoveBuffAction) Source() string             { return a.SourceID }
+func (a *RemoveBuffAction) Target() string             { return a.TargetPlayer.ID.UUID() }
 
-// PreTriggerPhase returns PhaseOnBuffRemoved for death effects/亡语.
+// PreTriggerPhase returns PhasePreBuffRemoved for death effects/亡语.
 func (a *RemoveBuffAction) PreTriggerPhase() constants.Phase {
-	return constants.PhaseOnBuffRemoved
+	return constants.PhasePreBuffRemoved
 }
 
-// PostTriggerPhase returns PhaseAnyTime (no post-trigger after removal).
+// PostTriggerPhase returns PhasePostBuffRemoved.
 func (a *RemoveBuffAction) PostTriggerPhase() constants.Phase {
-	return constants.PhaseAnyTime
+	return constants.PhasePostBuffRemoved
 }
 
 func (a *RemoveBuffAction) Execute(ctx *ActionContext) error {
@@ -430,9 +430,9 @@ func NewTeleportAction(target *core.Player, targetPos int, sourceID string) *Tel
 }
 
 func (a *TeleportAction) Type() constants.ActionType { return constants.ActionTeleport }
-func (a *TeleportAction) CanModify() bool  { return false }
-func (a *TeleportAction) Source() string   { return a.SourceID }
-func (a *TeleportAction) Target() string   { return a.TargetPlayer.ID.UUID() }
+func (a *TeleportAction) CanModify() bool            { return false }
+func (a *TeleportAction) Source() string             { return a.SourceID }
+func (a *TeleportAction) Target() string             { return a.TargetPlayer.ID.UUID() }
 
 // PreTriggerPhase returns PhaseAnyTime (teleport not intercepted).
 func (a *TeleportAction) PreTriggerPhase() constants.Phase {
@@ -485,9 +485,9 @@ func NewStealBuffAction(target, source *core.Player, sourceID string) *StealBuff
 }
 
 func (a *StealBuffAction) Type() constants.ActionType { return constants.ActionStealBuff }
-func (a *StealBuffAction) CanModify() bool  { return false }
-func (a *StealBuffAction) Source() string   { return a.SourceID }
-func (a *StealBuffAction) Target() string   { return a.TargetPlayer.ID.UUID() }
+func (a *StealBuffAction) CanModify() bool            { return false }
+func (a *StealBuffAction) Source() string             { return a.SourceID }
+func (a *StealBuffAction) Target() string             { return a.TargetPlayer.ID.UUID() }
 
 // PreTriggerPhase returns PhaseAnyTime (steal not intercepted).
 func (a *StealBuffAction) PreTriggerPhase() constants.Phase {
@@ -560,9 +560,9 @@ func NewDrawEventAction(target *core.Player, sourceID string) *DrawEventAction {
 }
 
 func (a *DrawEventAction) Type() constants.ActionType { return constants.ActionDrawEvent }
-func (a *DrawEventAction) CanModify() bool  { return true }
-func (a *DrawEventAction) Source() string   { return a.SourceID }
-func (a *DrawEventAction) Target() string   { return a.TargetPlayer.ID.UUID() }
+func (a *DrawEventAction) CanModify() bool            { return true }
+func (a *DrawEventAction) Source() string             { return a.SourceID }
+func (a *DrawEventAction) Target() string             { return a.TargetPlayer.ID.UUID() }
 
 // PreTriggerPhase returns PhasePreEvent for interception by 辟邪/玄武.
 func (a *DrawEventAction) PreTriggerPhase() constants.Phase {
@@ -632,9 +632,9 @@ func NewRespawnAction(target *core.Player, checkpointPos int, sourceID string) *
 }
 
 func (a *RespawnAction) Type() constants.ActionType { return constants.ActionRespawn }
-func (a *RespawnAction) CanModify() bool  { return false }
-func (a *RespawnAction) Source() string   { return a.SourceID }
-func (a *RespawnAction) Target() string   { return a.TargetPlayer.ID.UUID() }
+func (a *RespawnAction) CanModify() bool            { return false }
+func (a *RespawnAction) Source() string             { return a.SourceID }
+func (a *RespawnAction) Target() string             { return a.TargetPlayer.ID.UUID() }
 
 // PreTriggerPhase returns PhasePreRespawn (respawn can be intercepted by Undying等).
 func (a *RespawnAction) PreTriggerPhase() constants.Phase {
@@ -690,9 +690,9 @@ func NewFellDownAction(target *core.Player, position int, damage int, sourceID s
 }
 
 func (a *FellDownAction) Type() constants.ActionType { return constants.ActionFellDown }
-func (a *FellDownAction) CanModify() bool  { return false }
-func (a *FellDownAction) Source() string   { return a.SourceID }
-func (a *FellDownAction) Target() string   { return a.TargetPlayer.ID.UUID() }
+func (a *FellDownAction) CanModify() bool            { return false }
+func (a *FellDownAction) Source() string             { return a.SourceID }
+func (a *FellDownAction) Target() string             { return a.TargetPlayer.ID.UUID() }
 
 // PreTriggerPhase returns PhaseAnyTime (fell down not intercepted).
 func (a *FellDownAction) PreTriggerPhase() constants.Phase {

@@ -1,6 +1,7 @@
 package engine
 
 import (
+	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
@@ -296,43 +297,116 @@ func registerAllEvents() {
 
 // ========== Event Handler Helpers ==========
 
+// createEventModifyHPHandler creates a handler that modifies HP through Action system.
 func createEventModifyHPHandler(amount int) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) {
+		if ctx == nil || ctx.Player == nil || amount == 0 {
+			return
+		}
+
+		source := "Event_Effect"
+
+		if amount > 0 {
+			action := engineaction.NewHealAction(ctx.Player, amount, source)
+			ctx.AddDerivedAction(action)
+		} else {
+			action := engineaction.NewDamageAction(ctx.Player, -amount, source)
+			ctx.AddDerivedAction(action)
+		}
+
 		ctx.SetInt("hp_change", amount)
 	}
 }
 
+// createEventModifyLPHandler creates a handler that modifies LP through Action system.
 func createEventModifyLPHandler(amount int) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) {
-		if ctx.Player != nil {
-			ctx.Player.ModifyLP(amount)
+		if ctx == nil || ctx.Player == nil {
+			return
 		}
+
+		source := "Event_Effect"
+		action := engineaction.NewModifyLPAction(ctx.Player, amount, source)
+		ctx.AddDerivedAction(action)
+
+		ctx.SetInt("lp_change", amount)
 	}
 }
 
+// createEventGiveBuffHandler creates a handler that gives a Buff through Action system.
 func createEventGiveBuffHandler(buffType constants.BuffType, duration int) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) {
+		if ctx == nil || ctx.Player == nil {
+			return
+		}
+
+		action := engineaction.NewAddBuffAction(ctx.Player, buffType, duration, "Event_Effect")
+		ctx.AddDerivedAction(action)
+
 		ctx.SetString("give_buff_type", string(buffType))
 		ctx.SetInt("give_buff_duration", duration)
 	}
 }
 
 func handleDrawItem(phase constants.Phase, ctx *event.Context) {
+	if ctx == nil || ctx.Player == nil {
+		return
+	}
+
+	// Set flag for HSM to draw item
 	ctx.SetBool("draw_item", true)
 }
 
 func handleSwapPosition(phase constants.Phase, ctx *event.Context) {
+	if ctx == nil || ctx.Player == nil {
+		return
+	}
+
+	// Set flag for HSM to handle position swap
 	ctx.SetBool("swap_position", true)
+
+	// Note: Actual position swap requires finding another player
+	// This would be implemented in HSM or handled by a dedicated action
 }
 
 func handleRandomBuff(phase constants.Phase, ctx *event.Context) {
+	if ctx == nil || ctx.Player == nil {
+		return
+	}
+
+	// Set flag for HSM to give random buff
 	ctx.SetBool("random_buff", true)
+
+	// Note: Actual random buff selection would use RNG engine
+	// This would be implemented in HSM or handled by a dedicated action
 }
 
 func handleLoseItem(phase constants.Phase, ctx *event.Context) {
+	if ctx == nil || ctx.Player == nil {
+		return
+	}
+
+	// Set flag for HSM to remove random item
 	ctx.SetBool("lose_item", true)
+
+	// Note: Actual item removal would select random item from inventory
+	// This would be implemented in HSM or handled by a dedicated action
 }
 
 func handleThunderDeath(phase constants.Phase, ctx *event.Context) {
+	if ctx == nil || ctx.Player == nil {
+		return
+	}
+
+	source := "Event_Thunder"
+
+	// Deal massive damage to set HP to 0
+	// Use player's current HP as damage amount
+	currentHP := ctx.Player.HP
+	if currentHP > 0 {
+		action := engineaction.NewDamageAction(ctx.Player, currentHP, source)
+		ctx.AddDerivedAction(action)
+	}
+
 	ctx.SetBool("instant_death", true)
 }

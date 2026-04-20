@@ -20,12 +20,14 @@ const (
 
 	// ========== Action Published Phases (Action Timing) ==========
 
-	PhasePreDamage     Phase = "pre_damage"     // Before damage application
-	PhasePreEvent      Phase = "pre_event"      // Before event triggers
-	PhasePreMove       Phase = "pre_move"       // Before movement
-	PhasePreRespawn    Phase = "pre_respawn"    // Before respawn (interceptable)
-	PhaseOnBuffApplied Phase = "on_buff_applied" // After buff applied
-	PhaseOnBuffRemoved Phase = "on_buff_removed" // Before buff removed
+	PhasePreDamage       Phase = "pre_damage"        // Before damage application
+	PhasePreEvent        Phase = "pre_event"         // Before event triggers
+	PhasePreMove         Phase = "pre_move"          // Before movement
+	PhasePreRespawn      Phase = "pre_respawn"       // Before respawn (interceptable)
+	PhasePreBuffApplied  Phase = "pre_buff_applied"  // Before buff applied
+	PhasePostBuffApplied Phase = "post_buff_applied" // After buff applied
+	PhasePreBuffRemoved  Phase = "pre_buff_removed"  // Before buff removed
+	PhasePostBuffRemoved Phase = "post_buff_removed" // After buff removed
 
 	// ========== Special Phases ==========
 
@@ -37,7 +39,8 @@ const (
 func (p Phase) IsValid() bool {
 	return p == PhaseBeforeTurn || p == PhaseOnLand || p == PhaseAfterTurn ||
 		p == PhasePreDamage || p == PhasePreEvent || p == PhasePreMove ||
-		p == PhasePreRespawn || p == PhaseOnBuffApplied || p == PhaseOnBuffRemoved ||
+		p == PhasePreRespawn || p == PhasePreBuffApplied || p == PhasePostBuffApplied ||
+		p == PhasePreBuffRemoved || p == PhasePostBuffRemoved ||
 		p == PhaseAnyTime || p == PhaseItemUsed
 }
 
@@ -55,5 +58,6 @@ func (p Phase) IsHSMPublished() bool {
 // IsActionPublished returns true if this Phase should be published by Action execution.
 func (p Phase) IsActionPublished() bool {
 	return p == PhasePreDamage || p == PhasePreEvent || p == PhasePreMove ||
-		p == PhasePreRespawn || p == PhaseOnBuffApplied || p == PhaseOnBuffRemoved
+		p == PhasePreRespawn || p == PhasePreBuffApplied || p == PhasePostBuffApplied ||
+		p == PhasePreBuffRemoved || p == PhasePostBuffRemoved
 }

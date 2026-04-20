@@ -150,7 +150,10 @@ func (s *WaitDecisionState) executeOption(ctx *StateContext, optionIndex int) {
 	option := s.decision.Options[optionIndex]
 
 	// Create execution context
-	execCtx := event.NewContext(ctx.Player)
+	execCtx := getPendingCtx(ctx)
+	if execCtx == nil {
+		execCtx = event.NewContext(ctx.Player)
+	}
 
 	// Execute option action if defined, with panic recovery
 	if option.Action != nil {
@@ -163,6 +166,8 @@ func (s *WaitDecisionState) executeOption(ctx *StateContext, optionIndex int) {
 		}()
 		option.Action(execCtx)
 	}
+	runDerived(execCtx)
+	ctx.Delete(KeyPendingCtx)
 
 	// Mark as completed
 	s.completed = true
