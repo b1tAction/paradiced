@@ -4,7 +4,9 @@ import (
 	"testing"
 
 	"github.com/b1tAction/paradiced/internal/core"
+	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/internal/event"
+	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
 )
@@ -73,7 +75,7 @@ func TestItemDefinitionsFields(t *testing.T) {
 		eval        constants.Evaluation
 		englishName string
 		name        string
-			}{
+	}{
 		{constants.ItemTypeReverseClock, constants.EvaluationGood, "ReverseClock", "反方向的钟"},
 		{constants.ItemTypeAnyDoor, constants.EvaluationNeutral, "AnyDoor", "任意门"},
 		{constants.ItemTypeDiceSwap, constants.EvaluationNeutral, "DiceSwap", "骰子交换"},
@@ -98,72 +100,72 @@ func TestItemDefinitionsFields(t *testing.T) {
 		if def.Name != tt.name {
 			t.Errorf("%s.Name = %s, expected %s", tt.itemType, def.Name, tt.name)
 		}
-
-
-
 	}
 }
 
 // ========== Item Handler Tests ==========
 
 func TestReverseClockHandlerBehavior(t *testing.T) {
-	// Test ReverseClock gives Lost buff
+	// Test ReverseClock gives Lost buff through Action system
+	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
 
-	config := GetItemHandlerConfig(constants.ItemTypeReverseClock)
-	if config == nil {
-		t.Fatal("ReverseClock should have HandlerConfig")
-	}
-	handler := config.Handler
-	if handler == nil {
-		t.Fatal("ReverseClock should have Handler")
-	}
+	handler := GetItemHandlerConfig(constants.ItemTypeReverseClock).Handler
 
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
 	handler(constants.PhaseAnyTime, ctx)
 
-	// Should signal give_buff_type=Lost
-	buffType, err := ctx.GetString("give_buff_type")
-	if err != nil {
-		t.Error("give_buff_type should be set")
-	}
-	if buffType != string(constants.BuffTypeLost) {
-		t.Errorf("give_buff_type = %s, expected %s", buffType, constants.BuffTypeLost)
+	// Should have AddBuffAction derived action
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
 	}
 
-	duration, err := ctx.GetInt("give_buff_duration")
-	if err != nil {
-		t.Error("give_buff_duration should be set")
+	addBuffAction, ok := derived[0].(*engineaction.AddBuffAction)
+	if !ok {
+		t.Fatal("expected AddBuffAction")
 	}
-	if duration != 1 {
-		t.Errorf("give_buff_duration = %d, expected 1", duration)
+	if addBuffAction.BuffType != constants.BuffTypeLost {
+		t.Errorf("BuffType = %s, expected Lost", addBuffAction.BuffType)
+	}
+	if addBuffAction.Duration != 1 {
+		t.Errorf("Duration = %d, expected 1", addBuffAction.Duration)
 	}
 }
 
 func TestAnyDoorHandlerBehavior(t *testing.T) {
-	// Test AnyDoor teleport to target
+	// Test AnyDoor teleport through Action system
+	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.Position = 10
+	game.AddPlayer(player)
 
-	config := GetItemHandlerConfig(constants.ItemTypeAnyDoor)
-	if config == nil {
-		t.Fatal("AnyDoor should have HandlerConfig")
-	}
-	handler := config.Handler
-	if handler == nil {
-		t.Fatal("AnyDoor should have Handler")
-	}
+	handler := GetItemHandlerConfig(constants.ItemTypeAnyDoor).Handler
 
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
 	ctx.SetString("target_id", "target-player-123")
+	ctx.SetInt("target_position", 50)
+
 	handler(constants.PhaseOnLand, ctx)
 
-	// Should signal teleport_target
-	target, err := ctx.GetString("teleport_target")
-	if err != nil {
-		t.Error("teleport_target should be set")
+	// Should have TeleportAction derived action
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
 	}
-	if target != "target-player-123" {
-		t.Errorf("teleport_target = %s, expected target-player-123", target)
+
+	teleportAction, ok := derived[0].(*engineaction.TeleportAction)
+	if !ok {
+		t.Fatal("expected TeleportAction")
+	}
+	if teleportAction.TargetPos != 50 {
+		t.Errorf("TargetPos = %d, expected 50", teleportAction.TargetPos)
 	}
 }
 
@@ -171,14 +173,7 @@ func TestDiceSwapHandlerBehavior(t *testing.T) {
 	// Test DiceSwap signals dice swap target
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 
-	config := GetItemHandlerConfig(constants.ItemTypeDiceSwap)
-	if config == nil {
-		t.Fatal("DiceSwap should have HandlerConfig")
-	}
-	handler := config.Handler
-	if handler == nil {
-		t.Fatal("DiceSwap should have Handler")
-	}
+	handler := GetItemHandlerConfig(constants.ItemTypeDiceSwap).Handler
 
 	ctx := event.NewContext(player)
 	ctx.SetString("target_id", "swap-target-456")
@@ -198,14 +193,7 @@ func TestDiceUpgradeHandlerBehavior(t *testing.T) {
 	// Test DiceUpgrade signals upgrade from current dice
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 
-	config := GetItemHandlerConfig(constants.ItemTypeDiceUpgrade)
-	if config == nil {
-		t.Fatal("DiceUpgrade should have HandlerConfig")
-	}
-	handler := config.Handler
-	if handler == nil {
-		t.Fatal("DiceUpgrade should have Handler")
-	}
+	handler := GetItemHandlerConfig(constants.ItemTypeDiceUpgrade).Handler
 
 	ctx := event.NewContext(player)
 	ctx.SetString("current_dice_type", "silver")
@@ -218,6 +206,15 @@ func TestDiceUpgradeHandlerBehavior(t *testing.T) {
 	}
 	if from != "silver" {
 		t.Errorf("dice_upgrade_from = %s, expected silver", from)
+	}
+
+	// Should signal dice_upgrade
+	upgrade, err := ctx.GetBool("dice_upgrade")
+	if err != nil {
+		t.Error("dice_upgrade should be set")
+	}
+	if !upgrade {
+		t.Error("dice_upgrade should be true")
 	}
 }
 

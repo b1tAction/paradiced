@@ -307,14 +307,10 @@ func createEventModifyHPHandler(amount int) EffectHandler {
 		source := "Event_Effect"
 
 		if amount > 0 {
-			action := engineaction.NewHealAction(ctx.Player, amount, source)
-			ctx.AddDerivedAction(action)
+			ctx.AddDerivedAction(engineaction.NewHealAction(ctx.Player, amount, source))
 		} else {
-			action := engineaction.NewDamageAction(ctx.Player, -amount, source)
-			ctx.AddDerivedAction(action)
+			ctx.AddDerivedAction(engineaction.NewDamageAction(ctx.Player, -amount, source))
 		}
-
-		ctx.SetInt("hp_change", amount)
 	}
 }
 
@@ -326,10 +322,7 @@ func createEventModifyLPHandler(amount int) EffectHandler {
 		}
 
 		source := "Event_Effect"
-		action := engineaction.NewModifyLPAction(ctx.Player, amount, source)
-		ctx.AddDerivedAction(action)
-
-		ctx.SetInt("lp_change", amount)
+		ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, amount, source))
 	}
 }
 
@@ -340,11 +333,7 @@ func createEventGiveBuffHandler(buffType constants.BuffType, duration int) Effec
 			return
 		}
 
-		action := engineaction.NewAddBuffAction(ctx.Player, buffType, duration, "Event_Effect")
-		ctx.AddDerivedAction(action)
-
-		ctx.SetString("give_buff_type", string(buffType))
-		ctx.SetInt("give_buff_duration", duration)
+		ctx.AddDerivedAction(engineaction.NewAddBuffAction(ctx.Player, buffType, duration, "Event_Effect"))
 	}
 }
 

@@ -202,12 +202,7 @@ func createGiveBuffHandler(buffType constants.BuffType, duration int) EffectHand
 			return
 		}
 
-		// Create AddBuffAction and add to derived actions
-		action := engineaction.NewAddBuffAction(ctx.Player, buffType, duration, "Item_Effect")
-		ctx.AddDerivedAction(action)
-
-		ctx.SetString("give_buff_type", string(buffType))
-		ctx.SetInt("give_buff_duration", duration)
+		ctx.AddDerivedAction(engineaction.NewAddBuffAction(ctx.Player, buffType, duration, "Item_Effect"))
 	}
 }
 
@@ -225,11 +220,7 @@ func handleTeleport(phase constants.Phase, ctx *event.Context) {
 	// For now, use stored target position
 	targetPos := ctx.GetIntOrDefault("target_position", 0)
 
-	// Create TeleportAction and add to derived actions
-	action := engineaction.NewTeleportAction(ctx.Player, targetPos, "Item_AnyDoor")
-	ctx.AddDerivedAction(action)
-
-	ctx.SetString("teleport_target", targetID)
+	ctx.AddDerivedAction(engineaction.NewTeleportAction(ctx.Player, targetPos, "Item_AnyDoor"))
 }
 
 func handleDiceSwap(phase constants.Phase, ctx *event.Context) {

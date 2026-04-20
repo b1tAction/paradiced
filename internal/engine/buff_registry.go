@@ -310,15 +310,13 @@ func createModifyLPHandler(amount int) EffectHandler {
 			return
 		}
 
-		if actionCtx := getActionCtxFromEventCtx(ctx); actionCtx != nil {
-			source := "Buff_Effect"
-			ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, amount, source))
-			ctx.SetInt("lp_change", amount)
+		// Must use Action system - no direct modification
+		actionCtx := getActionCtxFromEventCtx(ctx)
+		if actionCtx == nil {
 			return
 		}
 
-		ctx.Player.ModifyLP(amount)
-		ctx.SetInt("lp_change", amount)
+		ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, amount, "Buff_Effect"))
 	}
 }
 
@@ -328,16 +326,17 @@ func createModifyHPHandler(amount int) EffectHandler {
 			return
 		}
 
-		if actionCtx := getActionCtxFromEventCtx(ctx); actionCtx != nil {
-			source := "Buff_Effect"
-			if amount > 0 {
-				ctx.AddDerivedAction(engineaction.NewHealAction(ctx.Player, amount, source))
-			} else {
-				ctx.AddDerivedAction(engineaction.NewDamageAction(ctx.Player, -amount, source))
-			}
+		// Must use Action system - no direct modification
+		actionCtx := getActionCtxFromEventCtx(ctx)
+		if actionCtx == nil {
+			return
 		}
 
-		ctx.SetInt("hp_change", amount)
+		if amount > 0 {
+			ctx.AddDerivedAction(engineaction.NewHealAction(ctx.Player, amount, "Buff_Effect"))
+		} else {
+			ctx.AddDerivedAction(engineaction.NewDamageAction(ctx.Player, -amount, "Buff_Effect"))
+		}
 	}
 }
 
@@ -366,14 +365,14 @@ func handleZhuQueFire(phase constants.Phase, ctx *event.Context) {
 
 	newCount := ctx.Player.IncrementFireCounter()
 	if newCount >= 4 {
-		// Use Action system for LP modification
-		if actionCtx := getActionCtxFromEventCtx(ctx); actionCtx != nil {
-			ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, "Buff_Fire"))
-		} else {
-			ctx.Player.ModifyLP(1)
+		// Must use Action system - no direct modification
+		actionCtx := getActionCtxFromEventCtx(ctx)
+		if actionCtx == nil {
+			return
 		}
+
+		ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, "Buff_Fire"))
 		ctx.Player.SetFireCounter(0)
-		ctx.SetInt("lp_change", 1)
 	}
 }
 

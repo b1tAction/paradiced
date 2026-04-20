@@ -85,51 +85,47 @@ func TestEventDefinitionsFields(t *testing.T) {
 // ========== Event Handler Tests ==========
 
 func TestHerbEventHandler(t *testing.T) {
-	// Test Herb HP+1
+	// Test Herb HP+1 through Action system
+	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.HP = 5
+	game.AddPlayer(player)
+	game.Log.StartTurn(1, 0, player.ID.UUID())
 
-	config := GetEventHandlerConfig(constants.EventTypeHerb)
-	if config == nil {
-		t.Fatal("Herb should have HandlerConfig")
-	}
-	handler := config.Handler
-	if handler == nil {
-		t.Fatal("Herb should have Handler")
-	}
+	handler := GetEventHandlerConfig(constants.EventTypeHerb).Handler
 
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
 	handler(constants.PhaseOnLand, ctx)
 
-	// Should signal hp_change=1
-	hpChange, err := ctx.GetInt("hp_change")
-	if err != nil {
-		t.Error("hp_change should be set")
+	// Should have HealAction derived action
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
 	}
-	if hpChange != 1 {
-		t.Errorf("hp_change = %d, expected 1", hpChange)
+
+	healAction, ok := derived[0].(*engineaction.HealAction)
+	if !ok {
+		t.Fatal("expected HealAction")
+	}
+	if healAction.Amount != 1 {
+		t.Errorf("HealAction.Amount = %d, expected 1", healAction.Amount)
 	}
 }
 
 func TestMilkTeaEventHandler(t *testing.T) {
 	// Test MilkTea LP+1 through Action system
 	game := NewGame(id.NewGameID(), 0)
-	mapEngine := gamemap.NewMapEngine(20)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.LP = 5
 	game.AddPlayer(player)
 	game.Log.StartTurn(1, 0, player.ID.UUID())
 
-	config := GetEventHandlerConfig(constants.EventTypeMilkTea)
-	if config == nil {
-		t.Fatal("MilkTea should have HandlerConfig")
-	}
-	handler := config.Handler
-	if handler == nil {
-		t.Fatal("MilkTea should have Handler")
-	}
+	handler := GetEventHandlerConfig(constants.EventTypeMilkTea).Handler
 
-	// Create ActionContext for Action execution
-	actionCtx := engineaction.NewActionContext(game, game.Bus, mapEngine, game.Draw)
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
 	ctx.Set("action_context", actionCtx)
 
@@ -143,7 +139,6 @@ func TestMilkTeaEventHandler(t *testing.T) {
 	}
 	actionCtx.ProcessQueue()
 
-	// LP should be 6 after Action execution
 	if player.LP != 6 {
 		t.Errorf("LP = %d, expected 6 (LP+1)", player.LP)
 	}
@@ -153,14 +148,7 @@ func TestRelicEventHandler(t *testing.T) {
 	// Test Relic draw item
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 
-	config := GetEventHandlerConfig(constants.EventTypeRelic)
-	if config == nil {
-		t.Fatal("Relic should have HandlerConfig")
-	}
-	handler := config.Handler
-	if handler == nil {
-		t.Fatal("Relic should have Handler")
-	}
+	handler := GetEventHandlerConfig(constants.EventTypeRelic).Handler
 
 	ctx := event.NewContext(player)
 	handler(constants.PhaseOnLand, ctx)
@@ -176,36 +164,34 @@ func TestRelicEventHandler(t *testing.T) {
 }
 
 func TestDivineBlessEventHandler(t *testing.T) {
-	// Test DivineBless gives Divine buff
+	// Test DivineBless gives Divine buff through Action system
+	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
 
-	config := GetEventHandlerConfig(constants.EventTypeDivineBless)
-	if config == nil {
-		t.Fatal("DivineBless should have HandlerConfig")
-	}
-	handler := config.Handler
-	if handler == nil {
-		t.Fatal("DivineBless should have Handler")
-	}
+	handler := GetEventHandlerConfig(constants.EventTypeDivineBless).Handler
 
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
 	handler(constants.PhaseOnLand, ctx)
 
-	// Should signal give_buff_type=Divine
-	buffType, err := ctx.GetString("give_buff_type")
-	if err != nil {
-		t.Error("give_buff_type should be set")
-	}
-	if buffType != string(constants.BuffTypeDivine) {
-		t.Errorf("give_buff_type = %s, expected %s", buffType, constants.BuffTypeDivine)
+	// Should have AddBuffAction derived action
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
 	}
 
-	duration, err := ctx.GetInt("give_buff_duration")
-	if err != nil {
-		t.Error("give_buff_duration should be set")
+	addBuffAction, ok := derived[0].(*engineaction.AddBuffAction)
+	if !ok {
+		t.Fatal("expected AddBuffAction")
 	}
-	if duration != 3 {
-		t.Errorf("give_buff_duration = %d, expected 3", duration)
+	if addBuffAction.BuffType != constants.BuffTypeDivine {
+		t.Errorf("BuffType = %s, expected Divine", addBuffAction.BuffType)
+	}
+	if addBuffAction.Duration != 3 {
+		t.Errorf("Duration = %d, expected 3", addBuffAction.Duration)
 	}
 }
 
@@ -213,14 +199,7 @@ func TestExchangeEventHandler(t *testing.T) {
 	// Test Exchange swap position
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 
-	config := GetEventHandlerConfig(constants.EventTypeExchange)
-	if config == nil {
-		t.Fatal("Exchange should have HandlerConfig")
-	}
-	handler := config.Handler
-	if handler == nil {
-		t.Fatal("Exchange should have Handler")
-	}
+	handler := GetEventHandlerConfig(constants.EventTypeExchange).Handler
 
 	ctx := event.NewContext(player)
 	handler(constants.PhaseOnLand, ctx)
@@ -236,22 +215,31 @@ func TestExchangeEventHandler(t *testing.T) {
 }
 
 func TestHiddenBuffEventHandler(t *testing.T) {
-	// Test HiddenBuff gives Hidden buff
+	// Test HiddenBuff gives Hidden buff through Action system
+	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
 
-	config := GetEventHandlerConfig(constants.EventTypeHiddenBuff)
-	handler := config.Handler
+	handler := GetEventHandlerConfig(constants.EventTypeHiddenBuff).Handler
 
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
 	handler(constants.PhaseOnLand, ctx)
 
-	// Should signal give_buff_type=Hidden
-	buffType, err := ctx.GetString("give_buff_type")
-	if err != nil {
-		t.Error("give_buff_type should be set")
+	// Should have AddBuffAction derived action
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
 	}
-	if buffType != string(constants.BuffTypeHidden) {
-		t.Errorf("give_buff_type = %s, expected %s", buffType, constants.BuffTypeHidden)
+
+	addBuffAction, ok := derived[0].(*engineaction.AddBuffAction)
+	if !ok {
+		t.Fatal("expected AddBuffAction")
+	}
+	if addBuffAction.BuffType != constants.BuffTypeHidden {
+		t.Errorf("BuffType = %s, expected Hidden", addBuffAction.BuffType)
 	}
 }
 
@@ -259,8 +247,7 @@ func TestTasteTestEventHandler(t *testing.T) {
 	// Test TasteTest random buff
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 
-	config := GetEventHandlerConfig(constants.EventTypeTasteTest)
-	handler := config.Handler
+	handler := GetEventHandlerConfig(constants.EventTypeTasteTest).Handler
 
 	ctx := event.NewContext(player)
 	handler(constants.PhaseOnLand, ctx)
@@ -276,59 +263,76 @@ func TestTasteTestEventHandler(t *testing.T) {
 }
 
 func TestMosquitoEventHandler(t *testing.T) {
-	// Test Mosquito HP-1
+	// Test Mosquito HP-1 through Action system
+	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.HP = 5
+	game.AddPlayer(player)
 
-	config := GetEventHandlerConfig(constants.EventTypeMosquito)
-	handler := config.Handler
+	handler := GetEventHandlerConfig(constants.EventTypeMosquito).Handler
 
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
 	handler(constants.PhaseOnLand, ctx)
 
-	// Should signal hp_change=-1
-	hpChange, err := ctx.GetInt("hp_change")
-	if err != nil {
-		t.Error("hp_change should be set")
+	// Should have DamageAction derived action
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
 	}
-	if hpChange != -1 {
-		t.Errorf("hp_change = %d, expected -1", hpChange)
+
+	damageAction, ok := derived[0].(*engineaction.DamageAction)
+	if !ok {
+		t.Fatal("expected DamageAction")
+	}
+	if damageAction.Amount != 1 {
+		t.Errorf("DamageAction.Amount = %d, expected 1", damageAction.Amount)
 	}
 }
 
 func TestGhostHitEventHandler(t *testing.T) {
-	// Test GhostHit HP-1
+	// Test GhostHit HP-1 through Action system
+	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.HP = 5
+	game.AddPlayer(player)
 
-	config := GetEventHandlerConfig(constants.EventTypeGhostHit)
-	handler := config.Handler
+	handler := GetEventHandlerConfig(constants.EventTypeGhostHit).Handler
 
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
 	handler(constants.PhaseOnLand, ctx)
 
-	// Should signal hp_change=-1
-	hpChange, err := ctx.GetInt("hp_change")
-	if err != nil {
-		t.Error("hp_change should be set")
+	// Should have DamageAction derived action
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
 	}
-	if hpChange != -1 {
-		t.Errorf("hp_change = %d, expected -1", hpChange)
+
+	damageAction, ok := derived[0].(*engineaction.DamageAction)
+	if !ok {
+		t.Fatal("expected DamageAction")
+	}
+	if damageAction.Amount != 1 {
+		t.Errorf("DamageAction.Amount = %d, expected 1", damageAction.Amount)
 	}
 }
 
 func TestDogPoopEventHandler(t *testing.T) {
 	// Test DogPoop LP-1 through Action system
 	game := NewGame(id.NewGameID(), 0)
-	mapEngine := gamemap.NewMapEngine(20)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.LP = 5
 	game.AddPlayer(player)
 	game.Log.StartTurn(1, 0, player.ID.UUID())
 
-	config := GetEventHandlerConfig(constants.EventTypeDogPoop)
-	handler := config.Handler
+	handler := GetEventHandlerConfig(constants.EventTypeDogPoop).Handler
 
-	// Create ActionContext for Action execution
-	actionCtx := engineaction.NewActionContext(game, game.Bus, mapEngine, game.Draw)
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
 	ctx.Set("action_context", actionCtx)
 
@@ -342,7 +346,6 @@ func TestDogPoopEventHandler(t *testing.T) {
 	}
 	actionCtx.ProcessQueue()
 
-	// LP should be 4 after Action execution
 	if player.LP != 4 {
 		t.Errorf("LP = %d, expected 4 (LP-1)", player.LP)
 	}
@@ -352,8 +355,7 @@ func TestThiefEventHandler(t *testing.T) {
 	// Test Thief lose item
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 
-	config := GetEventHandlerConfig(constants.EventTypeThief)
-	handler := config.Handler
+	handler := GetEventHandlerConfig(constants.EventTypeThief).Handler
 
 	ctx := event.NewContext(player)
 	handler(constants.PhaseOnLand, ctx)
@@ -369,70 +371,97 @@ func TestThiefEventHandler(t *testing.T) {
 }
 
 func TestCurseBuddhaEventHandler(t *testing.T) {
-	// Test CurseBuddha gives Curse buff
+	// Test CurseBuddha gives Curse buff through Action system
+	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
 
-	config := GetEventHandlerConfig(constants.EventTypeCurseBuddha)
-	handler := config.Handler
+	handler := GetEventHandlerConfig(constants.EventTypeCurseBuddha).Handler
 
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
 	handler(constants.PhaseOnLand, ctx)
 
-	// Should signal give_buff_type=Curse
-	buffType, err := ctx.GetString("give_buff_type")
-	if err != nil {
-		t.Error("give_buff_type should be set")
-	}
-	if buffType != string(constants.BuffTypeCurse) {
-		t.Errorf("give_buff_type = %s, expected %s", buffType, constants.BuffTypeCurse)
+	// Should have AddBuffAction derived action
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
 	}
 
-	duration, err := ctx.GetInt("give_buff_duration")
-	if err != nil {
-		t.Error("give_buff_duration should be set")
+	addBuffAction, ok := derived[0].(*engineaction.AddBuffAction)
+	if !ok {
+		t.Fatal("expected AddBuffAction")
 	}
-	if duration != 3 {
-		t.Errorf("give_buff_duration = %d, expected 3", duration)
+	if addBuffAction.BuffType != constants.BuffTypeCurse {
+		t.Errorf("BuffType = %s, expected Curse", addBuffAction.BuffType)
+	}
+	if addBuffAction.Duration != 3 {
+		t.Errorf("Duration = %d, expected 3", addBuffAction.Duration)
 	}
 }
 
 func TestLostWayEventHandler(t *testing.T) {
-	// Test LostWay gives Lost buff
+	// Test LostWay gives Lost buff through Action system
+	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
 
-	config := GetEventHandlerConfig(constants.EventTypeLostWay)
-	handler := config.Handler
+	handler := GetEventHandlerConfig(constants.EventTypeLostWay).Handler
 
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
 	handler(constants.PhaseOnLand, ctx)
 
-	// Should signal give_buff_type=Lost
-	buffType, err := ctx.GetString("give_buff_type")
-	if err != nil {
-		t.Error("give_buff_type should be set")
-	}
-	if buffType != string(constants.BuffTypeLost) {
-		t.Errorf("give_buff_type = %s, expected %s", buffType, constants.BuffTypeLost)
+	// Should have AddBuffAction derived action
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
 	}
 
-	duration, err := ctx.GetInt("give_buff_duration")
-	if err != nil {
-		t.Error("give_buff_duration should be set")
+	addBuffAction, ok := derived[0].(*engineaction.AddBuffAction)
+	if !ok {
+		t.Fatal("expected AddBuffAction")
 	}
-	if duration != 1 {
-		t.Errorf("give_buff_duration = %d, expected 1", duration)
+	if addBuffAction.BuffType != constants.BuffTypeLost {
+		t.Errorf("BuffType = %s, expected Lost", addBuffAction.BuffType)
+	}
+	if addBuffAction.Duration != 1 {
+		t.Errorf("Duration = %d, expected 1", addBuffAction.Duration)
 	}
 }
 
 func TestThunderEventHandler(t *testing.T) {
-	// Test Thunder instant death
+	// Test Thunder instant death through Action system
+	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.HP = 5
+	game.AddPlayer(player)
 
-	config := GetEventHandlerConfig(constants.EventTypeThunder)
-	handler := config.Handler
+	handler := GetEventHandlerConfig(constants.EventTypeThunder).Handler
 
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
 	handler(constants.PhaseOnLand, ctx)
+
+	// Should have DamageAction derived action that sets HP to 0
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
+	}
+
+	damageAction, ok := derived[0].(*engineaction.DamageAction)
+	if !ok {
+		t.Fatal("expected DamageAction")
+	}
+	if damageAction.Amount != 5 {
+		t.Errorf("DamageAction.Amount = %d, expected 5 (current HP)", damageAction.Amount)
+	}
 
 	// Should signal instant_death
 	instantDeath, err := ctx.GetBool("instant_death")
