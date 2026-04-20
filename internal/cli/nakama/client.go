@@ -346,6 +346,21 @@ func (sc *SocketClient) Close() error {
 	return nil
 }
 
+// Rpc calls a server-side RPC function and returns the response payload.
+func (sc *SocketClient) Rpc(ctx context.Context, id string, payload string) (string, error) {
+	sc.logger.Debug("Calling RPC", "id", id, "payload", payload)
+
+	var response string
+	err := sc.conn.Rpc(ctx, id, payload, &response)
+	if err != nil {
+		sc.logger.Error("RPC call failed", "id", id, "error", err)
+		return "", err
+	}
+
+	sc.logger.Debug("RPC response", "id", id, "response", response)
+	return response, nil
+}
+
 // Session represents a Nakama session.
 type Session struct {
 	Token        string
@@ -367,6 +382,7 @@ const (
 	OpGameOver        int64 = 7
 	OpFullSync        int64 = 8
 	OpActionRejected  int64 = 9
+	OpWaitingSync     int64 = 10
 
 	// Client -> Server: 100+
 	OpRollDice             int64 = 100
@@ -374,6 +390,7 @@ const (
 	OpUseSkill             int64 = 102
 	OpUserChoice           int64 = 103
 	OpMiniGameResultSubmit int64 = 104
+	OpStartGame            int64 = 105
 )
 
 // IClient interface for both Nakama and Standalone clients.
@@ -444,6 +461,8 @@ type ISocketClient interface {
 	SetMatchmakerMatchedHandler(handler func(context.Context, *nakama.MatchmakerMatchedMsg))
 	SetMatchID(matchID string)
 	AddMatchmaker(ctx context.Context, query string, minPlayers, maxPlayers int, props map[string]string, numericProps map[string]float64) (*nakama.MatchmakerTicketMsg, error)
+	// Rpc calls a server-side RPC function and returns the response payload
+	Rpc(ctx context.Context, id string, payload string) (string, error)
 }
 
 // StandaloneSocketClient wraps standalone WebSocket connection.
@@ -584,6 +603,11 @@ func (sc *StandaloneSocketClient) SetMatchID(matchID string) {
 // MessageChan returns the message channel.
 func (sc *StandaloneSocketClient) MessageChan() <-chan *SocketMessage {
 	return sc.msgChan
+}
+
+// Rpc is not available in standalone mode.
+func (sc *StandaloneSocketClient) Rpc(ctx context.Context, id string, payload string) (string, error) {
+	return "", fmt.Errorf("RPC not available in standalone mode")
 }
 
 // Close closes the standalone socket client.

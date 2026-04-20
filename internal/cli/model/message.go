@@ -144,9 +144,29 @@ type MiniGameResultSubmit struct {
 
 // ActionRejected represents an action rejection notification (server -> client).
 type ActionRejected struct {
-	OpCode  int64  `json:"op_code"`
-	Reason  string `json:"reason"`
-	Message string `json:"message"`
+	OpCode    int64  `json:"op_code"`
+	ErrorCode int    `json:"error_code"` // Standardized error code for client handling
+	Reason    string `json:"reason"`
+	Message   string `json:"message"`
+}
+
+// WaitingSync represents waiting room status before game starts.
+type WaitingSync struct {
+	MatchID     string          `json:"match_id"`
+	HostUserID  string          `json:"host_user_id"`
+	Players     []WaitingPlayer `json:"players"`
+	PlayerCount int             `json:"player_count"`
+	MinPlayers  int             `json:"min_players"`
+	MaxPlayers  int             `json:"max_players"`
+	CanStart    bool            `json:"can_start"`
+	Message     string          `json:"message"`
+}
+
+// WaitingPlayer represents a player in the waiting room.
+type WaitingPlayer struct {
+	UserID  string `json:"user_id"`
+	Faction string `json:"faction"`
+	IsHost  bool   `json:"is_host"`
 }
 
 // ParseMessage parses a JSON message into the Message struct.
