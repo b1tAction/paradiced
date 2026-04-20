@@ -517,3 +517,128 @@ func TestGetEventTypesByCategory(t *testing.T) {
 		t.Error("Unknown category should return all events")
 	}
 }
+// ========== Edge Case Tests: nil player/context ==========
+
+func TestEventHandlerWithNilContext(t *testing.T) {
+	// All event handlers should gracefully handle nil context
+	eventTypes := GetAllEventTypes()
+	for _, et := range eventTypes {
+		handler := GetEventHandlerConfig(et).Handler
+		if handler == nil {
+			continue
+		}
+		// Should not panic with nil context
+		handler(constants.PhaseOnLand, nil)
+	}
+}
+
+func TestEventHandlerWithNilPlayer(t *testing.T) {
+	// All event handlers should gracefully handle nil player in context
+	eventTypes := GetAllEventTypes()
+	for _, et := range eventTypes {
+		handler := GetEventHandlerConfig(et).Handler
+		if handler == nil {
+			continue
+		}
+		ctx := event.NewContext(nil) // nil player
+		handler(constants.PhaseOnLand, ctx)
+		// Should not produce derived actions
+		if len(ctx.GetDerivedActions()) > 0 {
+			t.Errorf("EventType %s should not produce actions with nil player", et)
+		}
+	}
+}
+
+func TestEventModifyHPHandlerNilActionContext(t *testing.T) {
+	// createEventModifyHPHandler requires ActionContext
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+	// No action_context set
+
+	handler := GetEventHandlerConfig(constants.EventTypeHerb).Handler
+	handler(constants.PhaseOnLand, ctx)
+
+	// Should not produce derived actions without ActionContext
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Herb handler should not produce actions without ActionContext")
+	}
+}
+
+func TestEventModifyLPHandlerNilActionContext(t *testing.T) {
+	// createEventModifyLPHandler requires ActionContext
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+	// No action_context set
+
+	handler := GetEventHandlerConfig(constants.EventTypeMilkTea).Handler
+	handler(constants.PhaseOnLand, ctx)
+
+	// Should not produce derived actions without ActionContext
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("MilkTea handler should not produce actions without ActionContext")
+	}
+}
+
+func TestEventGiveBuffHandlerNilActionContext(t *testing.T) {
+	// createEventGiveBuffHandler requires ActionContext
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+	// No action_context set
+
+	handler := GetEventHandlerConfig(constants.EventTypeDivineBless).Handler
+	handler(constants.PhaseOnLand, ctx)
+
+	// Should not produce derived actions without ActionContext
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("DivineBless handler should not produce actions without ActionContext")
+	}
+}
+
+func TestThunderHandlerNilPlayer(t *testing.T) {
+	// Thunder handler sets HP to 0, requires player
+	ctx := event.NewContext(nil)
+	handler := GetEventHandlerConfig(constants.EventTypeThunder).Handler
+	handler(constants.PhaseOnLand, ctx)
+
+	// Should not panic
+}
+
+func TestExchangeHandlerNilPlayer(t *testing.T) {
+	// Exchange handler signals position swap, requires player
+	ctx := event.NewContext(nil)
+	handler := GetEventHandlerConfig(constants.EventTypeExchange).Handler
+	handler(constants.PhaseOnLand, ctx)
+
+	// Should not panic
+}
+
+func TestThiefHandlerNilPlayer(t *testing.T) {
+	// Thief handler signals item loss, requires player
+	ctx := event.NewContext(nil)
+	handler := GetEventHandlerConfig(constants.EventTypeThief).Handler
+	handler(constants.PhaseOnLand, ctx)
+
+	// Should not panic
+}
+
+func TestTasteTestHandlerNilPlayer(t *testing.T) {
+	// TasteTest handler signals random buff, requires player
+	ctx := event.NewContext(nil)
+	handler := GetEventHandlerConfig(constants.EventTypeTasteTest).Handler
+	handler(constants.PhaseOnLand, ctx)
+
+	// Should not panic
+}
+
+func TestRelicHandlerNilPlayer(t *testing.T) {
+	// Relic handler signals draw item, requires player
+	ctx := event.NewContext(nil)
+	handler := GetEventHandlerConfig(constants.EventTypeRelic).Handler
+	handler(constants.PhaseOnLand, ctx)
+
+	// Should not panic, and should not set draw_item
+	drawItem, err := ctx.GetBool("draw_item")
+	if err == nil && drawItem {
+		t.Error("Relic handler should not set draw_item with nil player")
+	}
+}

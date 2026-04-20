@@ -459,3 +459,150 @@ func TestLostBuffMutatesMoveAction(t *testing.T) {
 		t.Fatalf("move.Steps = %d, want -4", move.Steps)
 	}
 }
+
+// ========== Edge Case Tests: nil player/context ==========
+
+func TestHandlerWithNilContext(t *testing.T) {
+	// All handlers should gracefully handle nil context
+	buffTypes := GetAllBuffTypes()
+	for _, bt := range buffTypes {
+		handler := GetBuffHandlerConfig(bt).Handler
+		if handler == nil {
+			continue
+		}
+		// Should not panic with nil context
+		handler(constants.PhaseBeforeTurn, nil)
+	}
+}
+
+func TestHandlerWithNilPlayer(t *testing.T) {
+	// All handlers should gracefully handle nil player in context
+	buffTypes := GetAllBuffTypes()
+	for _, bt := range buffTypes {
+		handler := GetBuffHandlerConfig(bt).Handler
+		if handler == nil {
+			continue
+		}
+		ctx := event.NewContext(nil) // nil player
+		handler(constants.PhaseBeforeTurn, ctx)
+		// Should not produce derived actions
+		if len(ctx.GetDerivedActions()) > 0 {
+			t.Errorf("BuffType %s should not produce actions with nil player", bt)
+		}
+	}
+}
+
+func TestModifyLPHandlerNilActionContext(t *testing.T) {
+	// createModifyLPHandler requires ActionContext
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+	// No action_context set
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeCurse).Handler
+	handler(constants.PhaseBeforeTurn, ctx)
+
+	// Should not produce derived actions without ActionContext
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Curse handler should not produce actions without ActionContext")
+	}
+}
+
+func TestModifyHPHandlerNilActionContext(t *testing.T) {
+	// createModifyHPHandler requires ActionContext
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+	// No action_context set
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeRain).Handler
+	handler(constants.PhaseAfterTurn, ctx)
+
+	// Should not produce derived actions without ActionContext
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Rain handler should not produce actions without ActionContext")
+	}
+}
+
+func TestFireHandlerNilPlayer(t *testing.T) {
+	// Fire handler requires player for FireCounter
+	ctx := event.NewContext(nil)
+	handler := GetBuffHandlerConfig(constants.BuffTypeFire).Handler
+	handler(constants.PhaseBeforeTurn, ctx)
+
+	// Should not panic or produce actions
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Fire handler should not produce actions with nil player")
+	}
+}
+
+func TestLostHandlerNilAction(t *testing.T) {
+	// Lost handler requires current_action in context
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+	// No current_action set
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeLost).Handler
+	handler(constants.PhasePreMove, ctx)
+
+	// Should not panic
+}
+
+func TestHiddenHandlerNilAction(t *testing.T) {
+	// Hidden handler requires current_action in context
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+	// No current_action set
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeHidden).Handler
+	handler(constants.PhasePreBuffApplied, ctx)
+
+	// Should not panic
+}
+
+func TestExorcismHandlerNilAction(t *testing.T) {
+	// Exorcism handler requires current_action in context
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+	// No current_action set
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeExorcism).Handler
+	handler(constants.PhasePreEvent, ctx)
+
+	// Should not panic
+}
+
+func TestPoisonHandlerNilPlayer(t *testing.T) {
+	// Poison handler sets flag for bad event
+	ctx := event.NewContext(nil)
+	handler := GetBuffHandlerConfig(constants.BuffTypePoison).Handler
+	handler(constants.PhaseBeforeTurn, ctx)
+
+	// Should not panic
+}
+
+func TestCurseHandlerWrongPhase(t *testing.T) {
+	// Curse handler should only work on PhaseBeforeTurn
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeCurse).Handler
+	handler(constants.PhaseAfterTurn, ctx) // Wrong phase
+
+	// Should not produce derived actions on wrong phase
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Curse handler should not produce actions on wrong phase")
+	}
+}
+
+func TestDivineHandlerWrongPhase(t *testing.T) {
+	// Divine handler should only work on PhaseBeforeTurn
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeDivine).Handler
+	handler(constants.PhaseAfterTurn, ctx) // Wrong phase
+
+	// Should not produce derived actions on wrong phase
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Divine handler should not produce actions on wrong phase")
+	}
+}

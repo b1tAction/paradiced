@@ -202,12 +202,24 @@ func createGiveBuffHandler(buffType constants.BuffType, duration int) EffectHand
 			return
 		}
 
+		// Check ActionContext exists
+		actionCtx := getActionCtxFromEventCtx(ctx)
+		if actionCtx == nil {
+			return
+		}
+
 		ctx.AddDerivedAction(engineaction.NewAddBuffAction(ctx.Player, buffType, duration, "Item_Effect"))
 	}
 }
 
 func handleTeleport(phase constants.Phase, ctx *event.Context) {
 	if ctx == nil || ctx.Player == nil {
+		return
+	}
+
+	// Check ActionContext exists
+	actionCtx := getActionCtxFromEventCtx(ctx)
+	if actionCtx == nil {
 		return
 	}
 
@@ -245,7 +257,11 @@ func handleDiceUpgrade(phase constants.Phase, ctx *event.Context) {
 		return
 	}
 
-	currentDice, _ := ctx.GetString("current_dice_type")
+	currentDice, err := ctx.GetString("current_dice_type")
+	if err != nil || currentDice == "" {
+		return // No current dice type, cannot upgrade
+	}
+
 	ctx.SetString("dice_upgrade_from", currentDice)
 
 	// Set flag for HSM to upgrade dice

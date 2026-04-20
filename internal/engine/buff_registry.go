@@ -342,6 +342,9 @@ func createModifyHPHandler(amount int) EffectHandler {
 
 func createEveryNTurnsHandler(everyN int, innerHandler EffectHandler) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) {
+		if ctx == nil {
+			return
+		}
 		counter, _ := ctx.GetInt("buff_turn_counter")
 		counter++
 		ctx.SetInt("buff_turn_counter", counter)
@@ -404,6 +407,9 @@ func handleHiddenImmune(phase constants.Phase, ctx *event.Context) {
 }
 
 func handlePoisonBadEvent(phase constants.Phase, ctx *event.Context) {
+	if ctx == nil {
+		return
+	}
 	if phase != constants.PhaseBeforeTurn {
 		return
 	}
@@ -411,6 +417,9 @@ func handlePoisonBadEvent(phase constants.Phase, ctx *event.Context) {
 }
 
 func handleExorcismImmunePoison(phase constants.Phase, ctx *event.Context) {
+	if ctx == nil {
+		return
+	}
 	if phase != constants.PhasePreEvent {
 		return
 	}

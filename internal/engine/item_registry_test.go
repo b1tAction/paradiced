@@ -257,3 +257,119 @@ func TestGetItemTypesByCategory(t *testing.T) {
 		t.Error("Unknown category should return all items")
 	}
 }
+
+// ========== Edge Case Tests: nil player/context ==========
+
+func TestItemHandlerWithNilContext(t *testing.T) {
+	// All item handlers should gracefully handle nil context
+	itemTypes := GetAllItemTypes()
+	for _, it := range itemTypes {
+		handler := GetItemHandlerConfig(it).Handler
+		if handler == nil {
+			continue
+		}
+		// Should not panic with nil context
+		handler(constants.PhaseAnyTime, nil)
+	}
+}
+
+func TestItemHandlerWithNilPlayer(t *testing.T) {
+	// All item handlers should gracefully handle nil player in context
+	itemTypes := GetAllItemTypes()
+	for _, it := range itemTypes {
+		handler := GetItemHandlerConfig(it).Handler
+		if handler == nil {
+			continue
+		}
+		ctx := event.NewContext(nil) // nil player
+		handler(constants.PhaseAnyTime, ctx)
+		// Should not produce derived actions
+		if len(ctx.GetDerivedActions()) > 0 {
+			t.Errorf("ItemType %s should not produce actions with nil player", it)
+		}
+	}
+}
+
+func TestGiveBuffHandlerNilActionContext(t *testing.T) {
+	// createGiveBuffHandler requires ActionContext
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+	// No action_context set
+
+	handler := GetItemHandlerConfig(constants.ItemTypeReverseClock).Handler
+	handler(constants.PhaseAnyTime, ctx)
+
+	// Should not produce derived actions without ActionContext
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("ReverseClock handler should not produce actions without ActionContext")
+	}
+}
+
+func TestTeleportHandlerNilActionContext(t *testing.T) {
+	// handleTeleport requires ActionContext
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+	ctx.SetString("target_id", "test-target")
+	ctx.SetInt("target_position", 50)
+	// No action_context set
+
+	handler := GetItemHandlerConfig(constants.ItemTypeAnyDoor).Handler
+	handler(constants.PhaseOnLand, ctx)
+
+	// Should not produce derived actions without ActionContext
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("AnyDoor handler should not produce actions without ActionContext")
+	}
+}
+
+func TestTeleportHandlerNoTargetID(t *testing.T) {
+	// handleTeleport requires target_id
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+	// No target_id set
+
+	handler := GetItemHandlerConfig(constants.ItemTypeAnyDoor).Handler
+	handler(constants.PhaseOnLand, ctx)
+
+	// Should not produce derived actions without target_id
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("AnyDoor handler should not produce actions without target_id")
+	}
+}
+
+func TestDiceSwapHandlerNoTargetID(t *testing.T) {
+	// handleDiceSwap requires target_id
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+	// No target_id set
+
+	handler := GetItemHandlerConfig(constants.ItemTypeDiceSwap).Handler
+	handler(constants.PhaseAnyTime, ctx)
+
+	// Should not set dice_swap_target without target_id
+	_, err := ctx.GetString("dice_swap_target")
+	if err == nil {
+		t.Error("DiceSwap handler should not set dice_swap_target without target_id")
+	}
+}
+
+func TestDiceUpgradeHandlerNoCurrentDice(t *testing.T) {
+	// handleDiceUpgrade requires current_dice_type
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+	// No current_dice_type set
+
+	handler := GetItemHandlerConfig(constants.ItemTypeDiceUpgrade).Handler
+	handler(constants.PhaseBeforeTurn, ctx)
+
+	// Should not set dice_upgrade_from without current_dice_type
+	_, err := ctx.GetString("dice_upgrade_from")
+	if err == nil {
+		t.Error("DiceUpgrade handler should not set dice_upgrade_from without current_dice_type")
+	}
+}

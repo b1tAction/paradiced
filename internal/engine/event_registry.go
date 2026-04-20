@@ -304,6 +304,12 @@ func createEventModifyHPHandler(amount int) EffectHandler {
 			return
 		}
 
+		// Check ActionContext exists
+		actionCtx := getActionCtxFromEventCtx(ctx)
+		if actionCtx == nil {
+			return
+		}
+
 		source := "Event_Effect"
 
 		if amount > 0 {
@@ -321,6 +327,12 @@ func createEventModifyLPHandler(amount int) EffectHandler {
 			return
 		}
 
+		// Check ActionContext exists
+		actionCtx := getActionCtxFromEventCtx(ctx)
+		if actionCtx == nil {
+			return
+		}
+
 		source := "Event_Effect"
 		ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, amount, source))
 	}
@@ -330,6 +342,12 @@ func createEventModifyLPHandler(amount int) EffectHandler {
 func createEventGiveBuffHandler(buffType constants.BuffType, duration int) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) {
 		if ctx == nil || ctx.Player == nil {
+			return
+		}
+
+		// Check ActionContext exists
+		actionCtx := getActionCtxFromEventCtx(ctx)
+		if actionCtx == nil {
 			return
 		}
 
