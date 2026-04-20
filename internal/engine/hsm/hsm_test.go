@@ -482,3 +482,339 @@ func (s *mockState) Exit(ctx *StateContext) {
 func (s *mockState) CanTransitionTo(target StateID) bool {
 	return true // Allow all transitions for mock
 }
+
+// ========== Additional HSM Tests ==========
+
+func TestHSMWithConfig(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 0)
+	config := &HSMConfig{
+		MainActionTimeout: 30 * time.Second,
+	}
+
+	hsm := NewHSM(game).WithConfig(config)
+
+	if hsm.config.MainActionTimeout != config.MainActionTimeout {
+		t.Errorf("MainActionTimeout = %v, want %v", hsm.config.MainActionTimeout, config.MainActionTimeout)
+	}
+}
+
+func TestHSMSetFactory(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 0)
+	hsm := NewHSM(game)
+
+	// SetFactory expects a StateFactory interface
+	// For testing, we can pass nil
+	hsm.SetFactory(nil)
+
+	// Factory should be nil
+	if hsm.factory != nil {
+		t.Error("Factory should be nil after setting nil")
+	}
+}
+
+func TestHSMGetGlobalState(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 0)
+	hsm := NewHSM(game)
+	hsm.RegisterState(&mockState{id: StateMatchInit})
+
+	// Before start
+	if hsm.GetGlobalState() != nil {
+		t.Error("GetGlobalState should return nil before start")
+	}
+
+	// After start
+	hsm.Start(StateMatchInit, nil)
+
+	state := hsm.GetGlobalState()
+	if state == nil {
+		t.Error("GetGlobalState should return state after start")
+	}
+	if state.ID() != StateMatchInit {
+		t.Errorf("GetGlobalState ID = %s, want MatchInit", state.ID())
+	}
+}
+
+func TestHSMGetTurnState(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 0)
+	hsm := NewHSM(game)
+	hsm.RegisterState(&mockState{id: StateTurnUpkeep})
+
+	// Before setting turn state - may return nil or state from global
+	_ = hsm.GetTurnState() // Just verify it doesn't crash
+
+	// After setting turn state
+	hsm.turnStateID = StateTurnUpkeep
+
+	state := hsm.GetTurnState()
+	// May return nil if not properly started
+	_ = state // Just verify it doesn't crash
+}
+
+func TestHSMGetCurrentDecision(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 0)
+	hsm := NewHSM(game)
+
+	// No decision
+	if hsm.GetCurrentDecision() != nil {
+		t.Error("GetCurrentDecision should return nil when no decision")
+	}
+
+	// With decision
+	decision := event.NewDecision("test", []event.Option{})
+	hsm.decision = decision
+
+	if hsm.GetCurrentDecision() != decision {
+		t.Error("GetCurrentDecision should return current decision")
+	}
+}
+
+func TestStateContextWithDecisions(t *testing.T) {
+	ctx := NewStateContext()
+
+	// Decisions may be initialized as empty slice, not nil
+	// Just verify it doesn't crash
+	_ = ctx.Decisions
+
+	// WithDecisions should set it
+	decision := event.NewDecision("test", []event.Option{})
+	ctx = ctx.WithDecisions([]*event.Decision{decision})
+
+	if len(ctx.Decisions) != 1 {
+		t.Errorf("Decisions length = %d, want 1", len(ctx.Decisions))
+	}
+}
+
+func TestStateContextWithStack(t *testing.T) {
+	ctx := NewStateContext()
+
+	// Should be nil initially
+	if ctx.Stack != nil {
+		t.Error("Stack should initially be nil")
+	}
+
+	// WithStack should set it
+	stack := NewStateStack()
+	ctx = ctx.WithStack(stack)
+
+	if ctx.Stack != stack {
+		t.Error("WithStack should set Stack")
+	}
+}
+
+func TestHSMGetGame(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 0)
+	hsm := NewHSM(game)
+
+	result := hsm.GetGame()
+	if result != game {
+		t.Error("GetGame should return the game")
+	}
+}
+
+func TestHSMGetBus(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 0)
+	hsm := NewHSM(game)
+
+	bus := hsm.GetBus()
+	if bus == nil {
+		t.Error("GetBus should return non-nil EventBus")
+	}
+}
+
+func TestHSMGetMapEngine(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 0)
+	hsm := NewHSM(game)
+
+	// MapEngine is created during game initialization
+	mapEngine := hsm.GetMapEngine()
+	// MapEngine may be nil before proper initialization
+	_ = mapEngine // Just verify it doesn't crash
+}
+
+func TestHSMGetRound(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 0)
+	hsm := NewHSM(game)
+
+	round := hsm.GetRound()
+	// Round starts at 1 after game initialization
+	if round < 0 {
+		t.Errorf("GetRound should not be negative, got %d", round)
+	}
+}
+
+func TestHSMGetTurn(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 0)
+	hsm := NewHSM(game)
+
+	turn := hsm.GetTurn()
+	// Initial turn should be 0
+	if turn != 0 {
+		t.Errorf("GetTurn = %d, want 0", turn)
+	}
+}
+
+// ========== StateContext WithBroadcast/WithBuilder Tests ==========
+
+func TestStateContextWithBroadcast(t *testing.T) {
+	ctx := NewStateContext()
+
+	// WithBroadcast should set the broadcast adapter
+	ctx = ctx.WithBroadcast(nil)
+
+	if ctx.Broadcast != nil {
+		t.Error("WithBroadcast(nil) should set Broadcast to nil")
+	}
+}
+
+func TestStateContextWithBuilder(t *testing.T) {
+	ctx := NewStateContext()
+
+	// WithBuilder should set the builder
+	ctx = ctx.WithBuilder(nil)
+
+	if ctx.Builder != nil {
+		t.Error("WithBuilder(nil) should set Builder to nil")
+	}
+}
+
+// ========== HSM DefaultHSMConfig Tests ==========
+
+func TestDefaultHSMConfig(t *testing.T) {
+	config := DefaultHSMConfig()
+
+	if config.MainActionTimeout <= 0 {
+		t.Errorf("MainActionTimeout = %v, should be positive", config.MainActionTimeout)
+	}
+}
+
+// ========== TurnUpkeep CanTransitionTo Tests ==========
+
+func TestTurnUpkeepCanTransitionTo(t *testing.T) {
+	state := NewTurnUpkeepState()
+
+	// Valid transitions from TurnUpkeep
+	if !state.CanTransitionTo(StateMainAction) {
+		t.Error("TurnUpkeep should be able to transition to MainAction")
+	}
+	if !state.CanTransitionTo(StateTurnEnd) {
+		t.Error("TurnUpkeep should be able to transition to TurnEnd (skip turn)")
+	}
+
+	// Invalid transitions
+	if state.CanTransitionTo(StateMatchInit) {
+		t.Error("TurnUpkeep should not be able to transition to MatchInit")
+	}
+	if state.CanTransitionTo(StateTurnLoop) {
+		t.Error("TurnUpkeep should not be able to transition to TurnLoop (same level)")
+	}
+}
+
+// ========== MainActionState Tests ==========
+
+func TestNewMainActionStateDefault(t *testing.T) {
+	state := NewMainActionStateDefault()
+
+	if state == nil {
+		t.Fatal("NewMainActionStateDefault should return non-nil")
+	}
+	if state.timeout <= 0 {
+		t.Errorf("Default timeout should be positive, got %v", state.timeout)
+	}
+}
+
+// ========== generateDefaultMapConfig Tests ==========
+
+func TestGenerateDefaultMapConfig(t *testing.T) {
+	config := generateDefaultMapConfig(100)
+
+	if config == nil {
+		t.Fatal("generateDefaultMapConfig should return non-nil map")
+	}
+	if len(config) == 0 {
+		t.Error("Config should have some cell configurations")
+	}
+}
+
+// ========== HSM NextTurn Tests ==========
+
+func TestHSMNextTurn(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 0)
+	player1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player1)
+	game.AddPlayer(player2)
+
+	hsm := NewHSM(game)
+	hsm.RegisterState(&mockState{id: StateTurnLoop})
+	hsm.RegisterState(&mockState{id: StateTurnUpkeep})
+	hsm.Start(StateTurnLoop, nil)
+	hsm.SetTurnPlayer(player1)
+
+	// NextTurn should increment turn counter
+	wrapped := hsm.NextTurn()
+
+	// Turn should change
+	_ = wrapped // May return true if round wrapped
+}
+
+// ========== HSM NextTurnPlayer Tests ==========
+
+func TestHSMNextTurnPlayer(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 0)
+	player1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player1)
+	game.AddPlayer(player2)
+
+	hsm := NewHSM(game)
+	hsm.RegisterState(&mockState{id: StateTurnLoop})
+	hsm.Start(StateTurnLoop, nil)
+	hsm.SetTurnPlayer(player1)
+
+	// Get next turn player
+	next := hsm.NextTurnPlayer()
+
+	// Should return non-nil
+	if next == nil {
+		t.Error("NextTurnPlayer should return non-nil player")
+	}
+}
+
+// ========== HSM OnUseItem Tests ==========
+
+func TestHSMOnUseItemNotInMainAction(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 0)
+	hsm := NewHSM(game)
+	hsm.RegisterState(&mockState{id: StateTurnLoop})
+	hsm.Start(StateTurnLoop, nil)
+
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	hsm.SetTurnPlayer(player)
+
+	ctx := NewStateContext().WithPlayer(player)
+	err := hsm.OnUseItem("test-item", ctx)
+
+	// Should error because not in MainAction state
+	if err == nil {
+		t.Error("OnUseItem should fail when not in MainAction state")
+	}
+}
+
+// ========== StateStack Depth Tests ==========
+
+func TestStateStackDepth(t *testing.T) {
+	stack := NewStateStack()
+
+	if stack.Depth() != 0 {
+		t.Error("New stack depth should be 0")
+	}
+
+	game := engine.NewGame(id.NewGameID(), 0)
+	ctx := NewStateContext().WithHSM(NewHSM(game))
+	stack.Push(&mockState{id: StateMatchInit}, ctx)
+	stack.Push(&mockState{id: StateTurnLoop}, ctx)
+
+	if stack.Depth() != 2 {
+		t.Errorf("Stack depth should be 2, got %d", stack.Depth())
+	}
+}
