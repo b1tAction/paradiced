@@ -61,18 +61,35 @@ func (h *NakamaMatchHandler) HandlePresenceJoin(userID string, metadata *util.Me
 	faction := parseFactionFromMetadata(metadata)
 	h.logDebug("HandlePresenceJoin: faction determined", "user_id", userID, "faction", faction)
 
-	// Add player to match (faction set via PlayerConfig)
-	h.addPlayer(userID, faction)
+	// Set hostUserID for first player joining
+	if len(h.playerList) == 0 {
+		h.hostUserID = userID
+		h.logInfo("HandlePresenceJoin: host set", "user_id", userID)
+	}
 
-	// Start the game only when match reaches max players and hasn't been initialized yet.
-	// This avoids starting an empty/incomplete game before all expected players join.
-	if len(h.playerList) >= h.maxPlayers && h.hsm == nil {
-		h.logInfo("HandlePresenceJoin: match full, initializing game", "user_id", userID, "total_players", len(h.playerList))
-		// Initialize game (factions already set, buff initialization happens in MatchInitState.Enter())
+	// Add player to match (faction set via PlayerConfig)
+	player := h.addPlayer(userID, faction)
+
+	// Initialize game when first player joins (enter WaitingForHost state)
+	// This allows manual start instead of auto-start at max players
+	if len(h.playerList) == 1 && h.hsm == nil {
+		h.logInfo("HandlePresenceJoin: first player joined, initializing game", "user_id", userID)
 		if err := h.MatchInit(); err != nil {
 			h.logError("HandlePresenceJoin: failed to initialize game", "error", err)
 			return err
 		}
+	} else if h.hsm != nil {
+		// Game already initialized - add late-joining player to game
+		game := h.hsm.GetGame()
+		if game != nil {
+			h.logInfo("HandlePresenceJoin: adding late-joining player to game", "user_id", userID)
+			game.AddPlayer(player)
+		}
+	}
+
+	// Broadcast WaitingSync to host when in WaitingForHost state
+	if h.hsm != nil && h.hsm.GetGlobalStateID() == hsm.StateWaitingForHost {
+		h.broadcastWaitingSyncToAll()
 	} else if h.hsm != nil && h.hsm.IsRunning() {
 		// Game is already running, send state sync to new player
 		h.logDebug("HandlePresenceJoin: sending state sync to late joiner", "user_id", userID)
@@ -245,4 +262,115 @@ func (h *NakamaMatchHandler) GetConnectedPlayers() []string {
 		}
 	}
 	return result
+}
+
+// broadcastWaitingSyncToHost broadcasts waiting room status to the host.
+func (h *NakamaMatchHandler) broadcastWaitingSyncToHost() {
+	if h.hostUserID == "" {
+		h.logWarn("broadcastWaitingSyncToHost: no host set")
+		return
+	}
+
+	if h.dispatcher == nil {
+		h.logDebug("broadcastWaitingSyncToHost: no dispatcher set")
+		return
+	}
+
+	// Build waiting players list
+	waitingPlayers := make([]pkgnet.WaitingPlayer, len(h.playerList))
+	for i, userID := range h.playerList {
+		player := h.players[userID]
+		if player == nil {
+			continue
+		}
+		waitingPlayers[i] = pkgnet.WaitingPlayer{
+			UserID:  userID,
+			Faction: string(player.Faction),
+			IsHost:  userID == h.hostUserID,
+		}
+	}
+
+	// Build waiting sync message
+	playerCount := len(h.playerList)
+	canStart := playerCount >= 2 // Minimum 2 players to start
+
+	message := fmt.Sprintf("Waiting for host to start (%d/%d players)", playerCount, h.maxPlayers)
+	if canStart {
+		message = fmt.Sprintf("Ready to start (%d players). Type 'start' to begin.", playerCount)
+	}
+
+	// Note: MatchID is not set here because it's the internal game ID, not Nakama's match ID.
+	// Client already knows the correct match ID from the RPC response or JoinMatch parameter.
+	waitingSync := &pkgnet.WaitingSync{
+		MatchID:     "", // Client knows its match ID from RPC/JoinMatch
+		HostUserID:  h.hostUserID,
+		Players:     waitingPlayers,
+		PlayerCount: playerCount,
+		MinPlayers:  2,
+		MaxPlayers:  h.maxPlayers,
+		CanStart:    canStart,
+		Message:     message,
+	}
+
+	// Send to host
+	adapter := NewNakamaBroadcastAdapter(h)
+	if err := adapter.SendWaitingSync(h.hostUserID, waitingSync); err != nil {
+		h.logError("broadcastWaitingSyncToHost: failed to send", "error", err)
+	}
+
+	h.logDebug("broadcastWaitingSyncToHost: sent to host", "host_user_id", h.hostUserID, "player_count", playerCount)
+}
+
+// broadcastWaitingSyncToAll broadcasts waiting room status to all connected players.
+func (h *NakamaMatchHandler) broadcastWaitingSyncToAll() {
+	if h.dispatcher == nil {
+		h.logDebug("broadcastWaitingSyncToAll: no dispatcher set")
+		return
+	}
+
+	// Build waiting players list
+	waitingPlayers := make([]pkgnet.WaitingPlayer, len(h.playerList))
+	for i, userID := range h.playerList {
+		player := h.players[userID]
+		if player == nil {
+			continue
+		}
+		waitingPlayers[i] = pkgnet.WaitingPlayer{
+			UserID:  userID,
+			Faction: string(player.Faction),
+			IsHost:  userID == h.hostUserID,
+		}
+	}
+
+	// Build waiting sync message
+	playerCount := len(h.playerList)
+	canStart := playerCount >= 2 // Minimum 2 players to start
+
+	message := fmt.Sprintf("Waiting for host to start (%d/%d players)", playerCount, h.maxPlayers)
+	if canStart {
+		message = fmt.Sprintf("Ready to start (%d players). Host can type 'start' to begin.", playerCount)
+	}
+
+	waitingSync := &pkgnet.WaitingSync{
+		MatchID:     "",
+		HostUserID:  h.hostUserID,
+		Players:     waitingPlayers,
+		PlayerCount: playerCount,
+		MinPlayers:  2,
+		MaxPlayers:  h.maxPlayers,
+		CanStart:    canStart,
+		Message:     message,
+	}
+
+	// Broadcast to all connected players
+	adapter := NewNakamaBroadcastAdapter(h)
+	for _, userID := range h.playerList {
+		if !h.disconnected[userID] {
+			if err := adapter.SendWaitingSync(userID, waitingSync); err != nil {
+				h.logError("broadcastWaitingSyncToAll: failed to send", "user_id", userID, "error", err)
+			}
+		}
+	}
+
+	h.logDebug("broadcastWaitingSyncToAll: sent to all players", "player_count", playerCount)
 }

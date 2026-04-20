@@ -251,3 +251,17 @@ func (a *NakamaBroadcastAdapter) SendActionRejected(playerID string, rejected *n
 
 	return a.handler.dispatcher.SendMessage(userID, int64(net.OpActionRejected), data)
 }
+
+// SendWaitingSync sends waiting room status to the host.
+func (a *NakamaBroadcastAdapter) SendWaitingSync(userID string, waiting *net.WaitingSync) error {
+	if a.handler.dispatcher == nil {
+		return nil // No dispatcher set
+	}
+
+	data, err := json.Marshal(waiting)
+	if err != nil {
+		return err
+	}
+
+	return a.handler.dispatcher.SendMessage(userID, int64(net.OpWaitingSync), data)
+}

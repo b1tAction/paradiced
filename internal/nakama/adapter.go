@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/b1tAction/paradiced/internal/engine/hsm"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/b1tAction/paradiced/pkg/util"
@@ -126,9 +127,13 @@ func (a *NakamaMatchHandlerAdapter) MatchJoinAttempt(ctx context.Context, logger
 		return state, false, "match is full"
 	}
 
-	// Check if match is already running
+	// Check if match is already running (but allow join during WaitingForHost state)
 	if handler.hsm != nil && handler.hsm.IsRunning() {
-		return state, false, "game already in progress"
+		// Allow join during WaitingForHost state (manual start mode)
+		if handler.hsm.GetGlobalStateID() != hsm.StateWaitingForHost {
+			return state, false, "game already in progress"
+		}
+		// WaitingForHost state - allow more players to join
 	}
 
 	a.joinMetadata[userID] = newJoinMetadata(metadata)
@@ -222,6 +227,20 @@ func (a *NakamaMatchHandlerAdapter) MatchLeave(ctx context.Context, logger runti
 	for _, p := range presences {
 		logger.Debug("Player left: user_id=%s", p.GetUserId())
 		handler.HandlePresenceLeave(p.GetUserId())
+	}
+
+	// Check if all players disconnected - return nil to end match
+	allDisconnected := true
+	for _, id := range handler.playerList {
+		if !handler.disconnected[id] {
+			allDisconnected = false
+			break
+		}
+	}
+
+	if allDisconnected {
+		logger.Info("All players disconnected, ending match: match_id=%s", handler.matchID)
+		return nil // Return nil to terminate match in Nakama
 	}
 
 	return state
