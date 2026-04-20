@@ -13,6 +13,7 @@ type Context struct {
 	GameState      *GameState      `json:"game_state"`      // Game state (optional)
 	Choice         int             `json:"choice"`          // User's selected option index
 	DerivedActions []interface{}   `json:"derived_actions"` // Actions to execute after handler
+	Errors         []error         `json:"errors"`          // Errors collected from handlers
 	*util.Metadata `json:"metadata"` // Type-safe dynamic data container
 }
 
@@ -66,12 +67,15 @@ func (c *Context) WithChoice(choice int) *Context {
 
 // Clone clones the context.
 func (c *Context) Clone() *Context {
+	clonedErrors := make([]error, len(c.Errors))
+	copy(clonedErrors, c.Errors)
 	return &Context{
 		Player:         c.Player,
 		GameEvent:      c.GameEvent,
 		GameState:      c.GameState,
 		Choice:         c.Choice,
 		DerivedActions: c.DerivedActions,
+		Errors:         clonedErrors,
 		Metadata:       c.Metadata.Clone(),
 	}
 }
@@ -91,11 +95,43 @@ func (c *Context) GetDerivedActions() []interface{} {
 	return c.DerivedActions
 }
 
+// AddError adds an error to the error list.
+func (c *Context) AddError(err error) {
+	if err == nil {
+		return
+	}
+	c.Errors = append(c.Errors, err)
+}
+
+// HasError returns true if any errors were recorded.
+func (c *Context) HasError() bool {
+	return len(c.Errors) > 0
+}
+
+// GetErrors returns all recorded errors.
+func (c *Context) GetErrors() []error {
+	return c.Errors
+}
+
+// FirstError returns the first error, or nil if no errors.
+func (c *Context) FirstError() error {
+	if len(c.Errors) == 0 {
+		return nil
+	}
+	return c.Errors[0]
+}
+
+// ClearErrors removes all recorded errors.
+func (c *Context) ClearErrors() {
+	c.Errors = nil
+}
+
 // Clear resets the context to default values.
 func (c *Context) Clear() {
 	c.GameEvent = nil
 	c.GameState = nil
 	c.Choice = 0
 	c.DerivedActions = nil
+	c.Errors = nil
 	c.Metadata.Clear()
 }

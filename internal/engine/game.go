@@ -165,10 +165,11 @@ func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
 		}
 
 		// Create handler closure - executes config.Handler
-		action := func(ctx *event.Context) {
+		action := func(ctx *event.Context) error {
 			if config.Handler != nil {
-				config.Handler(phase, ctx)
+				return config.Handler(phase, ctx)
 			}
+			return nil
 		}
 
 		// Create Decision with Priority from config
@@ -180,7 +181,7 @@ func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
 }
 
 // createBuffDecisionWithAction creates a Buff Decision with Action using handler config.
-func (g *Game) createBuffDecisionWithAction(buff *core.Buff, def *core.BuffDefinition, config *BuffHandlerConfig, action func(ctx *event.Context)) *event.Decision {
+func (g *Game) createBuffDecisionWithAction(buff *core.Buff, def *core.BuffDefinition, config *BuffHandlerConfig, action func(ctx *event.Context) error) *event.Decision {
 	desc := def.Desc
 	if config.NeedConfirm {
 		return event.NewDecision(desc, []event.Option{
@@ -208,10 +209,11 @@ func (g *Game) SubscribeItem(player *core.Player, item *core.Item) {
 	}
 	if config.Phase.NeedsSubscription() {
 		// Create handler closure - executes config.Handler
-		action := func(ctx *event.Context) {
+		action := func(ctx *event.Context) error {
 			if config.Handler != nil {
-				config.Handler(constants.PhaseItemUsed, ctx)
+				return config.Handler(constants.PhaseItemUsed, ctx)
 			}
+			return nil
 		}
 		decision := g.createItemDecisionWithAction(item, def, config, action)
 		// Register with EventBus using item.ID.UUID() as sourceID
@@ -220,7 +222,7 @@ func (g *Game) SubscribeItem(player *core.Player, item *core.Item) {
 }
 
 // createItemDecisionWithAction creates an Item Decision with Action using handler config.
-func (g *Game) createItemDecisionWithAction(item *core.Item, def *core.ItemDefinition, config *ItemHandlerConfig, action func(ctx *event.Context)) *event.Decision {
+func (g *Game) createItemDecisionWithAction(item *core.Item, def *core.ItemDefinition, config *ItemHandlerConfig, action func(ctx *event.Context) error) *event.Decision {
 	desc := def.Desc
 	if config.NeedConfirm {
 		return event.NewDecision(desc, []event.Option{

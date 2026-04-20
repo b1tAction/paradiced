@@ -120,6 +120,8 @@ func (bus *EventBus) GetSubscriptions(phase constants.Phase) []*Subscription {
 }
 
 // Publish publishes a Phase event.
+// Errors from handlers are collected in ctx.Errors.
+// Use ctx.HasError() or ctx.FirstError() to check for errors after Publish.
 func (bus *EventBus) Publish(phase constants.Phase, ownerID string, ctx *Context) []*Decision {
 	bus.mutex.RLock()
 	subs := bus.subscriptions[phase]
@@ -141,6 +143,7 @@ func (bus *EventBus) Publish(phase constants.Phase, ownerID string, ctx *Context
 		if sub.Decision.ShouldAsk() {
 			decisions = append(decisions, sub.Decision)
 		} else {
+			// Execute stores errors in ctx.Errors
 			sub.Decision.Execute(sub.Decision.Default, ctx)
 		}
 	}

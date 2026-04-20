@@ -8,8 +8,9 @@ import (
 )
 
 // EffectHandler defines the handler signature for Buff/Item/Event effects.
+// Returns error to propagate failures up to HSM layer.
 // Defined in engine layer to maintain correct dependency direction.
-type EffectHandler func(phase constants.Phase, ctx *event.Context)
+type EffectHandler func(phase constants.Phase, ctx *event.Context) error
 
 // BuffHandlerConfig contains effect logic and execution configuration.
 type BuffHandlerConfig struct {
@@ -305,31 +306,32 @@ func registerAllBuffs() {
 // ========== Buff Handler Helpers ==========
 
 func createModifyLPHandler(amount int) EffectHandler {
-	return func(phase constants.Phase, ctx *event.Context) {
+	return func(phase constants.Phase, ctx *event.Context) error {
 		if ctx == nil || ctx.Player == nil {
-			return
+			return nil
 		}
 
 		// Must use Action system - no direct modification
 		actionCtx := getActionCtxFromEventCtx(ctx)
 		if actionCtx == nil {
-			return
+			return nil
 		}
 
 		ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, amount, "Buff_Effect"))
+		return nil
 	}
 }
 
 func createModifyHPHandler(amount int) EffectHandler {
-	return func(phase constants.Phase, ctx *event.Context) {
+	return func(phase constants.Phase, ctx *event.Context) error {
 		if ctx == nil || ctx.Player == nil || amount == 0 {
-			return
+			return nil
 		}
 
 		// Must use Action system - no direct modification
 		actionCtx := getActionCtxFromEventCtx(ctx)
 		if actionCtx == nil {
-			return
+			return nil
 		}
 
 		if amount > 0 {
@@ -337,33 +339,37 @@ func createModifyHPHandler(amount int) EffectHandler {
 		} else {
 			ctx.AddDerivedAction(engineaction.NewDamageAction(ctx.Player, -amount, "Buff_Effect"))
 		}
+		return nil
 	}
 }
 
 func createEveryNTurnsHandler(everyN int, innerHandler EffectHandler) EffectHandler {
-	return func(phase constants.Phase, ctx *event.Context) {
+	return func(phase constants.Phase, ctx *event.Context) error {
 		if ctx == nil {
-			return
+			return nil
 		}
 		counter, _ := ctx.GetInt("buff_turn_counter")
 		counter++
 		ctx.SetInt("buff_turn_counter", counter)
 
 		if counter >= everyN {
-			innerHandler(phase, ctx)
+			if err := innerHandler(phase, ctx); err != nil {
+				return err
+			}
 			ctx.SetInt("buff_turn_counter", 0)
 		}
+		return nil
 	}
 }
 
 // ========== Custom Buff Handlers ==========
 
-func handleZhuQueFire(phase constants.Phase, ctx *event.Context) {
+func handleZhuQueFire(phase constants.Phase, ctx *event.Context) error {
 	if phase != constants.PhaseBeforeTurn {
-		return
+		return nil
 	}
 	if ctx == nil || ctx.Player == nil {
-		return
+		return nil
 	}
 
 	newCount := ctx.Player.IncrementFireCounter()
@@ -371,59 +377,70 @@ func handleZhuQueFire(phase constants.Phase, ctx *event.Context) {
 		// Must use Action system - no direct modification
 		actionCtx := getActionCtxFromEventCtx(ctx)
 		if actionCtx == nil {
-			return
+			return nil
 		}
 
 		ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, "Buff_Fire"))
 		ctx.Player.SetFireCounter(0)
 	}
+	return nil
 }
 
-func handleLostReverse(phase constants.Phase, ctx *event.Context) {
+func handleLostReverse(phase constants.Phase, ctx *event.Context) error {
 	if phase != constants.PhasePreMove {
-		return
+		return nil
+	}
+	if ctx == nil {
+		return nil
 	}
 	ctx.SetBool("reverse_movement", true)
 
 	raw, ok := ctx.Get("current_action")
 	if !ok {
-		return
+		return nil
 	}
 
 	moveAction, ok := raw.(*engineaction.MoveAction)
 	if !ok || moveAction == nil {
-		return
+		return nil
 	}
 
 	moveAction.Steps = -moveAction.Steps
+	return nil
 }
 
-func handleHiddenImmune(phase constants.Phase, ctx *event.Context) {
+func handleHiddenImmune(phase constants.Phase, ctx *event.Context) error {
 	if phase != constants.PhasePreBuffApplied {
-		return
+		return nil
+	}
+	if ctx == nil {
+		return nil
 	}
 	ctx.SetBool("action_blocked", true)
 	ctx.SetString("blocked_by", "Buff_Hidden")
+	return nil
 }
 
-func handlePoisonBadEvent(phase constants.Phase, ctx *event.Context) {
+func handlePoisonBadEvent(phase constants.Phase, ctx *event.Context) error {
 	if ctx == nil {
-		return
+		return nil
 	}
 	if phase != constants.PhaseBeforeTurn {
-		return
+		return nil
 	}
 	ctx.SetBool("draw_bad_event", true)
+	return nil
 }
 
-func handleExorcismImmunePoison(phase constants.Phase, ctx *event.Context) {
+func handleExorcismImmunePoison(phase constants.Phase, ctx *event.Context) error {
 	if ctx == nil {
-		return
+		return nil
 	}
 	if phase != constants.PhasePreEvent {
-		return
+		return nil
 	}
 	ctx.SetBool("block_poison_effect", true)
+	return nil
 }
 
 func getActionCtxFromEventCtx(ctx *event.Context) *engineaction.ActionContext {

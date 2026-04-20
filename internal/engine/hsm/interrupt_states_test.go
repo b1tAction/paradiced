@@ -167,7 +167,7 @@ func TestWaitDecisionState_ExecuteOption(t *testing.T) {
 		{
 			ID:     "opt1",
 			Label:  "Option 1",
-			Action: func(ctx *event.Context) { actionExecuted = true },
+			Action: func(ctx *event.Context) error { actionExecuted = true; return nil },
 		},
 	})
 

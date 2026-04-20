@@ -64,8 +64,9 @@ func TestOnUserChoice_ProcessesDerivedActionsFromPendingDecisionContext(t *testi
 		{
 			ID:    "ok",
 			Label: "ok",
-			Action: func(ctx *event.Context) {
+			Action: func(ctx *event.Context) error {
 				ctx.AddDerivedAction(engineaction.NewHealAction(player, 2, "Decision_Test"))
+				return nil
 			},
 		},
 	})

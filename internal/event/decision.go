@@ -8,9 +8,9 @@ import (
 
 // Option represents a decision option.
 type Option struct {
-	ID     string         `json:"id"`
-	Label  string         `json:"label"`
-	Action func(*Context) `json:"-"`
+	ID     string            `json:"id"`
+	Label  string            `json:"label"`
+	Action func(*Context) error `json:"-"`
 }
 
 // Decision represents a user decision request.
@@ -23,7 +23,7 @@ type Decision struct {
 	Default     int                 `json:"default"`
 	NeedConfirm bool                `json:"need_confirm"`
 	Condition   func() bool         `json:"-"`
-	OnChoice    func(int, *Context) `json:"-"`
+	OnChoice    func(int, *Context) error `json:"-"`
 	SourceID    string              `json:"source_id"`
 	SourceType  string              `json:"source_type"`
 }
@@ -68,7 +68,7 @@ func (d *Decision) WithCondition(condition func() bool) *Decision {
 	return d
 }
 
-func (d *Decision) WithOnChoice(onChoice func(int, *Context)) *Decision {
+func (d *Decision) WithOnChoice(onChoice func(int, *Context) error) *Decision {
 	d.OnChoice = onChoice
 	return d
 }
@@ -94,26 +94,39 @@ func (d *Decision) WithNeedConfirm(need bool) *Decision {
 	return d
 }
 
-func (d *Decision) Execute(choice int, ctx *Context) {
+func (d *Decision) Execute(choice int, ctx *Context) error {
+	if ctx == nil {
+		return nil // nil context is handled by handlers
+	}
+
 	if choice < 0 || choice >= len(d.Options) {
 		choice = d.Default
 	}
 
+	var firstErr error
+
 	if d.Options[choice].Action != nil {
-		d.Options[choice].Action(ctx)
+		if err := d.Options[choice].Action(ctx); err != nil {
+			ctx.AddError(err)
+			firstErr = err
+		}
 	}
 
 	if d.OnChoice != nil {
-		d.OnChoice(choice, ctx)
+		if err := d.OnChoice(choice, ctx); err != nil && firstErr == nil {
+			ctx.AddError(err)
+			firstErr = err
+		}
 	}
+
+	return firstErr
 }
 
-func (d *Decision) ExecuteTimeout(ctx *Context) bool {
+func (d *Decision) ExecuteTimeout(ctx *Context) error {
 	if d.Timeout <= 0 {
-		return false
+		return nil
 	}
-	d.Execute(d.Default, ctx)
-	return true
+	return d.Execute(d.Default, ctx)
 }
 
 func (d *Decision) IsTimedOut(startTime time.Time) bool {
@@ -149,7 +162,7 @@ func NewDecisionBuilder(prompt string) *DecisionBuilder {
 	}
 }
 
-func (b *DecisionBuilder) AddOption(id, label string, action func(*Context)) *DecisionBuilder {
+func (b *DecisionBuilder) AddOption(id, label string, action func(*Context) error) *DecisionBuilder {
 	b.decision.Options = append(b.decision.Options, Option{
 		ID:     id,
 		Label:  label,
@@ -174,7 +187,7 @@ func (b *DecisionBuilder) SetCondition(condition func() bool) *DecisionBuilder {
 	return b
 }
 
-func (b *DecisionBuilder) SetOnChoice(onChoice func(int, *Context)) *DecisionBuilder {
+func (b *DecisionBuilder) SetOnChoice(onChoice func(int, *Context) error) *DecisionBuilder {
 	b.decision.OnChoice = onChoice
 	return b
 }

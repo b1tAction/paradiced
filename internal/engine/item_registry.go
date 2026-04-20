@@ -197,35 +197,36 @@ func registerAllItems() {
 // ========== Item Handler Helpers ==========
 
 func createGiveBuffHandler(buffType constants.BuffType, duration int) EffectHandler {
-	return func(phase constants.Phase, ctx *event.Context) {
+	return func(phase constants.Phase, ctx *event.Context) error {
 		if ctx == nil || ctx.Player == nil {
-			return
+			return nil
 		}
 
 		// Check ActionContext exists
 		actionCtx := getActionCtxFromEventCtx(ctx)
 		if actionCtx == nil {
-			return
+			return nil
 		}
 
 		ctx.AddDerivedAction(engineaction.NewAddBuffAction(ctx.Player, buffType, duration, "Item_Effect"))
+		return nil
 	}
 }
 
-func handleTeleport(phase constants.Phase, ctx *event.Context) {
+func handleTeleport(phase constants.Phase, ctx *event.Context) error {
 	if ctx == nil || ctx.Player == nil {
-		return
+		return nil
 	}
 
 	// Check ActionContext exists
 	actionCtx := getActionCtxFromEventCtx(ctx)
 	if actionCtx == nil {
-		return
+		return nil
 	}
 
 	targetID, _ := ctx.GetString("target_id")
 	if targetID == "" {
-		return
+		return nil
 	}
 
 	// Get target player position from game context
@@ -233,16 +234,17 @@ func handleTeleport(phase constants.Phase, ctx *event.Context) {
 	targetPos := ctx.GetIntOrDefault("target_position", 0)
 
 	ctx.AddDerivedAction(engineaction.NewTeleportAction(ctx.Player, targetPos, "Item_AnyDoor"))
+	return nil
 }
 
-func handleDiceSwap(phase constants.Phase, ctx *event.Context) {
+func handleDiceSwap(phase constants.Phase, ctx *event.Context) error {
 	if ctx == nil || ctx.Player == nil {
-		return
+		return nil
 	}
 
 	targetID, _ := ctx.GetString("target_id")
 	if targetID == "" {
-		return
+		return nil
 	}
 
 	// Set flag for HSM to handle dice swap
@@ -250,16 +252,17 @@ func handleDiceSwap(phase constants.Phase, ctx *event.Context) {
 
 	// Note: Actual dice swap requires game state access to get other player's dice
 	// This would be implemented in HSM or a dedicated DiceManager
+	return nil
 }
 
-func handleDiceUpgrade(phase constants.Phase, ctx *event.Context) {
+func handleDiceUpgrade(phase constants.Phase, ctx *event.Context) error {
 	if ctx == nil || ctx.Player == nil {
-		return
+		return nil
 	}
 
 	currentDice, err := ctx.GetString("current_dice_type")
 	if err != nil || currentDice == "" {
-		return // No current dice type, cannot upgrade
+		return nil // No current dice type, cannot upgrade
 	}
 
 	ctx.SetString("dice_upgrade_from", currentDice)
@@ -269,4 +272,5 @@ func handleDiceUpgrade(phase constants.Phase, ctx *event.Context) {
 
 	// Note: Actual dice upgrade requires DiceManager access
 	// This would be implemented in HSM or a dedicated DiceManager
+	return nil
 }

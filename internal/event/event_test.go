@@ -148,10 +148,10 @@ func TestDecisionExecute(t *testing.T) {
 	choice := -1
 
 	d := NewDecision("test", []Option{
-		{ID: "yes", Label: "是", Action: func(ctx *Context) { executed = true }},
+		{ID: "yes", Label: "是", Action: func(ctx *Context) error { executed = true; return nil }},
 		{ID: "no", Label: "否"},
 	})
-	d.WithOnChoice(func(c int, ctx *Context) { choice = c })
+	d.WithOnChoice(func(c int, ctx *Context) error { choice = c; return nil })
 
 	ctx := NewContext(nil)
 	d.Execute(0, ctx)
@@ -169,7 +169,7 @@ func TestDecisionExecuteDefault(t *testing.T) {
 
 	d := NewDecision("test", []Option{
 		{ID: "a", Label: "A"},
-		{ID: "b", Label: "B", Action: func(ctx *Context) { executed = true }},
+		{ID: "b", Label: "B", Action: func(ctx *Context) error { executed = true; return nil }},
 	})
 	d.WithTimeout(10*time.Second, 1) // Default option 1
 
@@ -203,8 +203,8 @@ func TestDecisionClone(t *testing.T) {
 
 func TestDecisionBuilder(t *testing.T) {
 	d := NewDecisionBuilder("是否使用道具？").
-		AddOption("use", "使用", func(ctx *Context) {}).
-		AddOption("skip", "跳过", func(ctx *Context) {}).
+		AddOption("use", "使用", func(ctx *Context) error { return nil }).
+		AddOption("skip", "跳过", func(ctx *Context) error { return nil }).
 		SetPriority(100).
 		SetTimeout(30*time.Second, 1).
 		SetSource("item-001", "item").

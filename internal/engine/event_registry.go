@@ -299,15 +299,15 @@ func registerAllEvents() {
 
 // createEventModifyHPHandler creates a handler that modifies HP through Action system.
 func createEventModifyHPHandler(amount int) EffectHandler {
-	return func(phase constants.Phase, ctx *event.Context) {
+	return func(phase constants.Phase, ctx *event.Context) error {
 		if ctx == nil || ctx.Player == nil || amount == 0 {
-			return
+			return nil
 		}
 
 		// Check ActionContext exists
 		actionCtx := getActionCtxFromEventCtx(ctx)
 		if actionCtx == nil {
-			return
+			return nil
 		}
 
 		source := "Event_Effect"
@@ -317,56 +317,60 @@ func createEventModifyHPHandler(amount int) EffectHandler {
 		} else {
 			ctx.AddDerivedAction(engineaction.NewDamageAction(ctx.Player, -amount, source))
 		}
+		return nil
 	}
 }
 
 // createEventModifyLPHandler creates a handler that modifies LP through Action system.
 func createEventModifyLPHandler(amount int) EffectHandler {
-	return func(phase constants.Phase, ctx *event.Context) {
+	return func(phase constants.Phase, ctx *event.Context) error {
 		if ctx == nil || ctx.Player == nil {
-			return
+			return nil
 		}
 
 		// Check ActionContext exists
 		actionCtx := getActionCtxFromEventCtx(ctx)
 		if actionCtx == nil {
-			return
+			return nil
 		}
 
 		source := "Event_Effect"
 		ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, amount, source))
+		return nil
 	}
 }
 
 // createEventGiveBuffHandler creates a handler that gives a Buff through Action system.
 func createEventGiveBuffHandler(buffType constants.BuffType, duration int) EffectHandler {
-	return func(phase constants.Phase, ctx *event.Context) {
+	return func(phase constants.Phase, ctx *event.Context) error {
 		if ctx == nil || ctx.Player == nil {
-			return
+			return nil
 		}
 
 		// Check ActionContext exists
 		actionCtx := getActionCtxFromEventCtx(ctx)
 		if actionCtx == nil {
-			return
+			return nil
 		}
 
 		ctx.AddDerivedAction(engineaction.NewAddBuffAction(ctx.Player, buffType, duration, "Event_Effect"))
+		return nil
 	}
 }
 
-func handleDrawItem(phase constants.Phase, ctx *event.Context) {
+func handleDrawItem(phase constants.Phase, ctx *event.Context) error {
 	if ctx == nil || ctx.Player == nil {
-		return
+		return nil
 	}
 
 	// Set flag for HSM to draw item
 	ctx.SetBool("draw_item", true)
+	return nil
 }
 
-func handleSwapPosition(phase constants.Phase, ctx *event.Context) {
+func handleSwapPosition(phase constants.Phase, ctx *event.Context) error {
 	if ctx == nil || ctx.Player == nil {
-		return
+		return nil
 	}
 
 	// Set flag for HSM to handle position swap
@@ -374,11 +378,12 @@ func handleSwapPosition(phase constants.Phase, ctx *event.Context) {
 
 	// Note: Actual position swap requires finding another player
 	// This would be implemented in HSM or handled by a dedicated action
+	return nil
 }
 
-func handleRandomBuff(phase constants.Phase, ctx *event.Context) {
+func handleRandomBuff(phase constants.Phase, ctx *event.Context) error {
 	if ctx == nil || ctx.Player == nil {
-		return
+		return nil
 	}
 
 	// Set flag for HSM to give random buff
@@ -386,11 +391,12 @@ func handleRandomBuff(phase constants.Phase, ctx *event.Context) {
 
 	// Note: Actual random buff selection would use RNG engine
 	// This would be implemented in HSM or handled by a dedicated action
+	return nil
 }
 
-func handleLoseItem(phase constants.Phase, ctx *event.Context) {
+func handleLoseItem(phase constants.Phase, ctx *event.Context) error {
 	if ctx == nil || ctx.Player == nil {
-		return
+		return nil
 	}
 
 	// Set flag for HSM to remove random item
@@ -398,11 +404,12 @@ func handleLoseItem(phase constants.Phase, ctx *event.Context) {
 
 	// Note: Actual item removal would select random item from inventory
 	// This would be implemented in HSM or handled by a dedicated action
+	return nil
 }
 
-func handleThunderDeath(phase constants.Phase, ctx *event.Context) {
+func handleThunderDeath(phase constants.Phase, ctx *event.Context) error {
 	if ctx == nil || ctx.Player == nil {
-		return
+		return nil
 	}
 
 	source := "Event_Thunder"
@@ -416,4 +423,5 @@ func handleThunderDeath(phase constants.Phase, ctx *event.Context) {
 	}
 
 	ctx.SetBool("instant_death", true)
+	return nil
 }
