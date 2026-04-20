@@ -4,7 +4,9 @@ import (
 	"testing"
 
 	"github.com/b1tAction/paradiced/internal/core"
+	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/internal/event"
+	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
 )
@@ -109,9 +111,13 @@ func TestHerbEventHandler(t *testing.T) {
 }
 
 func TestMilkTeaEventHandler(t *testing.T) {
-	// Test MilkTea LP+1
+	// Test MilkTea LP+1 through Action system
+	game := NewGame(id.NewGameID(), 0)
+	mapEngine := gamemap.NewMapEngine(20)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.LP = 5
+	game.AddPlayer(player)
+	game.Log.StartTurn(1, 0, player.ID.UUID())
 
 	config := GetEventHandlerConfig(constants.EventTypeMilkTea)
 	if config == nil {
@@ -122,10 +128,22 @@ func TestMilkTeaEventHandler(t *testing.T) {
 		t.Fatal("MilkTea should have Handler")
 	}
 
+	// Create ActionContext for Action execution
+	actionCtx := engineaction.NewActionContext(game, game.Bus, mapEngine, game.Draw)
 	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
 	handler(constants.PhaseOnLand, ctx)
 
-	// LP should be 6 after handler execution
+	// Execute derived actions
+	for _, derived := range ctx.GetDerivedActions() {
+		if execAction, ok := derived.(engineaction.Action); ok {
+			actionCtx.PushDerivedAction(execAction)
+		}
+	}
+	actionCtx.ProcessQueue()
+
+	// LP should be 6 after Action execution
 	if player.LP != 6 {
 		t.Errorf("LP = %d, expected 6 (LP+1)", player.LP)
 	}
@@ -298,17 +316,33 @@ func TestGhostHitEventHandler(t *testing.T) {
 }
 
 func TestDogPoopEventHandler(t *testing.T) {
-	// Test DogPoop LP-1
+	// Test DogPoop LP-1 through Action system
+	game := NewGame(id.NewGameID(), 0)
+	mapEngine := gamemap.NewMapEngine(20)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.LP = 5
+	game.AddPlayer(player)
+	game.Log.StartTurn(1, 0, player.ID.UUID())
 
 	config := GetEventHandlerConfig(constants.EventTypeDogPoop)
 	handler := config.Handler
 
+	// Create ActionContext for Action execution
+	actionCtx := engineaction.NewActionContext(game, game.Bus, mapEngine, game.Draw)
 	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
 	handler(constants.PhaseOnLand, ctx)
 
-	// LP should be 4 after handler execution
+	// Execute derived actions
+	for _, derived := range ctx.GetDerivedActions() {
+		if execAction, ok := derived.(engineaction.Action); ok {
+			actionCtx.PushDerivedAction(execAction)
+		}
+	}
+	actionCtx.ProcessQueue()
+
+	// LP should be 4 after Action execution
 	if player.LP != 4 {
 		t.Errorf("LP = %d, expected 4 (LP-1)", player.LP)
 	}

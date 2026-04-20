@@ -115,7 +115,8 @@ func TestPhaseIsValid(t *testing.T) {
 	validPhases := []Phase{
 		PhaseBeforeTurn, PhaseOnLand, PhaseAfterTurn,
 		PhasePreDamage, PhasePreEvent, PhasePreMove, PhasePreRespawn,
-		PhaseOnBuffApplied, PhaseOnBuffRemoved,
+		PhasePreBuffApplied, PhasePostBuffApplied,
+		PhasePreBuffRemoved, PhasePostBuffRemoved,
 		PhaseAnyTime, PhaseItemUsed,
 	}
 	for _, p := range validPhases {
@@ -142,7 +143,8 @@ func TestPhaseNeedsSubscription(t *testing.T) {
 	needsSubscription := []Phase{
 		PhaseBeforeTurn, PhaseOnLand, PhaseAfterTurn,
 		PhasePreDamage, PhasePreEvent, PhasePreMove, PhasePreRespawn,
-		PhaseOnBuffApplied, PhaseOnBuffRemoved, PhaseItemUsed,
+		PhasePreBuffApplied, PhasePostBuffApplied,
+		PhasePreBuffRemoved, PhasePostBuffRemoved, PhaseItemUsed,
 	}
 	for _, p := range needsSubscription {
 		if !p.NeedsSubscription() {
@@ -161,7 +163,8 @@ func TestPhaseIsHSMPublished(t *testing.T) {
 
 	nonHSMPublished := []Phase{
 		PhasePreDamage, PhasePreEvent, PhasePreMove, PhasePreRespawn,
-		PhaseOnBuffApplied, PhaseOnBuffRemoved, PhaseAnyTime, PhaseItemUsed,
+		PhasePreBuffApplied, PhasePostBuffApplied,
+		PhasePreBuffRemoved, PhasePostBuffRemoved, PhaseAnyTime, PhaseItemUsed,
 	}
 	for _, p := range nonHSMPublished {
 		if p.IsHSMPublished() {
@@ -173,7 +176,8 @@ func TestPhaseIsHSMPublished(t *testing.T) {
 func TestPhaseIsActionPublished(t *testing.T) {
 	actionPhases := []Phase{
 		PhasePreDamage, PhasePreEvent, PhasePreMove, PhasePreRespawn,
-		PhaseOnBuffApplied, PhaseOnBuffRemoved,
+		PhasePreBuffApplied, PhasePostBuffApplied,
+		PhasePreBuffRemoved, PhasePostBuffRemoved,
 	}
 	for _, p := range actionPhases {
 		if !p.IsActionPublished() {

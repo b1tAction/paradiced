@@ -781,11 +781,11 @@ func TestAddBuffActionFull(t *testing.T) {
 	if action.Target() != player.ID.UUID() {
 		t.Errorf("Target mismatch")
 	}
-	if action.PreTriggerPhase() != constants.PhaseAnyTime {
-		t.Errorf("PreTriggerPhase should be PhaseAnyTime, got %s", action.PreTriggerPhase())
+	if action.PreTriggerPhase() != constants.PhasePreBuffApplied {
+		t.Errorf("PreTriggerPhase should be PhasePreBuffApplied, got %s", action.PreTriggerPhase())
 	}
-	if action.PostTriggerPhase() != constants.PhaseOnBuffApplied {
-		t.Errorf("PostTriggerPhase should be PhaseOnBuffApplied, got %s", action.PostTriggerPhase())
+	if action.PostTriggerPhase() != constants.PhasePostBuffApplied {
+		t.Errorf("PostTriggerPhase should be PhasePostBuffApplied, got %s", action.PostTriggerPhase())
 	}
 
 	ctx := NewActionContext(nil, nil, nil, nil)
@@ -815,11 +815,11 @@ func TestRemoveBuffActionFull(t *testing.T) {
 	if action.Target() != player.ID.UUID() {
 		t.Errorf("Target mismatch")
 	}
-	if action.PreTriggerPhase() != constants.PhaseOnBuffRemoved {
-		t.Errorf("PreTriggerPhase should be PhaseOnBuffRemoved, got %s", action.PreTriggerPhase())
+	if action.PreTriggerPhase() != constants.PhasePreBuffRemoved {
+		t.Errorf("PreTriggerPhase should be PhasePreBuffRemoved, got %s", action.PreTriggerPhase())
 	}
-	if action.PostTriggerPhase() != constants.PhaseAnyTime {
-		t.Errorf("PostTriggerPhase should be PhaseAnyTime, got %s", action.PostTriggerPhase())
+	if action.PostTriggerPhase() != constants.PhasePostBuffRemoved {
+		t.Errorf("PostTriggerPhase should be PhasePostBuffRemoved, got %s", action.PostTriggerPhase())
 	}
 
 	ctx := NewActionContext(nil, nil, nil, nil)

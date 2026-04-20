@@ -15,7 +15,8 @@ func TestPhaseIsValid(t *testing.T) {
 	validPhases := []constants.Phase{
 		constants.PhaseBeforeTurn, constants.PhasePreMove, constants.PhaseOnLand, constants.PhasePreEvent,
 		constants.PhasePreDamage, constants.PhaseAfterTurn, constants.PhaseAnyTime,
-		constants.PhaseOnBuffApplied, constants.PhaseOnBuffRemoved,
+		constants.PhasePreBuffApplied, constants.PhasePostBuffApplied,
+		constants.PhasePreBuffRemoved, constants.PhasePostBuffRemoved,
 	}
 	for _, p := range validPhases {
 		if !p.IsValid() {
@@ -41,7 +42,8 @@ func TestPhaseNeedsSubscription(t *testing.T) {
 	needsSub := []constants.Phase{
 		constants.PhaseBeforeTurn, constants.PhasePreMove, constants.PhaseOnLand, constants.PhasePreEvent,
 		constants.PhasePreDamage, constants.PhaseAfterTurn,
-		constants.PhaseOnBuffApplied, constants.PhaseOnBuffRemoved,
+		constants.PhasePreBuffApplied, constants.PhasePostBuffApplied,
+		constants.PhasePreBuffRemoved, constants.PhasePostBuffRemoved,
 	}
 	for _, p := range needsSub {
 		if !p.NeedsSubscription() {
@@ -64,7 +66,9 @@ func TestPhaseIsHSMPublished(t *testing.T) {
 func TestPhaseIsActionPublished(t *testing.T) {
 	actionPhases := []constants.Phase{
 		constants.PhasePreDamage, constants.PhasePreEvent, constants.PhasePreMove,
-		constants.PhasePreRespawn, constants.PhaseOnBuffApplied, constants.PhaseOnBuffRemoved,
+		constants.PhasePreRespawn,
+		constants.PhasePreBuffApplied, constants.PhasePostBuffApplied,
+		constants.PhasePreBuffRemoved, constants.PhasePostBuffRemoved,
 	}
 	for _, p := range actionPhases {
 		if !p.IsActionPublished() {

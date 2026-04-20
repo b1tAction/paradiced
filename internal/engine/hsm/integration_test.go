@@ -57,6 +57,7 @@ func TestTurnFlow_BuffEffect_GameLog(t *testing.T) {
 	game := engine.NewGame(id.NewGameID(), 0)
 	mapEngine := gamemap.NewMapEngine(100)
 	mapEngine.GenerateLinearMap(nil)
+	game.Log.StartTurn(1, 0, "test-player")
 
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 6})
 	player.HP = 5
@@ -87,11 +88,15 @@ func TestTurnFlow_BuffEffect_GameLog(t *testing.T) {
 	// Publish PhaseBeforeTurn
 	game.Bus.Publish(constants.PhaseBeforeTurn, player.ID.UUID(), triggerCtx)
 
-	// Process any derived actions
+	// Bridge derived actions from triggerCtx to actionCtx and process
+	for _, derived := range triggerCtx.GetDerivedActions() {
+		if execAction, ok := derived.(engineaction.Action); ok {
+			actionCtx.PushDerivedAction(execAction)
+		}
+	}
 	actionCtx.ProcessQueue()
 
-	// Verify LP was modified (Divine buff: LP+1)
-	// Note: Current handler uses direct modification, not Action system
+	// Verify LP was modified (Divine buff: LP+1 through Action system)
 	if player.LP != 4 {
 		t.Errorf("LP should be 4 after Divine buff, got %d", player.LP)
 	}
@@ -260,6 +265,13 @@ func TestTurnFlow_CompleteTurn(t *testing.T) {
 	triggerCtx := event.NewContext(player)
 	triggerCtx.Set("action_context", actionCtx)
 	game.Bus.Publish(constants.PhaseBeforeTurn, player.ID.UUID(), triggerCtx)
+
+	// Bridge derived actions from triggerCtx to actionCtx and process
+	for _, derived := range triggerCtx.GetDerivedActions() {
+		if execAction, ok := derived.(engineaction.Action); ok {
+			actionCtx.PushDerivedAction(execAction)
+		}
+	}
 	actionCtx.ProcessQueue()
 
 	// === Step 3: Simulate Movement ===

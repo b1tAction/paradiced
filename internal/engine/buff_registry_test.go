@@ -4,7 +4,9 @@ import (
 	"testing"
 
 	"github.com/b1tAction/paradiced/internal/core"
+	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/internal/event"
+	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
 )
@@ -44,7 +46,7 @@ func TestBuffHandlerConfigPhases(t *testing.T) {
 		{constants.BuffTypeCurse, constants.PhaseBeforeTurn, true, 50, false},
 		{constants.BuffTypeDivine, constants.PhaseBeforeTurn, true, 50, false},
 		{constants.BuffTypeLost, constants.PhasePreMove, true, 100, false},
-		{constants.BuffTypeHidden, constants.PhasePreDamage, true, 100, false},
+		{constants.BuffTypeHidden, constants.PhasePreBuffApplied, true, 100, false},
 		{constants.BuffTypeRain, constants.PhaseAfterTurn, true, 50, false},
 		{constants.BuffTypeCorrupt, constants.PhaseAfterTurn, true, 50, false},
 		{constants.BuffTypeExorcism, constants.PhasePreEvent, true, 80, false},
@@ -112,7 +114,15 @@ func TestFireBuffHandlerBehavior(t *testing.T) {
 		handler(constants.PhaseBeforeTurn, ctx)
 	}
 
-	// After 4 times, LP should +1, counter reset
+	// After 4 times, LP should +1 (via derived action), counter reset
+	// Process derived actions
+	for _, da := range ctx.GetDerivedActions() {
+		if act, ok := da.(engineaction.Action); ok {
+			actCtx := engineaction.NewActionContext(nil, nil, nil, nil)
+			actCtx.ExecuteAction(act)
+		}
+	}
+
 	if player.LP != initialLP+1 {
 		t.Errorf("LP = %d, expected %d (initial+1)", player.LP, initialLP+1)
 	}
@@ -166,6 +176,14 @@ func TestCurseBuffHandlerBehavior(t *testing.T) {
 
 	// Execute handler
 	handler(constants.PhaseBeforeTurn, ctx)
+
+	// Process derived actions to apply LP change
+	for _, da := range ctx.GetDerivedActions() {
+		if act, ok := da.(engineaction.Action); ok {
+			actCtx := engineaction.NewActionContext(nil, nil, nil, nil)
+			actCtx.ExecuteAction(act)
+		}
+	}
 
 	// LP should be 4 after handler execution
 	if player.LP != 4 {
@@ -358,10 +376,10 @@ func TestHiddenBuffHandlerBehavior(t *testing.T) {
 	ctx := event.NewContext(player)
 
 	// Execute handler
-	handler(constants.PhasePreDamage, ctx)
+	handler(constants.PhasePreBuffApplied, ctx)
 
 	// Should signal action blocked
- blocked, err := ctx.GetBool("action_blocked")
+	blocked, err := ctx.GetBool("action_blocked")
 	if err != nil {
 		t.Error("action_blocked should be set")
 	}
@@ -369,7 +387,7 @@ func TestHiddenBuffHandlerBehavior(t *testing.T) {
 		t.Error("action_blocked should be true")
 	}
 
- blockedBy, err := ctx.GetString("blocked_by")
+	blockedBy, err := ctx.GetString("blocked_by")
 	if err != nil {
 		t.Error("blocked_by should be set")
 	}
@@ -401,7 +419,7 @@ func TestExorcismBuffHandlerBehavior(t *testing.T) {
 	handler(constants.PhasePreEvent, ctx)
 
 	// Should signal block poison effect
- blocked, err := ctx.GetBool("block_poison_effect")
+	blocked, err := ctx.GetBool("block_poison_effect")
 	if err != nil {
 		t.Error("block_poison_effect should be set")
 	}
@@ -433,11 +451,93 @@ func TestPoisonBuffHandlerBehavior(t *testing.T) {
 	handler(constants.PhaseBeforeTurn, ctx)
 
 	// Should signal draw bad event
- drawBad, err := ctx.GetBool("draw_bad_event")
+	drawBad, err := ctx.GetBool("draw_bad_event")
 	if err != nil {
 		t.Error("draw_bad_event should be set")
 	}
 	if !drawBad {
 		t.Error("draw_bad_event should be true")
+	}
+}
+
+func TestCurseAndDivineDerivedActions(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxLP: 5})
+	player.LP = 3
+	game.AddPlayer(player)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
+	GetBuffHandlerConfig(constants.BuffTypeDivine).Handler(constants.PhaseBeforeTurn, ctx)
+	GetBuffHandlerConfig(constants.BuffTypeCurse).Handler(constants.PhaseBeforeTurn, ctx)
+
+	if len(ctx.GetDerivedActions()) != 2 {
+		t.Fatalf("derived actions = %d, want 2", len(ctx.GetDerivedActions()))
+	}
+
+	for _, d := range ctx.GetDerivedActions() {
+		if act, ok := d.(engineaction.Action); ok {
+			actionCtx.PushDerivedAction(act)
+		}
+	}
+	actionCtx.ProcessQueue()
+
+	if player.LP != 3 {
+		t.Fatalf("LP = %d, want 3 (divine +1 and curse -1)", player.LP)
+	}
+}
+
+func TestRainAndCorruptDerivedActions(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	player.HP = 5
+	game.AddPlayer(player)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+
+	ctxRain := event.NewContext(player)
+	ctxRain.Set("action_context", actionCtx)
+	rainHandler := GetBuffHandlerConfig(constants.BuffTypeRain).Handler
+	rainHandler(constants.PhaseAfterTurn, ctxRain)
+	rainHandler(constants.PhaseAfterTurn, ctxRain)
+
+	ctxCorrupt := event.NewContext(player)
+	ctxCorrupt.Set("action_context", actionCtx)
+	corruptHandler := GetBuffHandlerConfig(constants.BuffTypeCorrupt).Handler
+	corruptHandler(constants.PhaseAfterTurn, ctxCorrupt)
+	corruptHandler(constants.PhaseAfterTurn, ctxCorrupt)
+
+	for _, d := range ctxRain.GetDerivedActions() {
+		if act, ok := d.(engineaction.Action); ok {
+			actionCtx.PushDerivedAction(act)
+		}
+	}
+	for _, d := range ctxCorrupt.GetDerivedActions() {
+		if act, ok := d.(engineaction.Action); ok {
+			actionCtx.PushDerivedAction(act)
+		}
+	}
+	actionCtx.ProcessQueue()
+
+	if player.HP != 5 {
+		t.Fatalf("HP = %d, want 5 (rain +1 and corrupt -1)", player.HP)
+	}
+}
+
+func TestLostBuffMutatesMoveAction(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	move := engineaction.NewMoveAction(player, 4, "DiceRoll")
+
+	ctx := event.NewContext(player)
+	ctx.Set("current_action", move)
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeLost).Handler
+	handler(constants.PhasePreMove, ctx)
+
+	if move.Steps != -4 {
+		t.Fatalf("move.Steps = %d, want -4", move.Steps)
 	}
 }
