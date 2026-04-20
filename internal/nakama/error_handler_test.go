@@ -119,3 +119,84 @@ func TestErrorCodeForInternalErrorWrappingOther(t *testing.T) {
 		t.Errorf("InternalError wrapping generic error should return ErrInternal (3001), got %d", code)
 	}
 }
+
+func TestErrorCodeForHSMErrorAllMessageVariants(t *testing.T) {
+	testCases := []struct {
+		message    string
+		expected   constants.ErrorCode
+		desc       string
+	}{
+		{"player is nil", constants.ErrPlayerNotFound, "player is nil"},
+		{"invalid state", constants.ErrInvalidState, "invalid state"},
+		{"state execution failed", constants.ErrInvalidState, "state execution failed"},
+		{"some other error", constants.ErrInternal, "other message"},
+		{"", constants.ErrInternal, "empty message"},
+	}
+
+	for _, tc := range testCases {
+		err := pkgerrors.NewHSMError("TurnUpkeep", 2, "Enter", errors.New("underlying"), tc.message)
+		code := ErrorCodeForError(err)
+		if code != tc.expected {
+			t.Errorf("%s: expected %d, got %d", tc.desc, tc.expected, code)
+		}
+	}
+}
+
+func TestErrorCodeForStateErrorAllVariants(t *testing.T) {
+	testCases := []struct {
+		message    string
+		expected   constants.ErrorCode
+		desc       string
+	}{
+		{"player is nil", constants.ErrPlayerNotFound, "player is nil"},
+		{"invalid state transition", constants.ErrInvalidState, "invalid state"},
+		{"some other state error", constants.ErrInvalidState, "other message"},
+		{"", constants.ErrInvalidState, "empty message"},
+	}
+
+	for _, tc := range testCases {
+		err := hsm.NewStateError(hsm.StateTurnUpkeep, tc.message)
+		code := ErrorCodeForError(err)
+		if code != tc.expected {
+			t.Errorf("%s: expected %d, got %d", tc.desc, tc.expected, code)
+		}
+	}
+}
+
+func TestErrorCodeForMultipleWrappedErrors(t *testing.T) {
+	// Create chain: ValidationError -> InternalError
+	innerErr := pkgerrors.NewValidationError("field", "value", "invalid")
+	wrappedErr := pkgerrors.Wrap(innerErr, "Handler", "Validate")
+
+	// errors.As should find ValidationError
+	code := ErrorCodeForError(wrappedErr)
+	if code != constants.ErrInvalidParameter {
+		t.Errorf("wrapped ValidationError should return ErrInvalidParameter, got %d", code)
+	}
+}
+
+func TestErrorCodeForActionExecutionErrorWithUnderlying(t *testing.T) {
+	underlying := errors.New("underlying cause")
+	err := pkgerrors.NewActionExecutionError("damage", "player-001", "failed", underlying)
+	code := ErrorCodeForError(err)
+	if code != constants.ErrInternal {
+		t.Errorf("ActionExecutionError should return ErrInternal, got %d", code)
+	}
+}
+
+func TestErrorCodeForValidationErrorAllFields(t *testing.T) {
+	err := pkgerrors.NewValidationError("hp", "invalid", "HP must be positive")
+	code := ErrorCodeForError(err)
+	if code != constants.ErrInvalidParameter {
+		t.Errorf("ValidationError should return ErrInvalidParameter, got %d", code)
+	}
+}
+
+func TestErrorCodeForInternalErrorAllFields(t *testing.T) {
+	underlying := errors.New("db connection failed")
+	err := pkgerrors.NewInternalError("Database", "Connect", underlying)
+	code := ErrorCodeForError(err)
+	if code != constants.ErrInternal {
+		t.Errorf("InternalError should return ErrInternal, got %d", code)
+	}
+}

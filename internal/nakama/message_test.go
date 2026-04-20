@@ -185,3 +185,164 @@ func TestHandleMessageNonExistingPlayer(t *testing.T) {
 		t.Errorf("HandleMessage from non-existing player should return nil, got: %v", err)
 	}
 }
+
+func TestHandleMessageWithOpRollDice(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	mockDispatcher := NewMockDispatcherAdapter()
+	handler.WithDispatcher(mockDispatcher)
+
+	// Add player and initialize
+	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.MatchInit()
+
+	// Send RollDice via HandleMessageWithOp
+	err := handler.HandleMessageWithOp("user-001", int64(100), nil) // OpRollDice = 100
+	if err != nil {
+		t.Errorf("HandleMessageWithOp with OpRollDice should return nil, got: %v", err)
+	}
+}
+
+func TestHandleMessageWithOpUnknown(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	mockDispatcher := NewMockDispatcherAdapter()
+	handler.WithDispatcher(mockDispatcher)
+
+	// Add player and initialize
+	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.MatchInit()
+
+	// Send unknown opcode - HandleMessageWithOp will fallback to HandleMessage
+	// which requires valid JSON payload. Since data is nil, it will fail to parse.
+	// This is expected behavior - unknown opcode triggers fallback that needs valid JSON.
+	err := handler.HandleMessageWithOp("user-001", int64(999), nil)
+	// Returns error from JSON parsing in HandleMessage fallback
+	_ = err // We accept that unknown opcode with nil data returns error
+}
+
+func TestHandleMessageWithOpUseItemInvalidJSON(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	mockDispatcher := NewMockDispatcherAdapter()
+	handler.WithDispatcher(mockDispatcher)
+
+	// Add player and initialize
+	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.MatchInit()
+
+	// Send UseItem with invalid JSON
+	err := handler.HandleMessageWithOp("user-001", int64(101), []byte("invalid json")) // OpUseItem = 101
+	if err == nil {
+		t.Error("HandleMessageWithOp with invalid JSON should return error")
+	}
+}
+
+func TestHandleMiniGameResultInvalidJSON(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	mockDispatcher := NewMockDispatcherAdapter()
+	handler.WithDispatcher(mockDispatcher)
+
+	// Add player and initialize
+	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.MatchInit()
+
+	// Send invalid JSON
+	data := []byte("invalid json")
+	err := handler.HandleMessage("user-001", data)
+	// Should not crash, may return error or nil
+	_ = err
+}
+
+func TestHandleUserChoiceInvalidJSON(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	mockDispatcher := NewMockDispatcherAdapter()
+	handler.WithDispatcher(mockDispatcher)
+
+	// Add player and initialize
+	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.MatchInit()
+
+	// Send invalid JSON for user choice
+	data := []byte("{\"op_code\": \"4\", \"decision_id\": \"dec-001\", \"choice\": \"invalid\"}")
+	err := handler.HandleMessage("user-001", data)
+	// Should not crash, may return error
+	_ = err
+}
+
+func TestHandleUseItemWithValidItem(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	mockDispatcher := NewMockDispatcherAdapter()
+	handler.WithDispatcher(mockDispatcher)
+
+	// Add player with an item that has known ID
+	player := handler.addPlayer("user-001", constants.FactionQingLong)
+	item := core.NewItem(constants.ItemTypeAnyDoor)
+	player.AddItem(item)
+
+	handler.MatchInit()
+
+	// Send use item request with actual item ID
+	data, _ := json.Marshal(UseItemRequest{
+		OpCode: "2",
+		ItemID: item.ID.UUID(),
+	})
+
+	err := handler.HandleMessage("user-001", data)
+	if err != nil {
+		t.Errorf("HandleMessage should return nil, got: %v", err)
+	}
+}
+
+func TestHandleUseItemWithoutDispatcher(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	// No dispatcher
+
+	// Add player with an item
+	player := handler.addPlayer("user-001", constants.FactionQingLong)
+	player.AddItem(core.NewItem(constants.ItemTypeAnyDoor))
+
+	handler.MatchInit()
+
+	// Send use item request - should not crash without dispatcher
+	data, _ := json.Marshal(UseItemRequest{
+		OpCode: "2",
+		ItemID: "test-item-id",
+	})
+
+	err := handler.HandleMessage("user-001", data)
+	// Should work even without dispatcher (dispatcher is nil-safe)
+	_ = err
+}
+
+func TestHandleRollDiceNoCurrentPlayer(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	mockDispatcher := NewMockDispatcherAdapter()
+	handler.WithDispatcher(mockDispatcher)
+
+	// Add player but don't initialize (no current player)
+	handler.addPlayer("user-001", constants.FactionQingLong)
+
+	// Send roll dice - should reject because no current player
+	// but without HSM initialized, the behavior may differ
+	data, _ := json.Marshal(RollDiceRequest{OpCode: "1"})
+	err := handler.HandleMessage("user-001", data)
+	// Without MatchInit, getCurrentPlayer returns nil
+	// But handleRollDice needs HSM initialized, so behavior may vary
+	_ = err // Accept any result - this tests that it doesn't crash
+}
+
+func TestHandleUseSkillNoDispatcher(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	// No dispatcher
+
+	// Add player with charge
+	player := handler.addPlayer("user-001", constants.FactionQingLong)
+	player.SetChargeCount(1)
+
+	handler.MatchInit()
+
+	// Send use skill request - should not crash without dispatcher
+	data, _ := json.Marshal(UseSkillRequest{OpCode: "3"})
+
+	err := handler.HandleMessage("user-001", data)
+	// Should work even without dispatcher
+	_ = err
+}

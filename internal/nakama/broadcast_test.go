@@ -4,6 +4,7 @@ package nakama
 import (
 	"testing"
 
+	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
 	"github.com/b1tAction/paradiced/pkg/net"
 )
@@ -399,5 +400,91 @@ func TestMockDispatcherMultipleCalls(t *testing.T) {
 
 	if mockDispatcher.CountMessages("p3") != 1 {
 		t.Errorf("p3 messages count = %d, want 1", mockDispatcher.CountMessages("p3"))
+	}
+}
+
+func TestSendActionRejected(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	mockDispatcher := NewMockDispatcherAdapter()
+	handler.WithDispatcher(mockDispatcher)
+
+	broadcastAdapter := NewNakamaBroadcastAdapter(handler)
+
+	rejected := &net.ActionRejected{
+		OpCode:    net.OpRollDice,
+		ErrorCode: constants.ErrInvalidParameter,
+		Message:   "Not your turn",
+	}
+
+	err := broadcastAdapter.SendActionRejected("player-001", rejected)
+	if err != nil {
+		t.Fatalf("SendActionRejected error: %v", err)
+	}
+
+	if mockDispatcher.CountMessages("player-001") != 1 {
+		t.Errorf("messages count = %d, want 1", mockDispatcher.CountMessages("player-001"))
+	}
+
+	// Verify OpCode
+	messages := mockDispatcher.GetMessages("player-001")
+	if messages[0].OpCode != int64(net.OpActionRejected) {
+		t.Errorf("OpCode = %d, want %d", messages[0].OpCode, int64(net.OpActionRejected))
+	}
+
+	// Parse and verify data
+	var parsed net.ActionRejected
+	err = mockDispatcher.ParseMessageData("player-001", 0, &parsed)
+	if err != nil {
+		t.Fatalf("ParseMessageData error: %v", err)
+	}
+
+	if parsed.ErrorCode != constants.ErrInvalidParameter {
+		t.Errorf("parsed.ErrorCode = %d, want %d", parsed.ErrorCode, constants.ErrInvalidParameter)
+	}
+
+	if parsed.Message != "Not your turn" {
+		t.Errorf("parsed.Message = %s, want 'Not your turn'", parsed.Message)
+	}
+
+	if parsed.OpCode != net.OpRollDice {
+		t.Errorf("parsed.OpCode = %d, want %d", parsed.OpCode, net.OpRollDice)
+	}
+}
+
+func TestSendActionRejectedWithoutDispatcher(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	// No dispatcher set
+
+	broadcastAdapter := NewNakamaBroadcastAdapter(handler)
+
+	rejected := &net.ActionRejected{
+		OpCode:    net.OpRollDice,
+		ErrorCode: constants.ErrInvalidParameter,
+		Message:   "Not your turn",
+	}
+
+	err := broadcastAdapter.SendActionRejected("player-001", rejected)
+	if err != nil {
+		t.Errorf("SendActionRejected should return nil without dispatcher, got: %v", err)
+	}
+}
+
+func TestResolveRecipientUserID(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+
+	broadcastAdapter := NewNakamaBroadcastAdapter(handler)
+
+	// Test with nil handler
+	nilAdapter := &NakamaBroadcastAdapter{handler: nil}
+	result := nilAdapter.resolveRecipientUserID("player-001")
+	if result != "player-001" {
+		t.Errorf("resolveRecipientUserID with nil handler should return input, got: %s", result)
+	}
+
+	// Test with already known userID
+	handler.players["user-001"] = nil
+	result = broadcastAdapter.resolveRecipientUserID("user-001")
+	if result != "user-001" {
+		t.Errorf("resolveRecipientUserID with known userID should return same, got: %s", result)
 	}
 }
