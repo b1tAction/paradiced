@@ -18,12 +18,12 @@ import (
 // Round/Turn state is managed by HSM (single source of truth).
 // Game only stores data, not state.
 type Game struct {
-	ID      id.GameID         `json:"id"`
-	Bus     *event.EventBus   `json:"bus"`
-	Players []*core.Player    `json:"players"`
-	RNG     *rand.Rand        `json:"-"`   // Game unique random source
-	Draw    *rng.DrawEngine   `json:"-"`   // Draw engine for random draws
-	Log     *gamelog.GameLog  `json:"log"` // Global game log for playback
+	ID      id.GameID        `json:"id"`
+	Bus     *event.EventBus  `json:"bus"`
+	Players []*core.Player   `json:"players"`
+	RNG     *rand.Rand       `json:"-"`   // Game unique random source
+	Draw    *rng.DrawEngine  `json:"-"`   // Draw engine for random draws
+	Log     *gamelog.GameLog `json:"log"` // Global game log for playback
 	mutex   sync.RWMutex
 }
 
@@ -243,7 +243,7 @@ func (g *Game) UnsubscribeItem(item *core.Item) {
 
 // InitializePlayerFactionBuffs adds faction-specific buffs to players.
 // Called during match initialization after EventBus is ready.
-// Uses ApplyBuffToPlayer for complete lifecycle (AddBuff + Subscribe + Broadcast).
+// Uses ApplyBuffToPlayer for complete lifecycle (AddBuff + Subscribe).
 func (g *Game) InitializePlayerFactionBuffs(player *core.Player) {
 	if player == nil {
 		return
@@ -263,8 +263,10 @@ func (g *Game) InitializePlayerFactionBuffs(player *core.Player) {
 // ApplyBuffToPlayer adds Buff to player and handles complete lifecycle.
 // Process order:
 //  1. Underlying data add (player.AddBuff)
-//  2. Subscribe to EventBus (SubscribeBuff) - Buff is now in listener list
-//  3. Broadcast Applied event - Buff can hear its own Applied event
+//  2. Subscribe to EventBus (SubscribeBuff)
+//
+// Note: Buff lifecycle Phases (PhasePostBuffApplied, PhasePreBuffRemoved) are
+// published by Action system (AddBuffAction/RemoveBuffAction) during execution.
 func (g *Game) ApplyBuffToPlayer(player *core.Player, buff *core.Buff) error {
 	// 1. Underlying data add
 	if err := player.AddBuff(buff); err != nil {
@@ -274,40 +276,22 @@ func (g *Game) ApplyBuffToPlayer(player *core.Player, buff *core.Buff) error {
 	// 2. Subscribe to EventBus
 	g.SubscribeBuff(player, buff)
 
-	// 3. Broadcast Applied event
-	g.BroadcastBuffApplied(player, buff)
-
 	return nil
 }
 
 // RemoveBuffFromPlayer removes Buff from player and handles complete lifecycle.
 // Process order:
-//  1. Broadcast Removed event (before removal) - Buff can hear its own Removed event
-//  2. Unsubscribe (UnsubscribeBuff)
-//  3. Underlying data remove (player.RemoveBuff)
+//  1. Unsubscribe (UnsubscribeBuff)
+//  2. Underlying data remove (player.RemoveBuff)
+//
+// Note: Buff lifecycle Phases (PhasePostBuffApplied, PhasePreBuffRemoved) are
+// published by Action system (AddBuffAction/RemoveBuffAction) during execution.
 func (g *Game) RemoveBuffFromPlayer(player *core.Player, buff *core.Buff) bool {
-	// 1. Broadcast Removed event first
-	g.BroadcastBuffRemoved(player, buff)
-
-	// 2. Unsubscribe
+	// 1. Unsubscribe
 	g.UnsubscribeBuff(buff)
 
-	// 3. Underlying data remove
+	// 2. Underlying data remove
 	return player.RemoveBuff(buff.Type)
-}
-
-// BroadcastBuffApplied broadcasts Buff Applied event.
-// Triggers PhaseOnBuffApplied, all Buffs/Items subscribed to this Phase receive notification.
-func (g *Game) BroadcastBuffApplied(player *core.Player, buff *core.Buff) {
-	ctx := event.NewContext(player).WithData(buff)
-	g.Bus.Publish(constants.PhaseOnBuffApplied, player.ID.UUID(), ctx)
-}
-
-// BroadcastBuffRemoved broadcasts Buff Removed event.
-// Triggers PhaseOnBuffRemoved, all Buffs/Items subscribed to this Phase receive notification.
-func (g *Game) BroadcastBuffRemoved(player *core.Player, buff *core.Buff) {
-	ctx := event.NewContext(player).WithData(buff)
-	g.Bus.Publish(constants.PhaseOnBuffRemoved, player.ID.UUID(), ctx)
 }
 
 // ========== Helper Methods ==========

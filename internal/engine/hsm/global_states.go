@@ -63,7 +63,7 @@ func (s *MatchInitState) Enter(ctx *StateContext) {
 	}
 
 	// 2. Initialize faction-specific buffs for all players
-	// Uses ApplyBuffToPlayer for complete lifecycle (AddBuff + Subscribe + Broadcast)
+	// Uses ApplyBuffToPlayer for complete lifecycle (AddBuff + Subscribe)
 	for _, player := range game.Players {
 		game.InitializePlayerFactionBuffs(player)
 	}

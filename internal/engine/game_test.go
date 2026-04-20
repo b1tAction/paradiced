@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/b1tAction/paradiced/internal/core"
-	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/b1tAction/paradiced/pkg/rng"
@@ -97,10 +96,10 @@ func TestGameAddMultiplePlayers(t *testing.T) {
 	game := NewGame(id.NewGameID(), 0)
 
 	factions := []constants.Faction{
-	 constants.FactionQingLong,
-	 constants.FactionZhuQue,
-	 constants.FactionBaiHu,
-	 constants.FactionXuanWu,
+		constants.FactionQingLong,
+		constants.FactionZhuQue,
+		constants.FactionBaiHu,
+		constants.FactionXuanWu,
 	}
 
 	for i := 0; i < 4; i++ {
@@ -183,10 +182,6 @@ func TestGameGetPlayer(t *testing.T) {
 		t.Error("GetPlayer should return nil for non-existent player")
 	}
 }
-
-
-
-
 
 // ========== Buff Subscription Tests ==========
 
@@ -506,78 +501,6 @@ func TestGameRemoveBuffFromPlayer(t *testing.T) {
 	}
 }
 
-func TestGameBroadcastBuffApplied(t *testing.T) {
-	game := NewGame(id.NewGameID(), 0)
-	playerID := id.NewPlayerID()
-	player := core.NewPlayer(core.PlayerConfig{ID: playerID})
-	game.AddPlayer(player)
-
-	// 订阅 PhaseOnBuffApplied（用于测试接收）
-	received := false
-	buffTypeCheck := constants.BuffTypeNone
-	d := event.NewAutoDecision("测试", []event.Option{
-		{ID: "ok", Label: "OK", Action: func(ctx *event.Context) {
-			received = true
-			// 验证 Context.Data 包含 Buff
-			buff, ok := ctx.GetData().(*core.Buff)
-			if !ok {
-				t.Error("Context.Data should be Buff")
-				return
-			}
-			buffTypeCheck = buff.Type
-		}},
-	})
-	game.Bus.Subscribe(constants.PhaseOnBuffApplied, playerID, "test-listener", "test", d)
-
-	// 广播 Applied 事件
-	buff := core.NewBuff(constants.BuffTypeCurse, 3)
-	game.BroadcastBuffApplied(player, buff)
-
-	// 验证事件已触发
-	if !received {
-		t.Error("PhaseOnBuffApplied should be triggered")
-	}
-	if buffTypeCheck != constants.BuffTypeCurse {
-		t.Errorf("Buff.Type = %v, expected Curse", buffTypeCheck)
-	}
-}
-
-func TestGameBroadcastBuffRemoved(t *testing.T) {
-	game := NewGame(id.NewGameID(), 0)
-	playerID := id.NewPlayerID()
-	player := core.NewPlayer(core.PlayerConfig{ID: playerID})
-	game.AddPlayer(player)
-
-	// 订阅 PhaseOnBuffRemoved（用于测试接收）
-	received := false
-	buffTypeCheck := constants.BuffTypeNone
-	d := event.NewAutoDecision("测试", []event.Option{
-		{ID: "ok", Label: "OK", Action: func(ctx *event.Context) {
-			received = true
-			// 验证 Context.Data 包含 Buff
-			buff, ok := ctx.GetData().(*core.Buff)
-			if !ok {
-				t.Error("Context.Data should be Buff")
-				return
-			}
-			buffTypeCheck = buff.Type
-		}},
-	})
-	game.Bus.Subscribe(constants.PhaseOnBuffRemoved, playerID, "test-listener", "test", d)
-
-	// 广播 Removed 事件
-	buff := core.NewBuff(constants.BuffTypeDivine, 3)
-	game.BroadcastBuffRemoved(player, buff)
-
-	// 验证事件已触发
-	if !received {
-		t.Error("PhaseOnBuffRemoved should be triggered")
-	}
-	if buffTypeCheck != constants.BuffTypeDivine {
-		t.Errorf("Buff.Type = %v, expected Divine", buffTypeCheck)
-	}
-}
-
 func TestGameGetActiveBuffCount(t *testing.T) {
 	game := NewGame(id.NewGameID(), 0)
 	playerID := id.NewPlayerID()
@@ -605,4 +528,3 @@ func TestGameGetActiveBuffCount(t *testing.T) {
 		t.Error("Unknown player buff count should be 0")
 	}
 }
-
