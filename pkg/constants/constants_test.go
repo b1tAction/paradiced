@@ -690,3 +690,240 @@ func TestEvaluationThresholds(t *testing.T) {
 		t.Errorf("EvaluationMax = %d, expected 100", EvaluationMax)
 	}
 }
+
+// ========== ParseFaction Tests ==========
+
+func TestParseFaction(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected Faction
+	}{
+		{"qing_long", FactionQingLong},
+		{"zhu_que", FactionZhuQue},
+		{"bai_hu", FactionBaiHu},
+		{"xuan_wu", FactionXuanWu},
+		{"invalid", FactionNone},
+		{"", FactionNone},
+		{"QING_LONG", FactionNone}, // case sensitive
+	}
+	for _, tt := range tests {
+		result := ParseFaction(tt.input)
+		if result != tt.expected {
+			t.Errorf("ParseFaction(%s) = %s, want %s", tt.input, result, tt.expected)
+		}
+	}
+}
+
+func TestFactionGetChineseName(t *testing.T) {
+	tests := []struct {
+		faction  Faction
+		expected string
+	}{
+		{FactionQingLong, "青龙"},
+		{FactionZhuQue, "朱雀"},
+		{FactionBaiHu, "白虎"},
+		{FactionXuanWu, "玄武"},
+		{FactionNone, "未知"},
+		{"invalid", "未知"},
+	}
+	for _, tt := range tests {
+		result := tt.faction.GetChineseName()
+		if result != tt.expected {
+			t.Errorf("Faction(%s).GetChineseName() = %s, want %s", tt.faction, result, tt.expected)
+		}
+	}
+}
+
+func TestFactionGetSkillName(t *testing.T) {
+	tests := []struct {
+		faction  Faction
+		expected string
+	}{
+		{FactionQingLong, "行迹"},
+		{FactionZhuQue, "离火"},
+		{FactionBaiHu, "劫运"},
+		{FactionXuanWu, "镇厄"},
+		{FactionNone, "未知"},
+		{"invalid", "未知"},
+	}
+	for _, tt := range tests {
+		result := tt.faction.GetSkillName()
+		if result != tt.expected {
+			t.Errorf("Faction(%s).GetSkillName() = %s, want %s", tt.faction, result, tt.expected)
+		}
+	}
+}
+
+func TestFactionGetSkillDesc(t *testing.T) {
+	tests := []struct {
+		faction  Faction
+		expected string
+	}{
+		{FactionQingLong, "每5回合获得充能，使用后1回合内无视负面地形"},
+		{FactionZhuQue, "每4回合幸运值+1，最高不超过8点"},
+		{FactionBaiHu, "反超其他玩家时随机从该玩家身上偷取一个Buff"},
+		{FactionXuanWu, "每5回合获得充能，可以抵消一次任意恶性事件"},
+		{FactionNone, "未知"},
+		{"invalid", "未知"},
+	}
+	for _, tt := range tests {
+		result := tt.faction.GetSkillDesc()
+		if result != tt.expected {
+			t.Errorf("Faction(%s).GetSkillDesc() = %s, want %s", tt.faction, result, tt.expected)
+		}
+	}
+}
+
+// ========== ParseBuffType Tests ==========
+
+func TestParseBuffType(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected BuffType
+	}{
+		{"curse", BuffTypeCurse},
+		{"lost", BuffTypeLost},
+		{"corrupt", BuffTypeCorrupt},
+		{"poison", BuffTypePoison},
+		{"hidden", BuffTypeHidden},
+		{"divine", BuffTypeDivine},
+		{"rain", BuffTypeRain},
+		{"exorcism", BuffTypeExorcism},
+		{"fire", BuffTypeFire},
+		{"invalid", BuffTypeNone},
+		{"", BuffTypeNone},
+	}
+	for _, tt := range tests {
+		result := ParseBuffType(tt.input)
+		if result != tt.expected {
+			t.Errorf("ParseBuffType(%s) = %s, want %s", tt.input, result, tt.expected)
+		}
+	}
+}
+
+// ========== ParseEventType Tests ==========
+
+func TestParseEventType(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected EventType
+	}{
+		{"herb", EventTypeHerb},
+		{"milk_tea", EventTypeMilkTea},
+		{"relic", EventTypeRelic},
+		{"divine_bless", EventTypeDivineBless},
+		{"exchange", EventTypeExchange},
+		{"hidden_buff", EventTypeHiddenBuff},
+		{"taste_test", EventTypeTasteTest},
+		{"mosquito", EventTypeMosquito},
+		{"ghost_hit", EventTypeGhostHit},
+		{"dog_poop", EventTypeDogPoop},
+		{"thief", EventTypeThief},
+		{"curse_buddha", EventTypeCurseBuddha},
+		{"lost_way", EventTypeLostWay},
+		{"thunder", EventTypeThunder},
+		{"invalid", EventTypeNone},
+		{"", EventTypeNone},
+	}
+	for _, tt := range tests {
+		result := ParseEventType(tt.input)
+		if result != tt.expected {
+			t.Errorf("ParseEventType(%s) = %s, want %s", tt.input, result, tt.expected)
+		}
+	}
+}
+
+// ========== ParseItemType Tests ==========
+
+func TestParseItemType(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected ItemType
+	}{
+		{"reverse_clock", ItemTypeReverseClock},
+		{"any_door", ItemTypeAnyDoor},
+		{"dice_swap", ItemTypeDiceSwap},
+		{"dice_upgrade", ItemTypeDiceUpgrade},
+		{"invalid", ItemTypeNone},
+		{"", ItemTypeNone},
+	}
+	for _, tt := range tests {
+		result := ParseItemType(tt.input)
+		if result != tt.expected {
+			t.Errorf("ParseItemType(%s) = %s, want %s", tt.input, result, tt.expected)
+		}
+	}
+}
+
+// ========== ParseCellType Tests ==========
+
+func TestParseCellType(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected CellType
+	}{
+		{"normal", CellTypeNormal},
+		{"fragile", CellTypeFragile},
+		{"fog", CellTypeFog},
+		{"checkpoint", CellTypeCheckpoint},
+		{"boss", CellTypeBoss},
+		{"invalid", CellTypeNone},
+		{"", CellTypeNone},
+	}
+	for _, tt := range tests {
+		result := ParseCellType(tt.input)
+		if result != tt.expected {
+			t.Errorf("ParseCellType(%s) = %s, want %s", tt.input, result, tt.expected)
+		}
+	}
+}
+
+// ========== ActionType Tests ==========
+
+func TestActionTypeIsValid(t *testing.T) {
+	validTypes := []ActionType{
+		ActionDamage, ActionHeal, ActionModifyLP, ActionMove,
+		ActionAddBuff, ActionRemoveBuff, ActionRespawn, ActionSkipTurn,
+		ActionDrawEvent, ActionTeleport, ActionStealBuff, ActionFellDown,
+	}
+	for _, at := range validTypes {
+		if !at.IsValid() {
+			t.Errorf("ActionType(%s).IsValid() should be true", at)
+		}
+	}
+
+	invalidTypes := []ActionType{ActionUnknown, "invalid", ""}
+	for _, at := range invalidTypes {
+		if at.IsValid() {
+			t.Errorf("ActionType(%s).IsValid() should be false", at)
+		}
+	}
+}
+
+func TestParseActionType(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected ActionType
+	}{
+		{"damage", ActionDamage},
+		{"heal", ActionHeal},
+		{"modify_lp", ActionModifyLP},
+		{"move", ActionMove},
+		{"add_buff", ActionAddBuff},
+		{"remove_buff", ActionRemoveBuff},
+		{"respawn", ActionRespawn},
+		{"skip_turn", ActionSkipTurn},
+		{"draw_event", ActionDrawEvent},
+		{"teleport", ActionTeleport},
+		{"steal_buff", ActionStealBuff},
+		{"fell_down", ActionFellDown},
+		{"invalid", ActionUnknown},
+		{"", ActionUnknown},
+	}
+	for _, tt := range tests {
+		result := ParseActionType(tt.input)
+		if result != tt.expected {
+			t.Errorf("ParseActionType(%s) = %s, want %s", tt.input, result, tt.expected)
+		}
+	}
+}
