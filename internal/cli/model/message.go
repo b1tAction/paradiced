@@ -30,6 +30,7 @@ type StateSync struct {
 type Player struct {
 	PlayerID    string `json:"player_id"` // 玩家游戏 ID (UUID)
 	ClientID    string `json:"client_id"` // 客户端 ID (用于客户端识别自己)
+	DisplayName string `json:"display_name"` // 用户显示名称
 	Faction     string `json:"faction"`
 	Position    int    `json:"position"`
 	HP          int    `json:"hp"`
@@ -164,9 +165,10 @@ type WaitingSync struct {
 
 // WaitingPlayer represents a player in the waiting room.
 type WaitingPlayer struct {
-	UserID  string `json:"user_id"`
-	Faction string `json:"faction"`
-	IsHost  bool   `json:"is_host"`
+	UserID      string `json:"user_id"`
+	DisplayName string `json:"display_name"` // 用户显示名称
+	Faction     string `json:"faction"`
+	IsHost      bool   `json:"is_host"`
 }
 
 // ParseMessage parses a JSON message into the Message struct.

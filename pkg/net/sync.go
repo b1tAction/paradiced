@@ -104,6 +104,10 @@ type Player struct {
 	// The server always extracts the real user ID from the WebSocket connection.
 	ClientID string `json:"client_id"`
 
+	// DisplayName is the user-provided display name for UI rendering.
+	// Falls back to ClientID (UUID) if not provided.
+	DisplayName string `json:"display_name"`
+
 	// Faction is the player's faction (snake_case: "qing_long", "zhu_que", "bai_hu", "xuan_wu").
 	Faction string `json:"faction"`
 
@@ -292,6 +296,9 @@ type WaitingSync struct {
 type WaitingPlayer struct {
 	// UserID is the Nakama user ID.
 	UserID string `json:"user_id"`
+
+	// DisplayName is the user-provided display name for UI rendering.
+	DisplayName string `json:"display_name"`
 
 	// Faction is the player's chosen faction.
 	Faction string `json:"faction"`
