@@ -29,8 +29,18 @@ func (p *Player) SetChargeCount(count int) {
 
 | 字段 | 类型 | 所属阵营 | 用途 | 便捷方法 |
 |------|------|----------|------|----------|
+| `display_name` | string | 通用 | 用户显示名称，fallback 到 userID | 无（直接通过 Metadata 访问） |
 | `charge_count` | int | 青龙/玄武 | 阵营技能充能数 | `GetChargeCount/SetChargeCount/IncrementChargeCount` |
 | `fire_counter` | int | 朱雀 | 离火计数器（每4回合LP+1） | `GetFireCounter/SetFireCounter/IncrementFireCounter` |
+
+### display_name 说明
+
+**通用字段**，所有阵营玩家均拥有：
+- 由客户端通过 MatchJoin metadata 传入
+- 存储在 `Player.Metadata` 中
+- 通过 `BroadcastStateSync` 注入到 `pkg/net.Player.DisplayName` 字段
+- 通过 `WaitingSync` 注入到 `pkg/net.WaitingPlayer.DisplayName` 字段
+- fallback：未传入时默认为 Nakama UserID（UUID）
 
 ### 阵营用途说明
 
