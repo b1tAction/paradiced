@@ -1,11 +1,13 @@
 package hsm
 
 import (
+	"sort"
+
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/errors"
-	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/id"
+	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
@@ -178,6 +180,10 @@ func NewRoundMiniGameState() *RoundMiniGameState {
 func (s *RoundMiniGameState) Enter(ctx *StateContext) {
 	// Start mini-game phase
 	game := ctx.GetGame()
+	// Clear round-level persistent data for new round
+	if game != nil && game.RoundData != nil {
+		game.RoundData.Clear()
+	}
 	s.totalPlayers = len(game.Players)
 	s.resultsReceived = 0
 
@@ -244,6 +250,32 @@ func (s *RoundPrepState) Enter(ctx *StateContext) {
 
 	game := ctx.GetGame()
 	players := game.Players
+
+	// Reorder players by mini-game rank (lower rank goes first).
+	// Stable sort preserves previous relative order for ties/unset ranks.
+	type rankedPlayer struct {
+		player *core.Player
+		rank   int
+		index  int
+	}
+	ranked := make([]rankedPlayer, len(players))
+	for i, p := range players {
+		rank := ctx.GetMiniGameRank(p.ID.UUID())
+		if rank <= 0 {
+			// Unset rank treated as lowest priority.
+			rank = len(players) + 100
+		}
+		ranked[i] = rankedPlayer{player: p, rank: rank, index: i}
+	}
+	sort.SliceStable(ranked, func(i, j int) bool {
+		if ranked[i].rank == ranked[j].rank {
+			return ranked[i].index < ranked[j].index
+		}
+		return ranked[i].rank < ranked[j].rank
+	})
+	for i := range ranked {
+		players[i] = ranked[i].player
+	}
 	for _, player := range players {
 		// Default assignment based on position (will be updated by mini-game results)
 		rank := len(players) // Default to lowest rank

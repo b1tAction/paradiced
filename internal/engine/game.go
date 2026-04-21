@@ -12,19 +12,21 @@ import (
 	"github.com/b1tAction/paradiced/pkg/gamelog"
 	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/b1tAction/paradiced/pkg/rng"
+	"github.com/b1tAction/paradiced/pkg/util"
 )
 
 // Game is the game instance, containing EventBus and all players.
 // Round/Turn state is managed by HSM (single source of truth).
 // Game only stores data, not state.
 type Game struct {
-	ID      id.GameID        `json:"id"`
-	Bus     *event.EventBus  `json:"bus"`
-	Players []*core.Player   `json:"players"`
-	RNG     *rand.Rand       `json:"-"`   // Game unique random source
-	Draw    *rng.DrawEngine  `json:"-"`   // Draw engine for random draws
-	Log     *gamelog.GameLog `json:"log"` // Global game log for playback
-	mutex   sync.RWMutex
+	ID        id.GameID        `json:"id"`
+	Bus       *event.EventBus  `json:"bus"`
+	Players   []*core.Player   `json:"players"`
+	RNG       *rand.Rand       `json:"-"`   // Game unique random source
+	Draw      *rng.DrawEngine  `json:"-"`   // Draw engine for random draws
+	Log       *gamelog.GameLog `json:"log"` // Global game log for playback
+	RoundData *util.Metadata   `json:"-"`   // Round-level persistent data (cleared each round)
+	mutex     sync.RWMutex
 }
 
 // NewGame creates a new game instance.
@@ -38,12 +40,13 @@ func NewGame(gameID id.GameID, seed int64) *Game {
 	rngInst := rand.New(rand.NewSource(rngSource))
 
 	return &Game{
-		ID:      gameID,
-		Bus:     event.NewEventBus(gameID.UUID()),
-		Players: make([]*core.Player, 0),
-		RNG:     rngInst,
-		Draw:    rng.NewDrawEngine(rngInst),
-		Log:     gamelog.NewGameLog(),
+		ID:        gameID,
+		Bus:       event.NewEventBus(gameID.UUID()),
+		Players:   make([]*core.Player, 0),
+		RNG:       rngInst,
+		Draw:      rng.NewDrawEngine(rngInst),
+		Log:       gamelog.NewGameLog(),
+		RoundData: util.NewMetadata(),
 	}
 }
 

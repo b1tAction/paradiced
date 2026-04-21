@@ -7,8 +7,8 @@ import (
 	"github.com/b1tAction/paradiced/internal/engine"
 	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/internal/gamemap"
-	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/constants"
+	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/rng"
 	"github.com/b1tAction/paradiced/pkg/util"
 )
@@ -63,12 +63,17 @@ type State interface {
 // Uses HSM as single source of truth for game data access.
 // Embeds util.Metadata for extensible type-safe key-value storage.
 type StateContext struct {
-	// Embedded Metadata for extensible storage
+	// Embedded Metadata for transient tick-level storage
 	*util.Metadata
 
 	// ========== Single Source of Truth ==========
 	// HSM reference provides access to Game, Bus, MapEngine via getter methods
 	HSM *HSM
+
+	// ========== Round-Level Persistent Data ==========
+	// Reference to Game.RoundData (set by HSM, not owned by StateContext)
+	// Persists across ticks within a round, cleared at round start.
+	RoundData *util.Metadata
 
 	// ========== Current Player ==========
 	Player *core.Player // Current player (direct access, used in Layer 2 states)
@@ -109,8 +114,18 @@ func NewStateContext() *StateContext {
 // ========== HSM Setup ==========
 
 // WithHSM sets the HSM reference (single source of truth).
+// Also sets RoundData reference from Game.RoundData.
 func (ctx *StateContext) WithHSM(hsm *HSM) *StateContext {
 	ctx.HSM = hsm
+	if hsm != nil && hsm.GetGame() != nil {
+		ctx.RoundData = hsm.GetGame().RoundData
+	}
+	return ctx
+}
+
+// WithRoundData sets the RoundData reference directly.
+func (ctx *StateContext) WithRoundData(roundData *util.Metadata) *StateContext {
+	ctx.RoundData = roundData
 	return ctx
 }
 
@@ -301,25 +316,48 @@ func (ctx *StateContext) SetReachedEnd(reached bool) {
 
 // ========== Mini-Game Results ==========
 
-// SetMiniGameRank sets player's mini-game ranking.
+// SetMiniGameRank sets player's mini-game ranking in RoundData.
 func (ctx *StateContext) SetMiniGameRank(playerID string, rank int) {
-	ctx.SetInt("result_"+playerID, rank)
+	if ctx.RoundData == nil {
+		return
+	}
+	ranks := util.GetMapOrDefault(ctx.RoundData, engine.KeyMiniGameRanks, make(map[string]int))
+	ranks[playerID] = rank
+	util.SetMap(ctx.RoundData, engine.KeyMiniGameRanks, ranks)
 }
 
-// GetMiniGameRank retrieves player's mini-game ranking.
+// GetMiniGameRank retrieves player's mini-game ranking from RoundData.
+// Returns 0 if not found.
 func (ctx *StateContext) GetMiniGameRank(playerID string) int {
-	return ctx.GetIntOrDefault("result_"+playerID, 0)
+	if ctx.RoundData == nil {
+		return 0
+	}
+	ranks := util.GetMapOrDefault(ctx.RoundData, engine.KeyMiniGameRanks, make(map[string]int))
+	return ranks[playerID]
 }
 
-// SetDiceType sets player's dice type based on ranking.
+// SetDiceType sets player's dice type based on ranking in RoundData.
 func (ctx *StateContext) SetDiceType(playerID string, diceType rng.DiceType) {
-	ctx.SetInt("dice_"+playerID, int(diceType))
+	if ctx.RoundData == nil {
+		return
+	}
+	types := util.GetMapOrDefault(ctx.RoundData, engine.KeyDiceTypes, make(map[string]int))
+	types[playerID] = int(diceType)
+	util.SetMap(ctx.RoundData, engine.KeyDiceTypes, types)
 }
 
-// GetDiceType retrieves player's dice type.
+// GetDiceType retrieves player's dice type from RoundData.
 // Returns DiceTypeWood if player has no assigned dice.
 func (ctx *StateContext) GetDiceType(playerID string) rng.DiceType {
-	val := ctx.GetIntOrDefault("dice_"+playerID, int(rng.DiceTypeWood))
+	if ctx.RoundData == nil {
+		return rng.DiceTypeWood
+	}
+	types := util.GetMapOrDefault(ctx.RoundData, engine.KeyDiceTypes, make(map[string]int))
+	val := types[playerID]
+	// 0 means not assigned, default to Wood
+	if val == 0 {
+		return rng.DiceTypeWood
+	}
 	return rng.DiceType(val)
 }
 
