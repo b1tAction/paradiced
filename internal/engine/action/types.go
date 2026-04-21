@@ -7,6 +7,7 @@ import (
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/errors"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
+	"github.com/b1tAction/paradiced/pkg/rng"
 	"github.com/b1tAction/paradiced/pkg/util"
 )
 
@@ -208,14 +209,15 @@ func (a *ModifyLPAction) LogEntry() gamelog.LogEntry {
 // ========== MoveAction ==========
 
 // MoveAction represents player movement on map.
-// Can be intercepted by 迷途 Buff to reverse direction.
+// Pure movement: only sets player position. Path calculation is done by HSM layer.
+// Path data is passed via ActionContext.Metadata (target_pos, path).
 type MoveAction struct {
 	TargetPlayer *core.Player   // Player moving
-	Steps        int            // Movement steps (can be negative for reverse)
-	SourceID     string         // Source identifier (usually "DiceRoll")
-	TargetPos    int            // Final position after movement (set by path calculation)
-	Path         []int          // Calculated path (cells visited during movement)
-	Overtaken    []*core.Player // Players overtaken during movement (for 白虎劫运)
+	Steps        int            // Movement steps (may be negative for reverse/迷途)
+	SourceID     string         // Source identifier (e.g., "DiceRoll", "DiceRollCheckpoint")
+	// Internal fields populated during Execute() from ctx.Metadata (for LogEntry)
+	targetPos int
+	path      []int
 }
 
 // NewMoveAction creates a new MoveAction.
@@ -224,7 +226,6 @@ func NewMoveAction(target *core.Player, steps int, sourceID string) *MoveAction 
 		TargetPlayer: target,
 		Steps:        steps,
 		SourceID:     sourceID,
-		Overtaken:    make([]*core.Player, 0),
 	}
 }
 
@@ -233,9 +234,9 @@ func (a *MoveAction) CanModify() bool            { return a.Steps != 0 }
 func (a *MoveAction) Source() string             { return a.SourceID }
 func (a *MoveAction) Target() string             { return a.TargetPlayer.ID.UUID() }
 
-// PreTriggerPhase returns PhasePreMove for interception by 迷途.
+// PreTriggerPhase returns PhaseAnyTime (PhasePreMove is published by HSM, not MoveAction).
 func (a *MoveAction) PreTriggerPhase() constants.Phase {
-	return constants.PhasePreMove
+	return constants.PhaseAnyTime
 }
 
 // PostTriggerPhase returns PhaseAnyTime (no post-trigger for movement).
@@ -244,42 +245,28 @@ func (a *MoveAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *MoveAction) Execute(ctx *ActionContext) error {
-	// Movement execution requires MapEngine
-	if ctx.MapEngine == nil {
-		return errors.NewInternalError("MoveAction", "Execute", nil).
-			WithContext("reason", "map engine is nil")
-	}
 	if a.TargetPlayer == nil {
 		return errors.NewActionExecutionError("move", "", "target player is nil", nil)
 	}
 
-	// Calculate path using MapEngine
-	startPos := a.TargetPlayer.Position
-	result, err := ctx.MapEngine.CalculatePath(startPos, a.Steps)
-	if err != nil {
-		return errors.Wrap(err, "MoveAction", "CalculatePath").
-			WithContext("start_pos", startPos).
-			WithContext("steps", a.Steps)
-	}
+	// Read target_pos and path from ActionContext.Metadata (set by HSM TurnMovingState)
+	a.targetPos = ctx.GetIntOrDefault("target_pos", a.TargetPlayer.Position+a.Steps)
+	a.path = ctx.GetIntSliceOrDefault("path", nil)
 
-	// Update player position
-	a.TargetPlayer.Position = result.TargetIndex
-	a.TargetPos = result.TargetIndex
-	a.Path = result.Path
-
-	// Note: Overtaken players detection would need additional logic
-	// This could be implemented by checking which players were passed during movement
-	// Currently leaving empty as PathResult doesn't track overtaken players
-	a.Overtaken = make([]*core.Player, 0)
-
+	// Pure movement: just set player position
+	a.TargetPlayer.Position = a.targetPos
 	return nil
 }
 
 func (a *MoveAction) LogEntry() gamelog.LogEntry {
 	metadata := util.NewMetadata()
-	metadata.SetInt("start_pos", a.TargetPlayer.Position-a.Steps) // Approximate start
-	metadata.SetInt("end_pos", a.TargetPos)
-	metadata.Set("path", a.Path)
+	startPos := 0
+	if len(a.path) > 0 {
+		startPos = a.path[0]
+	}
+	metadata.SetInt("start_pos", startPos)
+	metadata.SetInt("end_pos", a.TargetPlayer.Position)
+	metadata.Set("path", a.path)
 	metadata.SetInt("steps", a.Steps)
 
 	return gamelog.LogEntry{
@@ -293,12 +280,9 @@ func (a *MoveAction) LogEntry() gamelog.LogEntry {
 }
 
 // Overtook checks if this move overtook a specific player.
+// Overtaken detection is done by HSM layer.
 func (a *MoveAction) Overtook(player *core.Player) bool {
-	for _, p := range a.Overtaken {
-		if p.ID.Equal(player.ID.ID) {
-			return true
-		}
-	}
+	// Overtaken data will be managed by HSM in future
 	return false
 }
 
@@ -580,12 +564,17 @@ func (a *DrawEventAction) Execute(ctx *ActionContext) error {
 		return errors.NewInternalError("DrawEventAction", "Execute", nil).
 			WithContext("reason", "draw engine is nil")
 	}
+	if ctx.EventPool == nil {
+		return errors.NewInternalError("DrawEventAction", "Execute", nil).
+			WithContext("reason", "event pool is nil")
+	}
+	if a.TargetPlayer == nil {
+		return errors.NewActionExecutionError("draw_event", "", "target player is nil", nil)
+	}
 
-	// TODO: After engine Registry is created, implement proper event drawing
-	// Currently placeholder - needs pool data from engine layer
-
-	// Placeholder for future implementation
-	a.DrawnType = constants.EventTypeNone
+	// Draw event type from pool using player's LP for weight calculation
+	drawnType := ctx.DrawEngine.DrawFromPool(ctx.EventPool, rng.PoolTypeGood, a.TargetPlayer.LP)
+	a.DrawnType = constants.ParseEventType(drawnType)
 	a.DrawnName = ""
 
 	return nil
@@ -601,15 +590,86 @@ func (a *DrawEventAction) LogEntry() gamelog.LogEntry {
 		Metadata:   util.NewMetadata(),
 	}
 
-	// Add event type and name to metadata
+	// Add event type to metadata (client uses event_type to look up local definition table)
 	if a.DrawnType.IsValid() {
 		entry.Metadata.SetString("event_type", string(a.DrawnType))
 	}
-	if a.DrawnName != "" {
-		entry.Metadata.SetString("event_name", a.DrawnName)
-	}
 
 	return entry
+}
+
+// ========== DrawItemAction ==========
+
+// DrawItemAction represents drawing a random item (e.g. from CheckPoint treasure).
+// No interception - auto draw, cannot be blocked.
+type DrawItemAction struct {
+	TargetPlayer *core.Player          // Player drawing item
+	SourceID     string                // Source identifier (e.g., "CheckpointTreasure")
+	DrawnType    constants.ItemType    // Item type drawn (set after Execute)
+}
+
+// NewDrawItemAction creates a new DrawItemAction.
+func NewDrawItemAction(target *core.Player, sourceID string) *DrawItemAction {
+	return &DrawItemAction{
+		TargetPlayer: target,
+		SourceID:     sourceID,
+	}
+}
+
+func (a *DrawItemAction) Type() constants.ActionType { return constants.ActionDrawItem }
+func (a *DrawItemAction) CanModify() bool            { return false }
+func (a *DrawItemAction) Source() string             { return a.SourceID }
+func (a *DrawItemAction) Target() string             { return a.TargetPlayer.ID.UUID() }
+
+// PreTriggerPhase returns PhaseAnyTime (draw item cannot be intercepted).
+func (a *DrawItemAction) PreTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
+}
+
+// PostTriggerPhase returns PhaseAnyTime (no post-trigger for draw item).
+func (a *DrawItemAction) PostTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
+}
+
+func (a *DrawItemAction) Execute(ctx *ActionContext) error {
+	// Draw item requires DrawEngine and pool data
+	if ctx.DrawEngine == nil {
+		return errors.NewInternalError("DrawItemAction", "Execute", nil).
+			WithContext("reason", "draw engine is nil")
+	}
+	if ctx.ItemPool == nil {
+		return errors.NewInternalError("DrawItemAction", "Execute", nil).
+			WithContext("reason", "item pool is nil")
+	}
+	if a.TargetPlayer == nil {
+		return errors.NewActionExecutionError("draw_item", "", "target player is nil", nil)
+	}
+
+	// Draw item type from pool using player's LP for weight calculation
+	drawnType := ctx.DrawEngine.DrawFromPool(ctx.ItemPool, rng.PoolTypeGood, a.TargetPlayer.LP)
+	a.DrawnType = constants.ParseItemType(drawnType)
+
+	// Add drawn item to player's inventory
+	if a.DrawnType != constants.ItemTypeNone && a.DrawnType.IsValid() {
+		newItem := core.NewItem(a.DrawnType)
+		a.TargetPlayer.AddItem(newItem)
+	}
+
+	return nil
+}
+
+func (a *DrawItemAction) LogEntry() gamelog.LogEntry {
+	metadata := util.NewMetadata()
+	metadata.SetString("item_type", string(a.DrawnType))
+
+	return gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       constants.EntryTypeAction,
+		ActionType: string(a.Type()),
+		Target:     a.TargetPlayer.ID.UUID(),
+		Source:     a.SourceID,
+		Metadata:   metadata,
+	}
 }
 
 // ========== RespawnAction ==========

@@ -1,14 +1,15 @@
 package action
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/event"
-	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
 	"github.com/b1tAction/paradiced/pkg/id"
+	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
 // mockGame implements protocol.Game for testing
@@ -571,9 +572,17 @@ func TestLogEntryMetadata(t *testing.T) {
 	player.Position = 10
 
 	// Test MoveAction LogEntry with metadata
+	// MoveAction now reads target_pos and path from ActionContext.Metadata
 	action := NewMoveAction(player, 5, "DiceRoll")
-	action.TargetPos = 15
-	action.Path = []int{10, 11, 12, 13, 14, 15}
+
+	ctx := NewActionContext(nil, nil, nil, nil)
+	ctx.SetInt("target_pos", 15)
+	ctx.Set("path", []int{10, 11, 12, 13, 14, 15})
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
 
 	entry := action.LogEntry()
 
@@ -583,8 +592,8 @@ func TestLogEntryMetadata(t *testing.T) {
 
 	// Use type-safe metadata access
 	startPos := entry.Metadata.GetIntOrDefault("start_pos", -1)
-	if startPos != 5 { // 10 - 5 = 5
-		t.Errorf("start_pos should be 5, got %d", startPos)
+	if startPos != 10 { // Path[0] = 10
+		t.Errorf("start_pos should be 10, got %d", startPos)
 	}
 
 	endPos := entry.Metadata.GetIntOrDefault("end_pos", -1)
@@ -704,8 +713,8 @@ func TestMoveActionFull(t *testing.T) {
 	if action.Target() != player.ID.UUID() {
 		t.Errorf("Target mismatch")
 	}
-	if action.PreTriggerPhase() != constants.PhasePreMove {
-		t.Errorf("PreTriggerPhase should be PhasePreMove, got %s", action.PreTriggerPhase())
+	if action.PreTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PreTriggerPhase should be PhaseAnyTime (HSM publishes PhasePreMove), got %s", action.PreTriggerPhase())
 	}
 	if action.PostTriggerPhase() != constants.PhaseAnyTime {
 		t.Errorf("PostTriggerPhase should be PhaseAnyTime, got %s", action.PostTriggerPhase())
@@ -721,16 +730,9 @@ func TestMoveActionOvertook(t *testing.T) {
 
 	action := NewMoveAction(player, 5, "DiceRoll")
 
-	// Initially no overtaken players
+	// Overtaken detection is handled by HSM layer, MoveAction.Overtook always returns false
 	if action.Overtook(other) {
-		t.Error("Should not have overtaken initially")
-	}
-
-	// Add overtaken player
-	action.Overtaken = []*core.Player{other}
-
-	if !action.Overtook(other) {
-		t.Error("Should have overtaken the other player")
+		t.Error("MoveAction.Overtook should always return false (HSM handles overtaken)")
 	}
 }
 
@@ -1195,13 +1197,14 @@ func TestActionPhases(t *testing.T) {
 		{"DamageAction", NewDamageAction(player, 10, "test"), constants.PhasePreDamage, constants.PhaseAnyTime},
 		{"HealAction", NewHealAction(player, 10, "test"), constants.PhaseAnyTime, constants.PhaseAnyTime},
 		{"ModifyLPAction", NewModifyLPAction(player, 1, "test"), constants.PhaseAnyTime, constants.PhaseAnyTime},
-		{"MoveAction", NewMoveAction(player, 5, "test"), constants.PhasePreMove, constants.PhaseAnyTime},
+		{"MoveAction", NewMoveAction(player, 5, "test"), constants.PhaseAnyTime, constants.PhaseAnyTime},
 		{"AddBuffAction", NewAddBuffAction(player, constants.BuffTypeDivine, 3, "test"), constants.PhasePreBuffApplied, constants.PhasePostBuffApplied},
 		{"RemoveBuffAction", NewRemoveBuffAction(player, constants.BuffTypeDivine, "test"), constants.PhasePreBuffRemoved, constants.PhasePostBuffRemoved},
 		{"RespawnAction", NewRespawnAction(player, 50, "test"), constants.PhasePreRespawn, constants.PhaseAnyTime},
 		{"TeleportAction", NewTeleportAction(player, 20, "test"), constants.PhaseAnyTime, constants.PhaseAnyTime},
 		{"FellDownAction", NewFellDownAction(player, 10, 1, "test"), constants.PhaseAnyTime, constants.PhaseAnyTime},
 		{"DrawEventAction", NewDrawEventAction(player, "test"), constants.PhasePreEvent, constants.PhaseAnyTime},
+		{"DrawItemAction", NewDrawItemAction(player, "test"), constants.PhaseAnyTime, constants.PhaseAnyTime},
 	}
 
 	for _, tt := range tests {
@@ -1253,15 +1256,11 @@ func TestDrawEventActionLogEntry(t *testing.T) {
 		t.Errorf("Log ActionType should be draw_event, got %s", entry.ActionType)
 	}
 
-	// With drawn event
+	// With drawn event (only event_type in metadata, client uses event_type to look up local definition)
 	action.DrawnType = constants.EventTypeHerb
-	action.DrawnName = "Treasure"
 	entry = action.LogEntry()
 	if entry.Metadata.GetStringOrDefault("event_type", "") != "herb" {
 		t.Errorf("Log event_type should be herb, got %s", entry.Metadata.GetStringOrDefault("event_type", ""))
-	}
-	if entry.Metadata.GetStringOrDefault("event_name", "") != "Treasure" {
-		t.Errorf("Log event_name should be Treasure, got %s", entry.Metadata.GetStringOrDefault("event_name", ""))
 	}
 }
 
@@ -1326,43 +1325,47 @@ func TestMoveActionExecuteWithMapEngine(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.Position = 5
 
-	// Create a real MapEngine
-	mapEngine := gamemap.NewMapEngine(50)
-
+	// MoveAction is now pure movement - reads target_pos and path from ActionContext.Metadata
 	action := NewMoveAction(player, 10, "DiceRoll")
 
-	ctx := NewActionContext(nil, nil, mapEngine, nil)
-	err := action.Execute(ctx)
+	ctx := NewActionContext(nil, nil, nil, nil)
+	ctx.SetInt("target_pos", 15) // HSM sets this via CalculatePath result
+	ctx.Set("path", []int{5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15})
 
+	err := action.Execute(ctx)
 	if err != nil {
 		t.Errorf("MoveAction Execute failed: %v", err)
 	}
 
-	// Position should be updated
-	if action.TargetPos <= 5 {
-		t.Errorf("TargetPos should be greater than 5, got %d", action.TargetPos)
-	}
-	if len(action.Path) == 0 {
-		t.Error("Path should not be empty")
+	// Position should be updated to target_pos
+	if player.Position != 15 {
+		t.Errorf("Position should be 15, got %d", player.Position)
 	}
 }
 
 func TestMoveActionExecuteNilMapEngine(t *testing.T) {
+	// MoveAction no longer needs MapEngine - reads target_pos from ActionContext.Metadata
+	// Without target_pos metadata, it falls back to position + steps
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.Position = 5
 	action := NewMoveAction(player, 5, "test")
 
 	ctx := NewActionContext(nil, nil, nil, nil)
 	err := action.Execute(ctx)
 
-	if err == nil {
-		t.Error("MoveAction with nil MapEngine should return error")
+	// Should succeed - uses fallback position + steps
+	if err != nil {
+		t.Errorf("MoveAction without MapEngine should succeed using fallback: %v", err)
+	}
+	if player.Position != 10 { // 5 + 5 = 10
+		t.Errorf("Position should be 10, got %d", player.Position)
 	}
 }
 
 func TestMoveActionExecuteNilPlayer(t *testing.T) {
 	action := NewMoveAction(nil, 5, "test")
 
-	ctx := NewActionContext(nil, nil, gamemap.NewMapEngine(50), nil)
+	ctx := NewActionContext(nil, nil, nil, nil)
 	err := action.Execute(ctx)
 
 	if err == nil {
@@ -1374,19 +1377,20 @@ func TestMoveActionNegativeSteps(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.Position = 10
 
-	mapEngine := gamemap.NewMapEngine(50)
+	// MoveAction with negative steps - HSM provides target_pos via CalculatePath
 	action := NewMoveAction(player, -5, "ReverseMove")
 
-	ctx := NewActionContext(nil, nil, mapEngine, nil)
+	ctx := NewActionContext(nil, nil, nil, nil)
+	ctx.SetInt("target_pos", 5) // HSM calculates target from reverse movement
 	err := action.Execute(ctx)
 
 	if err != nil {
 		t.Errorf("MoveAction with negative steps should not error: %v", err)
 	}
 
-	// Position should be lower (reverse movement)
-	if action.TargetPos >= 10 {
-		t.Errorf("TargetPos should be less than 10 for negative steps, got %d", action.TargetPos)
+	// Position should be set to target_pos
+	if player.Position != 5 {
+		t.Errorf("Position should be 5 for reverse movement, got %d", player.Position)
 	}
 }
 
@@ -1459,5 +1463,192 @@ func TestAddBuffActionExecute(t *testing.T) {
 
 	if len(player.ActiveBuffs) != 1 {
 		t.Errorf("Player should have 1 buff, got %d", len(player.ActiveBuffs))
+	}
+}
+
+// ========== DrawEventAction Pool Execution Tests ==========
+
+func TestDrawEventActionExecuteWithPool(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.LP = 3
+
+	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
+	eventPool := &rng.EvaluatedItemPool{
+		Items: []rng.EvaluatedItem{
+			{Type: "herb", Eval: constants.EvaluationMildGood},
+			{Type: "milk_tea", Eval: constants.EvaluationGood},
+		},
+	}
+
+	action := NewDrawEventAction(player, "CellEvent")
+	ctx := NewActionContext(nil, nil, nil, drawEngine)
+	ctx.EventPool = eventPool
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Errorf("Execute should succeed with pool, got error: %v", err)
+	}
+
+	// DrawnType should be set from pool draw
+	if action.DrawnType == constants.EventTypeNone {
+		t.Error("DrawnType should not be EventTypeNone after pool draw")
+	}
+	if !action.DrawnType.IsValid() {
+		t.Errorf("DrawnType should be valid, got %s", action.DrawnType)
+	}
+
+	// Verify log entry has event_type metadata
+	entry := action.LogEntry()
+	if entry.Metadata.GetStringOrDefault("event_type", "") != string(action.DrawnType) {
+		t.Errorf("Log event_type should be %s, got %s", action.DrawnType, entry.Metadata.GetStringOrDefault("event_type", ""))
+	}
+}
+
+func TestDrawEventActionNilEventPool(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
+
+	action := NewDrawEventAction(player, "CellEvent")
+	ctx := NewActionContext(nil, nil, nil, drawEngine)
+	// EventPool is nil
+
+	err := action.Execute(ctx)
+	if err == nil {
+		t.Error("Execute with nil EventPool should return error")
+	}
+}
+
+func TestDrawEventActionNilPlayer(t *testing.T) {
+	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
+	eventPool := &rng.EvaluatedItemPool{
+		Items: []rng.EvaluatedItem{
+			{Type: "herb", Eval: constants.EvaluationMildGood},
+		},
+	}
+
+	action := NewDrawEventAction(nil, "CellEvent")
+	ctx := NewActionContext(nil, nil, nil, drawEngine)
+	ctx.EventPool = eventPool
+
+	err := action.Execute(ctx)
+	if err == nil {
+		t.Error("Execute with nil player should return error")
+	}
+}
+
+func TestDrawEventActionEmptyPool(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
+	eventPool := &rng.EvaluatedItemPool{Items: []rng.EvaluatedItem{}}
+
+	action := NewDrawEventAction(player, "CellEvent")
+	ctx := NewActionContext(nil, nil, nil, drawEngine)
+	ctx.EventPool = eventPool
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Errorf("Execute with empty pool should succeed (returns empty string), got: %v", err)
+	}
+	// Empty pool returns empty string → EventTypeNone
+	if action.DrawnType != constants.EventTypeNone {
+		t.Errorf("DrawnType should be EventTypeNone for empty pool, got %s", action.DrawnType)
+	}
+}
+
+// ========== DrawItemAction Pool Execution Tests ==========
+
+func TestDrawItemActionExecuteWithPool(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+
+	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
+	itemPool := &rng.EvaluatedItemPool{
+		Items: []rng.EvaluatedItem{
+			{Type: "reverse_clock", Eval: constants.EvaluationGood},
+		},
+	}
+
+	action := NewDrawItemAction(player, "CheckpointTreasure")
+	ctx := NewActionContext(nil, nil, nil, drawEngine)
+	ctx.ItemPool = itemPool
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Errorf("Execute should succeed with pool, got error: %v", err)
+	}
+
+	// DrawnType should be set from pool draw
+	if action.DrawnType == constants.ItemTypeNone {
+		t.Error("DrawnType should not be ItemTypeNone after pool draw")
+	}
+	if !action.DrawnType.IsValid() {
+		t.Errorf("DrawnType should be valid, got %s", action.DrawnType)
+	}
+
+	// Item should be added to player inventory
+	if len(player.Inventory) != 1 {
+		t.Errorf("Player should have 1 item in inventory, got %d", len(player.Inventory))
+	}
+	if player.Inventory[0].Type != action.DrawnType {
+		t.Errorf("Item type should match DrawnType, got %s vs %s", player.Inventory[0].Type, action.DrawnType)
+	}
+
+	// Verify log entry has item_type metadata
+	entry := action.LogEntry()
+	if entry.Metadata.GetStringOrDefault("item_type", "") != string(action.DrawnType) {
+		t.Errorf("Log item_type should be %s, got %s", action.DrawnType, entry.Metadata.GetStringOrDefault("item_type", ""))
+	}
+}
+
+func TestDrawItemActionNilItemPool(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
+
+	action := NewDrawItemAction(player, "CheckpointTreasure")
+	ctx := NewActionContext(nil, nil, nil, drawEngine)
+	// ItemPool is nil
+
+	err := action.Execute(ctx)
+	if err == nil {
+		t.Error("Execute with nil ItemPool should return error")
+	}
+}
+
+func TestDrawItemActionNilPlayer(t *testing.T) {
+	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
+	itemPool := &rng.EvaluatedItemPool{
+		Items: []rng.EvaluatedItem{
+			{Type: "reverse_clock", Eval: constants.EvaluationGood},
+		},
+	}
+
+	action := NewDrawItemAction(nil, "CheckpointTreasure")
+	ctx := NewActionContext(nil, nil, nil, drawEngine)
+	ctx.ItemPool = itemPool
+
+	err := action.Execute(ctx)
+	if err == nil {
+		t.Error("Execute with nil player should return error")
+	}
+}
+
+func TestDrawItemActionEmptyPool(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
+	itemPool := &rng.EvaluatedItemPool{Items: []rng.EvaluatedItem{}}
+
+	action := NewDrawItemAction(player, "CheckpointTreasure")
+	ctx := NewActionContext(nil, nil, nil, drawEngine)
+	ctx.ItemPool = itemPool
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Errorf("Execute with empty pool should succeed, got: %v", err)
+	}
+	// Empty pool → ItemTypeNone, no item added
+	if action.DrawnType != constants.ItemTypeNone {
+		t.Errorf("DrawnType should be ItemTypeNone for empty pool, got %s", action.DrawnType)
+	}
+	if len(player.Inventory) != 0 {
+		t.Errorf("Player should have no items for empty pool, got %d", len(player.Inventory))
 	}
 }

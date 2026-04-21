@@ -18,23 +18,25 @@ import (
 type ActionContext struct {
 	*util.Metadata // Embedded for extensible storage
 
-	Game         protocol.Game      // Game instance (interface to avoid circular dependency with engine)
-	EventBus     *event.EventBus    // EventBus for interception (nil if no interception)
-	MapEngine    *gamemap.MapEngine // MapEngine for movement calculation (direct type)
-	DrawEngine   *rng.DrawEngine    // DrawEngine for random draws (events, buffs, items)
-	ActionQueue  *Queue             // Queue for derived actions
-	CurrentPlayer *core.Player      // Current player (set by HSM, nil if not in turn)
+	Game          protocol.Game         // Game instance (interface to avoid circular dependency with engine)
+	EventBus      *event.EventBus       // EventBus for interception (nil if no interception)
+	MapEngine     *gamemap.MapEngine    // MapEngine for movement calculation (direct type)
+	DrawEngine    *rng.DrawEngine       // DrawEngine for random draws (events, buffs, items)
+	EventPool     *rng.EvaluatedItemPool // Event pool for DrawEventAction
+	ItemPool      *rng.EvaluatedItemPool // Item pool for DrawItemAction
+	ActionQueue   *Queue                // Queue for derived actions
+	CurrentPlayer *core.Player          // Current player (set by HSM, nil if not in turn)
 }
 
 // NewActionContext creates a new ActionContext with required components.
 func NewActionContext(game protocol.Game, bus *event.EventBus, mapEngine *gamemap.MapEngine, drawEngine *rng.DrawEngine) *ActionContext {
 	return &ActionContext{
-		Metadata:    util.NewMetadata(),
-		Game:        game,
-		EventBus:    bus,
-		MapEngine:   mapEngine,
-		DrawEngine:  drawEngine,
-		ActionQueue: NewQueue(),
+		Metadata:      util.NewMetadata(),
+		Game:          game,
+		EventBus:      bus,
+		MapEngine:     mapEngine,
+		DrawEngine:    drawEngine,
+		ActionQueue:   NewQueue(),
 		CurrentPlayer: nil, // Set separately via SetCurrentPlayer
 	}
 }
@@ -42,14 +44,21 @@ func NewActionContext(game protocol.Game, bus *event.EventBus, mapEngine *gamema
 // NewActionContextWithPlayer creates a new ActionContext with current player.
 func NewActionContextWithPlayer(game protocol.Game, bus *event.EventBus, mapEngine *gamemap.MapEngine, drawEngine *rng.DrawEngine, player *core.Player) *ActionContext {
 	return &ActionContext{
-		Metadata:     util.NewMetadata(),
-		Game:         game,
-		EventBus:     bus,
-		MapEngine:    mapEngine,
-		DrawEngine:   drawEngine,
-		ActionQueue:  NewQueue(),
+		Metadata:      util.NewMetadata(),
+		Game:          game,
+		EventBus:      bus,
+		MapEngine:     mapEngine,
+		DrawEngine:    drawEngine,
+		ActionQueue:   NewQueue(),
 		CurrentPlayer: player,
 	}
+}
+
+// SetPools sets the event and item pools for draw actions.
+func (ctx *ActionContext) SetPools(eventPool, itemPool *rng.EvaluatedItemPool) *ActionContext {
+	ctx.EventPool = eventPool
+	ctx.ItemPool = itemPool
+	return ctx
 }
 
 // SetCurrentPlayer sets the current player for trigger context.
