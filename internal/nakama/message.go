@@ -432,6 +432,10 @@ func (h *NakamaMatchHandler) handleMiniGameResult(sender string, data []byte) er
 		return h.sendActionRejectedWithCode(sender, pkgnet.OpMiniGameResultSubmit, constants.ErrInternal, ctx.Error.Error())
 	}
 
+	// Keep dice manager assignment in sync with submitted mini-game rank.
+	// RollDice currently uses sender(userID) as dice key.
+	h.diceMgr.AssignDice(sender, req.Rank)
+
 	logger.logResponse("OpMiniGameResultSubmit", sender, "result submitted")
 	return nil
 }

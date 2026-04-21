@@ -8,8 +8,8 @@ import (
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
 	"github.com/b1tAction/paradiced/internal/net"
 	"github.com/b1tAction/paradiced/pkg/constants"
-	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/id"
+	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 )
 
 // MatchInit initializes the match when created.
@@ -146,7 +146,7 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 	if h.logger != nil {
 		h.logger.Debug("MatchLoop: updating HSM")
 	}
-	nextState, err := h.hsm.Update(ctx)
+	_, err := h.hsm.Update(ctx)
 	if err != nil {
 		if h.logger != nil {
 			h.logger.Error("MatchLoop: HSM update failed", "error", err)
@@ -166,14 +166,11 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 		return h.broadcastErrorState(errCode, ctx.Error.Error())
 	}
 
-	// Handle state transitions
-	if nextState != hsm.StateNone {
-		if h.logger != nil {
-			h.logger.Debug("MatchLoop: transitioning to state", "next_state", nextState.String())
-		}
-		// Transition to new state
-		h.hsm.TransitionTo(nextState, ctx)
-	}
+	// NOTE:
+	// h.hsm.Update(ctx) already performs TransitionTo(nextState, ctx) internally
+	// when a state returns nextState != StateNone.
+	// Do NOT transition again here, otherwise Enter() side effects (for example
+	// BroadcastMiniGameStart) will execute twice.
 
 	// Handle waiting for decisions - send decision request to current player
 	if h.hsm.IsWaiting() {
