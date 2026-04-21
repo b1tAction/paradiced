@@ -19,13 +19,15 @@ import (
 // Round/Turn state is managed by HSM (single source of truth).
 // Game only stores data, not state.
 type Game struct {
-	ID        id.GameID        `json:"id"`
-	Bus       *event.EventBus  `json:"bus"`
-	Players   []*core.Player   `json:"players"`
-	RNG       *rand.Rand       `json:"-"`   // Game unique random source
-	Draw      *rng.DrawEngine  `json:"-"`   // Draw engine for random draws
-	Log       *gamelog.GameLog `json:"log"` // Global game log for playback
-	RoundData *util.Metadata   `json:"-"`   // Round-level persistent data (cleared each round)
+	ID        id.GameID           `json:"id"`
+	Bus       *event.EventBus     `json:"bus"`
+	Players   []*core.Player      `json:"players"`
+	RNG       *rand.Rand          `json:"-"`   // Game unique random source
+	Draw      *rng.DrawEngine     `json:"-"`   // Draw engine for random draws
+	Log       *gamelog.GameLog    `json:"log"` // Global game log for playback
+	RoundData *util.Metadata      `json:"-"`   // Round-level persistent data (cleared each round)
+	EventPool *rng.EvaluatedItemPool `json:"-"` // Event pool for DrawEventAction
+	ItemPool  *rng.EvaluatedItemPool `json:"-"` // Item pool for DrawItemAction
 	mutex     sync.RWMutex
 }
 

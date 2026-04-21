@@ -12,6 +12,14 @@ import (
 // Defined in engine layer to maintain correct dependency direction.
 type EffectHandler func(phase constants.Phase, ctx *event.Context) error
 
+// StepsModifier is an interface for state objects that hold movement steps.
+// Used by 迷途 handler to reverse movement direction without importing HSM package.
+// TurnMovingState implements this interface.
+type StepsModifier interface {
+	GetSteps() int
+	SetSteps(steps int)
+}
+
 // BuffHandlerConfig contains effect logic and execution configuration.
 type BuffHandlerConfig struct {
 	Phases      []constants.Phase `json:"phases"`
@@ -393,19 +401,24 @@ func handleLostReverse(phase constants.Phase, ctx *event.Context) error {
 	if ctx == nil {
 		return nil
 	}
-	ctx.SetBool("reverse_movement", true)
 
-	raw, ok := ctx.Get("current_action")
+	// Get TurnMovingState from context (passed as StepsModifier interface)
+	raw, ok := ctx.Get("current_state")
 	if !ok {
 		return nil
 	}
 
-	moveAction, ok := raw.(*engineaction.MoveAction)
-	if !ok || moveAction == nil {
+	movingState, ok := raw.(StepsModifier)
+	if !ok || movingState == nil {
 		return nil
 	}
 
-	moveAction.Steps = -moveAction.Steps
+	// Reverse steps (prevent double-flip: if Steps < 0, it's already reversed)
+	if movingState.GetSteps() > 0 {
+		movingState.SetSteps(-movingState.GetSteps())
+	}
+
+	ctx.SetBool("reverse_movement", true) // For logging/debugging
 	return nil
 }
 

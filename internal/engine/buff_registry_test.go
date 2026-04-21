@@ -276,8 +276,10 @@ func TestCorruptBuffHandlerBehavior(t *testing.T) {
 
 func TestLostBuffHandlerBehavior(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	mockState := &mockStepsModifier{steps: 3}
 
 	ctx := event.NewContext(player)
+	ctx.Set("current_state", mockState)
 
 	handler := GetBuffHandlerConfig(constants.BuffTypeLost).Handler
 	handler(constants.PhasePreMove, ctx)
@@ -289,6 +291,11 @@ func TestLostBuffHandlerBehavior(t *testing.T) {
 	}
 	if !reverse {
 		t.Error("reverse_movement should be true")
+	}
+
+	// Steps should be reversed
+	if mockState.steps != -3 {
+		t.Errorf("steps should be -3 (reversed), got %d", mockState.steps)
 	}
 }
 
@@ -445,19 +452,45 @@ func TestRainAndCorruptDerivedActions(t *testing.T) {
 	}
 }
 
-func TestLostBuffMutatesMoveAction(t *testing.T) {
+func TestLostBuffMutatesSteps(t *testing.T) {
+	// Test 迷途 handler reverses Steps via StepsModifier interface
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
-	move := engineaction.NewMoveAction(player, 4, "DiceRoll")
+
+	// Create a mock StepsModifier for testing (since TurnMovingState is in hsm package)
+	mockState := &mockStepsModifier{steps: 4}
 
 	ctx := event.NewContext(player)
-	ctx.Set("current_action", move)
+	ctx.Set("current_state", mockState)
 
 	handler := GetBuffHandlerConfig(constants.BuffTypeLost).Handler
 	handler(constants.PhasePreMove, ctx)
 
-	if move.Steps != -4 {
-		t.Fatalf("move.Steps = %d, want -4", move.Steps)
+	if mockState.steps != -4 {
+		t.Fatalf("steps = %d, want -4 (reversed by 迷途)", mockState.steps)
 	}
+
+	// Test double-flip protection: Steps < 0 should NOT be flipped again
+	mockState.steps = -3
+	ctx2 := event.NewContext(player)
+	ctx2.Set("current_state", mockState)
+	handler(constants.PhasePreMove, ctx2)
+
+	if mockState.steps != -3 {
+		t.Fatalf("steps = %d, want -3 (double-flip protection, should not change)", mockState.steps)
+	}
+}
+
+// mockStepsModifier implements StepsModifier for testing 迷途 handler.
+type mockStepsModifier struct {
+	steps int
+}
+
+func (m *mockStepsModifier) GetSteps() int {
+	return m.steps
+}
+
+func (m *mockStepsModifier) SetSteps(steps int) {
+	m.steps = steps
 }
 
 // ========== Edge Case Tests: nil player/context ==========
