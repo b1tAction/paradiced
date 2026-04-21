@@ -72,7 +72,7 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 #### Action System (`internal/engine/action`)
 - **ActionType**: String type with snake_case naming (damage, heal, move, etc.)
 - **Action interface**: Core interface with PreTriggerPhase/PostTriggerPhase
-- **ExecutableAction**: Concrete implementations (DamageAction, HealAction, RespawnAction, FellDownAction, etc.)
+- **ExecutableAction**: Concrete implementations (DamageAction, HealAction, RespawnAction, FellDownAction, DrawItemAction, DrawEventAction, etc.)
 - **ActionContext**: Execution context with EventBus and global GameLog integration
 
 #### Protocol Layer (`pkg/net`)
@@ -134,12 +134,12 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 #### HSM System (`internal/engine/hsm`)
 - **HSM**: Hierarchical State Machine with three layers
 - **Global States**: MatchInit, RoundMiniGame, RoundPrep, TurnLoop, BossBattle, GameOver
-- **Turn States**: TurnUpkeep, MainAction, TurnMoving, TurnLanded, TurnEvent, TurnEnd
+- **Turn States**: TurnUpkeep, MainAction, TurnMoving, TurnCheckpoint, TurnLanded, TurnEvent, TurnEnd
 - **Interrupt States**: WaitDecision for user input
 
 #### Map System (`internal/gamemap`)
 - **MapEngine**: Linear map generation and path calculation
-- **CellType**: Alias to constants.CellType - Normal, Fragile, Fog, Checkpoint, Boss
+- **CellType**: Alias to constants.CellType - Normal, Fragile, Fog, Checkpoint, Boss, Event
 - **PathResult**: Movement calculation with Fragile/Fog handling
 
 #### RNG Engine (`pkg/rng`)
@@ -160,7 +160,7 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 
 1. **BeforeTurn** (HSM publishes): Trigger BeforeTurn phase effects (神眷/诅咒 LP±1, 离火 every 4 turns)
 2. **MainAction**: Player can use items or faction skills
-3. **PreMove** (Action publishes): MoveAction triggers PreMove phase for 迷途 interception
+3. **PreMove** (HSM publishes): TurnMovingState publishes PreMove, 迷途 handler modifies Steps via StepsModifier interface
 4. **OnLand** (HSM publishes): Trigger landing events
 5. **PreEvent** (Action publishes): DrawEventAction triggers PreEvent for 辟邪/玄武
 6. **AfterTurn** (HSM publishes): Tick Buff durations, trigger AfterTurn effects
