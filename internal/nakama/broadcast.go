@@ -49,7 +49,7 @@ func (a *NakamaBroadcastAdapter) BroadcastStateSync(state *net.StateSync) error 
 		return nil // No dispatcher set
 	}
 
-	// Inject ClientID into each Player for client-side self-identification
+	// Inject ClientID and DisplayName into each Player for client-side self-identification
 	// Each client will find themselves in the Players array by matching ClientID
 	if state != nil && a.handler != nil {
 		for i := range state.Players {
@@ -57,6 +57,8 @@ func (a *NakamaBroadcastAdapter) BroadcastStateSync(state *net.StateSync) error 
 			for userID, player := range a.handler.players {
 				if player != nil && player.ID.UUID() == state.Players[i].PlayerID {
 					state.Players[i].ClientID = userID
+					// Extract display_name from Player.Metadata, fallback to userID
+					state.Players[i].DisplayName = player.Metadata.GetStringOrDefault("display_name", userID)
 					break
 				}
 			}

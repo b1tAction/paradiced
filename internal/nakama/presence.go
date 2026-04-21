@@ -26,6 +26,19 @@ func parseFactionFromMetadata(metadata *util.Metadata) constants.Faction {
 	return constants.FactionQingLong
 }
 
+func parseDisplayNameFromMetadata(metadata *util.Metadata, userID string) string {
+	if metadata == nil {
+		return userID // fallback to userID
+	}
+
+	displayName := metadata.GetStringOrDefault("display_name", "")
+	if displayName == "" {
+		return userID // fallback to userID
+	}
+
+	return displayName
+}
+
 // HandlePresenceJoin handles a player joining the match.
 // Called by Nakama when a new player joins the match.
 func (h *NakamaMatchHandler) HandlePresenceJoin(userID string, metadata *util.Metadata) error {
@@ -57,9 +70,10 @@ func (h *NakamaMatchHandler) HandlePresenceJoin(userID string, metadata *util.Me
 		return fmt.Errorf("match is full")
 	}
 
-	// Get faction from metadata (if provided)
+	// Get faction and display name from metadata (if provided)
 	faction := parseFactionFromMetadata(metadata)
-	h.logDebug("HandlePresenceJoin: faction determined", "user_id", userID, "faction", faction)
+	displayName := parseDisplayNameFromMetadata(metadata, userID)
+	h.logDebug("HandlePresenceJoin: faction and display_name determined", "user_id", userID, "faction", faction, "display_name", displayName)
 
 	// Set hostUserID for first player joining
 	if len(h.playerList) == 0 {
@@ -67,8 +81,8 @@ func (h *NakamaMatchHandler) HandlePresenceJoin(userID string, metadata *util.Me
 		h.logInfo("HandlePresenceJoin: host set", "user_id", userID)
 	}
 
-	// Add player to match (faction set via PlayerConfig)
-	player := h.addPlayer(userID, faction)
+	// Add player to match (faction and displayName set via PlayerConfig and Metadata)
+	player := h.addPlayer(userID, faction, displayName)
 
 	// Initialize game when first player joins (enter WaitingForHost state)
 	// This allows manual start instead of auto-start at max players
@@ -284,9 +298,10 @@ func (h *NakamaMatchHandler) broadcastWaitingSyncToHost() {
 			continue
 		}
 		waitingPlayers[i] = pkgnet.WaitingPlayer{
-			UserID:  userID,
-			Faction: string(player.Faction),
-			IsHost:  userID == h.hostUserID,
+			UserID:      userID,
+			DisplayName: player.Metadata.GetStringOrDefault("display_name", userID),
+			Faction:     string(player.Faction),
+			IsHost:      userID == h.hostUserID,
 		}
 	}
 
@@ -336,9 +351,10 @@ func (h *NakamaMatchHandler) broadcastWaitingSyncToAll() {
 			continue
 		}
 		waitingPlayers[i] = pkgnet.WaitingPlayer{
-			UserID:  userID,
-			Faction: string(player.Faction),
-			IsHost:  userID == h.hostUserID,
+			UserID:      userID,
+			DisplayName: player.Metadata.GetStringOrDefault("display_name", userID),
+			Faction:     string(player.Faction),
+			IsHost:      userID == h.hostUserID,
 		}
 	}
 

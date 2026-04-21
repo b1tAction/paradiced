@@ -91,10 +91,12 @@ func (a *NakamaMatchHandlerAdapter) MatchInit(ctx context.Context, logger runtim
 				userID := entry.GetPresence().GetUserId()
 				// Extract faction from entry properties (if available)
 				faction := getFactionFromProperties(entry.GetProperties())
-				a.handler.addPlayer(userID, faction)
+				// Extract display_name from entry properties, fallback to userID
+				displayName := getDisplayNameFromProperties(entry.GetProperties(), userID)
+				a.handler.addPlayer(userID, faction, displayName)
 				// Mark player as disconnected until they actually join
 				a.handler.disconnected[userID] = true
-				logger.Debug("Added player from matchmaker: user_id=%s (marked as disconnected)", userID)
+				logger.Debug("Added player from matchmaker: user_id=%s, display_name=%s (marked as disconnected)", userID, displayName)
 			}
 		}
 	}
@@ -351,4 +353,19 @@ func getFactionFromProperties(props map[string]interface{}) constants.Faction {
 	}
 
 	return constants.FactionQingLong
+}
+
+// getDisplayNameFromProperties extracts display_name from matchmaker entry properties.
+// Returns fallback userID if not specified.
+func getDisplayNameFromProperties(props map[string]interface{}, fallbackUserID string) string {
+	if props == nil {
+		return fallbackUserID
+	}
+
+	// Try string property
+	if displayName, ok := props["display_name"].(string); ok && displayName != "" {
+		return displayName
+	}
+
+	return fallbackUserID
 }

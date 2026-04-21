@@ -263,7 +263,8 @@ func (h *NakamaMatchHandler) getCurrentPlayer() *core.Player {
 
 // addPlayer adds a new player to the match.
 // Called during MatchInit or when players join.
-func (h *NakamaMatchHandler) addPlayer(userID string, faction constants.Faction) *core.Player {
+// displayName is stored in Player.Metadata for protocol synchronization.
+func (h *NakamaMatchHandler) addPlayer(userID string, faction constants.Faction, displayName string) *core.Player {
 	playerID := id.NewPlayerID()
 	player := core.NewPlayer(core.PlayerConfig{
 		ID:      playerID,
@@ -271,6 +272,9 @@ func (h *NakamaMatchHandler) addPlayer(userID string, faction constants.Faction)
 		MaxLP:   8,
 		Faction: faction,
 	})
+
+	// Store display name in player metadata for protocol sync
+	player.Metadata.SetString("display_name", displayName)
 
 	// Store player
 	h.players[userID] = player
@@ -281,6 +285,7 @@ func (h *NakamaMatchHandler) addPlayer(userID string, faction constants.Faction)
 			"user_id", userID,
 			"player_id", playerID.UUID(),
 			"faction", faction,
+			"display_name", displayName,
 			"total_players", len(h.playerList))
 	}
 

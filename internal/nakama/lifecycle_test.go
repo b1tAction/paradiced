@@ -15,10 +15,10 @@ func TestMatchInit(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add players first
-	handler.addPlayer("user-001", constants.FactionQingLong)
-	handler.addPlayer("user-002", constants.FactionZhuQue)
-	handler.addPlayer("user-003", constants.FactionBaiHu)
-	handler.addPlayer("user-004", constants.FactionXuanWu)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer("user-002", constants.FactionZhuQue, "user-002")
+	handler.addPlayer("user-003", constants.FactionBaiHu, "user-003")
+	handler.addPlayer("user-004", constants.FactionXuanWu, "user-004")
 
 	// Assign factions
 	handler.assignFactions()
@@ -65,8 +65,8 @@ func TestMatchLoop(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Setup match
-	handler.addPlayer("user-001", constants.FactionQingLong)
-	handler.addPlayer("user-002", constants.FactionZhuQue)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer("user-002", constants.FactionZhuQue, "user-002")
 	handler.MatchInit()
 
 	// Run one loop tick
@@ -82,7 +82,7 @@ func TestMatchStop(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Setup match
-	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 	handler.MatchInit()
 
 	// Stop match
@@ -116,8 +116,8 @@ func TestGetCurrentPlayer(t *testing.T) {
 	}
 
 	// Add players and initialize
-	handler.addPlayer("user-001", constants.FactionQingLong)
-	handler.addPlayer("user-002", constants.FactionZhuQue)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer("user-002", constants.FactionZhuQue, "user-002")
 	handler.MatchInit()
 
 	// Turn 0 should return first player
@@ -136,10 +136,10 @@ func TestAssignFactions(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Add 4 players with factions set via PlayerConfig
-	handler.addPlayer("user-001", constants.FactionQingLong)
-	handler.addPlayer("user-002", constants.FactionZhuQue)
-	handler.addPlayer("user-003", constants.FactionBaiHu)
-	handler.addPlayer("user-004", constants.FactionXuanWu)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer("user-002", constants.FactionZhuQue, "user-002")
+	handler.addPlayer("user-003", constants.FactionBaiHu, "user-003")
+	handler.addPlayer("user-004", constants.FactionXuanWu, "user-004")
 
 	// Note: assignFactions() is deprecated and does nothing now.
 	// Factions are set during addPlayer via PlayerConfig.
@@ -165,7 +165,7 @@ func TestAddPlayer(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Add first player
-	player1 := handler.addPlayer("user-001", constants.FactionQingLong)
+	player1 := handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 	if player1 == nil {
 		t.Fatal("addPlayer should return non-nil player")
 	}
@@ -184,7 +184,7 @@ func TestAddPlayer(t *testing.T) {
 	}
 
 	// Add second player
-	player2 := handler.addPlayer("user-002", constants.FactionZhuQue)
+	player2 := handler.addPlayer("user-002", constants.FactionZhuQue, "user-002")
 	if player2 == nil {
 		t.Fatal("addPlayer should return non-nil player")
 	}
@@ -205,10 +205,10 @@ func TestFullGameFlow(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Phase 1: Players join
-	handler.addPlayer("user-001", constants.FactionQingLong)
-	handler.addPlayer("user-002", constants.FactionZhuQue)
-	handler.addPlayer("user-003", constants.FactionBaiHu)
-	handler.addPlayer("user-004", constants.FactionXuanWu)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer("user-002", constants.FactionZhuQue, "user-002")
+	handler.addPlayer("user-003", constants.FactionBaiHu, "user-003")
+	handler.addPlayer("user-004", constants.FactionXuanWu, "user-004")
 
 	// Phase 2: Match initialization
 	handler.assignFactions()
@@ -252,8 +252,8 @@ func TestMatchInitWithMinimumPlayers(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add minimum 2 players
-	handler.addPlayer("user-001", constants.FactionQingLong)
-	handler.addPlayer("user-002", constants.FactionZhuQue)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer("user-002", constants.FactionZhuQue, "user-002")
 
 	// Initialize match - should work with 2 players
 	err := handler.MatchInit()
@@ -277,8 +277,8 @@ func TestMatchInitWithoutDispatcher(t *testing.T) {
 	// No dispatcher set
 
 	// Add players
-	handler.addPlayer("user-001", constants.FactionQingLong)
-	handler.addPlayer("user-002", constants.FactionZhuQue)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer("user-002", constants.FactionZhuQue, "user-002")
 
 	// Initialize match - should work without dispatcher
 	err := handler.MatchInit()
@@ -296,7 +296,7 @@ func TestGetPlayer(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Add player
-	player := handler.addPlayer("user-001", constants.FactionQingLong)
+	player := handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 
 	// Get existing player
 	found := handler.GetPlayer("user-001")
@@ -320,8 +320,8 @@ func TestMatchLoopMultipleTicks(t *testing.T) {
 	mockDispatcher := NewMockDispatcherAdapter()
 	handler.WithDispatcher(mockDispatcher)
 
-	handler.addPlayer("user-001", constants.FactionQingLong)
-	handler.addPlayer("user-002", constants.FactionZhuQue)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer("user-002", constants.FactionZhuQue, "user-002")
 	handler.MatchInit()
 
 	// Run many ticks
@@ -343,7 +343,7 @@ func TestMatchStopWithoutInit(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Add player but don't init
-	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 
 	// Stop should work even without init - but HSM is nil so we skip
 	// MatchStop requires HSM to be initialized first
@@ -360,10 +360,10 @@ func TestAddPlayerMaxCapacity(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Add 4 players (max capacity)
-	handler.addPlayer("user-001", constants.FactionQingLong)
-	handler.addPlayer("user-002", constants.FactionZhuQue)
-	handler.addPlayer("user-003", constants.FactionBaiHu)
-	handler.addPlayer("user-004", constants.FactionXuanWu)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer("user-002", constants.FactionZhuQue, "user-002")
+	handler.addPlayer("user-003", constants.FactionBaiHu, "user-003")
+	handler.addPlayer("user-004", constants.FactionXuanWu, "user-004")
 
 	// Verify max players
 	if len(handler.players) != 4 {
@@ -376,8 +376,8 @@ func TestGetCurrentPlayerAfterTurnAdvance(t *testing.T) {
 	mockDispatcher := NewMockDispatcherAdapter()
 	handler.WithDispatcher(mockDispatcher)
 
-	handler.addPlayer("user-001", constants.FactionQingLong)
-	handler.addPlayer("user-002", constants.FactionZhuQue)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer("user-002", constants.FactionZhuQue, "user-002")
 	handler.MatchInit()
 
 	// Get initial current player
@@ -401,10 +401,10 @@ func TestAssignFactionsAllFour(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Add players for all four factions
-	p1 := handler.addPlayer("user-001", constants.FactionQingLong)
-	p2 := handler.addPlayer("user-002", constants.FactionZhuQue)
-	p3 := handler.addPlayer("user-003", constants.FactionBaiHu)
-	p4 := handler.addPlayer("user-004", constants.FactionXuanWu)
+	p1 := handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	p2 := handler.addPlayer("user-002", constants.FactionZhuQue, "user-002")
+	p3 := handler.addPlayer("user-003", constants.FactionBaiHu, "user-003")
+	p4 := handler.addPlayer("user-004", constants.FactionXuanWu, "user-004")
 
 	// Verify each faction
 	if p1.GetFaction() != constants.FactionQingLong {

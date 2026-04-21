@@ -29,7 +29,8 @@ func setupHandlerWithPlayers(t *testing.T, count int) *NakamaMatchHandler {
 	}
 
 	for i := 0; i < count; i++ {
-	 handler.addPlayer(fmt.Sprintf("user-%03d", i+1), factions[i%4])
+	 userID := fmt.Sprintf("user-%03d", i+1)
+	 handler.addPlayer(userID, factions[i%4], userID)
 	}
 
 	err := handler.MatchInit()
@@ -733,7 +734,7 @@ func TestHandleRollDice_NoCurrentPlayer(t *testing.T) {
 	handler.WithDispatcher(mock)
 
 	// Add player but don't initialize HSM
-	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 
 	// No HSM means no current player
 	err := handler.handleRollDice("user-001")
@@ -754,7 +755,7 @@ func TestHandleUseItem_NoCurrentPlayer(t *testing.T) {
 	mock := NewMockDispatcherAdapter()
 	handler.WithDispatcher(mock)
 
-	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 
 	data := []byte(`{"op_code": "101", "item_id": "item-001"}`)
 	err := handler.handleUseItem("user-001", data)
@@ -768,7 +769,7 @@ func TestHandleUseSkill_NoCurrentPlayer(t *testing.T) {
 	mock := NewMockDispatcherAdapter()
 	handler.WithDispatcher(mock)
 
-	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 
 	err := handler.handleUseSkill("user-001")
 	if err != nil {

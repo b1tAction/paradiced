@@ -309,10 +309,10 @@ func TestFactionSetDuringAddPlayer(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Add players with specific factions
-	handler.addPlayer("user-001", constants.FactionQingLong)
-	handler.addPlayer("user-002", constants.FactionZhuQue)
-	handler.addPlayer("user-003", constants.FactionBaiHu)
-	handler.addPlayer("user-004", constants.FactionXuanWu)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer("user-002", constants.FactionZhuQue, "user-002")
+	handler.addPlayer("user-003", constants.FactionBaiHu, "user-003")
+	handler.addPlayer("user-004", constants.FactionXuanWu, "user-004")
 
 	// Verify factions are set correctly
 	if handler.players["user-001"].GetFaction() != constants.FactionQingLong {

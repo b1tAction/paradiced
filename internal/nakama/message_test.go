@@ -15,7 +15,7 @@ func TestHandleMessageUnknownOpCode(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player and initialize
-	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 	handler.MatchInit()
 
 	// Send unknown opcode
@@ -41,8 +41,8 @@ func TestHandleRollDiceNonCurrentPlayer(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add 2 players
-	handler.addPlayer("user-001", constants.FactionQingLong)
-	handler.addPlayer("user-002", constants.FactionZhuQue)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer("user-002", constants.FactionZhuQue, "user-002")
 	handler.MatchInit()
 
 	// Send roll dice from non-current player (user-002)
@@ -59,7 +59,7 @@ func TestHandleUseItem(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player with an item
-	player := handler.addPlayer("user-001", constants.FactionQingLong)
+	player := handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 	player.AddItem(core.NewItem(constants.ItemTypeAnyDoor))
 
 	handler.MatchInit()
@@ -83,7 +83,7 @@ func TestHandleUseSkill(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player with charge
-	player := handler.addPlayer("user-001", constants.FactionQingLong)
+	player := handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 	player.SetChargeCount(1)
 
 	handler.MatchInit()
@@ -107,7 +107,7 @@ func TestHandleUseSkillNoCharge(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player without charge
-	player := handler.addPlayer("user-001", constants.FactionQingLong)
+	player := handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 	player.SetChargeCount(0)
 
 	handler.MatchInit()
@@ -132,7 +132,7 @@ func TestHandleUserChoice(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player
-	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 	handler.MatchInit()
 
 	// Send user choice
@@ -154,7 +154,7 @@ func TestHandleMiniGameResult(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player
-	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 	handler.MatchInit()
 
 	// Send mini-game result
@@ -175,7 +175,7 @@ func TestHandleMessageNonExistingPlayer(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add one player
-	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 	handler.MatchInit()
 
 	// Send message from non-existing player
@@ -192,7 +192,7 @@ func TestHandleMessageWithOpRollDice(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player and initialize
-	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 	handler.MatchInit()
 
 	// Send RollDice via HandleMessageWithOp
@@ -208,7 +208,7 @@ func TestHandleMessageWithOpUnknown(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player and initialize
-	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 	handler.MatchInit()
 
 	// Send unknown opcode - HandleMessageWithOp will fallback to HandleMessage
@@ -225,7 +225,7 @@ func TestHandleMessageWithOpUseItemInvalidJSON(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player and initialize
-	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 	handler.MatchInit()
 
 	// Send UseItem with invalid JSON
@@ -241,7 +241,7 @@ func TestHandleMiniGameResultInvalidJSON(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player and initialize
-	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 	handler.MatchInit()
 
 	// Send invalid JSON
@@ -257,7 +257,7 @@ func TestHandleUserChoiceInvalidJSON(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player and initialize
-	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 	handler.MatchInit()
 
 	// Send invalid JSON for user choice
@@ -273,7 +273,7 @@ func TestHandleUseItemWithValidItem(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player with an item that has known ID
-	player := handler.addPlayer("user-001", constants.FactionQingLong)
+	player := handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 	item := core.NewItem(constants.ItemTypeAnyDoor)
 	player.AddItem(item)
 
@@ -296,7 +296,7 @@ func TestHandleUseItemWithoutDispatcher(t *testing.T) {
 	// No dispatcher
 
 	// Add player with an item
-	player := handler.addPlayer("user-001", constants.FactionQingLong)
+	player := handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 	player.AddItem(core.NewItem(constants.ItemTypeAnyDoor))
 
 	handler.MatchInit()
@@ -318,7 +318,7 @@ func TestHandleRollDiceNoCurrentPlayer(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player but don't initialize (no current player)
-	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 
 	// Send roll dice - should reject because no current player
 	// but without HSM initialized, the behavior may differ
@@ -334,7 +334,7 @@ func TestHandleUseSkillNoDispatcher(t *testing.T) {
 	// No dispatcher
 
 	// Add player with charge
-	player := handler.addPlayer("user-001", constants.FactionQingLong)
+	player := handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 	player.SetChargeCount(1)
 
 	handler.MatchInit()

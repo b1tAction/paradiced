@@ -71,7 +71,7 @@ func TestNakamaMatchHandlerAddPlayer(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Add player
-	player := handler.addPlayer("user-001", constants.FactionQingLong)
+	player := handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 
 	if player == nil {
 		t.Fatal("addPlayer should return non-nil player")
@@ -98,7 +98,7 @@ func TestNakamaMatchHandlerGetPlayer(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Add player
-	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 
 	// Get existing player
 	player := handler.GetPlayer("user-001")
@@ -127,7 +127,7 @@ func TestNakamaMatchHandlerGetRoundTurn(t *testing.T) {
 	}
 
 	// Add player first
-	handler.addPlayer("user-001", constants.FactionQingLong)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
 
 	// Initialize game
 	err := handler.initializeGame()
@@ -152,10 +152,10 @@ func TestNakamaMatchHandlerInitializeGame(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Add players
-	handler.addPlayer("user-001", constants.FactionQingLong)
-	handler.addPlayer("user-002", constants.FactionZhuQue)
-	handler.addPlayer("user-003", constants.FactionBaiHu)
-	handler.addPlayer("user-004", constants.FactionXuanWu)
+	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer("user-002", constants.FactionZhuQue, "user-002")
+	handler.addPlayer("user-003", constants.FactionBaiHu, "user-003")
+	handler.addPlayer("user-004", constants.FactionXuanWu, "user-004")
 
 	// Initialize game
 	err := handler.initializeGame()
