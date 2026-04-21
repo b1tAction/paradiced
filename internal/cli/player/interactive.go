@@ -126,8 +126,13 @@ func (p *InteractivePlayer) handleMessage(ctx context.Context, msg *nakama.Socke
 		}
 	}
 
-	// Create timeout context for handler
-	handlerCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	// Handlers that require human input should not use a short timeout.
+	// Otherwise input wait may exceed timeout and fail sending requests.
+	handlerCtx := ctx
+	cancel := func() {}
+	if !requiresUserInput(opCode) {
+		handlerCtx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	}
 	defer cancel()
 
 	switch opCode {
@@ -154,6 +159,15 @@ func (p *InteractivePlayer) handleMessage(ctx context.Context, msg *nakama.Socke
 	}
 }
 
+func requiresUserInput(opCode int64) bool {
+	switch opCode {
+	case nakama.OpAvailable, nakama.OpMiniGameStart, nakama.OpWaitingSync:
+		return true
+	default:
+		return false
+	}
+}
+
 func (p *InteractivePlayer) handleStateSync(ctx context.Context, data []byte) {
 	var stateSync model.StateSync
 	if err := json.Unmarshal(data, &stateSync); err != nil {
@@ -171,7 +185,7 @@ func (p *InteractivePlayer) handleStateSync(ctx context.Context, data []byte) {
 	for _, player := range stateSync.Players {
 		if player.ClientID == p.userID {
 			p.playerID = player.PlayerID
-			p.logger.Info("Found own player", "player_id", p.playerID, "client_id", p.userID)
+			p.logger.Debug("Found own player", "player_id", p.playerID, "client_id", p.userID)
 			break
 		}
 	}
@@ -180,7 +194,7 @@ func (p *InteractivePlayer) handleStateSync(ctx context.Context, data []byte) {
 	// Notify UI
 	p.uiAdapter.OnStateSync(ctx, &stateSync)
 
-	p.logger.Info("Received state sync",
+	p.logger.Debug("Received state sync",
 		"global", stateSync.GlobalState,
 		"turn", stateSync.TurnState,
 		"round", stateSync.Round,
@@ -196,7 +210,7 @@ func (p *InteractivePlayer) handleAvailable(ctx context.Context, data []byte) {
 		return
 	}
 
-	p.logger.Info("Received available actions",
+	p.logger.Debug("Received available actions",
 		"items", len(available.Items),
 		"can_use_skill", available.CanUseSkill,
 		"dice_type", available.DiceType)
@@ -238,7 +252,7 @@ func (p *InteractivePlayer) handleMiniGameStart(ctx context.Context, data []byte
 		return
 	}
 
-	p.logger.Info("Received mini-game start", "game_type", start.GameType, "players", len(start.Players))
+	p.logger.Debug("Received mini-game start", "game_type", start.GameType, "players", len(start.Players))
 
 	// Get rank from user
 	rank := p.uiAdapter.OnMiniGameStart(ctx, &start)
@@ -251,7 +265,7 @@ func (p *InteractivePlayer) handleMiniGameStart(ctx context.Context, data []byte
 		return
 	}
 
-	p.logger.Info("Submitted mini-game rank", "rank", rank)
+	p.logger.Debug("Submitted mini-game rank", "rank", rank)
 }
 
 func (p *InteractivePlayer) handleMiniGameResult(ctx context.Context, data []byte) {
@@ -264,7 +278,7 @@ func (p *InteractivePlayer) handleMiniGameResult(ctx context.Context, data []byt
 
 	p.uiAdapter.OnMiniGameResult(ctx, &result)
 
-	p.logger.Info("Received mini-game result")
+	p.logger.Debug("Received mini-game result")
 }
 
 func (p *InteractivePlayer) handleGameOver(ctx context.Context, data []byte) {
@@ -277,7 +291,7 @@ func (p *InteractivePlayer) handleGameOver(ctx context.Context, data []byte) {
 
 	p.uiAdapter.OnGameOver(ctx, &gameOver)
 
-	p.logger.Info("Game over", "winner", gameOver.WinnerID)
+	p.logger.Debug("Game over", "winner", gameOver.WinnerID)
 
 	// Signal game over
 	select {
@@ -301,7 +315,7 @@ func (p *InteractivePlayer) handleFullSync(ctx context.Context, data []byte) {
 
 	p.uiAdapter.OnFullSync(ctx, &stateSync)
 
-	p.logger.Info("Received full sync (reconnection)",
+	p.logger.Debug("Received full sync (reconnection)",
 		"global", stateSync.GlobalState,
 		"players", len(stateSync.Players))
 }
@@ -345,7 +359,7 @@ func (p *InteractivePlayer) handleWaitingSync(ctx context.Context, data []byte) 
 		return
 	}
 
-	p.logger.Info("Received waiting sync",
+	p.logger.Debug("Received waiting sync",
 		"match_id", waiting.MatchID,
 		"host_user_id", waiting.HostUserID,
 		"player_count", waiting.PlayerCount,
@@ -372,7 +386,7 @@ func (p *InteractivePlayer) sendAction(ctx context.Context, action PlayerAction)
 }
 
 func (p *InteractivePlayer) sendRollDice(ctx context.Context) {
-	p.logger.Info("Sending RollDice")
+	p.logger.Debug("Sending RollDice")
 
 	if err := p.socket.SendMessage(ctx, nakama.OpRollDice, model.RollDice{}); err != nil {
 		p.logger.Error("Failed to send RollDice", "error", err)
@@ -381,7 +395,7 @@ func (p *InteractivePlayer) sendRollDice(ctx context.Context) {
 }
 
 func (p *InteractivePlayer) sendUseItem(ctx context.Context, action PlayerAction) {
-	p.logger.Info("Sending UseItem", "item_id", action.ItemID, "target_id", action.TargetID)
+	p.logger.Debug("Sending UseItem", "item_id", action.ItemID, "target_id", action.TargetID)
 
 	useItem := model.UseItem{
 		ItemID:   action.ItemID,
@@ -395,7 +409,7 @@ func (p *InteractivePlayer) sendUseItem(ctx context.Context, action PlayerAction
 }
 
 func (p *InteractivePlayer) sendStartGame(ctx context.Context) {
-	p.logger.Info("Sending StartGame")
+	p.logger.Debug("Sending StartGame")
 
 	// StartGame has empty body - just the opcode matters
 	if err := p.socket.SendMessage(ctx, nakama.OpStartGame, nil); err != nil {
