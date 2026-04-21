@@ -120,8 +120,13 @@ func (a *NakamaBroadcastAdapter) SendAvailable(playerID string, available *net.A
 // BroadcastMiniGameStart broadcasts mini-game start notification.
 func (a *NakamaBroadcastAdapter) BroadcastMiniGameStart(start *net.MiniGameStart) error {
 	if a.handler.dispatcher == nil {
+		a.handler.logDebug("BroadcastMiniGameStart: no dispatcher set")
 		return nil // No dispatcher set
 	}
+
+	a.handler.logInfo("BroadcastMiniGameStart: broadcasting mini-game start",
+		"game_type", start.GameType,
+		"players_count", len(start.Players))
 
 	// Convert PlayerID to UserID for client-side matching
 	// Clients will match their UserID against this array
@@ -147,9 +152,11 @@ func (a *NakamaBroadcastAdapter) BroadcastMiniGameStart(start *net.MiniGameStart
 
 	data, err := json.Marshal(start)
 	if err != nil {
+		a.handler.logError("BroadcastMiniGameStart: failed to marshal", "error", err)
 		return err
 	}
 
+	a.handler.logDebug("BroadcastMiniGameStart: sending broadcast", "op_code", net.OpMiniGameStart)
 	return a.handler.dispatcher.BroadcastMessage(int64(net.OpMiniGameStart), data)
 }
 

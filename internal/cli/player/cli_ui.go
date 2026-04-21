@@ -263,23 +263,32 @@ func (ui *CLIUIAdapter) OnWaitingSync(ctx context.Context, waiting *model.Waitin
 	fmt.Println()
 
 	if waiting.CanStart {
-		fmt.Printf(">>> %s <<<\n", waiting.Message)
-		fmt.Println()
-		fmt.Print("Type 'start' to begin the game, or 'wait' for more players: ")
+		// Only host can start the game
+		if ui.userID == waiting.HostUserID {
+			fmt.Printf(">>> %s <<<\n", waiting.Message)
+			fmt.Println()
+			fmt.Print("Type 'start' to begin the game, or 'wait' for more players: ")
 
-		if !ui.reader.Scan() {
+			if !ui.reader.Scan() {
+				return false
+			}
+
+			input := strings.TrimSpace(ui.reader.Text())
+			if input == "start" {
+				fmt.Println()
+				fmt.Println("Starting game...")
+				return true
+			}
+			fmt.Println()
+			fmt.Println("Waiting for more players...")
+			return false
+		} else {
+			// Non-host players see waiting message
+			fmt.Printf("[Waiting] Host (%s) can start the game\n", waiting.HostUserID)
+			fmt.Println("==================================")
+			fmt.Println()
 			return false
 		}
-
-		input := strings.TrimSpace(ui.reader.Text())
-		if input == "start" {
-			fmt.Println()
-			fmt.Println("Starting game...")
-			return true
-		}
-		fmt.Println()
-		fmt.Println("Waiting for more players...")
-		return false
 	} else {
 		fmt.Printf("[Waiting] %s\n", waiting.Message)
 		fmt.Println("==================================")
