@@ -559,7 +559,17 @@ func (a *DrawEventAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *DrawEventAction) Execute(ctx *ActionContext) error {
-	// Draw event requires DrawEngine
+	if a.TargetPlayer == nil {
+		return errors.NewActionExecutionError("draw_event", "", "target player is nil", nil)
+	}
+
+	// If DrawnType is already set (e.g. bound event from CellTypeEvent), skip pool draw
+	if a.DrawnType != constants.EventTypeNone && a.DrawnType.IsValid() {
+		a.DrawnName = ""
+		return nil
+	}
+
+	// Draw event from pool requires DrawEngine and EventPool
 	if ctx.DrawEngine == nil {
 		return errors.NewInternalError("DrawEventAction", "Execute", nil).
 			WithContext("reason", "draw engine is nil")
@@ -567,9 +577,6 @@ func (a *DrawEventAction) Execute(ctx *ActionContext) error {
 	if ctx.EventPool == nil {
 		return errors.NewInternalError("DrawEventAction", "Execute", nil).
 			WithContext("reason", "event pool is nil")
-	}
-	if a.TargetPlayer == nil {
-		return errors.NewActionExecutionError("draw_event", "", "target player is nil", nil)
 	}
 
 	// Draw event type from pool using player's LP for weight calculation

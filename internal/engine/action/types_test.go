@@ -1555,6 +1555,27 @@ func TestDrawEventActionEmptyPool(t *testing.T) {
 	}
 }
 
+func TestDrawEventActionPresetDrawnType(t *testing.T) {
+	// When DrawnType is preset (CellTypeEvent bound event), Execute should preserve it
+	// and not require DrawEngine/EventPool
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewDrawEventAction(player, "CellEvent_herb")
+	action.DrawnType = constants.EventTypeHerb
+
+	ctx := NewActionContext(nil, nil, nil, nil) // nil DrawEngine, nil EventPool
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Errorf("Execute with preset DrawnType should succeed without pool, got: %v", err)
+	}
+	if action.DrawnType != constants.EventTypeHerb {
+		t.Errorf("DrawnType should be preserved as herb, got %s", action.DrawnType)
+	}
+	if action.DrawnName != "" {
+		t.Errorf("DrawnName should be empty (client uses event_type), got %s", action.DrawnName)
+	}
+}
+
 // ========== DrawItemAction Pool Execution Tests ==========
 
 func TestDrawItemActionExecuteWithPool(t *testing.T) {
