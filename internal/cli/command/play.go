@@ -23,7 +23,7 @@ and play the game with real-time user input.
 
 Examples:
   # Connect to Nakama server and wait for commands
-  pdcli play --server-http=http://127.0.0.1:7350 --user-id=myname
+	pdcli play --server-http=http://127.0.0.1:7350 --name=alice
 
   # Specify faction
   pdcli play --faction=zhu_que --verbose`,
@@ -31,25 +31,25 @@ Examples:
 }
 
 var (
-	playServerHTTP   string
-	playServerWS     string
-	playServerKey    string
-	playUserID       string
-	playFaction      string
-	playVerbose      bool
-	playTimeout      int
+	playServerHTTP string
+	playServerWS   string
+	playServerKey  string
+	playName       string
+	playFaction    string
+	playVerbose    bool
+	playTimeout    int
 )
 
 func init() {
 	playCmd.Flags().StringVar(&playServerHTTP, "server-http", "http://127.0.0.1:7350", "Nakama HTTP server URL")
 	playCmd.Flags().StringVar(&playServerWS, "server-ws", "ws://127.0.0.1:7350/ws", "Nakama WebSocket server URL")
 	playCmd.Flags().StringVar(&playServerKey, "server-key", "defaultkey", "Nakama server key")
-	playCmd.Flags().StringVar(&playUserID, "user-id", "", "User ID for authentication (required)")
+	playCmd.Flags().StringVar(&playName, "name", "", "Display name (required), used to auto-generate user-id")
 	playCmd.Flags().StringVar(&playFaction, "faction", "qing_long", "Faction choice (qing_long, zhu_que, bai_hu, xuan_wu)")
 	playCmd.Flags().BoolVar(&playVerbose, "verbose", false, "Enable verbose logging")
 	playCmd.Flags().IntVar(&playTimeout, "timeout", 300, "Game timeout in seconds")
 
-	playCmd.MarkFlagRequired("user-id")
+	playCmd.MarkFlagRequired("name")
 }
 
 func runPlay(cmd *cobra.Command, args []string) error {
@@ -78,6 +78,11 @@ func runPlay(cmd *cobra.Command, args []string) error {
 	// Create logger
 	logger := nakama.NewLogger(playVerbose)
 
+	resolvedUserID, err := resolveUserID(playName)
+	if err != nil {
+		return err
+	}
+
 	// Create Nakama client
 	clientConfig := nakama.ClientConfig{
 		ServerHTTP: playServerHTTP,
@@ -93,7 +98,7 @@ func runPlay(cmd *cobra.Command, args []string) error {
 	defer client.Close()
 
 	// Authenticate
-	session, err := client.Authenticate(ctx, playUserID)
+	session, err := client.Authenticate(ctx, resolvedUserID)
 	if err != nil {
 		return fmt.Errorf("failed to authenticate: %w", err)
 	}
@@ -119,7 +124,7 @@ func runPlay(cmd *cobra.Command, args []string) error {
 	fmt.Println("========================================")
 	fmt.Println("  ParaDiced CLI - Interactive Mode")
 	fmt.Println("========================================")
-	fmt.Printf("  User: %s\n", playUserID)
+	fmt.Printf("  Name: %s\n", playName)
 	fmt.Printf("  Faction: %s\n", string(faction))
 	fmt.Println("========================================")
 	fmt.Println()
