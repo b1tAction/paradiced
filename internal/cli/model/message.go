@@ -24,6 +24,21 @@ type StateSync struct {
 	Turn            int      `json:"turn"`
 	Paused          bool     `json:"paused"`
 	Players         []Player `json:"players"`
+	Map             MapInfo  `json:"map"`
+}
+
+// MapInfo represents map data for client synchronization.
+type MapInfo struct {
+	Length int        `json:"length"`
+	Cells  []CellInfo `json:"cells"`
+}
+
+// CellInfo represents a single map cell for client synchronization.
+type CellInfo struct {
+	Index    int    `json:"index"`
+	CellType string `json:"cell_type"`
+	EventID  string `json:"event_id,omitempty"`
+	IsBroken bool   `json:"is_broken,omitempty"`
 }
 
 // Player represents a player state snapshot.

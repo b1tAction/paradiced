@@ -292,20 +292,9 @@ func (ui *CLIUIAdapter) OnWaitingSync(ctx context.Context, waiting *model.Waitin
 		if ui.userID == waiting.HostUserID {
 			fmt.Printf(">>> %s <<<\n", waiting.Message)
 			fmt.Println()
-			fmt.Print("Type 'start' to begin the game, or 'wait' for more players: ")
-
-			if !ui.reader.Scan() {
-				return false
-			}
-
-			input := strings.TrimSpace(ui.reader.Text())
-			if input == "start" {
-				fmt.Println()
-				fmt.Println("Starting game...")
-				return true
-			}
+			fmt.Println("Host commands: 1=start, 2=wait")
+			fmt.Println("==================================")
 			fmt.Println()
-			fmt.Println("Waiting for more players...")
 			return false
 		} else {
 			// Non-host players see waiting message

@@ -4,6 +4,7 @@ package nakama
 import (
 	"testing"
 
+	"github.com/b1tAction/paradiced/internal/engine/hsm"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/util"
 )
@@ -107,28 +108,27 @@ func TestHandlePresenceLeave(t *testing.T) {
 	handler.HandlePresenceJoin("user-001", nil)
 	handler.HandlePresenceJoin("user-002", nil)
 
-	// Player leaves
-	err := handler.HandlePresenceLeave("user-001")
+	// Non-host player leaves
+	err := handler.HandlePresenceLeave("user-002")
 	if err != nil {
 		t.Fatalf("HandlePresenceLeave error: %v", err)
 	}
 
-	// Verify player is marked as disconnected (not removed)
-	if len(handler.players) != 2 {
-		t.Errorf("players count = %d, want 2 (disconnected players are kept for rejoin)", len(handler.players))
+	// In waiting room, non-host leave should remove from room immediately.
+	if len(handler.players) != 1 {
+		t.Errorf("players count = %d, want 1 (leaver removed from waiting room)", len(handler.players))
 	}
 
-	if handler.players["user-001"] == nil {
-		t.Error("user-001 should still be in players map (for rejoin)")
+	if handler.players["user-002"] != nil {
+		t.Error("user-002 should be removed from players map")
 	}
 
-	if !handler.disconnected["user-001"] {
-		t.Error("user-001 should be marked as disconnected")
+	if handler.disconnected["user-002"] {
+		t.Error("user-002 should not be kept in disconnected map in waiting room")
 	}
 
-	// playerList should remain unchanged (for turn order)
-	if len(handler.playerList) != 2 {
-		t.Errorf("playerList count = %d, want 2", len(handler.playerList))
+	if len(handler.playerList) != 1 {
+		t.Errorf("playerList count = %d, want 1", len(handler.playerList))
 	}
 }
 
@@ -158,26 +158,25 @@ func TestPlayerReconnect(t *testing.T) {
 		t.Fatal("match should be running after 4 players join")
 	}
 
-	// Player disconnects
-	err := handler.HandlePresenceLeave("user-001")
+	// Non-host player disconnects
+	err := handler.HandlePresenceLeave("user-002")
 	if err != nil {
 		t.Fatalf("HandlePresenceLeave error: %v", err)
 	}
 
-	// Verify player is marked disconnected
-	if !handler.disconnected["user-001"] {
-		t.Error("user-001 should be marked as disconnected")
+	// Waiting room leave removes player completely.
+	if handler.players["user-002"] != nil {
+		t.Error("user-002 should be removed from players map after leave in waiting room")
 	}
 
-	// Player reconnects
-	err = handler.HandlePresenceJoin("user-001", nil)
+	// Player joins again
+	err = handler.HandlePresenceJoin("user-002", nil)
 	if err != nil {
-		t.Fatalf("HandlePresenceJoin reconnect error: %v", err)
+		t.Fatalf("HandlePresenceJoin rejoin error: %v", err)
 	}
 
-	// Verify player is no longer disconnected
-	if handler.disconnected["user-001"] {
-		t.Error("user-001 should not be marked as disconnected after rejoin")
+	if handler.players["user-002"] == nil {
+		t.Error("user-002 should be added back after rejoin")
 	}
 
 	// Verify match is still running
@@ -225,8 +224,8 @@ func TestGetConnectedPlayers(t *testing.T) {
 		t.Errorf("connected players count = %d, want 3", len(connected))
 	}
 
-	// Disconnect one
-	handler.HandlePresenceLeave("user-001")
+	// Disconnect one (non-host)
+	handler.HandlePresenceLeave("user-002")
 
 	// Should have 2 connected
 	connected = handler.GetConnectedPlayers()
@@ -263,6 +262,70 @@ func TestHandlePresenceLeaveAllPlayers(t *testing.T) {
 	// Players should be cleared after MatchStop
 	if len(handler.players) != 0 {
 		t.Errorf("players count = %d, want 0", len(handler.players))
+	}
+}
+
+func TestHandlePresenceLeaveHostTerminatesMatch(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	mockDispatcher := NewMockDispatcherAdapter()
+	handler.WithDispatcher(mockDispatcher)
+
+	// First join becomes host.
+	handler.HandlePresenceJoin("user-001", nil)
+	handler.HandlePresenceJoin("user-002", nil)
+
+	if handler.hostUserID != "user-001" {
+		t.Fatalf("hostUserID = %s, want user-001", handler.hostUserID)
+	}
+
+	err := handler.HandlePresenceLeave("user-001")
+	if err != nil {
+		t.Fatalf("HandlePresenceLeave(host) error: %v", err)
+	}
+
+	if len(handler.players) != 0 {
+		t.Errorf("players count = %d, want 0 after host leave termination", len(handler.players))
+	}
+	if len(handler.playerList) != 0 {
+		t.Errorf("playerList count = %d, want 0 after host leave termination", len(handler.playerList))
+	}
+}
+
+func TestHandlePresenceLeaveHostDuringGameDoesNotTerminate(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	mockDispatcher := NewMockDispatcherAdapter()
+	handler.WithDispatcher(mockDispatcher)
+
+	// Add 4 players and start the game flow.
+	handler.HandlePresenceJoin("user-001", nil) // host
+	handler.HandlePresenceJoin("user-002", nil)
+	handler.HandlePresenceJoin("user-003", nil)
+	handler.HandlePresenceJoin("user-004", nil)
+
+	if handler.hsm == nil || !handler.hsm.IsRunning() {
+		t.Fatal("match should be running")
+	}
+
+	// Move out of waiting room state to simulate an active game.
+	ctx := hsm.NewStateContext().WithHSM(handler.hsm)
+	if err := handler.hsm.TransitionTo(hsm.StateRoundMiniGame, ctx); err != nil {
+		t.Fatalf("failed to transition out of waiting state: %v", err)
+	}
+
+	err := handler.HandlePresenceLeave("user-001")
+	if err != nil {
+		t.Fatalf("HandlePresenceLeave(host during game) error: %v", err)
+	}
+
+	// Should not terminate the whole room.
+	if len(handler.players) == 0 {
+		t.Fatal("players map should not be cleared when host leaves during game")
+	}
+	if handler.players["user-001"] == nil {
+		t.Fatal("host should remain in players map as disconnected")
+	}
+	if !handler.disconnected["user-001"] {
+		t.Fatal("host should be marked disconnected")
 	}
 }
 

@@ -2,10 +2,12 @@
 package command
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -124,6 +126,11 @@ func runHost(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create socket client: %w", err)
 	}
+	defer func() {
+		leaveCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = socketClient.LeaveMatch(leaveCtx)
+	}()
 	defer socketClient.Close()
 
 	// Connect WebSocket
@@ -177,6 +184,21 @@ func runHost(cmd *cobra.Command, args []string) error {
 	checkInterval := time.NewTicker(500 * time.Millisecond)
 	defer checkInterval.Stop()
 
+	inputChan := make(chan string, 8)
+	go func() {
+		scanner := bufio.NewScanner(os.Stdin)
+		for scanner.Scan() {
+			input := strings.TrimSpace(scanner.Text())
+			if input == "" {
+				continue
+			}
+			select {
+			case inputChan <- input:
+			default:
+			}
+		}
+	}()
+
 	// Check if game has started (state changed from WaitingForHost)
 	// The game start is handled by WaitingSync -> OnWaitingSync -> sendStartGame
 	for !gameStarted {
@@ -185,11 +207,24 @@ func runHost(cmd *cobra.Command, args []string) error {
 			if !gameStarted {
 				fmt.Println("\nWait timeout")
 			}
+			if ctx.Err() == context.Canceled {
+				return nil
+			}
 			return ctx.Err()
 
 		case <-interactivePlayer.GameOverChan():
 			gameStarted = true
 			fmt.Println("\nGame over!")
+
+		case input := <-inputChan:
+			switch strings.ToLower(input) {
+			case "1", "start", "s":
+				interactivePlayer.RequestStartGame(ctx)
+			case "2", "wait", "w":
+				fmt.Println("[Waiting] Continue waiting for players...")
+			default:
+				fmt.Println("Invalid choice, please enter 1 (start) or 2 (wait)")
+			}
 
 		case <-checkInterval.C:
 			state := interactivePlayer.GlobalState()
@@ -207,6 +242,9 @@ func runHost(cmd *cobra.Command, args []string) error {
 	// Game started, wait for game over
 	select {
 	case <-ctx.Done():
+		if ctx.Err() == context.Canceled {
+			return nil
+		}
 		return ctx.Err()
 	case <-interactivePlayer.GameOverChan():
 		fmt.Println("\nGame over!")

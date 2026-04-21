@@ -60,6 +60,7 @@ func (b *Builder) BuildStateSync() *pkgnet.StateSync {
 		Turn:            b.hsm.GetTurn(),
 		Paused:          b.hsm.IsPaused(),
 		Players:         b.BuildPlayers(),
+		Map:             *b.BuildMapInfo(),
 	}
 }
 
@@ -225,6 +226,35 @@ func (b *Builder) BuildDecisionFromEvent(decision *event.Decision) *pkgnet.Decis
 // BuildFullSync builds complete sync data for reconnecting players.
 func (b *Builder) BuildFullSync() (*pkgnet.StateSync, *pkgnet.TurnSync) {
 	return b.BuildStateSync(), b.BuildTurnSync()
+}
+
+// BuildMapInfo builds map information from MapEngine data.
+// Implements pkg/net.Builder interface.
+func (b *Builder) BuildMapInfo() *pkgnet.MapInfo {
+	mapEngine := b.hsm.GetMapEngine()
+	if mapEngine == nil {
+		return &pkgnet.MapInfo{}
+	}
+
+	cells := make([]pkgnet.CellInfo, len(mapEngine.Cells))
+	for i, cell := range mapEngine.Cells {
+		cellInfo := pkgnet.CellInfo{
+			Index:    cell.Index,
+			CellType: string(cell.CellType),
+		}
+		if cell.EventID != "" {
+			cellInfo.EventID = cell.EventID
+		}
+		if cell.IsBroken {
+			cellInfo.IsBroken = true
+		}
+		cells[i] = cellInfo
+	}
+
+	return &pkgnet.MapInfo{
+		Length: mapEngine.Length,
+		Cells: cells,
+	}
 }
 
 // GetCurrentTurnEntries returns current turn's log entries.

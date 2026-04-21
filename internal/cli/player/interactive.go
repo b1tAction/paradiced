@@ -418,6 +418,11 @@ func (p *InteractivePlayer) sendStartGame(ctx context.Context) {
 	}
 }
 
+// RequestStartGame sends host start-game request.
+func (p *InteractivePlayer) RequestStartGame(ctx context.Context) {
+	p.sendStartGame(ctx)
+}
+
 // ========== Helper Methods ==========
 
 // DisplayDetailedStatus displays detailed game status (public method for commands).

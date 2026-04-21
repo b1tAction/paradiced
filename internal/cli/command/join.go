@@ -120,6 +120,11 @@ func runJoin(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create socket client: %w", err)
 	}
+	defer func() {
+		leaveCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = socketClient.LeaveMatch(leaveCtx)
+	}()
 	defer socketClient.Close()
 
 	// Connect WebSocket
@@ -166,6 +171,9 @@ func runJoin(cmd *cobra.Command, args []string) error {
 			if !gameStarted {
 				fmt.Println("\nWait timeout")
 			}
+			if ctx.Err() == context.Canceled {
+				return nil
+			}
 			return ctx.Err()
 
 		case <-interactivePlayer.GameOverChan():
@@ -186,7 +194,10 @@ func runJoin(cmd *cobra.Command, args []string) error {
 			// This is a simplified approach - in production would use proper async input
 			if reader.Buffered() > 0 {
 				if input, err := reader.ReadString('\n'); err == nil {
-					handleJoinCommand(strings.TrimSpace(input), interactivePlayer)
+					if handleJoinCommand(strings.TrimSpace(input), interactivePlayer) {
+						cancel()
+						return nil
+					}
 				}
 			}
 		}
@@ -204,21 +215,24 @@ func runJoin(cmd *cobra.Command, args []string) error {
 }
 
 // handleJoinCommand handles user commands during game.
-func handleJoinCommand(input string, interactivePlayer *player.InteractivePlayer) {
+func handleJoinCommand(input string, interactivePlayer *player.InteractivePlayer) bool {
 	switch strings.ToLower(input) {
 	case "status", "s":
 		interactivePlayer.DisplayDetailedStatus()
+		return false
 	case "help", "h":
 		fmt.Println("\nAvailable commands:")
 		fmt.Println("  status/s - View current status")
 		fmt.Println("  help/h   - Show help")
 		fmt.Println("  quit/q   - Exit game")
+		return false
 	case "quit", "q":
 		fmt.Println("\nExiting game...")
-		os.Exit(0)
+		return true
 	default:
 		if input != "" {
 			fmt.Printf("\nUnknown command: %s (type 'help' for available commands)\n", input)
 		}
+		return false
 	}
 }

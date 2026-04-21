@@ -8,8 +8,8 @@ import (
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
 	"github.com/b1tAction/paradiced/internal/net"
 	"github.com/b1tAction/paradiced/pkg/constants"
-	"github.com/b1tAction/paradiced/pkg/util"
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
+	"github.com/b1tAction/paradiced/pkg/util"
 )
 
 func parseFactionFromMetadata(metadata *util.Metadata) constants.Faction {
@@ -222,7 +222,60 @@ func (h *NakamaMatchHandler) HandlePresenceLeave(userID string) error {
 		return nil // Player not in match
 	}
 
-	// Mark player as disconnected (but keep in game for rejoin)
+	// Host leaving should terminate the room only before the game starts
+	// (waiting room). During an active game, host leave is treated as a normal
+	// player disconnect to avoid ending the whole match unexpectedly.
+	if userID == h.hostUserID && (h.hsm == nil || h.hsm.GetGlobalStateID() == hsm.StateWaitingForHost) {
+		// Mark host disconnected first for consistent connected-player queries.
+		h.disconnected[userID] = true
+		h.logDebug("HandlePresenceLeave: player marked disconnected", "user_id", userID)
+
+		h.logWarn("HandlePresenceLeave: host disconnected, terminating match", "user_id", userID)
+
+		// Broadcast a final GameOver as termination signal for connected clients
+		// so CLI/frontends can exit gracefully.
+		if h.dispatcher != nil {
+			broadcast := NewNakamaBroadcastAdapter(h)
+			_ = broadcast.BroadcastGameOver(&pkgnet.GameOver{
+				WinnerID: "",
+				Stats:    []pkgnet.PlayerStats{},
+			})
+		}
+
+		for _, id := range h.playerList {
+			h.disconnected[id] = true
+		}
+
+		h.MatchStop()
+		h.logInfo("HandlePresenceLeave: host left, match terminated", "user_id", userID)
+		return nil
+	}
+
+	// In waiting room, a non-host leave should remove the player from room immediately.
+	// This avoids stale room member list/count and keeps WaitingSync accurate.
+	if h.hsm == nil || h.hsm.GetGlobalStateID() == hsm.StateWaitingForHost {
+		if h.hsm != nil {
+			if game := h.hsm.GetGame(); game != nil {
+				game.RemovePlayer(player.ID)
+			}
+		}
+
+		delete(h.players, userID)
+		delete(h.disconnected, userID)
+
+		for i, id := range h.playerList {
+			if id == userID {
+				h.playerList = append(h.playerList[:i], h.playerList[i+1:]...)
+				break
+			}
+		}
+
+		h.logInfo("HandlePresenceLeave: player removed from waiting room", "user_id", userID, "remaining_players", len(h.playerList))
+		h.broadcastWaitingSyncToAll()
+		return nil
+	}
+
+	// Mark player as disconnected (keep in game for mid-game rejoin)
 	h.disconnected[userID] = true
 	h.logDebug("HandlePresenceLeave: player marked disconnected", "user_id", userID)
 
@@ -290,9 +343,11 @@ func (h *NakamaMatchHandler) broadcastWaitingSyncToHost() {
 		return
 	}
 
-	// Build waiting players list
-	waitingPlayers := make([]pkgnet.WaitingPlayer, len(h.playerList))
-	for i, userID := range h.playerList {
+	connectedIDs := h.GetConnectedPlayers()
+
+	// Build waiting players list (connected only)
+	waitingPlayers := make([]pkgnet.WaitingPlayer, len(connectedIDs))
+	for i, userID := range connectedIDs {
 		player := h.players[userID]
 		if player == nil {
 			continue
@@ -306,7 +361,7 @@ func (h *NakamaMatchHandler) broadcastWaitingSyncToHost() {
 	}
 
 	// Build waiting sync message
-	playerCount := len(h.playerList)
+	playerCount := len(connectedIDs)
 	canStart := playerCount >= 2 // Minimum 2 players to start
 
 	message := fmt.Sprintf("Waiting for host to start (%d/%d players)", playerCount, h.maxPlayers)
@@ -343,9 +398,11 @@ func (h *NakamaMatchHandler) broadcastWaitingSyncToAll() {
 		return
 	}
 
-	// Build waiting players list
-	waitingPlayers := make([]pkgnet.WaitingPlayer, len(h.playerList))
-	for i, userID := range h.playerList {
+	connectedIDs := h.GetConnectedPlayers()
+
+	// Build waiting players list (connected only)
+	waitingPlayers := make([]pkgnet.WaitingPlayer, len(connectedIDs))
+	for i, userID := range connectedIDs {
 		player := h.players[userID]
 		if player == nil {
 			continue
@@ -359,7 +416,7 @@ func (h *NakamaMatchHandler) broadcastWaitingSyncToAll() {
 	}
 
 	// Build waiting sync message
-	playerCount := len(h.playerList)
+	playerCount := len(connectedIDs)
 	canStart := playerCount >= 2 // Minimum 2 players to start
 
 	message := fmt.Sprintf("Waiting for host to start (%d/%d players)", playerCount, h.maxPlayers)
@@ -380,11 +437,9 @@ func (h *NakamaMatchHandler) broadcastWaitingSyncToAll() {
 
 	// Broadcast to all connected players
 	adapter := NewNakamaBroadcastAdapter(h)
-	for _, userID := range h.playerList {
-		if !h.disconnected[userID] {
-			if err := adapter.SendWaitingSync(userID, waitingSync); err != nil {
-				h.logError("broadcastWaitingSyncToAll: failed to send", "user_id", userID, "error", err)
-			}
+	for _, userID := range connectedIDs {
+		if err := adapter.SendWaitingSync(userID, waitingSync); err != nil {
+			h.logError("broadcastWaitingSyncToAll: failed to send", "user_id", userID, "error", err)
 		}
 	}
 

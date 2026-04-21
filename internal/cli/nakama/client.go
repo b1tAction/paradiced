@@ -287,6 +287,24 @@ func (sc *SocketClient) JoinMatch(ctx context.Context, matchIDOrToken string, me
 	return nil
 }
 
+// LeaveMatch leaves the current match explicitly.
+func (sc *SocketClient) LeaveMatch(ctx context.Context) error {
+	if sc.conn == nil {
+		return nil
+	}
+	if sc.matchID == "" {
+		return nil
+	}
+
+	if err := sc.conn.MatchLeave(ctx, sc.matchID); err != nil {
+		return err
+	}
+
+	sc.logger.Debug("Left match successfully", "match_id", sc.matchID)
+	sc.matchID = ""
+	return nil
+}
+
 // SendMessage sends a message to the match.
 func (sc *SocketClient) SendMessage(ctx context.Context, opCode int64, data any) error {
 	// Marshal data to JSON
@@ -456,6 +474,7 @@ type ISocketClient interface {
 	Connect(ctx context.Context, session *Session) error
 	CreateMatch(ctx context.Context, name string) (string, error)
 	JoinMatch(ctx context.Context, matchIDOrToken string, metadata map[string]string) error
+	LeaveMatch(ctx context.Context) error
 	SendMessage(ctx context.Context, opCode int64, data any) error
 	MessageChan() <-chan *SocketMessage
 	Close() error
@@ -555,6 +574,12 @@ func (sc *StandaloneSocketClient) CreateMatch(ctx context.Context, name string) 
 // JoinMatch is not used in standalone mode.
 func (sc *StandaloneSocketClient) JoinMatch(ctx context.Context, matchIDOrToken string, metadata map[string]string) error {
 	sc.matchID = matchIDOrToken
+	return nil
+}
+
+// LeaveMatch is a no-op in standalone mode.
+func (sc *StandaloneSocketClient) LeaveMatch(ctx context.Context) error {
+	sc.matchID = ""
 	return nil
 }
 
