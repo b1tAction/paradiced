@@ -16,12 +16,12 @@ import (
 // CLIUIAdapter implements PlayerUIAdapter using simple text output.
 // Uses fmt.Printf for output and bufio.Scanner for input.
 type CLIUIAdapter struct {
-	reader     *bufio.Scanner
-	stateSync  *model.StateSync
-	userID     string
-	playerID   string
-	verbose    bool
-	faction    constants.Faction
+	reader    *bufio.Scanner
+	stateSync *model.StateSync
+	userID    string
+	playerID  string
+	verbose   bool
+	faction   constants.Faction
 }
 
 // NewCLIUIAdapter creates a new CLI UI adapter.
@@ -56,8 +56,28 @@ func (ui *CLIUIAdapter) GetUserID() string {
 
 // OnStateSync displays game state update.
 func (ui *CLIUIAdapter) OnStateSync(ctx context.Context, state *model.StateSync) {
+	prev := ui.stateSync
 	ui.stateSync = state
 	ui.playerID = ui.findMyPlayerID(state)
+
+	if !ui.verbose {
+		stateChanged := prev == nil ||
+			prev.GlobalState != state.GlobalState ||
+			prev.TurnState != state.TurnState ||
+			prev.Round != state.Round ||
+			prev.Turn != state.Turn ||
+			prev.CurrentPlayerID != state.CurrentPlayerID
+
+		if stateChanged {
+			myTurnMark := ""
+			if state.CurrentPlayerID != "" && state.CurrentPlayerID == ui.playerID {
+				myTurnMark = " [Your Turn]"
+			}
+			fmt.Printf("\n[State] %s/%s R%d T%d%s\n",
+				state.GlobalState, state.TurnState, state.Round, state.Turn, myTurnMark)
+		}
+		return
+	}
 
 	// Display state header
 	fmt.Println()
@@ -258,7 +278,12 @@ func (ui *CLIUIAdapter) OnWaitingSync(ctx context.Context, waiting *model.Waitin
 		if player.UserID == ui.userID {
 			meMark = " (You)"
 		}
-		fmt.Printf("  %s (%s)%s%s\n", player.UserID, player.Faction, hostMark, meMark)
+		// Use DisplayName for display, fallback to UserID if empty
+		displayName := player.DisplayName
+		if displayName == "" {
+			displayName = player.UserID
+		}
+		fmt.Printf("  %s (%s)%s%s\n", displayName, player.Faction, hostMark, meMark)
 	}
 	fmt.Println()
 
@@ -351,8 +376,14 @@ func (ui *CLIUIAdapter) displayPlayers(state *model.StateSync) {
 			prefix = "  *> "
 		}
 
+		// Use DisplayName for display, fallback to PlayerID if empty
+		displayName := player.DisplayName
+		if displayName == "" {
+			displayName = player.PlayerID
+		}
+
 		fmt.Printf("%s%s (%s) Pos:%d HP:%d LP:%d\n",
-			prefix, player.PlayerID, player.Faction, player.Position, player.HP, player.LP)
+			prefix, displayName, player.Faction, player.Position, player.HP, player.LP)
 
 		// Show buffs
 		if len(player.Buffs) > 0 {

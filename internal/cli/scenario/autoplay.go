@@ -187,7 +187,11 @@ func runNakamaPlay(ctx context.Context, client *nakama.Client, config ScenarioCo
 		logger.Info("Joining match with match ID", "match_id", finalMatchID)
 		// All players need to join the match
 		for i := 0; i < playersCount; i++ {
-			err := socketClients[i].JoinMatch(ctx, finalMatchID)
+			// Pass metadata with display_name for autoplay testing
+			metadata := map[string]string{
+				"display_name": fmt.Sprintf("player-%d", i+1),
+			}
+			err := socketClients[i].JoinMatch(ctx, finalMatchID, metadata)
 			if err != nil {
 				return result, fmt.Errorf("player %d failed to join match: %w", i+1, err)
 			}
@@ -201,7 +205,11 @@ func runNakamaPlay(ctx context.Context, client *nakama.Client, config ScenarioCo
 				logger.Info("All players have same token, joining match", "token", token)
 				// All players need to join the match for authoritative match to start
 				for i := 0; i < playersCount; i++ {
-					err := socketClients[i].JoinMatch(ctx, token)
+					// Pass metadata with display_name for autoplay testing
+					metadata := map[string]string{
+						"display_name": fmt.Sprintf("player-%d", i+1),
+					}
+					err := socketClients[i].JoinMatch(ctx, token, metadata)
 					if err != nil {
 						return result, fmt.Errorf("player %d failed to join match: %w", i+1, err)
 					}

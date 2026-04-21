@@ -255,8 +255,9 @@ func (sc *SocketClient) CreateMatch(ctx context.Context, name string) (string, e
 	return sc.matchID, nil
 }
 
-// JoinMatch joins an existing match by ID or token.
-func (sc *SocketClient) JoinMatch(ctx context.Context, matchIDOrToken string) error {
+// JoinMatch joins an existing match by ID or token with optional metadata.
+// Metadata is passed to Nakama MatchJoinAttempt for server-side processing.
+func (sc *SocketClient) JoinMatch(ctx context.Context, matchIDOrToken string, metadata map[string]string) error {
 	if sc.conn == nil {
 		return fmt.Errorf("socket connection not established")
 	}
@@ -270,11 +271,11 @@ func (sc *SocketClient) JoinMatch(ctx context.Context, matchIDOrToken string) er
 	if strings.Count(matchIDOrToken, ".") == 2 {
 		// Likely a JWT token (starts with "eyJ")
 		sc.logger.Debug("Joining match with token", "token_len", len(matchIDOrToken))
-		match, err = sc.conn.MatchJoinToken(ctx, matchIDOrToken, nil)
+		match, err = sc.conn.MatchJoinToken(ctx, matchIDOrToken, metadata)
 	} else {
 		// Use as match ID
-		sc.logger.Debug("Joining match with ID", "match_id", matchIDOrToken)
-		match, err = sc.conn.MatchJoin(ctx, matchIDOrToken, nil)
+		sc.logger.Debug("Joining match with ID", "match_id", matchIDOrToken, "metadata", metadata)
+		match, err = sc.conn.MatchJoin(ctx, matchIDOrToken, metadata)
 	}
 
 	if err != nil {
@@ -454,7 +455,7 @@ func (c *StandaloneClient) Close() error {
 type ISocketClient interface {
 	Connect(ctx context.Context, session *Session) error
 	CreateMatch(ctx context.Context, name string) (string, error)
-	JoinMatch(ctx context.Context, matchIDOrToken string) error
+	JoinMatch(ctx context.Context, matchIDOrToken string, metadata map[string]string) error
 	SendMessage(ctx context.Context, opCode int64, data any) error
 	MessageChan() <-chan *SocketMessage
 	Close() error
@@ -552,7 +553,7 @@ func (sc *StandaloneSocketClient) CreateMatch(ctx context.Context, name string) 
 }
 
 // JoinMatch is not used in standalone mode.
-func (sc *StandaloneSocketClient) JoinMatch(ctx context.Context, matchIDOrToken string) error {
+func (sc *StandaloneSocketClient) JoinMatch(ctx context.Context, matchIDOrToken string, metadata map[string]string) error {
 	sc.matchID = matchIDOrToken
 	return nil
 }

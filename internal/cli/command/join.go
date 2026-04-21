@@ -25,8 +25,8 @@ var joinCmd = &cobra.Command{
 You can get the match ID from the host player who created the room.
 
 Examples:
-  # Join a room with match ID
-  pdcli join --match-id=7c9b4d2a-xxxx.xxxx --user-id=myname
+	# Join a room with display name (auto-generate user-id)
+	pdcli join --match-id=7c9b4d2a-xxxx.xxxx --name=alice
 
   # Join with specific faction
   pdcli join --match-id=<match-id> --faction=bai_hu --verbose`,
@@ -34,27 +34,27 @@ Examples:
 }
 
 var (
-	joinServerHTTP   string
-	joinServerWS     string
-	joinServerKey    string
-	joinUserID       string
-	joinMatchID      string
-	joinFaction      string
-	joinVerbose      bool
-	joinTimeout      int
+	joinServerHTTP string
+	joinServerWS   string
+	joinServerKey  string
+	joinName       string
+	joinMatchID    string
+	joinFaction    string
+	joinVerbose    bool
+	joinTimeout    int
 )
 
 func init() {
 	joinCmd.Flags().StringVar(&joinServerHTTP, "server-http", "http://127.0.0.1:7350", "Nakama HTTP server URL")
 	joinCmd.Flags().StringVar(&joinServerWS, "server-ws", "ws://127.0.0.1:7350/ws", "Nakama WebSocket server URL")
 	joinCmd.Flags().StringVar(&joinServerKey, "server-key", "defaultkey", "Nakama server key")
-	joinCmd.Flags().StringVar(&joinUserID, "user-id", "", "User ID for authentication (required)")
+	joinCmd.Flags().StringVar(&joinName, "name", "", "Display name (required), used to auto-generate user-id")
 	joinCmd.Flags().StringVar(&joinMatchID, "match-id", "", "Match ID to join (required)")
 	joinCmd.Flags().StringVar(&joinFaction, "faction", "qing_long", "Faction choice (qing_long, zhu_que, bai_hu, xuan_wu)")
 	joinCmd.Flags().BoolVar(&joinVerbose, "verbose", false, "Enable verbose logging")
 	joinCmd.Flags().IntVar(&joinTimeout, "timeout", 600, "Game timeout in seconds")
 
-	joinCmd.MarkFlagRequired("user-id")
+	joinCmd.MarkFlagRequired("name")
 	joinCmd.MarkFlagRequired("match-id")
 }
 
@@ -84,6 +84,11 @@ func runJoin(cmd *cobra.Command, args []string) error {
 	// Create logger
 	logger := nakama.NewLogger(joinVerbose)
 
+	resolvedUserID, err := resolveUserID(joinName)
+	if err != nil {
+		return err
+	}
+
 	// Create Nakama client
 	clientConfig := nakama.ClientConfig{
 		ServerHTTP: joinServerHTTP,
@@ -99,12 +104,16 @@ func runJoin(cmd *cobra.Command, args []string) error {
 	defer client.Close()
 
 	// Authenticate
-	session, err := client.Authenticate(ctx, joinUserID)
+	session, err := client.Authenticate(ctx, resolvedUserID)
 	if err != nil {
 		return fmt.Errorf("failed to authenticate: %w", err)
 	}
 
-	logger.Info("Authentication successful", "user_id", session.UserID)
+	if joinVerbose {
+		fmt.Printf("Using user-id: %s\n", session.UserID)
+	}
+
+	logger.Debug("Authentication successful", "user_id", session.UserID)
 
 	// Create socket client
 	socketClient, err := client.CreateSocketClient()
@@ -118,10 +127,14 @@ func runJoin(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to connect WebSocket: %w", err)
 	}
 
-	logger.Info("WebSocket connected")
+	logger.Debug("WebSocket connected")
 
-	// Join match
-	if err := socketClient.JoinMatch(ctx, joinMatchID); err != nil {
+	// Join match with metadata (faction and display_name)
+	metadata := map[string]string{
+		"faction":      joinFaction,
+		"display_name": joinName,
+	}
+	if err := socketClient.JoinMatch(ctx, joinMatchID, metadata); err != nil {
 		return fmt.Errorf("failed to join match: %w", err)
 	}
 

@@ -23,8 +23,8 @@ var hostCmd = &cobra.Command{
 The game will start automatically when the room is full (4 players).
 
 Examples:
-  # Create a room with default settings
-  pdcli host --server-http=http://127.0.0.1:7350 --user-id=myname
+	# Create a room with display name (auto-generate user-id)
+	pdcli host --server-http=http://127.0.0.1:7350 --name=alice
 
   # Create a room with custom name and faction
   pdcli host --match-name=myroom --faction=zhu_que --verbose`,
@@ -32,29 +32,29 @@ Examples:
 }
 
 var (
-	hostServerHTTP   string
-	hostServerWS     string
-	hostServerKey    string
-	hostUserID       string
-	hostMatchName    string
-	hostFaction      string
-	hostMaxPlayers   int
-	hostVerbose      bool
-	hostTimeout      int
+	hostServerHTTP string
+	hostServerWS   string
+	hostServerKey  string
+	hostName       string
+	hostMatchName  string
+	hostFaction    string
+	hostMaxPlayers int
+	hostVerbose    bool
+	hostTimeout    int
 )
 
 func init() {
 	hostCmd.Flags().StringVar(&hostServerHTTP, "server-http", "http://127.0.0.1:7350", "Nakama HTTP server URL")
 	hostCmd.Flags().StringVar(&hostServerWS, "server-ws", "ws://127.0.0.1:7350/ws", "Nakama WebSocket server URL")
 	hostCmd.Flags().StringVar(&hostServerKey, "server-key", "defaultkey", "Nakama server key")
-	hostCmd.Flags().StringVar(&hostUserID, "user-id", "", "User ID for authentication (required)")
+	hostCmd.Flags().StringVar(&hostName, "name", "", "Display name (required), used to auto-generate user-id")
 	hostCmd.Flags().StringVar(&hostMatchName, "match-name", "paradiced_match", "Match name for room")
 	hostCmd.Flags().StringVar(&hostFaction, "faction", "qing_long", "Faction choice (qing_long, zhu_que, bai_hu, xuan_wu)")
 	hostCmd.Flags().IntVar(&hostMaxPlayers, "max-players", 4, "Maximum players for the room")
 	hostCmd.Flags().BoolVar(&hostVerbose, "verbose", false, "Enable verbose logging")
 	hostCmd.Flags().IntVar(&hostTimeout, "timeout", 600, "Game timeout in seconds (including waiting)")
+	hostCmd.MarkFlagRequired("name")
 
-	hostCmd.MarkFlagRequired("user-id")
 }
 
 func runHost(cmd *cobra.Command, args []string) error {
@@ -88,6 +88,11 @@ func runHost(cmd *cobra.Command, args []string) error {
 	// Create logger
 	logger := nakama.NewLogger(hostVerbose)
 
+	resolvedUserID, err := resolveUserID(hostName)
+	if err != nil {
+		return err
+	}
+
 	// Create Nakama client
 	clientConfig := nakama.ClientConfig{
 		ServerHTTP: hostServerHTTP,
@@ -103,12 +108,16 @@ func runHost(cmd *cobra.Command, args []string) error {
 	defer client.Close()
 
 	// Authenticate
-	session, err := client.Authenticate(ctx, hostUserID)
+	session, err := client.Authenticate(ctx, resolvedUserID)
 	if err != nil {
 		return fmt.Errorf("failed to authenticate: %w", err)
 	}
 
-	logger.Info("Authentication successful", "user_id", session.UserID)
+	if hostVerbose {
+		fmt.Printf("Using user-id: %s\n", session.UserID)
+	}
+
+	logger.Debug("Authentication successful", "user_id", session.UserID)
 
 	// Create socket client
 	socketClient, err := client.CreateSocketClient()
@@ -122,7 +131,7 @@ func runHost(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to connect WebSocket: %w", err)
 	}
 
-	logger.Info("WebSocket connected")
+	logger.Debug("WebSocket connected")
 
 	// Call RPC to create authoritative room on server
 	// IMPORTANT: socket.CreateMatch creates a relayed match (not authoritative)
@@ -132,14 +141,19 @@ func runHost(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create authoritative room via RPC: %w", err)
 	}
 
-	logger.Info("Authoritative room created", "match_id", matchID)
+	logger.Debug("Authoritative room created", "match_id", matchID)
 
 	// Host must explicitly join the match (MatchJoin will be triggered on server)
-	if err := socketClient.JoinMatch(ctx, matchID); err != nil {
+	// Pass metadata with faction and display_name for server-side processing
+	metadata := map[string]string{
+		"faction":      hostFaction,
+		"display_name": hostName,
+	}
+	if err := socketClient.JoinMatch(ctx, matchID, metadata); err != nil {
 		return fmt.Errorf("host failed to join match: %w", err)
 	}
 
-	logger.Info("Host joined match", "match_id", matchID)
+	logger.Debug("Host joined match", "match_id", matchID)
 
 	// Create UI adapter
 	uiAdapter := player.NewCLIUIAdapter(session.UserID, faction, hostVerbose)
