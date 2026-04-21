@@ -109,8 +109,9 @@ ctx.GetDiceSteps() // 返回 5
 |-------|------|-----------|
 | TurnUpkeep | 回合准备：检查死亡/跳过、触发BeforeTurn | PhaseBeforeTurn |
 | MainAction | 主要行动：等待骰子/道具/技能输入 | - |
-| TurnMoving | 移动处理：计算路径、处理Fragile/Fog | PhasePreMove |
-| TurnLanded | 落地处理：检查格子类型、触发OnLand | PhaseOnLand |
+| TurnMoving | 移动处理：HSM预扫描路径、迷途Steps修改、CheckPoint拆分、FellDown | PhasePreMove (HSM发布) |
+| TurnCheckpoint | CheckPoint结算：DrawItemAction（宝箱道具） | - |
+| TurnLanded | 落地处理：CellType行为矩阵、触发OnLand | PhaseOnLand |
 | TurnEvent | 事件处理：抽取事件、触发PreEvent | PhasePreEvent |
 | TurnEnd | 回合结束：触发AfterTurn、TickBuffs | PhaseAfterTurn |
 
@@ -129,7 +130,7 @@ ctx.GetDiceSteps() // 返回 5
 | BeforeTurn | HSM | TurnUpkeep.Enter() |
 | OnLand | HSM | TurnLanded.Enter() |
 | AfterTurn | HSM | TurnEnd.Enter() |
-| PreMove | Action | MoveAction.Execute() |
+| PreMove | HSM | TurnMoving.Enter() |
 | PreEvent | Action | DrawEventAction.Execute() |
 | PreDamage | Action | DamageAction.Execute() |
 | ItemUsed | Game | Game.UseItem() |
@@ -140,7 +141,8 @@ Turn States 通过 ActionContext 执行 Action：
 
 ```
 TurnUpkeep → ExecuteAction(ModifyLPAction) → PreTrigger → Execute → PostTrigger → EventLog
-TurnMoving → ExecuteAction(MoveAction) → PreTrigger(PreMove) → Execute → EventLog
+TurnMoving → HSM publishes PhasePreMove → CalculatePath → ExecuteAction(MoveAction) → Execute → EventLog
+TurnCheckpoint → ExecuteAction(DrawItemAction) → Execute → EventLog
 TurnEvent → ExecuteAction(DrawEventAction) → PreTrigger(PreEvent) → Execute → EventLog
 ```
 

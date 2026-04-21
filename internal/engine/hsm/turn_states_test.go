@@ -84,7 +84,7 @@ func TestTurnUpkeepState_Enter_DeadPlayer(t *testing.T) {
 
 	// Setup map with checkpoint
 	mapEngine := gamemap.NewMapEngine(100)
-	configs := map[int]gamemap.CellType{30: gamemap.CellTypeCheckpoint}
+	configs := map[int]constants.CellType{30: constants.CellTypeCheckpoint}
 	mapEngine.GenerateLinearMap(configs)
 	
 	state := NewTurnUpkeepState()
@@ -244,7 +244,7 @@ func TestTurnMovingState_Enter_FellDown(t *testing.T) {
 
 	// Setup map with Fragile cell
 	mapEngine := gamemap.NewMapEngine(100)
-	configs := map[int]gamemap.CellType{25: gamemap.CellTypeFragile}
+	configs := map[int]constants.CellType{25: constants.CellTypeFragile}
 	mapEngine.GenerateLinearMap(configs)
 	
 	state := NewTurnMovingState()
@@ -320,9 +320,9 @@ func TestTurnLandedState_Enter(t *testing.T) {
 	game.AddPlayer(player)
 
 	mapEngine := gamemap.NewMapEngine(100)
-	configs := map[int]gamemap.CellType{30: gamemap.CellTypeCheckpoint}
+	configs := map[int]constants.CellType{30: constants.CellTypeCheckpoint}
 	mapEngine.GenerateLinearMap(configs)
-	
+
 	state := NewTurnLandedState()
 	hsmInst := NewHSM(game)
 	hsmInst.SetMapEngine(mapEngine)
@@ -335,8 +335,97 @@ func TestTurnLandedState_Enter(t *testing.T) {
 	if ctx.Error != nil {
 		t.Errorf("Enter should succeed, got error: %v", ctx.Error)
 	}
-	if state.cellType != gamemap.CellTypeCheckpoint {
-		t.Errorf("cellType should be Checkpoint, got %d", state.cellType)
+	if state.cellType != constants.CellTypeCheckpoint {
+		t.Errorf("cellType should be Checkpoint, got %s", state.cellType)
+	}
+}
+
+func TestTurnLandedState_Enter_CellTypeEvent(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 42)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 6})
+	player.HP = 3
+	player.Position = 25
+	game.AddPlayer(player)
+
+	// Setup EventPool for fallback (though bound events set DrawnType directly)
+	game.EventPool = &rng.EvaluatedItemPool{
+		Items: []rng.EvaluatedItem{
+			{Type: "herb", Eval: constants.EvaluationMildGood},
+		},
+	}
+
+	// Setup map with CellTypeEvent and bound event ID "herb"
+	mapEngine := gamemap.NewMapEngine(100)
+	configs := map[int]constants.CellType{25: constants.CellTypeEvent}
+	mapEngine.GenerateLinearMap(configs)
+
+	// Set EventID on the event cell
+	cell, _ := mapEngine.GetCell(25)
+	cell.EventID = "herb"
+
+	state := NewTurnLandedState()
+	hsmInst := NewHSM(game)
+	hsmInst.SetMapEngine(mapEngine)
+	ctx := NewStateContext().
+		WithHSM(hsmInst).
+		WithPlayer(player)
+
+	state.Enter(ctx)
+
+	if ctx.Error != nil {
+		t.Errorf("Enter should succeed, got error: %v", ctx.Error)
+	}
+	// CellType should be Event
+	if state.cellType != constants.CellTypeEvent {
+		t.Errorf("cellType should be Event, got %s", state.cellType)
+	}
+	// Bound event should have been executed, so skipEvent=true
+	if !state.skipEvent {
+		t.Error("skipEvent should be true after bound event execution (CellTypeEvent)")
+	}
+	// Herb event handler gives HP+1 via HealAction
+	if player.HP != 4 {
+		t.Errorf("Player HP should be 4 (3+1 from herb), got %d", player.HP)
+	}
+	// Update should go to TurnEnd (skipEvent=true)
+	nextID := state.Update(ctx)
+	if nextID != StateTurnEnd {
+		t.Errorf("Update should return StateTurnEnd for skipEvent, got %s", nextID.String())
+	}
+}
+
+func TestTurnLandedState_Enter_CellTypeNormal(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.Position = 20
+	game.AddPlayer(player)
+
+	mapEngine := gamemap.NewMapEngine(100)
+	mapEngine.GenerateLinearMap(nil) // All Normal cells
+
+	state := NewTurnLandedState()
+	hsmInst := NewHSM(game)
+	hsmInst.SetMapEngine(mapEngine)
+	ctx := NewStateContext().
+		WithHSM(hsmInst).
+		WithPlayer(player)
+
+	state.Enter(ctx)
+
+	if ctx.Error != nil {
+		t.Errorf("Enter should succeed, got error: %v", ctx.Error)
+	}
+	if state.cellType != constants.CellTypeNormal {
+		t.Errorf("cellType should be Normal, got %s", state.cellType)
+	}
+	// Normal cell should NOT skip event
+	if state.skipEvent {
+		t.Error("skipEvent should be false for Normal cell")
+	}
+	// Update should go to TurnEvent
+	nextID := state.Update(ctx)
+	if nextID != StateTurnEvent {
+		t.Errorf("Update should return StateTurnEvent for Normal cell, got %s", nextID.String())
 	}
 }
 
@@ -351,13 +440,168 @@ func TestTurnLandedState_Update(t *testing.T) {
 	}
 }
 
+// ========== TurnCheckpointState Tests ==========
+
+func TestTurnCheckpointState_Enter(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 42)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.Position = 25
+	player.HP = 5
+	game.AddPlayer(player)
+
+	// Setup ItemPool for DrawItemAction
+	game.ItemPool = &rng.EvaluatedItemPool{
+		Items: []rng.EvaluatedItem{
+			{Type: "healing_potion", Eval: constants.EvaluationGood},
+		},
+	}
+
+	state := NewTurnCheckpointState()
+	ctx := NewStateContext().
+		WithHSM(NewHSM(game)).
+		WithPlayer(player)
+
+	state.Enter(ctx)
+
+	if ctx.Error != nil {
+		t.Errorf("Enter should succeed, got error: %v", ctx.Error)
+	}
+}
+
+func TestTurnCheckpointState_Update(t *testing.T) {
+	state := NewTurnCheckpointState()
+	ctx := NewStateContext()
+
+	nextID := state.Update(ctx)
+
+	if nextID != StateTurnMoving {
+		t.Errorf("Update should return StateTurnMoving, got %s", nextID.String())
+	}
+}
+
+// ========== TurnMovingState CheckPoint Split Tests ==========
+
+func TestTurnMovingState_Enter_CheckPointSplit(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 42)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.Position = 20
+	player.HP = 5
+	game.AddPlayer(player)
+
+	// Setup map with CheckPoint at position 25
+	mapEngine := gamemap.NewMapEngine(100)
+	configs := map[int]constants.CellType{25: constants.CellTypeCheckpoint}
+	mapEngine.GenerateLinearMap(configs)
+
+	// Setup pools for ActionContext
+	game.EventPool = &rng.EvaluatedItemPool{Items: []rng.EvaluatedItem{}}
+	game.ItemPool = &rng.EvaluatedItemPool{
+		Items: []rng.EvaluatedItem{
+			{Type: "healing_potion", Eval: constants.EvaluationGood},
+		},
+	}
+
+	state := NewTurnMovingState()
+	hsmInst := NewHSM(game)
+	hsmInst.SetMapEngine(mapEngine)
+	ctx := NewStateContext().
+		WithHSM(hsmInst).
+		WithPlayer(player)
+	ctx.SetInt(KeyDiceSteps, 10) // Should pass through CheckPoint at 25
+
+	state.Enter(ctx)
+
+	if ctx.Error != nil {
+		t.Errorf("Enter should succeed, got error: %v", ctx.Error)
+	}
+	if state.hasCheckpoint != true {
+		t.Error("hasCheckpoint should be true when path contains CheckPoint")
+	}
+	if state.checkpointPos != 25 {
+		t.Errorf("checkpointPos should be 25, got %d", state.checkpointPos)
+	}
+	// Player should have moved to checkpoint position (first segment)
+	if player.Position != 25 {
+		t.Errorf("Player should be at checkpoint 25, got %d", player.Position)
+	}
+	// Remaining steps should be 5 (10 - 5 = 5)
+	if state.remainingSteps != 5 {
+		t.Errorf("remainingSteps should be 5, got %d", state.remainingSteps)
+	}
+
+	// Update should transition to TurnCheckpoint
+	nextID := state.Update(ctx)
+	if nextID != StateTurnCheckpoint {
+		t.Errorf("Update should return StateTurnCheckpoint for CheckPoint split, got %s", nextID.String())
+	}
+}
+
+func TestTurnMovingState_Enter_ReverseSkipsCheckpoint(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 42)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.Position = 30
+	player.HP = 5
+	game.AddPlayer(player)
+
+	// Setup map with CheckPoint at position 25 (before player position)
+	mapEngine := gamemap.NewMapEngine(100)
+	configs := map[int]constants.CellType{25: constants.CellTypeCheckpoint}
+	mapEngine.GenerateLinearMap(configs)
+
+	// Setup pools for ActionContext
+	game.EventPool = &rng.EvaluatedItemPool{Items: []rng.EvaluatedItem{}}
+	game.ItemPool = &rng.EvaluatedItemPool{Items: []rng.EvaluatedItem{}}
+
+	state := NewTurnMovingState()
+	hsmInst := NewHSM(game)
+	hsmInst.SetMapEngine(mapEngine)
+	ctx := NewStateContext().
+		WithHSM(hsmInst).
+		WithPlayer(player)
+	// Simulate 迷途 reverse movement: set Steps < 0 directly
+	// (after 迷途 handler flips positive Steps to negative)
+	ctx.SetInt(KeyDiceSteps, -5) // Moving backward from 30
+
+	state.Enter(ctx)
+
+	if ctx.Error != nil {
+		t.Errorf("Enter should succeed, got error: %v", ctx.Error)
+	}
+	// Reverse movement should NOT trigger CheckPoint split
+	if state.hasCheckpoint != false {
+		t.Error("hasCheckpoint should be false for reverse movement (迷途)")
+	}
+	// Player should have moved backward (30 + (-5) = 25)
+	if player.Position != 25 {
+		t.Errorf("Player should be at 25 (reverse movement), got %d", player.Position)
+	}
+	// Steps should remain negative
+	if state.Steps >= 0 {
+		t.Errorf("Steps should be negative after reverse movement, got %d", state.Steps)
+	}
+
+	// Update should transition to TurnLanded (no CheckPoint split)
+	nextID := state.Update(ctx)
+	if nextID != StateTurnLanded {
+		t.Errorf("Update should return StateTurnLanded for reverse movement, got %s", nextID.String())
+	}
+}
+
 // ========== TurnEventState Tests ==========
 
 func TestTurnEventState_Enter(t *testing.T) {
-	game := engine.NewGame(id.NewGameID(), 0)
+	game := engine.NewGame(id.NewGameID(), 42)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.Position = 20
 	game.AddPlayer(player)
+
+	// Setup EventPool for DrawEventAction (Game.Draw already initialized by NewGame)
+	game.EventPool = &rng.EvaluatedItemPool{
+		Items: []rng.EvaluatedItem{
+			{Type: "herb", Eval: constants.EvaluationMildGood},
+			{Type: "milk_tea", Eval: constants.EvaluationGood},
+		},
+	}
 
 	state := NewTurnEventState()
 	ctx := NewStateContext().
@@ -366,7 +610,9 @@ func TestTurnEventState_Enter(t *testing.T) {
 
 	state.Enter(ctx)
 
-	// Note: DrawEventAction requires event pool, this test verifies state setup
+	if ctx.Error != nil {
+		t.Errorf("Enter should succeed, got error: %v", ctx.Error)
+	}
 	if state.eventDrawn != true {
 		t.Error("eventDrawn should be true after Enter")
 	}

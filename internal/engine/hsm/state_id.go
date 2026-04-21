@@ -27,6 +27,7 @@ const (
 	StateTurnLanded                       // 203: Landing phase, trigger PhaseOnLand
 	StateTurnEvent                        // 204: Event phase, trigger PhasePreEvent/PhasePreDamage
 	StateTurnEnd                          // 205: Turn end phase, trigger PhaseAfterTurn, TickBuffs
+	StateTurnCheckpoint                   // 206: CheckPoint processing (DrawItem etc.)
 )
 
 // ========== Layer 3: Interrupt States ==========
@@ -59,6 +60,7 @@ func (s StateID) String() string {
 		StateTurnLanded:     "TurnLanded",
 		StateTurnEvent:      "TurnEvent",
 		StateTurnEnd:        "TurnEnd",
+		StateTurnCheckpoint: "TurnCheckpoint",
 		StateWaitDecision:   "WaitDecision",
 		StateNone:           "None",
 		StateInvalid:        "Invalid",
@@ -81,7 +83,7 @@ func (s StateID) IsGlobalState() bool {
 
 // IsTurnState checks if state belongs to Layer 2 (Turn).
 func (s StateID) IsTurnState() bool {
-	return s >= StateTurnUpkeep && s <= StateTurnEnd
+	return s >= StateTurnUpkeep && s <= StateTurnCheckpoint
 }
 
 // IsInterruptState checks if state belongs to Layer 3 (Interrupt).

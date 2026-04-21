@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/b1tAction/paradiced/internal/core"
+	"github.com/b1tAction/paradiced/internal/engine"
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/internal/gamemap"
@@ -72,7 +73,7 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 
 	// Create ActionContext for executing Actions
 	mapEngine := ctx.GetMapEngine()
-	s.actionCtx = engineaction.NewActionContext(
+	s.actionCtx = newActionContextWithPoolsNoPlayer(
 		game,
 		game.Bus,
 		mapEngine,
@@ -218,7 +219,7 @@ func (s *MainActionState) Enter(ctx *StateContext) {
 	// Initialize action context
 	game := ctx.GetGame()
 	mapEngine := ctx.GetMapEngine()
-	s.actionCtx = engineaction.NewActionContext(
+	s.actionCtx = newActionContextWithPoolsNoPlayer(
 		game,
 		game.Bus,
 		mapEngine,
@@ -363,13 +364,19 @@ func (s *MainActionState) defaultDiceRoll(ctx *StateContext) int {
 // ========== TurnMovingState ==========
 
 // TurnMovingState handles movement calculation and path processing.
-// Uses Action system for MoveAction execution.
+// HSM layer does path pre-scanning via CalculatePath, then executes pure MoveAction.
+// Steps field stores dice steps, modified by 迷途 handler during PhasePreMove.
+// Data flow: State → ActionContext.Metadata → MoveAction.Execute()
 type TurnMovingState struct {
 	BaseTurnState
-	pathResult PathResultData
-	fellDown   bool
-	reachedEnd bool
-	actionCtx  *engineaction.ActionContext
+	Steps          int    // Movement steps (from dice, may be modified by 迷途)
+	fellDown       bool   // Player fell from Fragile cell
+	reachedEnd     bool   // Player reached Boss cell (end of map)
+	hasCheckpoint  bool   // CheckPoint detected in path (Enter→Update transition flag)
+	checkpointPos  int    // CheckPoint position (Enter→Update transition data)
+	remainingSteps int    // Remaining steps after CheckPoint (Enter→Update transition data)
+	pathResult     PathResultData
+	actionCtx      *engineaction.ActionContext
 }
 
 // PathResultData stores path calculation results.
@@ -384,9 +391,18 @@ type PathResultData struct {
 func NewTurnMovingState() *TurnMovingState {
 	return &TurnMovingState{
 		BaseTurnState: BaseTurnState{id: StateTurnMoving},
-		fellDown:      false,
-		reachedEnd:    false,
 	}
+}
+
+// GetSteps returns current movement steps (implements engine.StepsModifier).
+func (s *TurnMovingState) GetSteps() int {
+	return s.Steps
+}
+
+// SetSteps sets movement steps (implements engine.StepsModifier).
+// Used by 迷途 handler to reverse movement direction.
+func (s *TurnMovingState) SetSteps(steps int) {
+	s.Steps = steps
 }
 
 func (s *TurnMovingState) Enter(ctx *StateContext) {
@@ -398,95 +414,142 @@ func (s *TurnMovingState) Enter(ctx *StateContext) {
 		return
 	}
 
-	// Get dice steps
-	steps := ctx.GetDiceSteps()
-	fmt.Printf("[hsm] TurnMovingState.Enter: dice_steps=%d, player_position=%d\n", steps, player.Position)
-	if steps <= 0 {
-		// Invalid steps, set error and end turn
-		fmt.Printf("[hsm] TurnMovingState.Enter: invalid dice steps, ending turn\n")
-		ctx.Error = errors.WrapHSMError(
-			errors.NewValidationError("dice_steps", steps, "must be positive"),
-			"TurnMoving", 2, "Enter", "invalid dice steps")
+	// Get dice steps (from dice or remaining steps from TurnCheckpoint re-entry)
+	s.Steps = ctx.GetDiceSteps()
+	fmt.Printf("[hsm] TurnMovingState.Enter: dice_steps=%d, player_position=%d\n", s.Steps, player.Position)
+	if s.Steps == 0 {
+		// Zero steps, skip movement entirely
+		fmt.Printf("[hsm] TurnMovingState.Enter: zero steps, going to TurnLanded\n")
 		return
 	}
 
 	// Create ActionContext
 	game := ctx.GetGame()
 	mapEngine := ctx.GetMapEngine()
-	s.actionCtx = engineaction.NewActionContext(
+	s.actionCtx = newActionContextWithPools(
 		game,
 		game.Bus,
 		mapEngine,
 		game.Draw,
+		player,
 	)
 
-	// Create and execute MoveAction
-	// MoveAction's PreTriggerPhase = PhasePreMove (迷途 can intercept)
-	moveAction := engineaction.NewMoveAction(player, steps, "DiceRoll")
+	// Step 1: HSM publishes PhasePreMove (迷途 handler modifies s.Steps directly)
+	triggerCtx := event.NewContext(player)
+	triggerCtx.Set("action_context", s.actionCtx)
+	triggerCtx.Set("current_state", s)
+	triggerCtx.Set("current_player", player)
 
-	// Execute through ActionContext (handles PreTrigger, Execute, PostTrigger)
-	if err := s.actionCtx.ExecuteAction(moveAction); err != nil {
+	decisions := ctx.GetBus().Publish(constants.PhasePreMove, player.ID.UUID(), triggerCtx)
+
+	// Check for handler errors
+	if triggerCtx.HasError() {
 		ctx.Error = errors.WrapHSMError(
-			err, "TurnMoving", 2, "Enter", "move action execution failed")
+			triggerCtx.FirstError(), "TurnMoving", 2, "Enter", "PhasePreMove handler failed")
 		return
 	}
 
-	// Get path result from MoveAction
-	s.pathResult.TargetIndex = moveAction.TargetPos
-	s.pathResult.Path = moveAction.Path
-	s.pathResult.StartIndex = player.Position - steps // Approximate
-
-	// Check for Fragile fall (PathResult.Interrupted/FellDown)
-	// This would be set by MapEngine during CalculatePath
-	// For now, check if player position changed correctly
-	if player.Position != s.pathResult.TargetIndex {
-		// Position mismatch might indicate fall
-		// In full implementation, check MapEngine.PathResult.FellDown
+	// Step 2: Path pre-scanning via CalculatePath (using modified s.Steps)
+	startPos := player.Position
+	pathResult, err := mapEngine.CalculatePath(startPos, s.Steps)
+	if err != nil {
+		ctx.Error = errors.WrapHSMError(
+			err, "TurnMoving", 2, "Enter", "path calculation failed")
+		return
 	}
 
-	// Check for reaching end (Boss cell)
-	if mapEngine != nil {
-		mapLength := mapEngine.Length
-		if player.Position >= mapLength-1 {
-			s.reachedEnd = true
-			ctx.SetReachedEnd(true)
+	// Step 3: FellDown handling (HSM layer)
+	if pathResult.FellDown {
+		s.fellDown = true
+		// Write path data to actionCtx.Metadata for MoveAction to read
+		s.actionCtx.SetInt("target_pos", pathResult.TargetIndex)
+		s.actionCtx.Set("path", pathResult.Path)
+		moveAction := engineaction.NewMoveAction(player, pathResult.TargetIndex-startPos, "DiceRollFellDown")
+		s.actionCtx.ExecuteAction(moveAction)
+		fellDownAction := engineaction.NewFellDownAction(player, pathResult.TargetIndex, 1, "FragileCell")
+		s.actionCtx.ExecuteAction(fellDownAction)
+		// FellDown -> TurnEnd, no further processing
+		return
+	}
+
+	// Step 4: CheckPoint check (only when Steps > 0, i.e. forward movement)
+	if s.Steps > 0 {
+		checkpointPos := findFirstCheckpointInPath(pathResult.Path, mapEngine)
+		if checkpointPos != -1 {
+			// Split movement at CheckPoint
+			remainingSteps := pathResult.OriginalTarget - checkpointPos
+			firstSegSteps := checkpointPos - startPos
+
+			// Calculate first segment path
+			firstSegPathResult, firstSegErr := mapEngine.CalculatePath(startPos, firstSegSteps)
+			if firstSegErr != nil {
+				ctx.Error = errors.WrapHSMError(
+					firstSegErr, "TurnMoving", 2, "Enter", "first segment path calculation failed")
+				return
+			}
+
+			// Write first segment path data to actionCtx.Metadata
+			s.actionCtx.SetInt("target_pos", checkpointPos)
+			s.actionCtx.Set("path", firstSegPathResult.Path)
+
+			moveAction := engineaction.NewMoveAction(player, firstSegSteps, "DiceRollCheckpoint")
+			s.actionCtx.ExecuteAction(moveAction)
+
+			s.hasCheckpoint = true
+			s.checkpointPos = checkpointPos
+			s.remainingSteps = remainingSteps
+			// Store remaining steps for TurnCheckpoint → TurnMoving re-entry
+			ctx.SetInt(KeyDiceSteps, remainingSteps)
+			return
 		}
 	}
 
-	// Handle Fog activation (first player passing through)
+	// Normal full movement (no CheckPoint, or reverse movement)
+	s.actionCtx.SetInt("target_pos", pathResult.TargetIndex)
+	s.actionCtx.Set("path", pathResult.Path)
+
+	moveAction := engineaction.NewMoveAction(player, s.Steps, "DiceRoll")
+	s.actionCtx.ExecuteAction(moveAction)
+
+	s.reachedEnd = pathResult.ReachedEnd
+	if s.reachedEnd {
+		ctx.SetReachedEnd(true)
+	}
+
+	s.pathResult = PathResultData{
+		StartIndex:     startPos,
+		TargetIndex:    pathResult.TargetIndex,
+		Path:           pathResult.Path,
+		BrokenFragiles: pathResult.BrokenFragiles,
+	}
+
+	// Handle Fog activation
 	for _, pos := range s.pathResult.Path {
 		if mapEngine != nil {
 			cell, _ := mapEngine.GetCell(pos)
-			if cell != nil && cell.CellType == gamemap.CellTypeFog {
+			if cell != nil && cell.CellType == constants.CellTypeFog {
 				mapEngine.ActivateFog(pos)
 			}
 		}
 	}
 
-	// Note: Overtaken handling (白虎劫运) would be implemented
-	// by checking players at positions in path and generating StealBuffAction
+	// Store decisions if any
+	if len(decisions) > 0 {
+		ctx.Decisions = decisions
+		ctx.Set(KeyPendingCtx, triggerCtx)
+	}
 }
 
 func (s *TurnMovingState) Update(ctx *StateContext) StateID {
-	// Check if fell down -> skip to TurnEnd, use FellDownAction
+	// FellDown -> TurnEnd (FellDownAction already executed in Enter)
 	if s.fellDown {
 		ctx.SetFellDown(true)
-		// Use FellDownAction for falling
-		if s.actionCtx != nil && ctx.Player != nil {
-			fellDownAction := engineaction.NewFellDownAction(ctx.Player, ctx.Player.Position, 1, "FragileCell")
-			if err := s.actionCtx.ExecuteAction(fellDownAction); err != nil {
-				ctx.Error = errors.WrapHSMError(
-					err, "TurnMoving", 2, "Update", "fell down action failed")
-				return StateNone // Block state transition
-			}
-		}
 		return StateTurnEnd
 	}
 
-	// Check if reached Boss -> notify TurnLoop
-	if s.reachedEnd {
-		// TurnLoop will handle transition to BossBattle
-		return StateTurnLanded
+	// CheckPoint detected -> TurnCheckpoint (then re-enter TurnMoving with remaining steps)
+	if s.hasCheckpoint {
+		return StateTurnCheckpoint
 	}
 
 	// Normal flow -> TurnLanded
@@ -494,22 +557,155 @@ func (s *TurnMovingState) Update(ctx *StateContext) StateID {
 }
 
 func (s *TurnMovingState) Exit(ctx *StateContext) {
+	s.Steps = 0
 	s.fellDown = false
 	s.reachedEnd = false
+	s.hasCheckpoint = false
+	s.remainingSteps = 0
+	s.checkpointPos = 0
 	s.pathResult = PathResultData{}
 	if s.actionCtx != nil {
 		s.actionCtx.Clear()
 	}
 }
 
+// ========== TurnCheckpointState ==========
+
+// TurnCheckpointState handles CheckPoint landing effects (DrawItem etc.).
+// After processing, re-enters TurnMoving with remaining steps as dice_steps.
+type TurnCheckpointState struct {
+	BaseTurnState
+	actionCtx *engineaction.ActionContext
+}
+
+// NewTurnCheckpointState creates a new TurnCheckpoint state.
+func NewTurnCheckpointState() *TurnCheckpointState {
+	return &TurnCheckpointState{
+		BaseTurnState: BaseTurnState{id: StateTurnCheckpoint},
+	}
+}
+
+func (s *TurnCheckpointState) Enter(ctx *StateContext) {
+	player := ctx.Player
+	if player == nil {
+		ctx.Error = errors.WrapHSMError(
+			errors.NewInternalError("HSM", "TurnCheckpoint", nil),
+			"TurnCheckpoint", 2, "Enter", "player is nil")
+		return
+	}
+
+	// Create ActionContext for DrawItem
+	game := ctx.GetGame()
+	mapEngine := ctx.GetMapEngine()
+	s.actionCtx = newActionContextWithPools(
+		game,
+		game.Bus,
+		mapEngine,
+		game.Draw,
+		player,
+	)
+
+	// Execute DrawItemAction at CheckPoint (auto draw, no interception)
+	drawItemAction := engineaction.NewDrawItemAction(player, "CheckpointTreasure")
+	s.actionCtx.ExecuteAction(drawItemAction)
+
+	// No TurnSync broadcast here, LogEntry recorded to GameLog
+	// TurnSync will be broadcast at turn end (TurnEndState)
+}
+
+func (s *TurnCheckpointState) Update(ctx *StateContext) StateID {
+	// Re-enter TurnMoving with remaining steps
+	// remaining steps were already written to ctx(KeyDiceSteps) by TurnMoving.Update()
+	return StateTurnMoving
+}
+
+func (s *TurnCheckpointState) Exit(ctx *StateContext) {
+	if s.actionCtx != nil {
+		s.actionCtx.Clear()
+	}
+}
+
+// ========== Helper Functions ==========
+
+// findFirstCheckpointInPath scans the path for the first CheckPoint cell.
+// Skips the first element (start position) since player is already there.
+// Returns position index or -1 if none found.
+func findFirstCheckpointInPath(path []int, mapEngine *gamemap.MapEngine) int {
+	for i, pos := range path {
+		if i == 0 {
+			continue // Skip start position (player already at this cell)
+		}
+		cell, err := mapEngine.GetCell(pos)
+		if err == nil && cell != nil && cell.CellType == constants.CellTypeCheckpoint {
+			return pos
+		}
+	}
+	return -1
+}
+
+// newActionContextWithPools creates an ActionContext with pool data from Game.
+func newActionContextWithPools(game *engine.Game, bus *event.EventBus, mapEngine *gamemap.MapEngine, drawEngine *rng.DrawEngine, player *core.Player) *engineaction.ActionContext {
+	ctx := engineaction.NewActionContextWithPlayer(game, bus, mapEngine, drawEngine, player)
+	ctx.SetPools(game.EventPool, game.ItemPool)
+	return ctx
+}
+
+// newActionContextWithPoolsNoPlayer creates an ActionContext with pool data from Game (no current player).
+func newActionContextWithPoolsNoPlayer(game *engine.Game, bus *event.EventBus, mapEngine *gamemap.MapEngine, drawEngine *rng.DrawEngine) *engineaction.ActionContext {
+	ctx := engineaction.NewActionContext(game, bus, mapEngine, drawEngine)
+	ctx.SetPools(game.EventPool, game.ItemPool)
+	return ctx
+}
+
+// runEventEffect looks up the EventRegistry handler for the drawn event type
+// and bridges DerivedActions from the handler to ActionContext.
+func runEventEffect(drawnType constants.EventType, player *core.Player, actionCtx *engineaction.ActionContext) error {
+	if drawnType == constants.EventTypeNone || !drawnType.IsValid() {
+		return nil // No event drawn or invalid type
+	}
+
+	// Look up EventRegistry handler
+	handlerConfig := engine.GetEventHandlerConfig(drawnType)
+	if handlerConfig == nil || handlerConfig.Handler == nil {
+		return nil // No handler registered for this event type
+	}
+
+	// Create event.Context and call handler
+	triggerCtx := event.NewContext(player)
+	triggerCtx.Set("action_context", actionCtx)
+	triggerCtx.Set("current_player", player)
+
+	// Call the event effect handler
+	if err := handlerConfig.Handler(constants.PhaseAnyTime, triggerCtx); err != nil {
+		return err
+	}
+
+	// Bridge DerivedActions to ActionContext
+	for _, derived := range triggerCtx.GetDerivedActions() {
+		if act, ok := derived.(engineaction.Action); ok {
+			actionCtx.PushDerivedAction(act)
+		}
+	}
+
+	// Process the derived actions
+	return actionCtx.ProcessQueue()
+}
+
 // ========== TurnLandedState ==========
 
-// TurnLandedState handles landing effects and PhaseOnLand trigger.
+// TurnLandedState handles landing effects based on cell type behavior matrix.
+// PhaseOnLand is triggered first, then cell-type-specific actions:
+// - CellTypeEvent: DrawEventAction with bound event ID
+// - CellTypeNormal/Fog/Fragile: DrawEventAction for random event (handled in TurnEvent state)
+// - CellTypeCheckpoint: Already processed in TurnCheckpoint, no action here
+// - CellTypeBoss: Already handled in TurnMoving (reachedEnd flag)
 type TurnLandedState struct {
 	BaseTurnState
-	cellType  gamemap.CellType
-	decisions []*event.Decision
-	actionCtx *engineaction.ActionContext
+	cellType   constants.CellType
+	cell       *gamemap.MapCell // Landing cell data (for EventID access)
+	decisions  []*event.Decision
+	actionCtx  *engineaction.ActionContext
+	skipEvent  bool             // Skip TurnEvent (CellTypeCheckpoint/Boss don't need random event)
 }
 
 // NewTurnLandedState creates a new TurnLanded state.
@@ -532,18 +728,19 @@ func (s *TurnLandedState) Enter(ctx *StateContext) {
 	// Create ActionContext
 	game := ctx.GetGame()
 	mapEngine := ctx.GetMapEngine()
-	s.actionCtx = engineaction.NewActionContext(
+	s.actionCtx = newActionContextWithPoolsNoPlayer(
 		game,
 		game.Bus,
 		mapEngine,
 		game.Draw,
 	)
 
-	// Get cell type at landing position
+	// Get cell data at landing position
 	if mapEngine != nil {
 		cell, err := mapEngine.GetCell(player.Position)
 		if err == nil && cell != nil {
 			s.cellType = cell.CellType
+			s.cell = cell
 		}
 	}
 
@@ -573,12 +770,42 @@ func (s *TurnLandedState) Enter(ctx *StateContext) {
 		return
 	}
 
-	// Handle special cell types
+	// Handle cell type behavior matrix
 	switch s.cellType {
-	case gamemap.CellTypeCheckpoint:
-		// Checkpoint: could trigger treasure refresh (implementation specific)
-	case gamemap.CellTypeBoss:
-		// Boss cell: mark as reached end (already handled in Moving)
+	case constants.CellTypeEvent:
+		// Event cell: trigger bound event (cell.EventID specifies which event type)
+		if s.cell != nil && s.cell.EventID != "" {
+			drawnType := constants.ParseEventType(s.cell.EventID)
+			if drawnType.IsValid() {
+				drawAction := engineaction.NewDrawEventAction(player, "CellEvent_"+s.cell.EventID)
+				drawAction.DrawnType = drawnType // Set directly from cell binding
+				drawAction.DrawnName = engine.GetEventName(drawnType)
+				if err := s.actionCtx.ExecuteAction(drawAction); err != nil {
+					ctx.Error = errors.WrapHSMError(
+						err, "TurnLanded", 2, "Enter", "bound event action failed")
+					return
+				}
+				// Execute the bound event's effect via EventRegistry handler
+				if err := runEventEffect(drawnType, player, s.actionCtx); err != nil {
+					ctx.Error = errors.WrapHSMError(
+						err, "TurnLanded", 2, "Enter", "bound event effect failed")
+					return
+				}
+				// Bound event already executed, skip random draw in TurnEvent
+				s.skipEvent = true
+			}
+		}
+	case constants.CellTypeCheckpoint:
+		// Checkpoint already processed in TurnCheckpoint state
+		// Skip random event draw in TurnEvent
+		s.skipEvent = true
+	case constants.CellTypeBoss:
+		// Boss cell: already handled in TurnMoving (reachedEnd flag)
+		// Skip random event draw in TurnEvent
+		s.skipEvent = true
+	case constants.CellTypeNormal, constants.CellTypeFog, constants.CellTypeFragile:
+		// Random DrawEvent will be handled in TurnEvent state
+		// No special action needed here
 	}
 }
 
@@ -589,12 +816,19 @@ func (s *TurnLandedState) Update(ctx *StateContext) StateID {
 		return StateNone // Wait for decision
 	}
 
+	// Skip TurnEvent for CheckPoint/Boss cells (already processed)
+	if s.skipEvent {
+		return StateTurnEnd
+	}
+
 	// Normal flow -> TurnEvent
 	return StateTurnEvent
 }
 
 func (s *TurnLandedState) Exit(ctx *StateContext) {
-	s.cellType = gamemap.CellTypeNormal
+	s.cellType = constants.CellTypeNormal
+	s.cell = nil
+	s.skipEvent = false
 	s.decisions = make([]*event.Decision, 0)
 	if s.actionCtx != nil {
 		s.actionCtx.Clear()
@@ -635,7 +869,7 @@ func (s *TurnEventState) Enter(ctx *StateContext) {
 	// Create ActionContext
 	game := ctx.GetGame()
 	mapEngine := ctx.GetMapEngine()
-	s.actionCtx = engineaction.NewActionContext(
+	s.actionCtx = newActionContextWithPoolsNoPlayer(
 		game,
 		game.Bus,
 		mapEngine,
@@ -658,8 +892,14 @@ func (s *TurnEventState) Enter(ctx *StateContext) {
 
 	s.eventDrawn = true
 
-	// Note: Actual event drawing and execution would be in DrawEventAction.Execute()
-	// which would use RNG engine and event pool
+	// Execute the drawn event's effect via EventRegistry handler
+	if !s.eventBlocked && drawAction.DrawnType.IsValid() {
+		if err := runEventEffect(drawAction.DrawnType, player, s.actionCtx); err != nil {
+			ctx.Error = errors.WrapHSMError(
+				err, "TurnEvent", 2, "Enter", "event effect execution failed")
+			return
+		}
+	}
 }
 
 func (s *TurnEventState) Update(ctx *StateContext) StateID {
@@ -710,7 +950,7 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 	// Create ActionContext
 	game := ctx.GetGame()
 	mapEngine := ctx.GetMapEngine()
-	s.actionCtx = engineaction.NewActionContext(
+	s.actionCtx = newActionContextWithPoolsNoPlayer(
 		game,
 		game.Bus,
 		mapEngine,
@@ -868,6 +1108,8 @@ func (f *TurnStateFactory) CreateState(id StateID) State {
 		return NewMainActionState(timeout)
 	case StateTurnMoving:
 		return NewTurnMovingState()
+	case StateTurnCheckpoint:
+		return NewTurnCheckpointState()
 	case StateTurnLanded:
 		return NewTurnLandedState()
 	case StateTurnEvent:
@@ -890,6 +1132,7 @@ func RegisterTurnStates(hsm *HSM) error {
 		factory.CreateState(StateTurnUpkeep),
 		factory.CreateState(StateMainAction),
 		factory.CreateState(StateTurnMoving),
+		factory.CreateState(StateTurnCheckpoint),
 		factory.CreateState(StateTurnLanded),
 		factory.CreateState(StateTurnEvent),
 		factory.CreateState(StateTurnEnd),

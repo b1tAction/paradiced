@@ -12,6 +12,7 @@ import (
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
 	"github.com/b1tAction/paradiced/pkg/id"
+	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
 // ========== Integration Tests: Turn Flow with GameLog ==========
@@ -21,7 +22,7 @@ func TestTurnFlow_GameLog_Integration(t *testing.T) {
 	// Setup game and map
 	game := engine.NewGame(id.NewGameID(), 0)
 	mapEngine := gamemap.NewMapEngine(100)
-	configs := map[int]gamemap.CellType{30: gamemap.CellTypeCheckpoint}
+	configs := map[int]constants.CellType{30: constants.CellTypeCheckpoint}
 	mapEngine.GenerateLinearMap(configs)
 
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
@@ -107,7 +108,7 @@ func TestTurnFlow_Respawn_GameLog(t *testing.T) {
 	// Setup
 	game := engine.NewGame(id.NewGameID(), 0)
 	mapEngine := gamemap.NewMapEngine(100)
-	configs := map[int]gamemap.CellType{30: gamemap.CellTypeCheckpoint}
+	configs := map[int]constants.CellType{30: constants.CellTypeCheckpoint}
 	mapEngine.GenerateLinearMap(configs)
 
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 6})
@@ -235,7 +236,7 @@ func TestTurnFlow_CompleteTurn(t *testing.T) {
 	// Setup
 	game := engine.NewGame(id.NewGameID(), 0)
 	mapEngine := gamemap.NewMapEngine(100)
-	configs := map[int]gamemap.CellType{30: gamemap.CellTypeCheckpoint}
+	configs := map[int]constants.CellType{30: constants.CellTypeCheckpoint}
 	mapEngine.GenerateLinearMap(configs)
 
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 6})
@@ -275,11 +276,11 @@ func TestTurnFlow_CompleteTurn(t *testing.T) {
 	actionCtx.ProcessQueue()
 
 	// === Step 3: Simulate Movement ===
-	moveAction := engineaction.NewMoveAction(player, 5, "DiceRoll")
-	// Calculate path
+	// MoveAction now reads from ActionContext.Metadata
 	result, _ := mapEngine.CalculatePath(player.Position, 5)
-	moveAction.TargetPos = result.TargetIndex
-	moveAction.Path = result.Path
+	actionCtx.SetInt("target_pos", result.TargetIndex)
+	actionCtx.Set("path", result.Path)
+	moveAction := engineaction.NewMoveAction(player, 5, "DiceRoll")
 	actionCtx.ExecuteAction(moveAction)
 
 	// === Step 4: Simulate Trap Damage ===
@@ -377,7 +378,7 @@ func TestTurnFlow_Interrupt_Respawn(t *testing.T) {
 	// Setup
 	game := engine.NewGame(id.NewGameID(), 0)
 	mapEngine := gamemap.NewMapEngine(100)
-	configs := map[int]gamemap.CellType{30: gamemap.CellTypeCheckpoint}
+	configs := map[int]constants.CellType{30: constants.CellTypeCheckpoint}
 	mapEngine.GenerateLinearMap(configs)
 
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 6})
@@ -574,4 +575,143 @@ func TestGameLog_JSON_Output(t *testing.T) {
 			t.Errorf("Entry %d Type should be action, got %s", i, entry.Type)
 		}
 	}
+}
+
+// ========== CheckPoint Split Flow Integration Test ==========
+
+// TestCheckPointSplit_Integration tests the full CheckPoint split flow:
+// TurnMoving → TurnCheckpoint → TurnMoving(re-entry) → TurnLanded
+// Verifying: two MoveAction entries + one DrawItemAction entry in GameLog.
+func TestCheckPointSplit_Integration(t *testing.T) {
+	// Setup game with seed for deterministic RNG
+	game := engine.NewGame(id.NewGameID(), 42)
+	mapEngine := gamemap.NewMapEngine(100)
+	configs := map[int]constants.CellType{25: constants.CellTypeCheckpoint}
+	mapEngine.GenerateLinearMap(configs)
+
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 6})
+	player.HP = 5
+	player.LP = 3
+	player.Position = 20
+	game.AddPlayer(player)
+
+	// Setup pools for DrawItemAction
+	game.ItemPool = &rng.EvaluatedItemPool{
+		Items: []rng.EvaluatedItem{
+			{Type: "healing_potion", Eval: constants.EvaluationGood},
+		},
+	}
+	game.EventPool = &rng.EvaluatedItemPool{
+		Items: []rng.EvaluatedItem{
+			{Type: "herb", Eval: constants.EvaluationMildGood},
+		},
+	}
+
+	// Start turn log for GameLog recording
+	game.Log.StartTurn(1, 0, player.ID.UUID())
+
+	hsmInst := NewHSM(game)
+	hsmInst.SetMapEngine(mapEngine)
+
+	// === Phase 1: TurnMoving (first segment - move to CheckPoint) ===
+	movingState1 := NewTurnMovingState()
+	ctx1 := NewStateContext().
+		WithHSM(hsmInst).
+		WithPlayer(player)
+	ctx1.SetInt(KeyDiceSteps, 10) // Start at 20, should reach CheckPoint at 25 (5 steps)
+
+	movingState1.Enter(ctx1)
+
+	if ctx1.Error != nil {
+		t.Fatalf("TurnMoving.Enter should succeed, got error: %v", ctx1.Error)
+	}
+	if !movingState1.hasCheckpoint {
+		t.Error("TurnMoving should detect CheckPoint at 25")
+	}
+	if player.Position != 25 {
+		t.Errorf("Player should be at CheckPoint 25 after first segment, got %d", player.Position)
+	}
+	if movingState1.remainingSteps != 5 {
+		t.Errorf("Remaining steps should be 5, got %d", movingState1.remainingSteps)
+	}
+
+	nextState1 := movingState1.Update(ctx1)
+	if nextState1 != StateTurnCheckpoint {
+		t.Errorf("TurnMoving.Update should return StateTurnCheckpoint, got %s", nextState1.String())
+	}
+
+	// === Phase 2: TurnCheckpoint (DrawItemAction) ===
+	checkpointState := NewTurnCheckpointState()
+	ctx2 := NewStateContext().
+		WithHSM(hsmInst).
+		WithPlayer(player)
+	// Set remaining steps for re-entry
+	ctx2.SetInt(KeyDiceSteps, movingState1.remainingSteps)
+
+	checkpointState.Enter(ctx2)
+
+	if ctx2.Error != nil {
+		t.Fatalf("TurnCheckpoint.Enter should succeed, got error: %v", ctx2.Error)
+	}
+
+	nextState2 := checkpointState.Update(ctx2)
+	if nextState2 != StateTurnMoving {
+		t.Errorf("TurnCheckpoint.Update should return StateTurnMoving, got %s", nextState2.String())
+	}
+
+	// === Phase 3: TurnMoving (second segment - continue movement) ===
+	movingState2 := NewTurnMovingState()
+	ctx3 := NewStateContext().
+		WithHSM(hsmInst).
+		WithPlayer(player)
+	ctx3.SetInt(KeyDiceSteps, 5) // Remaining 5 steps from CheckPoint 25 → 30
+
+	movingState2.Enter(ctx3)
+
+	if ctx3.Error != nil {
+		t.Fatalf("TurnMoving re-entry should succeed, got error: %v", ctx3.Error)
+	}
+	// Player should be at 25 + 5 = 30
+	if player.Position != 30 {
+		t.Errorf("Player should be at 30 after second segment, got %d", player.Position)
+	}
+
+	// === Phase 4: TurnLanded ===
+	landedState := NewTurnLandedState()
+	ctx4 := NewStateContext().
+		WithHSM(hsmInst).
+		WithPlayer(player)
+	landedState.Enter(ctx4)
+
+	if ctx4.Error != nil {
+		t.Fatalf("TurnLanded.Enter should succeed, got error: %v", ctx4.Error)
+	}
+
+	// === Verify GameLog: two move entries + one draw_item entry ===
+	game.Log.EndTurn()
+	segments := game.Log.GetTurnSegments()
+	if len(segments) == 0 {
+		t.Fatal("Should have at least 1 turn segment")
+	}
+	entries := segments[len(segments)-1].Entries
+
+	moveCount := 0
+	drawItemCount := 0
+	for _, entry := range entries {
+		if entry.ActionType == "move" {
+			moveCount++
+		}
+		if entry.ActionType == "draw_item" {
+			drawItemCount++
+		}
+	}
+
+	if moveCount < 2 {
+		t.Errorf("Should have at least 2 move entries for CheckPoint split, got %d", moveCount)
+	}
+	if drawItemCount < 1 {
+		t.Errorf("Should have at least 1 draw_item entry from CheckPoint, got %d", drawItemCount)
+	}
+
+	t.Logf("CheckPoint split flow produced %d move entries + %d draw_item entries", moveCount, drawItemCount)
 }

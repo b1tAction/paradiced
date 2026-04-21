@@ -4,7 +4,7 @@ import (
 	"sort"
 
 	"github.com/b1tAction/paradiced/internal/core"
-	"github.com/b1tAction/paradiced/internal/gamemap"
+	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/errors"
 	"github.com/b1tAction/paradiced/pkg/id"
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
@@ -82,26 +82,26 @@ func (s *MatchInitState) Enter(ctx *StateContext) {
 // generateDefaultMapConfig creates default map cell configurations.
 // Fragile cells every 15 positions, Fog cells every 10 positions,
 // Checkpoint every 25 positions, Boss cell at end.
-func generateDefaultMapConfig(length int) map[int]gamemap.CellType {
-	configs := make(map[int]gamemap.CellType)
+func generateDefaultMapConfig(length int) map[int]constants.CellType {
+	configs := make(map[int]constants.CellType)
 
 	// Fog cells (迷雾) - every 10 positions
 	for i := 10; i < length-10; i += 10 {
-		configs[i] = gamemap.CellTypeFog
+		configs[i] = constants.CellTypeFog
 	}
 
 	// Fragile cells (易碎) - every 15 positions
 	for i := 15; i < length-15; i += 15 {
-		configs[i] = gamemap.CellTypeFragile
+		configs[i] = constants.CellTypeFragile
 	}
 
 	// Checkpoint cells (检查点) - every 25 positions
 	for i := 25; i < length-25; i += 25 {
-		configs[i] = gamemap.CellTypeCheckpoint
+		configs[i] = constants.CellTypeCheckpoint
 	}
 
 	// Boss cell at end
-	configs[length-1] = gamemap.CellTypeBoss
+	configs[length-1] = constants.CellTypeBoss
 
 	return configs
 }
