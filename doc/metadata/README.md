@@ -17,9 +17,18 @@
 |------|------|--------|------|
 | `logentry.md` | `gamelog.LogEntry.Metadata` | 客户端可见 | Action效果详情，通过TurnSync发送给客户端渲染 |
 | `player.md` | `core.Player.Metadata` | 客户端可见 | 玩家动态属性（阵营特定） |
+| `round_data.md` | `Game.RoundData` | 内部 | 回合级持久数据（每回合清空） |
 | `event_context.md` | `event.Context.Metadata` | 内部 | EventBus Handler之间传递意图信号 |
-| `hsm_context.md` | `hsm.StateContext.Metadata` | 内部 | HSM状态之间传递数据 |
+| `hsm_context.md` | `hsm.StateContext.Metadata` | 内部 | HSM状态之间传递数据（tick级） |
 | `action_context.md` | `action.ActionContext.Metadata` | 内部 | Action执行上下文数据 |
+
+## 数据分层设计
+
+| 层级 | 存储位置 | 生命周期 | 适用数据 |
+|-----|---------|---------|---------|
+| **瞬时层** | StateContext.Metadata | 单 tick | Enter→Update→Exit 通信 |
+| **回合层** | Game.RoundData | 一回合 | 跨状态但回合结束时清理 |
+| **核心层** | Game/HSM 字段 | 整个游戏 | 类型安全的核心数据 |
 
 ## 维护指南
 
@@ -28,6 +37,7 @@
 1. **确定字段归属**：
    - 需要发送给客户端 → 更新 `logentry.md`
    - 玩家动态属性 → 更新 `player.md`
+   - 回合级持久数据 → 更新 `round_data.md`
    - Handler通信 → 更新 `event_context.md`
    - HSM状态通信 → 更新 `hsm_context.md`
    - Action执行 → 更新 `action_context.md`

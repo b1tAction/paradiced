@@ -1,10 +1,23 @@
 # StateContext.Metadata 契约（HSM状态机通信）
 
-`hsm.StateContext.Metadata` 用于状态之间传递数据，**不发送给客户端**。
+`hsm.StateContext.Metadata` 用于状态之间传递**瞬时数据**，生命周期为单 tick。
 
 **位置**：`internal/engine/hsm/state.go`
 
 **可见性**：内部（仅后端使用）
+
+**生命周期**：每次 MatchLoop 创建新的 StateContext，Metadata 随之清空。
+
+---
+
+## 数据分层
+
+| 数据类型 | 存储位置 | 生命周期 | 适用场景 |
+|---------|---------|---------|---------|
+| **瞬时数据** | StateContext.Metadata | 单 tick | Enter→Update→Exit 通信 |
+| **回合级数据** | Game.RoundData | 一回合 | 跨 tick 持久（见 `round_data.md`） |
+
+**重要**：需要跨 tick 持久的数据应使用 `Game.RoundData`，不要存储在 StateContext.Metadata。
 
 ---
 
