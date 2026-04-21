@@ -12,33 +12,43 @@ const (
 	CellTypeFog      CellType = "fog"       // Fog cell (poison area)
 	CellTypeCheckpoint CellType = "checkpoint" // Checkpoint (respawn point)
 	CellTypeBoss     CellType = "boss"      // Boss cell (end point)
+	CellTypeEvent    CellType = "event"     // Event cell (triggers bound event)
 )
 
-// IsValid checks if CellType is valid.
+// IsValid checks if CellType is valid (one of the known cell types).
 func (ct CellType) IsValid() bool {
-	return ct != CellTypeNone && ct != ""
+	switch ct {
+	case CellTypeNormal, CellTypeFragile, CellTypeFog,
+		CellTypeCheckpoint, CellTypeBoss, CellTypeEvent:
+		return true
+	default:
+		return false
+	}
 }
 
 // IsSpecial checks if the cell has special behavior.
 func (ct CellType) IsSpecial() bool {
 	return ct == CellTypeFragile || ct == CellTypeFog ||
-		ct == CellTypeCheckpoint || ct == CellTypeBoss
+		ct == CellTypeCheckpoint || ct == CellTypeBoss || ct == CellTypeEvent
 }
 
 // ParseCellType converts a string to CellType.
 // Returns CellTypeNone if the string is not a valid cell type.
+// Supports both snake_case ("normal") and PascalCase ("Normal") formats.
 func ParseCellType(s string) CellType {
 	switch s {
-	case "normal":
+	case "normal", "Normal":
 		return CellTypeNormal
-	case "fragile":
+	case "fragile", "Fragile":
 		return CellTypeFragile
-	case "fog":
+	case "fog", "Fog":
 		return CellTypeFog
-	case "checkpoint":
+	case "checkpoint", "Checkpoint":
 		return CellTypeCheckpoint
-	case "boss":
+	case "boss", "Boss":
 		return CellTypeBoss
+	case "event", "Event":
+		return CellTypeEvent
 	default:
 		return CellTypeNone
 	}

@@ -36,6 +36,9 @@ type StateSync struct {
 
 	// Players contains all player state snapshots.
 	Players []Player `json:"players"`
+
+	// Map contains the map information for client rendering.
+	Map MapInfo `json:"map"`
 }
 
 // TurnSync represents all events for a turn/phase.
@@ -56,7 +59,8 @@ type StateSync struct {
 // | steal_buff    | stolen_by: string, buff_type: string                                 | 显示白虎劫运动画           |
 // | respawn       | checkpoint_pos: int                                                  | 显示重生动画               |
 // | fell_down     | position: int, hp_change: int                                        | 显示落坑动画及坠落伤害       |
-// | draw_event    | event_type: string, event_name: string                               | 显示抽取事件动画           |
+// | draw_event    | event_type: string                                                 | 显示抽取事件动画           |
+// | draw_item     | item_type: string                                                  | 显示道具获取动画           |
 // | dice_roll     | dice_type: string, dice_steps: int                                   | 显示骰子动画               |
 // | state         | from: string, to: string                                             | 状态转换记录               |
 //
@@ -88,6 +92,31 @@ type TurnSync struct {
 	// Entries contains all log entries for this turn/phase.
 	// Directly uses gamelog.LogEntry (no conversion to Action).
 	Entries []gamelog.LogEntry `json:"entries"`
+}
+
+// MapInfo represents map data for client synchronization.
+type MapInfo struct {
+	// Length is the total number of cells in the map.
+	Length int `json:"length"`
+
+	// Cells contains cell information for the map.
+	Cells []CellInfo `json:"cells"`
+}
+
+// CellInfo represents a single map cell for client synchronization.
+type CellInfo struct {
+	// Index is the cell position (0 to Length-1).
+	Index int `json:"index"`
+
+	// CellType is the cell type identifier (snake_case).
+	// Values: "normal", "fragile", "fog", "checkpoint", "boss", "event"
+	CellType string `json:"cell_type"`
+
+	// EventID is the bound event ID for CellTypeEvent cells.
+	EventID string `json:"event_id,omitempty"`
+
+	// IsBroken indicates whether a Fragile cell is broken.
+	IsBroken bool `json:"is_broken,omitempty"`
 }
 
 // Player represents a player state snapshot for synchronization.

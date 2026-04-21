@@ -30,6 +30,8 @@ const (
 	ActionStealBuff ActionType = "steal_buff"
 	// ActionFellDown represents player falling from Fragile cell.
 	ActionFellDown ActionType = "fell_down"
+	// ActionDrawItem represents drawing a random item (e.g. from CheckPoint treasure).
+	ActionDrawItem ActionType = "draw_item"
 	// ActionUnknown represents an unknown action type.
 	ActionUnknown ActionType = "unknown"
 )
@@ -39,7 +41,8 @@ func (at ActionType) IsValid() bool {
 	switch at {
 	case ActionDamage, ActionHeal, ActionModifyLP, ActionMove,
 		ActionAddBuff, ActionRemoveBuff, ActionRespawn, ActionSkipTurn,
-		ActionDrawEvent, ActionTeleport, ActionStealBuff, ActionFellDown:
+		ActionDrawEvent, ActionTeleport, ActionStealBuff, ActionFellDown,
+		ActionDrawItem:
 		return true
 	default:
 		return false
@@ -74,6 +77,8 @@ func ParseActionType(s string) ActionType {
 		return ActionStealBuff
 	case "fell_down":
 		return ActionFellDown
+	case "draw_item":
+		return ActionDrawItem
 	default:
 		return ActionUnknown
 	}

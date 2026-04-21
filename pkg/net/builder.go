@@ -14,6 +14,9 @@ type Builder interface {
 	// BuildAvailable builds available actions for current player.
 	BuildAvailable() *Available
 
+	// BuildMapInfo builds map info from MapEngine data.
+	BuildMapInfo() *MapInfo
+
 	// SetDiceType sets the current player's dice type (string format: "gold", "silver", "copper", "wood").
 	SetDiceType(diceType string)
 }

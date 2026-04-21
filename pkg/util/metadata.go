@@ -124,6 +124,40 @@ func (m *Metadata) SetString(key string, value string) *Metadata {
 	return m
 }
 
+// GetIntSliceOrDefault retrieves an []int value, returns default if key doesn't exist or type mismatch.
+// Also handles []float64 (from JSON unmarshal) by converting to []int.
+func (m *Metadata) GetIntSliceOrDefault(key string, defaultValue []int) []int {
+	val, ok := m.values[key]
+	if !ok {
+		return defaultValue
+	}
+	// Direct []int type
+	if slice, ok := val.([]int); ok {
+		return slice
+	}
+	// JSON unmarshal converts numbers to float64
+	if slice, ok := val.([]float64); ok {
+		result := make([]int, len(slice))
+		for i, f := range slice {
+			result[i] = int(f)
+		}
+		return result
+	}
+	// Interface slice from JSON ([]interface{})
+	if slice, ok := val.([]interface{}); ok {
+		result := make([]int, 0, len(slice))
+		for _, v := range slice {
+			if f, ok := v.(float64); ok {
+				result = append(result, int(f))
+			} else if i, ok := v.(int); ok {
+				result = append(result, i)
+			}
+		}
+		return result
+	}
+	return defaultValue
+}
+
 // GetFloat64 retrieves a float64 value. Returns error if key doesn't exist or type mismatch.
 func (m *Metadata) GetFloat64(key string) (float64, error) {
 	val, ok := m.values[key]
