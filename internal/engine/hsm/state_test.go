@@ -128,7 +128,10 @@ func TestStateContextStateMarkers(t *testing.T) {
 }
 
 func TestStateContextMiniGameMethods(t *testing.T) {
-	ctx := NewStateContext()
+	// Create context with proper RoundData (via HSM -> Game)
+	game := engine.NewGame(id.NewGameID(), 0)
+	hsmInst := NewHSM(game)
+	ctx := NewStateContext().WithHSM(hsmInst)
 
 	// Test mini-game rank
 	ctx.SetMiniGameRank("p1", 1)

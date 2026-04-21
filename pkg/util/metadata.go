@@ -151,6 +151,84 @@ func (m *Metadata) SetFloat64(key string, value float64) *Metadata {
 	return m
 }
 
+// GetMap returns a typed map value for a key.
+// Note: this requires the underlying stored value to be exactly map[K]V.
+func GetMap[K comparable, V any](m *Metadata, key string) (map[K]V, error) {
+	val, ok := m.values[key]
+	if !ok {
+		return nil, fmt.Errorf("key '%s' not found", key)
+	}
+	typed, ok := val.(map[K]V)
+	if !ok {
+		return nil, fmt.Errorf("key '%s' is not expected map type, got %T", key, val)
+	}
+	return typed, nil
+}
+
+// GetMapOrDefault returns typed map value or defaultValue when missing/type mismatch.
+func GetMapOrDefault[K comparable, V any](m *Metadata, key string, defaultValue map[K]V) map[K]V {
+	val, ok := m.values[key]
+	if !ok {
+		return defaultValue
+	}
+	typed, ok := val.(map[K]V)
+	if !ok {
+		return defaultValue
+	}
+	return typed
+}
+
+// SetMap stores a typed map in Metadata.
+func SetMap[K comparable, V any](m *Metadata, key string, value map[K]V) *Metadata {
+	m.values[key] = value
+	return m
+}
+
+// SetMapOrDefault ensures key contains a typed map value.
+// If key is missing or type-mismatched, it stores defaultValue and returns it.
+func SetMapOrDefault[K comparable, V any](m *Metadata, key string, defaultValue map[K]V) map[K]V {
+	val, ok := m.values[key]
+	if ok {
+		if typed, ok := val.(map[K]V); ok {
+			return typed
+		}
+	}
+	m.values[key] = defaultValue
+	return defaultValue
+}
+
+// GetMapStringInt returns map[string]int value for a key.
+func (m *Metadata) GetMapStringInt(key string) (map[string]int, error) {
+	val, ok := m.values[key]
+	if !ok {
+		return nil, fmt.Errorf("key '%s' not found", key)
+	}
+	typed, ok := val.(map[string]int)
+	if !ok {
+		return nil, fmt.Errorf("key '%s' is not map[string]int, got %T", key, val)
+	}
+	return typed, nil
+}
+
+// GetMapStringIntOrDefault returns map[string]int or defaultValue when missing/type mismatch.
+func (m *Metadata) GetMapStringIntOrDefault(key string, defaultValue map[string]int) map[string]int {
+	val, ok := m.values[key]
+	if !ok {
+		return defaultValue
+	}
+	typed, ok := val.(map[string]int)
+	if !ok {
+		return defaultValue
+	}
+	return typed
+}
+
+// SetMapStringInt stores map[string]int value. Returns itself for chaining.
+func (m *Metadata) SetMapStringInt(key string, value map[string]int) *Metadata {
+	m.values[key] = value
+	return m
+}
+
 // HasKey checks if a key exists.
 func (m *Metadata) HasKey(key string) bool {
 	_, ok := m.values[key]
@@ -261,6 +339,6 @@ func (m *Metadata) UnmarshalJSON(data []byte) error {
 
 // Common errors
 var (
-	ErrKeyNotFound   = errors.New("key not found")
-	ErrTypeMismatch  = errors.New("type mismatch")
+	ErrKeyNotFound  = errors.New("key not found")
+	ErrTypeMismatch = errors.New("type mismatch")
 )

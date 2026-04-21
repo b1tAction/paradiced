@@ -27,8 +27,8 @@ func TestStateMatchInit(t *testing.T) {
 	}
 
 	nextID := state.Update(ctx)
-	if nextID != StateRoundMiniGame {
-		t.Errorf("Update should return StateRoundMiniGame, got %s", nextID.String())
+	if nextID != StateWaitingForHost {
+		t.Errorf("Update should return StateWaitingForHost, got %s", nextID.String())
 	}
 
 	if !state.CanTransitionTo(StateRoundMiniGame) {

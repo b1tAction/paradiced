@@ -208,8 +208,10 @@ func TestMainActionState_Update_Waiting(t *testing.T) {
 
 func TestMainActionState_defaultDiceRoll(t *testing.T) {
 	state := NewMainActionState(45 * time.Second)
+	game := engine.NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
-	ctx := NewStateContext().WithPlayer(player)
+	hsmInst := NewHSM(game)
+	ctx := NewStateContext().WithHSM(hsmInst).WithPlayer(player)
 
 	tests := []struct {
 		diceType rng.DiceType
