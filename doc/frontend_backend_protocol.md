@@ -12,7 +12,7 @@
 |--------|------|----------|----------|
 | 1 | `OpStateSync` | StateSync | 进入新全局状态时 |
 | 2 | `OpTurnSync` | TurnSync | 回合效果执行后 |
-| 3 | `OpDecisionRequest` | Decision | 需要玩家决策时 |
+| ~~3~~ | ~~`OpDecisionRequest`~~ | ~~Decision~~ | ~~需要玩家决策时~~ |
 | 4 | `OpAvailable` | Available | 进入 MainAction 状态 |
 | 5 | `OpMiniGameStart` | MiniGameStart | 小游戏阶段开始 |
 | 6 | `OpMiniGameResult` | MiniGameResult | 小游戏结束广播排名 |
@@ -28,7 +28,7 @@
 | 100 | `OpRollDice` | RollDice | 玩家请求投骰子 |
 | 101 | `OpUseItem` | UseItem | 玩家使用道具 |
 | 102 | `OpUseSkill` | UseSkill | 玩家使用阵营技能 |
-| 103 | `OpUserChoice` | UserChoice | 玩家回复决策选择 |
+| ~~103~~ | ~~`OpUserChoice`~~ | ~~UserChoice~~ | ~~玩家回复决策选择~~ |
 | 104 | `OpMiniGameResultSubmit` | MiniGameResultSubmit | 小游戏排名提交 |
 | 105 | `OpStartGame` | StartGame | 主机请求开始游戏 |
 
@@ -194,7 +194,7 @@ interface Item {
 ```typescript
 interface Available {
     items: Item[];        // 可用道具列表
-    can_use_skill: boolean; // 阵营技能是否可用
+    // can_use_skill: boolean; // 阵营技能是否可用
     dice_type: string;    // 当前骰子类型
 }
 ```
@@ -210,7 +210,7 @@ interface Available {
 
 ---
 
-### 2.7 Decision（决策请求）
+### ~~2.7 Decision（决策请求）~~
 
 **用途**：请求玩家选择。
 
@@ -584,7 +584,323 @@ interface LogEntry {
 
 ---
 
-## 六、游戏流程图
+## 六、消息发送时机详解
+
+本节详细说明每个消息的精确发送时机，帮助前端开发者正确处理消息流。
+
+### 6.1 Server → Client 消息时机
+
+#### OpWaitingSync (10)
+
+**发送时机**：
+1. **玩家加入等待房间**：当新玩家连接到 match 且当前状态为 `WaitingForHost` 时
+2. **玩家离开等待房间**：当玩家断开连接且当前状态为 `WaitingForHost` 时
+
+**接收对象**：广播给所有已连接玩家
+
+**触发条件**：`hsm.GetGlobalStateID() == StateWaitingForHost`
+
+**相关代码**：`internal/nakama/presence.go` - `HandlePresenceJoin/HandlePresenceLeave`
+
+---
+
+#### OpStateSync (1)
+
+**发送时机**：
+
+| 状态 | 发送时机 | 目的 |
+|------|----------|------|
+| `MatchInit.Enter` | 游戏初始化完成（生成地图、分配阵营、初始化 Buff）后 | 广播初始游戏状态 |
+| `TurnUpkeep.Enter` | 进入回合维护阶段时 | 更新回合玩家状态 |
+| `MainAction.Enter` | 进入主行动阶段时 | 更新当前行动玩家状态 |
+| `TurnEnd.Enter` | 回合结束时 | 广播回合结束后的最终状态 |
+
+**接收对象**：广播给所有玩家
+
+**客户端行为**：更新 UI 显示当前全局状态、回合状态、玩家列表
+
+---
+
+#### OpAvailable (4)
+
+**发送时机**：`MainAction.Enter` 时，紧随 `OpStateSync` 之后发送
+
+**接收对象**：仅发送给当前回合玩家（`current_player_id`）
+
+**触发条件**：进入 `MainAction` 状态时
+
+**客户端行为**：
+1. 显示骰子类型（`dice_type`）
+2. 显示可用道具列表（`items`）
+3. 启用投骰子按钮
+4. 启用道具使用按钮（如果有道具）
+
+---
+
+#### OpMiniGameStart (5)
+
+**发送时机**：`RoundMiniGame.Enter` 时
+
+**接收对象**：广播给所有玩家
+
+**触发条件**：进入小游戏阶段（每回合开始）
+
+**客户端行为**：
+1. 切换到小游戏界面
+2. 根据 `game_type` 加载对应小游戏
+3. 显示参赛玩家列表
+
+---
+
+#### OpMiniGameResult (6)
+
+**发送时机**：所有玩家提交 `MiniGameResultSubmit` 后，退出 `RoundMiniGame` 时
+
+**接收对象**：广播给所有玩家
+
+**触发条件**：小游戏结束，准备进入 `RoundPrep`
+
+**客户端行为**：
+1. 显示排名结果
+2. 根据排名显示骰子分配（第1名=金骰，第2名=银骰...）
+
+---
+
+#### OpTurnSync (2)
+
+**发送时机**：
+
+| 状态 | 发送时机 | 包含内容 |
+|------|----------|----------|
+| `TurnEnd.Enter` | 回合结束时 | 该回合所有 Action 效果 |
+
+**注意**：`TurnSync` 在 `TurnEnd.Enter` 时发送，包含整个回合的 `LogEntry` 列表
+
+**接收对象**：广播给所有玩家
+
+**客户端行为**：
+1. 按顺序遍历 `entries` 数组
+2. 根据 `action_type` 播放对应动画
+3. 动画完成后等待下一个 `StateSync`
+
+---
+
+#### OpGameOver (7)
+
+**发送时机**：有玩家到达终点并击败 Boss 时
+
+**接收对象**：广播给所有玩家
+
+**触发条件**：游戏结束条件达成
+
+**客户端行为**：
+1. 显示胜利玩家
+2. 显示统计数据
+3. 显示结算界面
+
+---
+
+#### OpFullSync (8)
+
+**发送时机**：
+1. 玩家断线重连时
+2. 新玩家中途加入正在进行的游戏时
+
+**接收对象**：仅发送给重连/新加入的玩家
+
+**触发条件**：`HandlePresenceJoin` 且游戏已在进行中（`hsm.IsRunning()`）
+
+**客户端行为**：
+1. 从 `state` 恢复完整游戏状态
+2. 从 `turn` 恢复当前回合效果
+3. 同步显示当前界面
+
+---
+
+#### OpActionRejected (9)
+
+**发送时机**：客户端发送的操作被服务器拒绝时
+
+**接收对象**：仅发送给发送操作的玩家
+
+**触发条件**：
+- 非当前回合玩家发送操作
+- 无效状态时发送操作
+- 道具不存在
+- 技能未充能
+- 条件未满足
+
+**客户端行为**：
+1. 根据 `error_code` 显示错误提示
+2. 禁用相关按钮或重置状态
+
+---
+
+### 6.2 Client → Server 消息时机
+
+#### OpStartGame (105)
+
+**发送时机**：主机在等待房间点击"开始游戏"按钮时
+
+**前置条件**：
+1. 发送者必须是主机（`host_user_id`）
+2. 玩家数量 >= 2
+
+**服务器响应**：
+- 成功：进入 `MatchInit` → `WaitingForHost` → `RoundMiniGame`
+- 失败：发送 `OpActionRejected`
+
+---
+
+#### OpMiniGameResultSubmit (104)
+
+**发送时机**：小游戏结束后，客户端计算出排名时
+
+**前置条件**：
+1. 当前状态为 `RoundMiniGame`
+2. 小游戏已完成
+
+**服务器响应**：
+- 成功：等待所有玩家提交后进入 `RoundPrep`
+- 失败：发送 `OpActionRejected`
+
+---
+
+#### OpRollDice (100)
+
+**发送时机**：当前回合玩家在 `MainAction` 阶段点击投骰子按钮时
+
+**前置条件**：
+1. 发送者必须是当前回合玩家（`current_player_id`）
+2. 当前状态为 `MainAction`
+
+**服务器响应**：
+- 成功：进入 `TurnMoving` → 执行移动
+- 失败：发送 `OpActionRejected`（`not_current_player`）
+
+---
+
+#### OpUseItem (101)
+
+**发送时机**：当前回合玩家在 `MainAction` 阶段选择使用道具时
+
+**前置条件**：
+1. 发送者必须是当前回合玩家
+2. 当前状态为 `MainAction`
+3. 玩家拥有该道具
+
+**服务器响应**：
+- 成功：执行道具效果，可能触发衍生 Action
+- 失败：发送 `OpActionRejected`（`item_not_found`）
+
+---
+
+#### OpUseSkill (102)
+
+**发送时机**：当前回合玩家使用阵营技能时
+
+**前置条件**：
+1. 发送者必须是当前回合玩家
+2. 玩家阵营为青龙或玄武
+3. `charge >= 1`（充能已满）
+
+**服务器响应**：
+- 成功：执行阵营技能，消耗充能
+- 失败：发送 `OpActionRejected`（`skill_not_ready`）
+
+---
+
+### 6.3 消息时序图
+
+#### 游戏启动流程
+
+```
+[Client Host]              [Server]                  [All Clients]
+     |                        |                          |
+     |--- OpStartGame ------->|                          |
+     |                        |--- OpStateSync --------->| (MatchInit完成)
+     |                        |                          |
+     |                        |<== 状态转换 ==>           |
+     |                        |                          |
+     |                        |--- OpMiniGameStart ----->| (RoundMiniGame)
+     |                        |                          |
+```
+
+#### 小游戏流程
+
+```
+[All Clients]              [Server]
+     |                        |
+     |<== 小游戏执行 ==>       |
+     |                        |
+     |--- OpMiniGameResultSubmit -->| (每个玩家发送)
+     |                        |
+     |<== 等待所有玩家提交 ==>  |
+     |                        |
+     |<-- OpMiniGameResult ---| (广播排名)
+     |                        |
+     |<-- OpStateSync --------| (RoundPrep完成)
+     |                        |
+```
+
+#### 回合流程
+
+```
+[Current Player]           [Server]                  [All Clients]
+     |                        |                          |
+     |                        |--- OpStateSync --------->| (TurnUpkeep)
+     |                        |                          |
+     |                        |--- OpAvailable --------->| (仅发给当前玩家)
+     |                        |                          |
+     |<== 等待玩家操作 ==>     |                          |
+     |                        |                          |
+     |--- OpRollDice -------->|                          |
+     |                        |<== 执行移动 ==>           |
+     |                        |                          |
+     |                        |<== 状态转换 ==>           |
+     |                        |--- OpTurnSync ---------->| (TurnEnd)
+     |                        |--- OpStateSync --------->| (回合结束状态)
+     |                        |                          |
+     |<== 下一个玩家回合 ==>   |                          |
+```
+
+#### 断线重连流程
+
+```
+[Reconnecting Player]      [Server]
+     |                        |
+     |<== 重新连接 ==>         |
+     |                        |
+     |<-- OpFullSync ---------| (恢复完整状态)
+     |                        |
+     |<== 同步显示 ==>         |
+     |                        |
+```
+
+---
+
+### 6.4 客户端状态对应表
+
+| global_state | 客户端应显示的界面 |
+|---------------|-------------------|
+| `waiting_for_host` | 等待房间界面，显示玩家列表、等待主机开始 |
+| `round_mini_game` | 小游戏界面，根据 `game_type` 加载 |
+| `round_prep` | 回合准备界面，显示骰子分配结果 |
+| `turn_loop` | 回合循环界面，显示地图和玩家位置 |
+| `game_over` | 结算界面，显示胜利者和统计数据 |
+
+| turn_state | 客户端应显示的 UI 元素 |
+|------------|----------------------|
+| `turn_upkeep` | 回合开始动画（LP 变化等） |
+| `main_action` | 操作面板（投骰子、道具、技能按钮），等待当前玩家操作 |
+| `turn_moving` | 移动动画播放中 |
+| `turn_landed` | 落地效果动画 |
+| `turn_event` | 事件卡片显示 |
+| `turn_end` | 回合结束动画（Buff 消耗、甘霖/腐化触发） |
+
+---
+
+## 七、游戏流程图
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -666,7 +982,7 @@ interface LogEntry {
 
 ---
 
-## 七、客户端 TypeScript 类型汇总
+## 八、客户端 TypeScript 类型汇总
 
 ```typescript
 // ========== OpCode 枚举 ==========
@@ -873,7 +1189,7 @@ interface StartGame {}
 
 ---
 
-## 八、相关文档
+## 九、相关文档
 
 - [pkg/net/README.md](../pkg/net/README.md) - 网络协议层详细说明
 - [doc/metadata/logentry.md](../doc/metadata/logentry.md) - LogEntry.Metadata 契约
