@@ -146,6 +146,8 @@ TurnEndState.Enter(ctx)
 1. **ctx 必须外部传入** - HSM 内部不创建 Builder
 2. **每次 MatchLoop 创建新 Builder** - 确保 HSM 状态是最新的
 3. **TransitionTo 不创建 ctx** - 依赖外部传入的完整 ctx
+4. **PhasePreMove 由 HSM 发布** - TurnMovingState.Enter() 中发布，迷途 handler 通过 StepsModifier 接口修改 Steps（非 MoveAction.PreTrigger）
+5. **TurnCheckpoint 不单独广播** - DrawItem LogEntry 记录到 GameLog，回合结束时统一广播 TurnSync
 
 ## 协议消息对应表
 
@@ -155,5 +157,8 @@ TurnEndState.Enter(ctx)
 | MiniGame | RoundMiniGameState.Enter | BuildStateSync | BroadcastMiniGameStart | OpMiniGameStart |
 | TurnUpkeep | TurnUpkeepState.Enter | BuildStateSync | BroadcastStateSync | OpStateSync |
 | MainAction | MainActionState.Enter | BuildAvailable | SendAvailable | OpAvailable |
+| TurnMoving | TurnMovingState.Enter (PhasePreMove) | - | - | - (纯移动，不单独广播) |
+| TurnCheckpoint | TurnCheckpointState.Enter | - | - | - (DrawItem，不单独广播) |
+| TurnLanded | TurnLandedState.Enter (PhaseOnLand) | - | - | - (落地，不单独广播) |
 | TurnEnd | TurnEndState.Enter | BuildTurnSync + BuildStateSync | BroadcastTurnSync + BroadcastStateSync | OpTurnSync + OpStateSync |
 | GameOver | GameOverState.Enter | BuildStateSync | BroadcastGameOver | OpGameOver |
