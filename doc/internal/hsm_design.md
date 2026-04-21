@@ -32,8 +32,9 @@
 |------|------|------|------|
 | TurnUpkeepState | turn_states.go | ✅ | PhaseBeforeTurn触发、SkipTurn/IsDead检查 |
 | MainActionState | turn_states.go | ✅ | 等待道具/骰子选择、超时处理 |
-| TurnMovingState | turn_states.go | ✅ | 路径计算、Fragile/Fog处理 |
-| TurnLandedState | turn_states.go | ✅ | PhaseOnLand触发、CellType检查 |
+| TurnMovingState | turn_states.go | ✅ | HSM预扫描路径、迷途修改Steps、CheckPoint拆分、FellDown处理 |
+| TurnCheckpointState | turn_states.go | ✅ | DrawItemAction（宝箱道具） |
+| TurnLandedState | turn_states.go | ✅ | CellType行为矩阵、PhaseOnLand触发 |
 | TurnEventState | turn_states.go | ✅ | PhasePreEvent触发、事件抽取 |
 | TurnEndState | turn_states.go | ✅ | PhaseAfterTurn触发、TickBuffs、阵营充能 |
 
@@ -133,9 +134,9 @@ internal/engine/hsm/
 |---------|----------|------|-----------|----------|
 | `S_TURN_UPKEEP` | 回合准备 | 检查SkipTurn、IsDead | `PhaseBeforeTurn` | 可行动→MainAction；不可→TurnEnd |
 | `S_MAIN_ACTION` | 主行动 | 等待道具/骰子选择 | `PhaseItemUsed`道具可用 | 收到RollDice→TurnMoving |
-| `S_TURN_MOVING` | 移动结算 | 路径计算、Fragile/Fog处理 | Action发布`PhasePreMove` | 正常→TurnLanded；坠落→TurnEnd |
-| `S_TURN_LANDED` | 落地结算 | 触发落地事件 | `PhaseOnLand` | 自动进入TurnEvent |
-| `S_TURN_EVENT` | 事件结算 | 抽取事件、执行效果 | Action发布`PhasePreEvent`/`PhasePreDamage` | 完成后→TurnEnd |
+| `S_TURN_MOVING` | 移动结算 | HSM预扫描路径、迷途处理、CheckPoint拆分 | HSM发布`PhasePreMove` | 正常→TurnLanded；坠落→TurnEnd；CheckPoint→TurnCheckpoint |
+| `S_TURN_CHECKPOINT` | CheckPoint结算 | DrawItemAction（宝箱道具） | - | →TurnMoving(remaining steps) |
+| `S_TURN_LANDED` | 落地结算 | CellType行为矩阵触发 | `PhaseOnLand` | Event/Normal→TurnEvent；Checkpoint/Boss→TurnEnd |
 | `S_TURN_END` | 回合收尾 | TickBuff、死亡检查 | `PhaseAfterTurn` | 完成后返回父状态 |
 
 #### Phase 与发布者映射
@@ -148,12 +149,12 @@ internal/engine/hsm/
 PhaseBeforeTurn    → S_TURN_UPKEEP.Enter()    // 回合开始前
 PhaseOnLand        → S_TURN_LANDED.Enter()    // 落地后
 PhaseAfterTurn     → S_TURN_END.Enter()       // 回合结束后
+PhasePreMove       → S_TURN_MOVING.Enter()    // 移动前（迷途handler修改Steps）
 
 // ========== Action发布的Phase（动作时机） ==========
 // 这些Phase由ActionContext.ExecuteAction()发布
 PhasePreDamage     → DamageAction.PreTriggerPhase()    // 伤害应用前
 PhasePreEvent      → DrawEventAction.PreTriggerPhase() // 事件触发前
-PhasePreMove       → MoveAction.PreTriggerPhase()      // 移动前
 PhaseOnBuffApplied → AddBuffAction.PostTriggerPhase()  // Buff添加后
 PhaseOnBuffRemoved → RemoveBuffAction.PreTriggerPhase() // Buff移除前
 
@@ -375,46 +376,59 @@ S_MAIN_ACTION (主行动)
 
 S_TURN_MOVING (移动结算)
 ├── Enter()
-│   ├── 创建 MoveAction，通过 ActionContext.ExecuteAction()
-│   │   ├── Action发布 PhasePreMove（PreTrigger阶段）
-│   │   │   ├── 迷途 Buff订阅PhasePreMove，篡改Steps为负数
-│   │   ├── 执行 Execute() → 调用 MapEngine.CalculatePath(position, diceSteps)
-│   │   ├── 自动记录到 GameLog（MoveAction.LogEntry()）
-│   │   ├── 检查迷途 Buff → 修正移动方向（已通过Phase篡改）
-├── 路径处理
-│   ├── Fragile 处理
-│   │   ├── 首次经过 → 标记已碎
-│   │   ├── 落点在未碎 Fragile → FellDownAction
-│   │   │   └── actionCtx.ExecuteAction(NewFellDownAction(player, pos, 1, "FragileCell"))
-│   │   │   └── 自动记录到 GameLog
-│   │   │   └── 坠落 → 强制转移 S_TURN_END
+│   ├── Steps = ctx.GetDiceSteps() (from dice or remaining steps from CheckPoint)
+│   ├── HSM 发布 PhasePreMove（迷途 handler 修改 Steps 为负数）
+│   │   ├── 迷途 Buff: Steps > 0 → Steps = -Steps（防 double-flip）
+│   ├── 路径预扫描 MapEngine.CalculatePath(position, Steps)
+│   │   ├── 迷途反向移动: Steps < 0, direction=-1
+│   ├── FellDown 处理（HSM 层）
+│   │   ├── MoveAction 到坠落位置
+│   │   ├── FellDownAction → 坠落伤害
+│   │   └── 强制转移 S_TURN_END
+│   ├── CheckPoint 拆分（仅 Steps > 0 正向移动）
+│   │   ├── 经过 CheckPoint → 拆分为两个移动段
+│   │   ├── MoveAction(seg1) → CheckPoint位置
+│   │   ├── ctx.SetInt(KeyDiceSteps, remainingSteps)
+│   │   ├── hasCheckpoint flag → S_TURN_CHECKPOINT
+│   ├── 正常移动 → MoveAction → S_TURN_LANDED
+│   │   ├── 自动记录到 GameLog
 │   ├── Fog 处理
 │   │   ├── 首位经过 → 激活迷雾区域
-│   │   │   ├── 区域内玩家获得 Poison Buff
-│   │   │   └── 后续经过 → 投骰子获得 Exorcism Buff
-│   ├── 反超处理
-│   │   ├── 经过其他玩家 → 触发白虎被动 [劫运]
-│   │   │   ├── StealBuffAction（自动记录到 GameLog）
-│   │   │   └── 偷取对方随机 Buff
-│   ├── 捷径处理
-│   │   ├── 经过传送阵 → 向前传送
+│   ├── 反向移动不触发 CheckPoint 奖励
 ├── 转移
 │   ├── 正常到达 → S_TURN_LANDED
+│   ├── CheckPoint 拆分 → S_TURN_CHECKPOINT
 │   ├── Fragile 坠落 → S_TURN_END (提前结束)
 │   ├── 到达终点 → 父状态转移至 S_BOSS_BATTLE
-│
+
+
+S_TURN_CHECKPOINT (CheckPoint结算)
+├── Enter()
+│   ├── Execute DrawItemAction (CheckpointTreasure)
+│   │   ├── 从 ItemPool 随机抽取道具
+│   │   ├── 加入玩家 Inventory
+│   │   ├── 自动记录到 GameLog
+│   ├── 不中途广播 TurnSync
+├── Update()
+│   └── → S_TURN_MOVING (remaining steps as dice_steps)
+
 
 S_TURN_LANDED (落地结算)
 ├── Enter()
 │   ├── 触发 PhaseOnLand
 │   │   ├── 任意门道具: 可选择传送到目标
-│   │   ├── 检查点宝箱: 刷新道具
-│   ├── 检查 CellType
-│   │   ├── Checkpoint: 触发宝箱刷新
-│   │   ├── Boss: 标记到达终点
+│   ├── CellType 行为矩阵
+│   │   ├── CellTypeEvent: 触发绑定固定事件 (cell.EventID)
+│   │   │   ├── DrawEventAction (bound event)
+│   │   │   ├── runEventEffect (执行事件效果)
+│   │   │   ├── skipEvent=true → S_TURN_END
+│   │   ├── CellTypeCheckpoint: 已在TurnCheckpoint处理 → skipEvent=true → S_TURN_END
+│   │   ├── CellTypeBoss: 已在TurnMoving处理 → skipEvent=true → S_TURN_END
+│   │   ├── CellTypeNormal/Fog/Fragile: → S_TURN_EVENT (随机DrawEvent)
 ├── 转移
-│   └── 自动 → S_TURN_EVENT
-│
+│   ├── skipEvent=true → S_TURN_END
+│   ├── skipEvent=false → S_TURN_EVENT
+
 
 S_TURN_EVENT (事件结算)
 ├── Enter()

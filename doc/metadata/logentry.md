@@ -101,8 +101,13 @@ for (const entry of turnSync.entries) {
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
-| `event_type` | string | 是 | 事件类型标识 | 事件卡片类型 |
-| `event_name` | string | 是 | 事件中文名（显示） | 事件卡片标题 |
+| `event_type` | string | 是 | 事件类型标识（客户端查找本地定义表） | 事件卡片类型 |
+
+### draw_item 类型
+
+| 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
+|------|------|------|------|-----------|
+| `item_type` | string | 是 | 道具类型标识 | 显示道具获取动画 |
 
 ### teleport 类型
 
@@ -177,7 +182,9 @@ interface LogEntry {
 
         // draw_event
         event_type?: string;
-        event_name?: string;
+
+        // draw_item
+        item_type?: string;
 
         // teleport
         from_pos?: number;

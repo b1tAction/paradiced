@@ -55,9 +55,9 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **BuffType**: Buff identifiers with IsPositive/IsNegative classification
 - **EventType**: Event identifiers for random events
 - **ItemType**: Item identifiers for consumables
-- **Phase**: Trigger timing (HSM: BeforeTurn/OnLand/AfterTurn; Action: PreDamage/PreEvent/PreMove/PreRespawn/OnBuffApplied/OnBuffRemoved)
+- **Phase**: Trigger timing (HSM: BeforeTurn/OnLand/AfterTurn/PreMove; Action: PreDamage/PreEvent/PreRespawn/OnBuffApplied/OnBuffRemoved)
 - **Faction**: Player faction type (青龙/朱雀/白虎/玄武)
-- **CellType**: Map cell type (Normal, Fragile, Fog, Checkpoint, Boss)
+- **CellType**: Map cell type (Normal, Fragile, Fog, Checkpoint, Boss, Event)
 - **StateID**: HSM state identifier (Global/Turn/Interrupt layers)
 - **EntryType**: GameLog entry type (action, state, mini_game, boss, decision)
 - **ActionSource**: Action source identifier (Buff/Item/Event/Faction/System)
@@ -311,7 +311,7 @@ Git Commit信息必须使用英文提交
 |------|--------|--------|
 | 神眷 (Divine) | BeforeTurn | LP+1 per turn |
 | 诅咒 (Curse) | BeforeTurn | LP-1 per turn |
-| 迷途 (Lost) | PreMove | Reverse movement direction |
+| 迷途 (Lost) | PreMove (HSM发布) | Reverse movement direction (Steps → -Steps, anti double-flip) |
 | 隐匿 (Hidden) | PreDamage | Immunity to damage/events |
 | 甘霖 (Rain) | AfterTurn | HP+1 every 2 turns |
 | 腐化 (Corrupt) | AfterTurn | HP-1 every 2 turns |

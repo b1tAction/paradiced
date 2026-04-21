@@ -48,7 +48,8 @@ func ExecuteHPChange(ctx *ActionContext, target *Player) {
 |------|------|----------|------|------|
 | `blocked_by` | string | Buff_Hidden（隐匿） | 阻挡来源标识 | LogEntry.Metadata |
 | `action_blocked` | bool | Buff_Hidden | 动作被阻挡标志 | ActionContext |
-| `reverse_movement` | bool | Buff_Lost（迷途） | 反向移动标志 | MoveAction |
+| `reverse_movement` | bool | Buff_Lost（迷途） | 反向移动标志（仅日志/调试） | LogEntry.Metadata |
+| `current_state` | StepsModifier | HSM (TurnMoving) | 当前移动状态实例（迷途修改Steps） | 迷途handler |
 | `draw_bad_event` | bool | Buff_Poison（毒瘴） | 抽取坏事件标志 | DrawEventAction |
 | `block_poison_effect` | bool | Buff_Exorcism（辟邪） | 阻挡毒效果标志 | Event Handler |
 | `buff_turn_counter` | int | Buff_Rain/Corrupt | 计数器（每N回合触发） | Buff Handler |

@@ -35,6 +35,13 @@ type ActionContext struct {
 | `current_action` | ExecutableAction | ExecuteAction | 当前执行的Action | EventBus Context |
 | `action_context` | *ActionContext | ExecuteAction | ActionContext引用 | EventBus Context |
 
+### MoveAction 路径数据字段
+
+| 字段 | 类型 | 来源 | 用途 | 目标 |
+|------|------|------|------|------|
+| `target_pos` | int | HSM (TurnMovingState) | 移动目标位置（CalculatePath结果） | MoveAction.Execute() |
+| `path` | []int | HSM (TurnMovingState) | 移动路径（CalculatePath结果） | MoveAction.LogEntry() |
+
 ### 使用场景
 
 这些字段在 `ExecuteAction()` 中设置，传递给 EventBus PreTrigger/PostTrigger：
