@@ -722,19 +722,6 @@ func TestNewMainActionStateDefault(t *testing.T) {
 	}
 }
 
-// ========== generateDefaultMapConfig Tests ==========
-
-func TestGenerateDefaultMapConfig(t *testing.T) {
-	config := generateDefaultMapConfig(100)
-
-	if config == nil {
-		t.Fatal("generateDefaultMapConfig should return non-nil map")
-	}
-	if len(config) == 0 {
-		t.Error("Config should have some cell configurations")
-	}
-}
-
 // ========== HSM NextTurn Tests ==========
 
 func TestHSMNextTurn(t *testing.T) {

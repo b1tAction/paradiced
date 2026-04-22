@@ -4,7 +4,6 @@ import (
 	"sort"
 
 	"github.com/b1tAction/paradiced/internal/core"
-	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/errors"
 	"github.com/b1tAction/paradiced/pkg/id"
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
@@ -45,7 +44,6 @@ func NewMatchInitState() *MatchInitState {
 
 func (s *MatchInitState) Enter(ctx *StateContext) {
 	game := ctx.GetGame()
-	mapEngine := ctx.GetMapEngine()
 
 	if game == nil {
 		ctx.Error = errors.WrapHSMError(
@@ -54,17 +52,12 @@ func (s *MatchInitState) Enter(ctx *StateContext) {
 		return
 	}
 
-	// 1. Generate map - configure special cells
-	if mapEngine != nil {
-		cellConfigs := generateDefaultMapConfig(mapEngine.Length)
-		if err := mapEngine.GenerateLinearMap(cellConfigs); err != nil {
-			ctx.Error = errors.WrapHSMError(
-				err, "MatchInit", 1, "Enter", "failed to generate map")
-			return
-		}
-	}
+	// Map is already initialized by the caller (Nakama handler loads from
+	// pkg/resource/default.json via BuildMapEngine). MatchInitState should
+	// NOT regenerate the map, as that would overwrite DrawType, ProbGood,
+	// ProbNeutral, ProbBad, EventID and other per-cell configuration.
 
-	// 2. Initialize faction-specific buffs for all players
+	// 1. Initialize faction-specific buffs for all players
 	// Uses ApplyBuffToPlayer for complete lifecycle (AddBuff + Subscribe)
 	for _, player := range game.Players {
 		game.InitializePlayerFactionBuffs(player)
@@ -77,33 +70,6 @@ func (s *MatchInitState) Enter(ctx *StateContext) {
 	}
 
 	ctx.SetBool(KeyInitialized, true)
-}
-
-// generateDefaultMapConfig creates default map cell configurations.
-// Fragile cells every 15 positions, Fog cells every 10 positions,
-// Checkpoint every 25 positions, Boss cell at end.
-func generateDefaultMapConfig(length int) map[int]constants.CellType {
-	configs := make(map[int]constants.CellType)
-
-	// Fog cells (迷雾) - every 10 positions
-	for i := 10; i < length-10; i += 10 {
-		configs[i] = constants.CellTypeFog
-	}
-
-	// Fragile cells (易碎) - every 15 positions
-	for i := 15; i < length-15; i += 15 {
-		configs[i] = constants.CellTypeFragile
-	}
-
-	// Checkpoint cells (检查点) - every 25 positions
-	for i := 25; i < length-25; i += 25 {
-		configs[i] = constants.CellTypeCheckpoint
-	}
-
-	// Boss cell at end
-	configs[length-1] = constants.CellTypeBoss
-
-	return configs
 }
 
 func (s *MatchInitState) Update(ctx *StateContext) StateID {
