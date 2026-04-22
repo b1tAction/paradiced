@@ -117,8 +117,9 @@ type MiniGameResult struct {
 
 // RankingEntry represents a single player's mini-game ranking.
 type RankingEntry struct {
-	PlayerID string `json:"player_id"`
-	Rank     int    `json:"rank"`
+	PlayerID    string `json:"player_id"`
+	DisplayName string `json:"display_name"`
+	Rank        int    `json:"rank"`
 }
 
 // GameOver represents game end notification.
