@@ -252,6 +252,11 @@ func (p *InteractivePlayer) handleMiniGameStart(ctx context.Context, data []byte
 		return
 	}
 
+	// Entering mini-game phase: guard against any stale WaitingSync prompts.
+	p.mu.Lock()
+	p.globalState = "RoundMiniGame"
+	p.mu.Unlock()
+
 	p.logger.Debug("Received mini-game start", "game_type", start.GameType, "players", len(start.Players))
 
 	// Get rank from user
@@ -275,6 +280,13 @@ func (p *InteractivePlayer) handleMiniGameResult(ctx context.Context, data []byt
 		p.uiAdapter.OnError(err)
 		return
 	}
+
+	p.mu.Lock()
+	// Mini-game result received: local phase is complete; next sync will enter turn flow.
+	if p.globalState == "RoundMiniGame" {
+		p.globalState = "RoundPrep"
+	}
+	p.mu.Unlock()
 
 	p.uiAdapter.OnMiniGameResult(ctx, &result)
 
@@ -356,6 +368,18 @@ func (p *InteractivePlayer) handleWaitingSync(ctx context.Context, data []byte) 
 	if err := json.Unmarshal(data, &waiting); err != nil {
 		p.logger.Error("Failed to parse WaitingSync", "error", err)
 		p.uiAdapter.OnError(err)
+		return
+	}
+
+	// Ignore waiting-room prompts once we have left waiting states.
+	p.mu.RLock()
+	state := p.globalState
+	p.mu.RUnlock()
+	if state != "" && state != "MatchInit" && state != "WaitingForHost" {
+		p.logger.Debug("Ignoring waiting sync outside waiting states",
+			"global_state", state,
+			"player_count", waiting.PlayerCount,
+			"can_start", waiting.CanStart)
 		return
 	}
 

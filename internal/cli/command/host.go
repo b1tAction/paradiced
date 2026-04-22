@@ -2,12 +2,10 @@
 package command
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -175,29 +173,14 @@ func runHost(cmd *cobra.Command, args []string) error {
 	go interactivePlayer.Listen(ctx)
 
 	// Wait for game to start or timeout
-	// NOTE: stdin is handled by OnWaitingSync in interactive.go, not here
-	// Do not add stdin reading here to avoid conflict with bufio.Scanner in CLIUIAdapter
+	// NOTE: stdin is handled by OnWaitingSync in interactive.go/UI adapter.
+	// Do not read stdin in this command to avoid scanner competition.
 	fmt.Println("Press Ctrl+C to exit, or wait for players to join...")
 
 	// Monitor for game start
 	gameStarted := false
 	checkInterval := time.NewTicker(500 * time.Millisecond)
 	defer checkInterval.Stop()
-
-	inputChan := make(chan string, 8)
-	go func() {
-		scanner := bufio.NewScanner(os.Stdin)
-		for scanner.Scan() {
-			input := strings.TrimSpace(scanner.Text())
-			if input == "" {
-				continue
-			}
-			select {
-			case inputChan <- input:
-			default:
-			}
-		}
-	}()
 
 	// Check if game has started (state changed from WaitingForHost)
 	// The game start is handled by WaitingSync -> OnWaitingSync -> sendStartGame
@@ -215,16 +198,6 @@ func runHost(cmd *cobra.Command, args []string) error {
 		case <-interactivePlayer.GameOverChan():
 			gameStarted = true
 			fmt.Println("\nGame over!")
-
-		case input := <-inputChan:
-			switch strings.ToLower(input) {
-			case "1", "start", "s":
-				interactivePlayer.RequestStartGame(ctx)
-			case "2", "wait", "w":
-				fmt.Println("[Waiting] Continue waiting for players...")
-			default:
-				fmt.Println("Invalid choice, please enter 1 (start) or 2 (wait)")
-			}
 
 		case <-checkInterval.C:
 			state := interactivePlayer.GlobalState()

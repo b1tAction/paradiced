@@ -11,6 +11,7 @@ import (
 
 	"github.com/b1tAction/paradiced/internal/cli/model"
 	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/gamelog"
 )
 
 // CLIUIAdapter implements PlayerUIAdapter using simple text output.
@@ -175,13 +176,19 @@ func (ui *CLIUIAdapter) OnMiniGameStart(ctx context.Context, start *model.MiniGa
 // OnMiniGameResult displays mini-game result.
 func (ui *CLIUIAdapter) OnMiniGameResult(ctx context.Context, result *model.MiniGameResult) {
 	fmt.Println()
-	fmt.Println("========== Mini Game Result ==========")
+	fmt.Println("========== Mini Game Final Ranking ==========")
 	for _, entry := range result.Rankings {
 		myRank := ""
-		if entry.PlayerID == ui.playerID {
+		// Server may send either internal PlayerID or Nakama UserID.
+		if entry.PlayerID == ui.playerID || entry.PlayerID == ui.userID {
 			myRank = " (You)"
 		}
-		fmt.Printf("Rank %d: %s%s\n", entry.Rank, entry.PlayerID, myRank)
+		// Use DisplayName for display, fallback to PlayerID if empty
+		displayName := entry.DisplayName
+		if displayName == "" {
+			displayName = entry.PlayerID
+		}
+		fmt.Printf("Rank %d: %s%s\n", entry.Rank, displayName, myRank)
 	}
 	fmt.Println("======================================")
 	fmt.Println()
@@ -226,12 +233,126 @@ func (ui *CLIUIAdapter) OnTurnSync(ctx context.Context, turnSync *model.TurnSync
 		fmt.Println("---------- Turn Sync ----------")
 		fmt.Printf("Round: %d | Turn: %d\n", turnSync.Round, turnSync.Turn)
 		fmt.Printf("Current Player: %s\n", turnSync.CurrentPlayerID)
-		if len(turnSync.Entries) > 0 {
-			fmt.Printf("Log Entries: %d\n", len(turnSync.Entries))
+		for _, entry := range turnSync.Entries {
+			ui.displayLogEntry(entry)
 		}
 		fmt.Println("------------------------------")
 		fmt.Println()
 	}
+}
+
+// displayLogEntry renders a single log entry with action-specific details.
+func (ui *CLIUIAdapter) displayLogEntry(entry gamelog.LogEntry) {
+	// Resolve display name for target (prefer DisplayName from cached StateSync)
+	targetName := ui.resolveDisplayName(entry.Target)
+	source := entry.Source
+
+	// Non-action entries (state, mini_game, boss, decision) use Type field for classification.
+	// Action entries use ActionType field. State entries have empty ActionType but metadata has from/to.
+	switch {
+	case entry.Type == constants.EntryTypeState:
+		from := entry.Metadata.GetStringOrDefault("from", "?")
+		to := entry.Metadata.GetStringOrDefault("to", "?")
+		fmt.Printf("  [state] %s: %s -> %s\n", targetName, from, to)
+
+	case entry.ActionType == "damage":
+		hpChange := entry.Metadata.GetIntOrDefault("hp_change", 0)
+		blockedBy := entry.Metadata.GetStringOrDefault("blocked_by", "")
+		piercing := entry.Metadata.GetBoolOrDefault("piercing", false)
+		extra := ""
+		if blockedBy != "" {
+			extra += fmt.Sprintf(" [blocked by %s]", blockedBy)
+		}
+		if piercing {
+			extra += " [piercing]"
+		}
+		fmt.Printf("  [damage] %s HP%d from %s%s\n", targetName, hpChange, source, extra)
+
+	case entry.ActionType == "heal":
+		hpChange := entry.Metadata.GetIntOrDefault("hp_change", 0)
+		fmt.Printf("  [heal] %s HP+%d from %s\n", targetName, hpChange, source)
+
+	case entry.ActionType == "modify_lp":
+		lpChange := entry.Metadata.GetIntOrDefault("lp_change", 0)
+		sign := "+"
+		if lpChange < 0 {
+			sign = ""
+		}
+		fmt.Printf("  [modify_lp] %s LP%s%d from %s\n", targetName, sign, lpChange, source)
+
+	case entry.ActionType == "move":
+		steps := entry.Metadata.GetIntOrDefault("steps", 0)
+		startPos := entry.Metadata.GetIntOrDefault("start_pos", 0)
+		endPos := entry.Metadata.GetIntOrDefault("end_pos", 0)
+		fmt.Printf("  [move] %s %d steps (pos %d -> %d) from %s\n", targetName, steps, startPos, endPos, source)
+
+	case entry.ActionType == "add_buff":
+		buffType := entry.Metadata.GetStringOrDefault("buff_type", "")
+		duration := entry.Metadata.GetIntOrDefault("duration", 0)
+		fmt.Printf("  [add_buff] %s gained %s (duration: %d) from %s\n", targetName, buffType, duration, source)
+
+	case entry.ActionType == "remove_buff":
+		buffType := entry.Metadata.GetStringOrDefault("buff_type", "")
+		fmt.Printf("  [remove_buff] %s lost %s from %s\n", targetName, buffType, source)
+
+	case entry.ActionType == "draw_event":
+		eventType := entry.Metadata.GetStringOrDefault("event_type", "")
+		fmt.Printf("  [draw_event] %s drew event %s\n", targetName, eventType)
+
+	case entry.ActionType == "draw_item":
+		itemType := entry.Metadata.GetStringOrDefault("item_type", "")
+		fmt.Printf("  [draw_item] %s drew item %s\n", targetName, itemType)
+
+	case entry.ActionType == "teleport":
+		fromPos := entry.Metadata.GetIntOrDefault("from_pos", 0)
+		toPos := entry.Metadata.GetIntOrDefault("to_pos", 0)
+		fmt.Printf("  [teleport] %s pos %d -> %d from %s\n", targetName, fromPos, toPos, source)
+
+	case entry.ActionType == "steal_buff":
+		stolenBy := entry.Metadata.GetStringOrDefault("stolen_by", "")
+		buffType := entry.Metadata.GetStringOrDefault("buff_type", "")
+		stolenByName := ui.resolveDisplayName(stolenBy)
+		fmt.Printf("  [steal_buff] %s stolen %s by %s\n", targetName, buffType, stolenByName)
+
+	case entry.ActionType == "fell_down":
+		position := entry.Metadata.GetIntOrDefault("position", 0)
+		hpChange := entry.Metadata.GetIntOrDefault("hp_change", 0)
+		fmt.Printf("  [fell_down] %s fell at pos %d HP%d from %s\n", targetName, position, hpChange, source)
+
+	case entry.ActionType == "respawn":
+		checkpointPos := entry.Metadata.GetIntOrDefault("checkpoint_pos", 0)
+		fmt.Printf("  [respawn] %s respawn at pos %d from %s\n", targetName, checkpointPos, source)
+
+	case entry.ActionType == "dice_roll":
+		diceType := entry.Metadata.GetStringOrDefault("dice_type", "")
+		diceSteps := entry.Metadata.GetIntOrDefault("dice_steps", 0)
+		fmt.Printf("  [dice_roll] %s rolled %s dice: %d steps\n", targetName, diceType, diceSteps)
+
+	default:
+		// Generic fallback for unknown entry types
+		typeStr := string(entry.Type)
+		if entry.ActionType != "" {
+			typeStr = entry.ActionType
+		}
+		fmt.Printf("  [%s] target=%s source=%s\n", typeStr, targetName, source)
+	}
+}
+
+// resolveDisplayName maps a player ID to a display name using cached StateSync.
+func (ui *CLIUIAdapter) resolveDisplayName(playerID string) string {
+	if ui.stateSync == nil {
+		return playerID
+	}
+	for _, player := range ui.stateSync.Players {
+		if player.PlayerID == playerID || player.ClientID == playerID {
+			name := player.DisplayName
+			if name == "" {
+				name = player.PlayerID
+			}
+			return name
+		}
+	}
+	return playerID
 }
 
 // OnFullSync displays full sync (reconnection).
@@ -295,7 +416,26 @@ func (ui *CLIUIAdapter) OnWaitingSync(ctx context.Context, waiting *model.Waitin
 			fmt.Println("Host commands: 1=start, 2=wait")
 			fmt.Println("==================================")
 			fmt.Println()
-			return false
+
+			for {
+				fmt.Print("Enter command (1=start, 2=wait): ")
+
+				if !ui.reader.Scan() {
+					// EOF/interrupt -> keep waiting safely
+					return false
+				}
+
+				input := strings.TrimSpace(strings.ToLower(ui.reader.Text()))
+				switch input {
+				case "1", "start", "s":
+					return true
+				case "2", "wait", "w":
+					fmt.Println("[Waiting] Continue waiting for players...")
+					return false
+				default:
+					fmt.Println("Invalid choice, please enter 1 (start) or 2 (wait)")
+				}
+			}
 		} else {
 			// Non-host players see waiting message
 			fmt.Printf("[Waiting] Host (%s) can start the game\n", waiting.HostUserID)
