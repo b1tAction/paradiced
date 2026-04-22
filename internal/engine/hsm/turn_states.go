@@ -1028,13 +1028,14 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 		ctx.Set(KeyPendingCtx, triggerCtx)
 	}
 
+	// Broadcast TurnSync (all actions from this turn) BEFORE EndTurn,
+	// because EndTurn sets GameLog.current to nil, making GetCurrentTurnEntries return nil.
+	s.broadcastTurnSync(ctx)
+
 	// End turn log segment
 	if game != nil && game.Log != nil {
 		game.Log.EndTurn()
 	}
-
-	// Broadcast TurnSync (all actions from this turn)
-	s.broadcastTurnSync(ctx)
 
 	// Broadcast StateSync (final state after turn)
 	s.broadcastStateSync(ctx)
