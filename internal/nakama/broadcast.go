@@ -168,12 +168,14 @@ func (a *NakamaBroadcastAdapter) BroadcastMiniGameResult(result *net.MiniGameRes
 		return nil // No dispatcher set
 	}
 
-	// Convert PlayerID to ClientID in rankings for client-side matching
+	// Convert PlayerID to ClientID in rankings for client-side matching,
+	// and inject DisplayName for UI rendering.
 	if result != nil && a.handler != nil {
 		for i := range result.Rankings {
 			for userID, player := range a.handler.players {
 				if player != nil && player.ID.UUID() == result.Rankings[i].PlayerID {
 					result.Rankings[i].PlayerID = userID
+					result.Rankings[i].DisplayName = player.Metadata.GetStringOrDefault("display_name", userID)
 					break
 				}
 			}

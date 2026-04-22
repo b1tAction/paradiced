@@ -224,12 +224,16 @@ func TestBroadcastMiniGameResult(t *testing.T) {
 	mockDispatcher := NewMockDispatcherAdapter()
 	handler.WithDispatcher(mockDispatcher)
 
+	// Add players with display names for DisplayName injection testing
+	p1 := handler.addPlayer("user-001", constants.FactionQingLong, "Alice")
+	p2 := handler.addPlayer("user-002", constants.FactionZhuQue, "Bob")
+
 	broadcastAdapter := NewNakamaBroadcastAdapter(handler)
 
 	result := &net.MiniGameResult{
 		Rankings: []net.RankingEntry{
-			{PlayerID: "p1", Rank: 1},
-			{PlayerID: "p2", Rank: 2},
+			{PlayerID: p1.ID.UUID(), Rank: 1},
+			{PlayerID: p2.ID.UUID(), Rank: 2},
 		},
 	}
 
@@ -246,6 +250,20 @@ func TestBroadcastMiniGameResult(t *testing.T) {
 	broadcasts := mockDispatcher.GetBroadcasts()
 	if broadcasts[0].OpCode != int64(net.OpMiniGameResult) {
 		t.Errorf("OpCode = %d, want %d", broadcasts[0].OpCode, int64(net.OpMiniGameResult))
+	}
+
+	// Verify DisplayName injection and PlayerID -> UserID conversion
+	if result.Rankings[0].PlayerID != "user-001" {
+		t.Errorf("Rankings[0].PlayerID = %s, want user-001 (should be converted to UserID)", result.Rankings[0].PlayerID)
+	}
+	if result.Rankings[0].DisplayName != "Alice" {
+		t.Errorf("Rankings[0].DisplayName = %s, want Alice", result.Rankings[0].DisplayName)
+	}
+	if result.Rankings[1].PlayerID != "user-002" {
+		t.Errorf("Rankings[1].PlayerID = %s, want user-002 (should be converted to UserID)", result.Rankings[1].PlayerID)
+	}
+	if result.Rankings[1].DisplayName != "Bob" {
+		t.Errorf("Rankings[1].DisplayName = %s, want Bob", result.Rankings[1].DisplayName)
 	}
 }
 

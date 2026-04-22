@@ -236,6 +236,10 @@ type RankingEntry struct {
 	// Matches core.Player.ID.UUID() format.
 	PlayerID string `json:"player_id"`
 
+	// DisplayName is the user-provided display name for UI rendering.
+	// Falls back to PlayerID (ClientID UUID) if not provided.
+	DisplayName string `json:"display_name"`
+
 	// Rank is the player's ranking (1-4).
 	Rank int `json:"rank"`
 }

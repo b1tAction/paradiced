@@ -323,14 +323,22 @@ func TestMiniGameStartWithPlayers(t *testing.T) {
 func TestMiniGameResult(t *testing.T) {
 	result := MiniGameResult{
 		Rankings: []RankingEntry{
-			{PlayerID: "player-001", Rank: 1},
-			{PlayerID: "player-002", Rank: 2},
+			{PlayerID: "player-001", DisplayName: "Alice", Rank: 1},
+			{PlayerID: "player-002", DisplayName: "Bob", Rank: 2},
 		},
 	}
 
 	jsonBytes, err := json.Marshal(result)
 	if err != nil {
 		t.Fatalf("json.Marshal() error: %v", err)
+	}
+
+	jsonStr := string(jsonBytes)
+	if !strings.Contains(jsonStr, `"display_name":"Alice"`) {
+		t.Errorf("JSON should contain display_name: Alice, got: %s", jsonStr)
+	}
+	if !strings.Contains(jsonStr, `"display_name":"Bob"`) {
+		t.Errorf("JSON should contain display_name: Bob, got: %s", jsonStr)
 	}
 
 	var parsed MiniGameResult
@@ -343,6 +351,12 @@ func TestMiniGameResult(t *testing.T) {
 	}
 	if parsed.Rankings[0].Rank != 1 {
 		t.Errorf("parsed.Rankings[0].Rank = %d, want 1", parsed.Rankings[0].Rank)
+	}
+	if parsed.Rankings[0].DisplayName != "Alice" {
+		t.Errorf("parsed.Rankings[0].DisplayName = %s, want Alice", parsed.Rankings[0].DisplayName)
+	}
+	if parsed.Rankings[1].DisplayName != "Bob" {
+		t.Errorf("parsed.Rankings[1].DisplayName = %s, want Bob", parsed.Rankings[1].DisplayName)
 	}
 }
 
