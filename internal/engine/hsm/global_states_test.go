@@ -6,6 +6,7 @@ import (
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/engine"
 	"github.com/b1tAction/paradiced/pkg/id"
+	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
@@ -79,6 +80,44 @@ func TestStateRoundMiniGame(t *testing.T) {
 	state.Exit(ctx)
 	if ctx.GetBoolOrDefault(KeyMiniGameStarted, true) {
 		t.Error("mini_game_started should be false after exit")
+	}
+}
+
+func TestStateRoundMiniGame_ExitBroadcastsResult(t *testing.T) {
+	state := NewRoundMiniGameState()
+
+	game := engine.NewGame(id.NewGameID(), 0)
+	p1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	p2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(p1)
+	game.AddPlayer(p2)
+
+	ctx := NewStateContext().WithHSM(NewHSM(game))
+	mockBroadcast := pkgnet.NewMockBroadcastAdapter()
+	ctx.Broadcast = mockBroadcast
+
+	state.Enter(ctx)
+	state.OnMiniGameResult(ctx, p1.ID.UUID(), 2)
+	state.OnMiniGameResult(ctx, p2.ID.UUID(), 1)
+	state.Exit(ctx)
+
+	if len(mockBroadcast.MiniGameResults) != 1 {
+		t.Fatalf("MiniGameResults broadcast count = %d, want 1", len(mockBroadcast.MiniGameResults))
+	}
+
+	result := mockBroadcast.MiniGameResults[0]
+	if result == nil {
+		t.Fatal("MiniGameResult should not be nil")
+	}
+	if len(result.Rankings) != 2 {
+		t.Fatalf("rankings length = %d, want 2", len(result.Rankings))
+	}
+
+	if result.Rankings[0].PlayerID != p2.ID.UUID() || result.Rankings[0].Rank != 1 {
+		t.Errorf("rankings[0] = (%s, %d), want (%s, 1)", result.Rankings[0].PlayerID, result.Rankings[0].Rank, p2.ID.UUID())
+	}
+	if result.Rankings[1].PlayerID != p1.ID.UUID() || result.Rankings[1].Rank != 2 {
+		t.Errorf("rankings[1] = (%s, %d), want (%s, 2)", result.Rankings[1].PlayerID, result.Rankings[1].Rank, p1.ID.UUID())
 	}
 }
 

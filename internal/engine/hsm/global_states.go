@@ -215,6 +215,35 @@ func (s *RoundMiniGameState) Update(ctx *StateContext) StateID {
 }
 
 func (s *RoundMiniGameState) Exit(ctx *StateContext) {
+	// Broadcast final mini-game rankings before leaving mini-game phase.
+	if ctx.Broadcast != nil {
+		game := ctx.GetGame()
+		if game != nil {
+			rankings := make([]pkgnet.RankingEntry, 0, len(game.Players))
+
+			for idx, p := range game.Players {
+				rank := ctx.GetMiniGameRank(p.ID.UUID())
+				if rank <= 0 {
+					// Deterministic fallback for players without submission.
+					rank = len(game.Players) + idx + 1
+				}
+				rankings = append(rankings, pkgnet.RankingEntry{
+					PlayerID: p.ID.UUID(),
+					Rank:     rank,
+				})
+			}
+
+			sort.SliceStable(rankings, func(i, j int) bool {
+				if rankings[i].Rank == rankings[j].Rank {
+					return rankings[i].PlayerID < rankings[j].PlayerID
+				}
+				return rankings[i].Rank < rankings[j].Rank
+			})
+
+			_ = ctx.Broadcast.BroadcastMiniGameResult(&pkgnet.MiniGameResult{Rankings: rankings})
+		}
+	}
+
 	ctx.SetBool(KeyMiniGameStarted, false)
 	ctx.SetBool(KeyWaitingForResults, false)
 }
