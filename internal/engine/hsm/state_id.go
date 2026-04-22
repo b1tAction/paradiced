@@ -25,7 +25,7 @@ const (
 	StateMainAction                       // 201: Main action phase, wait for item/skill/dice
 	StateTurnMoving                       // 202: Movement phase, calculate path, handle Fragile/Fog
 	StateTurnLanded                       // 203: Landing phase, trigger PhaseOnLand
-	StateTurnEvent                        // 204: Event phase, trigger PhasePreEvent/PhasePreDamage
+	StateTurnDraw                         // 204: Draw phase, draw event/item based on cell config
 	StateTurnEnd                          // 205: Turn end phase, trigger PhaseAfterTurn, TickBuffs
 	StateTurnCheckpoint                   // 206: CheckPoint processing (DrawItem etc.)
 )
@@ -58,7 +58,7 @@ func (s StateID) String() string {
 		StateMainAction:     "MainAction",
 		StateTurnMoving:     "TurnMoving",
 		StateTurnLanded:     "TurnLanded",
-		StateTurnEvent:      "TurnEvent",
+		StateTurnDraw:       "TurnDraw",
 		StateTurnEnd:        "TurnEnd",
 		StateTurnCheckpoint: "TurnCheckpoint",
 		StateWaitDecision:   "WaitDecision",

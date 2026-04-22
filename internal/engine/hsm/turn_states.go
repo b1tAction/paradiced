@@ -696,7 +696,7 @@ func runEventEffect(drawnType constants.EventType, player *core.Player, actionCt
 // TurnLandedState handles landing effects based on cell type behavior matrix.
 // PhaseOnLand is triggered first, then cell-type-specific actions:
 // - CellTypeEvent: DrawEventAction with bound event ID
-// - CellTypeNormal/Fog/Fragile: DrawEventAction for random event (handled in TurnEvent state)
+// - CellTypeNormal/Fog/Fragile: Draw based on cell.DrawType (Event/Item/None)
 // - CellTypeCheckpoint: Already processed in TurnCheckpoint, no action here
 // - CellTypeBoss: Already handled in TurnMoving (reachedEnd flag)
 type TurnLandedState struct {
@@ -705,7 +705,12 @@ type TurnLandedState struct {
 	cell       *gamemap.MapCell // Landing cell data (for EventID access)
 	decisions  []*event.Decision
 	actionCtx  *engineaction.ActionContext
-	skipEvent  bool             // Skip TurnEvent (CellTypeCheckpoint/Boss don't need random event)
+	skipEvent  bool             // Skip TurnDraw (CellTypeCheckpoint/Boss don't need random event)
+	// Cell draw configuration
+	drawType   constants.DrawType
+	probGood   float64
+	probNeutral float64
+	probBad    float64
 }
 
 // NewTurnLandedState creates a new TurnLanded state.
@@ -741,6 +746,11 @@ func (s *TurnLandedState) Enter(ctx *StateContext) {
 		if err == nil && cell != nil {
 			s.cellType = cell.CellType
 			s.cell = cell
+			// Capture cell draw configuration
+			s.drawType = cell.DrawType
+			s.probGood = cell.ProbGood
+			s.probNeutral = cell.ProbNeutral
+			s.probBad = cell.ProbBad
 		}
 	}
 
@@ -791,20 +801,20 @@ func (s *TurnLandedState) Enter(ctx *StateContext) {
 						err, "TurnLanded", 2, "Enter", "bound event effect failed")
 					return
 				}
-				// Bound event already executed, skip random draw in TurnEvent
+				// Bound event already executed, skip random draw in TurnDraw
 				s.skipEvent = true
 			}
 		}
 	case constants.CellTypeCheckpoint:
 		// Checkpoint already processed in TurnCheckpoint state
-		// Skip random event draw in TurnEvent
+		// Skip random event draw in TurnDraw
 		s.skipEvent = true
 	case constants.CellTypeBoss:
 		// Boss cell: already handled in TurnMoving (reachedEnd flag)
-		// Skip random event draw in TurnEvent
+		// Skip random event draw in TurnDraw
 		s.skipEvent = true
 	case constants.CellTypeNormal, constants.CellTypeFog, constants.CellTypeFragile:
-		// Random DrawEvent will be handled in TurnEvent state
+		// Random DrawEvent will be handled in TurnDraw state
 		// No special action needed here
 	}
 }
@@ -816,13 +826,23 @@ func (s *TurnLandedState) Update(ctx *StateContext) StateID {
 		return StateNone // Wait for decision
 	}
 
-	// Skip TurnEvent for CheckPoint/Boss cells (already processed)
-	if s.skipEvent {
+	// Skip TurnDraw for CheckPoint/Boss cells or if DrawType is None (or not set)
+	if s.skipEvent || s.drawType == constants.DrawTypeNone || !s.drawType.IsValid() {
 		return StateTurnEnd
 	}
 
-	// Normal flow -> TurnEvent
-	return StateTurnEvent
+	// Normal flow -> TurnDraw
+	// Pass cell draw configuration to TurnDrawState
+	if ctx.HSM != nil {
+		if drawState, ok := ctx.HSM.states[StateTurnDraw].(*TurnDrawState); ok {
+			drawState.drawType = s.drawType
+			drawState.probGood = s.probGood
+			drawState.probNeutral = s.probNeutral
+			drawState.probBad = s.probBad
+		}
+	}
+
+	return StateTurnDraw
 }
 
 func (s *TurnLandedState) Exit(ctx *StateContext) {
@@ -835,34 +855,38 @@ func (s *TurnLandedState) Exit(ctx *StateContext) {
 	}
 }
 
-// ========== TurnEventState ==========
+// ========== TurnDrawState ==========
 
-// TurnEventState handles random event drawing and execution.
-// Triggers PhasePreEvent for immunity checks.
-type TurnEventState struct {
+// TurnDrawState handles drawing events or items based on cell configuration.
+// Uses cell's DrawType to determine what to draw (Event/Item/None).
+// Uses cell's ProbGood/ProbNeutral/ProbBad for weighted pool selection.
+type TurnDrawState struct {
 	BaseTurnState
-	eventDrawn   bool
-	eventBlocked bool
-	decisions    []*event.Decision
-	actionCtx    *engineaction.ActionContext
+	drawType    constants.DrawType
+	probGood    float64
+	probNeutral float64
+	probBad     float64
+	actionCtx   *engineaction.ActionContext
 }
 
-// NewTurnEventState creates a new TurnEvent state.
-func NewTurnEventState() *TurnEventState {
-	return &TurnEventState{
-		BaseTurnState: BaseTurnState{id: StateTurnEvent},
-		eventDrawn:    false,
-		eventBlocked:  false,
-		decisions:     make([]*event.Decision, 0),
+// NewTurnDrawState creates a new TurnDraw state.
+func NewTurnDrawState() *TurnDrawState {
+	return &TurnDrawState{
+		BaseTurnState: BaseTurnState{id: StateTurnDraw},
 	}
 }
 
-func (s *TurnEventState) Enter(ctx *StateContext) {
+func (s *TurnDrawState) Enter(ctx *StateContext) {
 	player := ctx.Player
 	if player == nil {
 		ctx.Error = errors.WrapHSMError(
-			errors.NewInternalError("HSM", "TurnEvent", nil),
-			"TurnEvent", 2, "Enter", "player is nil")
+			errors.NewInternalError("HSM", "TurnDraw", nil),
+			"TurnDraw", 2, "Enter", "player is nil")
+		return
+	}
+
+	// Skip if DrawType is None
+	if s.drawType == constants.DrawTypeNone {
 		return
 	}
 
@@ -876,47 +900,44 @@ func (s *TurnEventState) Enter(ctx *StateContext) {
 		game.Draw,
 	)
 
-	// Create DrawEventAction (PreTriggerPhase = PhasePreEvent)
-	// This allows 辟邪/玄武 to intercept bad events
-	drawAction := engineaction.NewDrawEventAction(player, "CellEvent")
+	// Set cell draw probabilities
+	s.actionCtx.SetCellDraw(s.probGood, s.probNeutral, s.probBad)
 
-	// Execute through ActionContext
-	if err := s.actionCtx.ExecuteAction(drawAction); err != nil {
-		ctx.Error = errors.WrapHSMError(
-			err, "TurnEvent", 2, "Enter", "draw event action failed")
-		return
-	}
-
-	// Check if event was blocked (set during PhasePreEvent interception)
-	s.eventBlocked = s.actionCtx.GetBoolOrDefault("event_blocked", false)
-
-	s.eventDrawn = true
-
-	// Execute the drawn event's effect via EventRegistry handler
-	if !s.eventBlocked && drawAction.DrawnType.IsValid() {
-		if err := runEventEffect(drawAction.DrawnType, player, s.actionCtx); err != nil {
+	// Execute draw based on DrawType
+	switch s.drawType {
+	case constants.DrawTypeEvent:
+		// Draw event (PreTriggerPhase = PhasePreEvent for immunity checks)
+		drawAction := engineaction.NewDrawEventAction(player, "CellDraw")
+		if err := s.actionCtx.ExecuteAction(drawAction); err != nil {
 			ctx.Error = errors.WrapHSMError(
-				err, "TurnEvent", 2, "Enter", "event effect execution failed")
+				err, "TurnDraw", 2, "Enter", "draw event action failed")
+			return
+		}
+		// Execute the drawn event's effect via EventRegistry handler
+		if drawAction.DrawnType.IsValid() {
+			if err := runEventEffect(drawAction.DrawnType, player, s.actionCtx); err != nil {
+				ctx.Error = errors.WrapHSMError(
+					err, "TurnDraw", 2, "Enter", "event effect execution failed")
+				return
+			}
+		}
+	case constants.DrawTypeItem:
+		// Draw item (no interception)
+		drawAction := engineaction.NewDrawItemAction(player, "CellDraw")
+		if err := s.actionCtx.ExecuteAction(drawAction); err != nil {
+			ctx.Error = errors.WrapHSMError(
+				err, "TurnDraw", 2, "Enter", "draw item action failed")
 			return
 		}
 	}
 }
 
-func (s *TurnEventState) Update(ctx *StateContext) StateID {
-	// Check if decisions need processing
-	if len(s.decisions) > 0 {
-		ctx.Decisions = s.decisions
-		return StateNone
-	}
-
+func (s *TurnDrawState) Update(ctx *StateContext) StateID {
 	// Normal flow -> TurnEnd
 	return StateTurnEnd
 }
 
-func (s *TurnEventState) Exit(ctx *StateContext) {
-	s.eventDrawn = false
-	s.eventBlocked = false
-	s.decisions = make([]*event.Decision, 0)
+func (s *TurnDrawState) Exit(ctx *StateContext) {
 	if s.actionCtx != nil {
 		s.actionCtx.Clear()
 	}
@@ -1112,8 +1133,8 @@ func (f *TurnStateFactory) CreateState(id StateID) State {
 		return NewTurnCheckpointState()
 	case StateTurnLanded:
 		return NewTurnLandedState()
-	case StateTurnEvent:
-		return NewTurnEventState()
+	case StateTurnDraw:
+		return NewTurnDrawState()
 	case StateTurnEnd:
 		return NewTurnEndState()
 	default:
@@ -1134,7 +1155,7 @@ func RegisterTurnStates(hsm *HSM) error {
 		factory.CreateState(StateTurnMoving),
 		factory.CreateState(StateTurnCheckpoint),
 		factory.CreateState(StateTurnLanded),
-		factory.CreateState(StateTurnEvent),
+		factory.CreateState(StateTurnDraw),
 		factory.CreateState(StateTurnEnd),
 	}
 	return hsm.RegisterStates(states)

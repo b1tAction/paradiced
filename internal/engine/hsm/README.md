@@ -26,7 +26,7 @@ HSM 包提供三层架构的状态机：
 │ Layer 2: Turn States (在 TurnLoop 内循环执行)            │
 │ TurnUpkeep → MainAction → TurnMoving → TurnLanded       │
 │                                            ↓             │
-│                                        TurnEvent         │
+│                                         TurnDraw         │
 │                                            ↓             │
 │                                         TurnEnd          │
 └─────────────────────────────────────────────────────────┘
@@ -42,13 +42,13 @@ HSM 包提供三层架构的状态机：
 
 | 文件 | 描述 |
 |------|------|
-| `state.go` | State接口定义、StateContext上下文、Metadata key常量 |
-| `state_id.go` | StateID枚举定义和辅助方法 |
-| `state_stack.go` | StateStack实现（入栈/出栈机制） |
-| `hsm.go` | HSM主结构、状态转移逻辑、Snapshot机制 |
+| `state.go` | State 接口定义、StateContext 上下文、Metadata key 常量 |
+| `state_id.go` | StateID 枚举定义和辅助方法 |
+| `state_stack.go` | StateStack 实现（入栈/出栈机制） |
+| `hsm.go` | HSM 主结构、状态转移逻辑、Snapshot 机制 |
 | `adapter.go` | EventBusAdapter、MapEngineAdapter、GameWrapper |
 | `global_states.go` | Layer 1 全局状态实现 |
-| `turn_states.go` | Layer 2 回合状态实现 |
+| `turn_states.go` | Layer 2 回合状态实现（含 TurnDrawState） |
 | `interrupt_states.go` | Layer 3 中断状态实现 |
 
 ## State 接口
@@ -67,7 +67,7 @@ type State interface {
 
 StateContext 提供状态执行的上下文数据，包含：
 - **Metadata**: 嵌入的元数据存储（类型安全的键值对）
-- **HSM**: HSM实例引用（单一真相来源）
+- **HSM**: HSM 实例引用（单一真相来源）
 - **Player**: 当前玩家引用
 - **Phase/PhaseData**: 阶段触发数据
 - **Decision/Decisions**: 待处理决策
@@ -100,20 +100,45 @@ ctx.GetDiceSteps() // 返回 5
 | RoundMiniGame | 小游戏阶段：所有玩家参与竞争 |
 | RoundPrep | 回合准备：根据排名分配骰子类型 |
 | TurnLoop | 回合循环：管理玩家回合轮转 |
-| BossBattle | Boss战斗：玩家到达终点触发 |
+| BossBattle | Boss 战斗：玩家到达终点触发 |
 | GameOver | 游戏结束：结算和排名 |
 
 ## Layer 2: Turn States
 
-| State | 描述 | Phase触发 |
+| State | 描述 | Phase 触发 |
 |-------|------|-----------|
-| TurnUpkeep | 回合准备：检查死亡/跳过、触发BeforeTurn | PhaseBeforeTurn |
+| TurnUpkeep | 回合准备：检查死亡/跳过、触发 BeforeTurn | PhaseBeforeTurn |
 | MainAction | 主要行动：等待骰子/道具/技能输入 | - |
-| TurnMoving | 移动处理：HSM预扫描路径、迷途Steps修改、CheckPoint拆分、FellDown | PhasePreMove (HSM发布) |
-| TurnCheckpoint | CheckPoint结算：DrawItemAction（宝箱道具） | - |
-| TurnLanded | 落地处理：CellType行为矩阵、触发OnLand | PhaseOnLand |
-| TurnEvent | 事件处理：抽取事件、触发PreEvent | PhasePreEvent |
-| TurnEnd | 回合结束：触发AfterTurn、TickBuffs | PhaseAfterTurn |
+| TurnMoving | 移动处理：HSM 预扫描路径、迷途 Steps 修改、CheckPoint 拆分、FellDown | PhasePreMove (HSM 发布) |
+| TurnCheckpoint | CheckPoint 结算：DrawItemAction（宝箱道具） | - |
+| TurnLanded | 落地处理：CellType 行为矩阵、触发 OnLand、捕获 DrawType 配置 | PhaseOnLand |
+| TurnDraw | 概率抽取：根据 cell 的 DrawType 和 prob 配置进行事件/道具抽取 | PhasePreEvent (DrawEventAction) |
+| TurnEnd | 回合结束：触发 AfterTurn、TickBuffs | PhaseAfterTurn |
+
+### TurnDrawState 详解
+
+`TurnDrawState` 是统一的概率抽取状态，用于处理地图格子的概率抽取配置：
+
+**状态转移**：
+```
+TurnLanded (检测到 DrawType != none)
+    ↓
+TurnDraw (执行概率抽取)
+    ↓
+TurnEnd
+```
+
+**执行逻辑**：
+1. 从 TurnLandedState 接收 DrawType、ProbGood、ProbNeutral、ProbBad 配置
+2. 创建 ActionContext 并设置概率配置
+3. 根据 DrawType 执行对应的抽取动作：
+   - `DrawTypeEvent`: 执行 `DrawEventAction` → 触发 `PhasePreEvent` → 调用事件 handler
+   - `DrawTypeItem`: 执行 `DrawItemAction` → 获得道具
+
+**概率抽取机制**：
+- 使用 `rng.DrawEngine.DrawWithProb` 方法
+- 按照 probGood/probNeutral/probBad 的权重选择池
+- 如果概率总和 < 1.0，剩余概率从全部 items 中抽取（不进行池过滤）
 
 ## Layer 3: Interrupt States
 
@@ -123,7 +148,7 @@ ctx.GetDiceSteps() // 返回 5
 
 ## Phase 触发机制
 
-设计原则：**谁产生时机，谁发布Phase**
+设计原则：**谁产生时机，谁发布 Phase**
 
 | Phase | 发布者 | 触发位置 |
 |-------|--------|----------|
@@ -143,7 +168,8 @@ Turn States 通过 ActionContext 执行 Action：
 TurnUpkeep → ExecuteAction(ModifyLPAction) → PreTrigger → Execute → PostTrigger → EventLog
 TurnMoving → HSM publishes PhasePreMove → CalculatePath → ExecuteAction(MoveAction) → Execute → EventLog
 TurnCheckpoint → ExecuteAction(DrawItemAction) → Execute → EventLog
-TurnEvent → ExecuteAction(DrawEventAction) → PreTrigger(PreEvent) → Execute → EventLog
+TurnLanded → 捕获 cell 配置 → 转移到 TurnDraw
+TurnDraw → ExecuteAction(DrawEventAction/DrawItemAction) → Execute → EventLog
 ```
 
 ## 使用示例
