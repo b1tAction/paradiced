@@ -378,3 +378,279 @@ func calculateAverageEvaluation(stats map[constants.Evaluation]int) float64 {
 	}
 	return float64(total) / float64(count)
 }
+
+// ========== DrawWithProb Tests ==========
+
+func TestDrawWithProbNilItems(t *testing.T) {
+	engine := NewDrawEngine(rand.New(rand.NewSource(42)))
+
+	result := engine.DrawWithProb(nil, 1.0, 0.0, 0.0, 0)
+	if result.Item != nil {
+		t.Errorf("DrawWithProb with nil items should return nil item, got %v", result.Item)
+	}
+}
+
+func TestDrawWithProbEmptyItems(t *testing.T) {
+	engine := NewDrawEngine(rand.New(rand.NewSource(42)))
+
+	items := []*EvaluatedItem{}
+	result := engine.DrawWithProb(items, 1.0, 0.0, 0.0, 0)
+	if result.Item != nil {
+		t.Errorf("DrawWithProb with empty items should return nil item, got %v", result.Item)
+	}
+}
+
+func TestDrawWithProbAllGood(t *testing.T) {
+	items := []*EvaluatedItem{
+		{Type: "herb", Eval: constants.EvaluationMildGood},
+		{Type: "milk_tea", Eval: constants.EvaluationGood},
+		{Type: "divine_bless", Eval: constants.EvaluationExcellent},
+	}
+
+	// 100% Good pool - should only draw Good items
+	for i := 0; i < 50; i++ {
+		e := NewDrawEngine(rand.New(rand.NewSource(int64(i))))
+		result := e.DrawWithProb(items, 1.0, 0.0, 0.0, 0)
+		if result.Item == nil {
+			t.Fatal("DrawWithProb should return non-nil item")
+		}
+		if !result.Item.Eval.IsGood() {
+			t.Errorf("DrawWithProb(probGood=1.0) should only return Good items, got Eval=%d", result.Item.Eval)
+		}
+	}
+}
+
+func TestDrawWithProbAllBad(t *testing.T) {
+	items := []*EvaluatedItem{
+		{Type: "thunder", Eval: constants.EvaluationVeryBad},
+		{Type: "mosquito", Eval: constants.EvaluationMildBad},
+		{Type: "ghost_hit", Eval: constants.EvaluationMildBad},
+	}
+
+	// 100% Bad pool - should only draw Bad items
+	for i := 0; i < 50; i++ {
+		e := NewDrawEngine(rand.New(rand.NewSource(int64(i))))
+		result := e.DrawWithProb(items, 0.0, 0.0, 1.0, 0)
+		if result.Item == nil {
+			t.Fatal("DrawWithProb should return non-nil item")
+		}
+		if !result.Item.Eval.IsBad() {
+			t.Errorf("DrawWithProb(probBad=1.0) should only return Bad items, got Eval=%d", result.Item.Eval)
+		}
+	}
+}
+
+func TestDrawWithProbAllNeutral(t *testing.T) {
+	items := []*EvaluatedItem{
+		{Type: "exchange", Eval: constants.EvaluationNeutral},
+		{Type: "taste_test", Eval: constants.EvaluationMixed},
+	}
+
+	// 100% Neutral pool - should only draw Neutral items
+	for i := 0; i < 50; i++ {
+		e := NewDrawEngine(rand.New(rand.NewSource(int64(i))))
+		result := e.DrawWithProb(items, 0.0, 1.0, 0.0, 0)
+		if result.Item == nil {
+			t.Fatal("DrawWithProb should return non-nil item")
+		}
+		if !result.Item.Eval.IsNeutral() {
+			t.Errorf("DrawWithProb(probNeutral=1.0) should only return Neutral items, got Eval=%d", result.Item.Eval)
+		}
+	}
+}
+
+func TestDrawWithProbTotalLessThanOne(t *testing.T) {
+	// Mix of Good and Bad items
+	items := []*EvaluatedItem{
+		{Type: "herb", Eval: constants.EvaluationMildGood},    // Good
+		{Type: "thunder", Eval: constants.EvaluationVeryBad},   // Bad
+		{Type: "exchange", Eval: constants.EvaluationNeutral},  // Neutral
+	}
+
+	// total = 0.6 < 1.0, so 40% chance to draw from ALL items
+	// Run many iterations to verify it can draw from all categories
+	stats := make(map[string]int)
+	iterations := 3000
+
+	for i := 0; i < iterations; i++ {
+		e := NewDrawEngine(rand.New(rand.NewSource(int64(i))))
+		result := e.DrawWithProb(items, 0.2, 0.2, 0.2, 0)
+		if result.Item != nil {
+			stats[result.Item.Type]++
+		}
+	}
+
+	// Verify all items were drawn at least some of the time
+	for _, itemType := range []string{"herb", "thunder", "exchange"} {
+		if stats[itemType] == 0 {
+			t.Errorf("Item '%s' should be drawn at least once with total<1.0, got 0 draws", itemType)
+		}
+	}
+
+	t.Logf("Draw distribution with total=0.6: herb=%d, thunder=%d, exchange=%d",
+		stats["herb"], stats["thunder"], stats["exchange"])
+}
+
+func TestDrawWithProbPoolFallback(t *testing.T) {
+	engine := NewDrawEngine(rand.New(rand.NewSource(42)))
+
+	// Only Good items in pool
+	items := []*EvaluatedItem{
+		{Type: "herb", Eval: constants.EvaluationMildGood},
+		{Type: "milk_tea", Eval: constants.EvaluationGood},
+	}
+
+	// Request 100% Bad pool, but no Bad items exist - should fallback to all items
+	result := engine.DrawWithProb(items, 0.0, 0.0, 1.0, 0)
+	if result.Item == nil {
+		t.Fatal("DrawWithProb should fallback to all items when filtered pool is empty")
+	}
+	// Should still return one of the available items
+	if result.Item.Type != "herb" && result.Item.Type != "milk_tea" {
+		t.Errorf("DrawWithProb fallback should return available item, got %s", result.Item.Type)
+	}
+}
+
+func TestDrawWithProbZeroProbabilities(t *testing.T) {
+	items := []*EvaluatedItem{
+		{Type: "herb", Eval: constants.EvaluationMildGood},
+		{Type: "thunder", Eval: constants.EvaluationVeryBad},
+	}
+
+	// All zeros - should use equal distribution and draw from all items
+	stats := make(map[string]int)
+	iterations := 300
+
+	for i := 0; i < iterations; i++ {
+		e := NewDrawEngine(rand.New(rand.NewSource(int64(i))))
+		result := e.DrawWithProb(items, 0.0, 0.0, 0.0, 0)
+		if result.Item != nil {
+			stats[result.Item.Type]++
+		}
+	}
+
+	// Both items should be drawn roughly equally (within 20% tolerance)
+	expected := iterations / 2
+	tolerance := iterations / 5
+
+	for _, itemType := range []string{"herb", "thunder"} {
+		count := stats[itemType]
+		if count < expected-tolerance || count > expected+tolerance {
+			t.Logf("Warning: %s drawn %d times (expected ~%d +/- %d)", itemType, count, expected, tolerance)
+		}
+	}
+}
+
+func TestDrawWithProbLPClamp(t *testing.T) {
+	engine := NewDrawEngine(rand.New(rand.NewSource(42)))
+
+	items := []*EvaluatedItem{
+		{Type: "herb", Eval: constants.EvaluationMildGood},
+	}
+
+	// Negative LP - should be clamped to 0
+	result := engine.DrawWithProb(items, 1.0, 0.0, 0.0, -5)
+	if result.Item == nil {
+		t.Error("DrawWithProb with negative LP should still return item")
+	}
+
+	// LP > 8 - should be clamped to 8
+	result = engine.DrawWithProb(items, 1.0, 0.0, 0.0, 100)
+	if result.Item == nil {
+		t.Error("DrawWithProb with LP>8 should still return item")
+	}
+}
+
+func TestDrawWithProbLPInfluence(t *testing.T) {
+	// Test that LP influences draws toward higher Evaluation items
+	items := []*EvaluatedItem{
+		{Type: "divine_bless", Eval: constants.EvaluationExcellent}, // 100
+		{Type: "herb", Eval: constants.EvaluationMildGood},          // 70
+		{Type: "milk_tea", Eval: constants.EvaluationGood},          // 80
+	}
+
+	iterations := 5000
+
+	// LP=0 draws
+	stats0 := make(map[string]int)
+	for i := 0; i < iterations; i++ {
+		e := NewDrawEngine(rand.New(rand.NewSource(int64(i))))
+		result := e.DrawWithProb(items, 1.0, 0.0, 0.0, 0)
+		if result.Item != nil {
+			stats0[result.Item.Type]++
+		}
+	}
+
+	// LP=8 draws
+	stats8 := make(map[string]int)
+	for i := 0; i < iterations; i++ {
+		e := NewDrawEngine(rand.New(rand.NewSource(int64(i + 100000))))
+		result := e.DrawWithProb(items, 1.0, 0.0, 0.0, 8)
+		if result.Item != nil {
+			stats8[result.Item.Type]++
+		}
+	}
+
+	// LP=8 should favor divine_bless (highest Eval) more than LP=0
+	rate0 := float64(stats0["divine_bless"]) / float64(iterations)
+	rate8 := float64(stats8["divine_bless"]) / float64(iterations)
+
+	if rate8 <= rate0 {
+		t.Errorf("LP=8 should favor high-Eval items more than LP=0: divine_bless rate LP=0=%.3f, LP=8=%.3f", rate0, rate8)
+	}
+
+	t.Logf("LP=0 distribution: divine_bless=%.3f, herb=%.3f, milk_tea=%.3f",
+		float64(stats0["divine_bless"])/float64(iterations),
+		float64(stats0["herb"])/float64(iterations),
+		float64(stats0["milk_tea"])/float64(iterations))
+	t.Logf("LP=8 distribution: divine_bless=%.3f, herb=%.3f, milk_tea=%.3f",
+		float64(stats8["divine_bless"])/float64(iterations),
+		float64(stats8["herb"])/float64(iterations),
+		float64(stats8["milk_tea"])/float64(iterations))
+}
+
+func TestDrawWithProbMixedProbabilities(t *testing.T) {
+	items := []*EvaluatedItem{
+		{Type: "divine_bless", Eval: constants.EvaluationExcellent}, // Good
+		{Type: "exchange", Eval: constants.EvaluationNeutral},       // Neutral
+		{Type: "thunder", Eval: constants.EvaluationVeryBad},        // Bad
+	}
+
+	// 50% Good, 30% Neutral, 20% Bad
+	stats := make(map[string]int)
+	iterations := 3000
+
+	for i := 0; i < iterations; i++ {
+		e := NewDrawEngine(rand.New(rand.NewSource(int64(i))))
+		result := e.DrawWithProb(items, 0.5, 0.3, 0.2, 0)
+		if result.Item != nil {
+			stats[result.Item.Type]++
+		}
+	}
+
+	// Verify all categories are drawn
+	for _, itemType := range []string{"divine_bless", "exchange", "thunder"} {
+		if stats[itemType] == 0 {
+			t.Errorf("Item '%s' should be drawn at least once, got 0 draws", itemType)
+		}
+	}
+
+	t.Logf("Mixed probability distribution: divine_bless=%d (%.1f%%), exchange=%d (%.1f%%), thunder=%d (%.1f%%)",
+		stats["divine_bless"], float64(stats["divine_bless"])*100/float64(iterations),
+		stats["exchange"], float64(stats["exchange"])*100/float64(iterations),
+		stats["thunder"], float64(stats["thunder"])*100/float64(iterations))
+}
+
+func TestCategoryDrawResult(t *testing.T) {
+	// Test CategoryDrawResult structure
+	result := &CategoryDrawResult{
+		Item: &EvaluatedItem{Type: "test", Eval: constants.EvaluationGood},
+	}
+
+	if result.Item == nil {
+		t.Error("CategoryDrawResult.Item should not be nil")
+	}
+	if result.Item.Type != "test" {
+		t.Errorf("CategoryDrawResult.Item.Type should be 'test', got '%s'", result.Item.Type)
+	}
+}

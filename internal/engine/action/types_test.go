@@ -1473,11 +1473,9 @@ func TestDrawEventActionExecuteWithPool(t *testing.T) {
 	player.LP = 3
 
 	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
-	eventPool := &rng.EvaluatedItemPool{
-		Items: []rng.EvaluatedItem{
-			{Type: "herb", Eval: constants.EvaluationMildGood},
-			{Type: "milk_tea", Eval: constants.EvaluationGood},
-		},
+	eventPool := []*rng.EvaluatedItem{
+		{Type: "herb", Eval: constants.EvaluationMildGood},
+		{Type: "milk_tea", Eval: constants.EvaluationGood},
 	}
 
 	action := NewDrawEventAction(player, "CellEvent")
@@ -1520,10 +1518,8 @@ func TestDrawEventActionNilEventPool(t *testing.T) {
 
 func TestDrawEventActionNilPlayer(t *testing.T) {
 	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
-	eventPool := &rng.EvaluatedItemPool{
-		Items: []rng.EvaluatedItem{
-			{Type: "herb", Eval: constants.EvaluationMildGood},
-		},
+	eventPool := []*rng.EvaluatedItem{
+		{Type: "herb", Eval: constants.EvaluationMildGood},
 	}
 
 	action := NewDrawEventAction(nil, "CellEvent")
@@ -1539,7 +1535,7 @@ func TestDrawEventActionNilPlayer(t *testing.T) {
 func TestDrawEventActionEmptyPool(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
-	eventPool := &rng.EvaluatedItemPool{Items: []rng.EvaluatedItem{}}
+	eventPool := []*rng.EvaluatedItem{}
 
 	action := NewDrawEventAction(player, "CellEvent")
 	ctx := NewActionContext(nil, nil, nil, drawEngine)
@@ -1582,10 +1578,8 @@ func TestDrawItemActionExecuteWithPool(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 
 	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
-	itemPool := &rng.EvaluatedItemPool{
-		Items: []rng.EvaluatedItem{
-			{Type: "reverse_clock", Eval: constants.EvaluationGood},
-		},
+	itemPool := []*rng.EvaluatedItem{
+		{Type: "reverse_clock", Eval: constants.EvaluationGood},
 	}
 
 	action := NewDrawItemAction(player, "CheckpointTreasure")
@@ -1636,10 +1630,8 @@ func TestDrawItemActionNilItemPool(t *testing.T) {
 
 func TestDrawItemActionNilPlayer(t *testing.T) {
 	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
-	itemPool := &rng.EvaluatedItemPool{
-		Items: []rng.EvaluatedItem{
-			{Type: "reverse_clock", Eval: constants.EvaluationGood},
-		},
+	itemPool := []*rng.EvaluatedItem{
+		{Type: "reverse_clock", Eval: constants.EvaluationGood},
 	}
 
 	action := NewDrawItemAction(nil, "CheckpointTreasure")
@@ -1655,7 +1647,7 @@ func TestDrawItemActionNilPlayer(t *testing.T) {
 func TestDrawItemActionEmptyPool(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
-	itemPool := &rng.EvaluatedItemPool{Items: []rng.EvaluatedItem{}}
+	itemPool := []*rng.EvaluatedItem{}
 
 	action := NewDrawItemAction(player, "CheckpointTreasure")
 	ctx := NewActionContext(nil, nil, nil, drawEngine)

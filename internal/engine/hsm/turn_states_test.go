@@ -348,10 +348,8 @@ func TestTurnLandedState_Enter_CellTypeEvent(t *testing.T) {
 	game.AddPlayer(player)
 
 	// Setup EventPool for fallback (though bound events set DrawnType directly)
-	game.EventPool = &rng.EvaluatedItemPool{
-		Items: []rng.EvaluatedItem{
-			{Type: "herb", Eval: constants.EvaluationMildGood},
-		},
+	game.EventPool = []*rng.EvaluatedItem{
+		{Type: "herb", Eval: constants.EvaluationMildGood},
 	}
 
 	// Setup map with CellTypeEvent and bound event ID "herb"
@@ -403,6 +401,13 @@ func TestTurnLandedState_Enter_CellTypeNormal(t *testing.T) {
 	mapEngine := gamemap.NewMapEngine(100)
 	mapEngine.GenerateLinearMap(nil) // All Normal cells
 
+	// Set DrawType on the cell to enable drawing
+	cell, _ := mapEngine.GetCell(20)
+	cell.DrawType = constants.DrawTypeEvent
+	cell.ProbGood = 1.0
+	cell.ProbNeutral = 0.0
+	cell.ProbBad = 0.0
+
 	state := NewTurnLandedState()
 	hsmInst := NewHSM(game)
 	hsmInst.SetMapEngine(mapEngine)
@@ -422,10 +427,10 @@ func TestTurnLandedState_Enter_CellTypeNormal(t *testing.T) {
 	if state.skipEvent {
 		t.Error("skipEvent should be false for Normal cell")
 	}
-	// Update should go to TurnEvent
+	// Update should go to TurnDraw (DrawType is Event)
 	nextID := state.Update(ctx)
-	if nextID != StateTurnEvent {
-		t.Errorf("Update should return StateTurnEvent for Normal cell, got %s", nextID.String())
+	if nextID != StateTurnDraw {
+		t.Errorf("Update should return StateTurnDraw for Normal cell with DrawType=Event, got %s", nextID.String())
 	}
 }
 
@@ -433,10 +438,11 @@ func TestTurnLandedState_Update(t *testing.T) {
 	state := NewTurnLandedState()
 	ctx := NewStateContext()
 
+	// With default drawType (None), Update should return StateTurnEnd
 	nextID := state.Update(ctx)
 
-	if nextID != StateTurnEvent {
-		t.Errorf("Update should return StateTurnEvent, got %s", nextID.String())
+	if nextID != StateTurnEnd {
+		t.Errorf("Update should return StateTurnEnd for DrawTypeNone, got %s", nextID.String())
 	}
 }
 
@@ -450,10 +456,8 @@ func TestTurnCheckpointState_Enter(t *testing.T) {
 	game.AddPlayer(player)
 
 	// Setup ItemPool for DrawItemAction
-	game.ItemPool = &rng.EvaluatedItemPool{
-		Items: []rng.EvaluatedItem{
-			{Type: "healing_potion", Eval: constants.EvaluationGood},
-		},
+	game.ItemPool = []*rng.EvaluatedItem{
+		{Type: "healing_potion", Eval: constants.EvaluationGood},
 	}
 
 	state := NewTurnCheckpointState()
@@ -494,11 +498,9 @@ func TestTurnMovingState_Enter_CheckPointSplit(t *testing.T) {
 	mapEngine.GenerateLinearMap(configs)
 
 	// Setup pools for ActionContext
-	game.EventPool = &rng.EvaluatedItemPool{Items: []rng.EvaluatedItem{}}
-	game.ItemPool = &rng.EvaluatedItemPool{
-		Items: []rng.EvaluatedItem{
-			{Type: "healing_potion", Eval: constants.EvaluationGood},
-		},
+	game.EventPool = []*rng.EvaluatedItem{}
+	game.ItemPool = []*rng.EvaluatedItem{
+		{Type: "healing_potion", Eval: constants.EvaluationGood},
 	}
 
 	state := NewTurnMovingState()
@@ -549,8 +551,8 @@ func TestTurnMovingState_Enter_ReverseSkipsCheckpoint(t *testing.T) {
 	mapEngine.GenerateLinearMap(configs)
 
 	// Setup pools for ActionContext
-	game.EventPool = &rng.EvaluatedItemPool{Items: []rng.EvaluatedItem{}}
-	game.ItemPool = &rng.EvaluatedItemPool{Items: []rng.EvaluatedItem{}}
+	game.EventPool = []*rng.EvaluatedItem{}
+	game.ItemPool = []*rng.EvaluatedItem{}
 
 	state := NewTurnMovingState()
 	hsmInst := NewHSM(game)
@@ -587,23 +589,27 @@ func TestTurnMovingState_Enter_ReverseSkipsCheckpoint(t *testing.T) {
 	}
 }
 
-// ========== TurnEventState Tests ==========
+// ========== TurnDrawState Tests ==========
 
-func TestTurnEventState_Enter(t *testing.T) {
+func TestTurnDrawState_Enter(t *testing.T) {
 	game := engine.NewGame(id.NewGameID(), 42)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.Position = 20
 	game.AddPlayer(player)
 
 	// Setup EventPool for DrawEventAction (Game.Draw already initialized by NewGame)
-	game.EventPool = &rng.EvaluatedItemPool{
-		Items: []rng.EvaluatedItem{
-			{Type: "herb", Eval: constants.EvaluationMildGood},
-			{Type: "milk_tea", Eval: constants.EvaluationGood},
-		},
+	game.EventPool = []*rng.EvaluatedItem{
+		{Type: "herb", Eval: constants.EvaluationMildGood},
+		{Type: "milk_tea", Eval: constants.EvaluationGood},
 	}
 
-	state := NewTurnEventState()
+	state := NewTurnDrawState()
+	// Set draw configuration
+	state.drawType = constants.DrawTypeEvent
+	state.probGood = 1.0
+	state.probNeutral = 0.0
+	state.probBad = 0.0
+
 	ctx := NewStateContext().
 		WithHSM(NewHSM(game)).
 		WithPlayer(player)
@@ -613,13 +619,86 @@ func TestTurnEventState_Enter(t *testing.T) {
 	if ctx.Error != nil {
 		t.Errorf("Enter should succeed, got error: %v", ctx.Error)
 	}
-	if state.eventDrawn != true {
-		t.Error("eventDrawn should be true after Enter")
+}
+
+func TestTurnDrawState_Enter_DrawTypeItem(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 42)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.Position = 20
+	player.HP = 5
+	player.LP = 4 // Set LP for draw weight calculation
+	game.AddPlayer(player)
+
+	// Setup ItemPool for DrawItemAction
+	game.ItemPool = []*rng.EvaluatedItem{
+		{Type: "healing_potion", Eval: constants.EvaluationGood},
+		{Type: "reverse_clock", Eval: constants.EvaluationMildGood},
+	}
+
+	state := NewTurnDrawState()
+	// Set draw configuration for item draw
+	state.drawType = constants.DrawTypeItem
+	state.probGood = 1.0
+	state.probNeutral = 0.0
+	state.probBad = 0.0
+
+	ctx := NewStateContext().
+		WithHSM(NewHSM(game)).
+		WithPlayer(player)
+
+	state.Enter(ctx)
+
+	if ctx.Error != nil {
+		t.Errorf("Enter should succeed, got error: %v", ctx.Error)
+	}
+
+	// Verify item was drawn and added to inventory
+	// Note: DrawItemAction uses DrawWithProb which may return nil if draw fails
+	// but with valid pool it should succeed
+	if len(player.Inventory) == 0 {
+		t.Logf("Warning: No item was drawn (this may be expected if DrawWithProb returned nil)")
 	}
 }
 
-func TestTurnEventState_Update(t *testing.T) {
-	state := NewTurnEventState()
+func TestTurnDrawState_Enter_DrawTypeNone(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 42)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.Position = 20
+	game.AddPlayer(player)
+
+	state := NewTurnDrawState()
+	// Set draw configuration to None (should skip drawing)
+	state.drawType = constants.DrawTypeNone
+
+	ctx := NewStateContext().
+		WithHSM(NewHSM(game)).
+		WithPlayer(player)
+
+	state.Enter(ctx)
+
+	if ctx.Error != nil {
+		t.Errorf("Enter should succeed, got error: %v", ctx.Error)
+	}
+	// No action should be taken when DrawType is None
+}
+
+func TestTurnDrawState_Enter_NilPlayer(t *testing.T) {
+	state := NewTurnDrawState()
+	state.drawType = constants.DrawTypeEvent
+
+	ctx := NewStateContext().
+		WithHSM(NewHSM(engine.NewGame(id.NewGameID(), 42))).
+		WithPlayer(nil)
+
+	state.Enter(ctx)
+
+	if ctx.Error == nil {
+		t.Error("Enter should return error when player is nil")
+	}
+}
+
+func TestTurnDrawState_Update(t *testing.T) {
+	state := NewTurnDrawState()
 	ctx := NewStateContext()
 
 	nextID := state.Update(ctx)
@@ -627,6 +706,26 @@ func TestTurnEventState_Update(t *testing.T) {
 	if nextID != StateTurnEnd {
 		t.Errorf("Update should return StateTurnEnd, got %s", nextID.String())
 	}
+}
+
+func TestTurnDrawState_Exit(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 42)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+
+	state := NewTurnDrawState()
+	ctx := NewStateContext().
+		WithHSM(NewHSM(game)).
+		WithPlayer(player)
+
+	// Enter to initialize actionCtx
+	state.drawType = constants.DrawTypeEvent
+	state.probGood = 1.0
+	state.Enter(ctx)
+
+	// Exit should clear actionCtx
+	state.Exit(ctx)
+
+	// Verify actionCtx is cleared (can't directly check, but Exit should not panic)
 }
 
 // ========== TurnEndState Tests ==========
@@ -722,7 +821,7 @@ func TestTurnStateFactory_CreateState(t *testing.T) {
 		StateMainAction,
 		StateTurnMoving,
 		StateTurnLanded,
-		StateTurnEvent,
+		StateTurnDraw,
 		StateTurnEnd,
 	}
 

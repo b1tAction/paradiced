@@ -596,15 +596,11 @@ func TestCheckPointSplit_Integration(t *testing.T) {
 	game.AddPlayer(player)
 
 	// Setup pools for DrawItemAction
-	game.ItemPool = &rng.EvaluatedItemPool{
-		Items: []rng.EvaluatedItem{
-			{Type: "healing_potion", Eval: constants.EvaluationGood},
-		},
+	game.ItemPool = []*rng.EvaluatedItem{
+		{Type: "healing_potion", Eval: constants.EvaluationGood},
 	}
-	game.EventPool = &rng.EvaluatedItemPool{
-		Items: []rng.EvaluatedItem{
-			{Type: "herb", Eval: constants.EvaluationMildGood},
-		},
+	game.EventPool = []*rng.EvaluatedItem{
+		{Type: "herb", Eval: constants.EvaluationMildGood},
 	}
 
 	// Start turn log for GameLog recording
