@@ -53,3 +53,40 @@ func ParseCellType(s string) CellType {
 		return CellTypeNone
 	}
 }
+
+// ========== DrawType ==========
+
+// DrawType defines what type of draw to perform on a cell.
+type DrawType string
+
+// DrawType constants.
+const (
+	DrawTypeNone  DrawType = "none"  // No draw
+	DrawTypeEvent DrawType = "event" // Draw event
+	DrawTypeItem  DrawType = "item"  // Draw item
+)
+
+// IsValid checks if DrawType is valid.
+func (dt DrawType) IsValid() bool {
+	switch dt {
+	case DrawTypeNone, DrawTypeEvent, DrawTypeItem:
+		return true
+	default:
+		return false
+	}
+}
+
+// ParseDrawType converts a string to DrawType.
+// Returns DrawTypeNone if the string is not valid.
+func ParseDrawType(s string) DrawType {
+	switch s {
+	case "none", "None":
+		return DrawTypeNone
+	case "event", "Event":
+		return DrawTypeEvent
+	case "item", "Item":
+		return DrawTypeItem
+	default:
+		return DrawTypeNone
+	}
+}

@@ -9,21 +9,29 @@ import (
 
 // MapCell defines single map cell structure.
 type MapCell struct {
-	Index     int      `json:"index"`      // Coordinate index (0~N)
-	CellType  constants.CellType `json:"cell_type"`  // Cell type
-	IsBroken  bool     `json:"is_broken"`  // Whether broken (only for Fragile)
-	EventID   string   `json:"event_id"`   // Associated event ID (optional)
-	FogActive bool     `json:"fog_active"` // Whether fog activated (only for Fog)
+	Index       int     `json:"index"`       // Coordinate index (0~N)
+	CellType    constants.CellType `json:"cell_type"` // Cell type
+	IsBroken    bool    `json:"is_broken"`   // Whether broken (only for Fragile)
+	EventID     string  `json:"event_id"`    // Associated event ID (optional, for bound events)
+	FogActive   bool    `json:"fog_active"`  // Whether fog activated (only for Fog)
+	DrawType    constants.DrawType `json:"draw_type"` // What to draw on land (Event/Item/None)
+	ProbGood    float64 `json:"prob_good"`   // Probability weight for Good pool
+	ProbNeutral float64 `json:"prob_neutral"` // Probability weight for Neutral pool
+	ProbBad     float64 `json:"prob_bad"`    // Probability weight for Bad pool
 }
 
 // NewMapCell creates a new map cell.
 func NewMapCell(index int, cellType constants.CellType) *MapCell {
 	return &MapCell{
-		Index:     index,
-		CellType:  cellType,
-		IsBroken:  false,
-		EventID:   "",
-		FogActive: false,
+		Index:       index,
+		CellType:    cellType,
+		IsBroken:    false,
+		EventID:     "",
+		FogActive:   false,
+		DrawType:    constants.DrawTypeNone,
+		ProbGood:    0.0,
+		ProbNeutral: 0.0,
+		ProbBad:     0.0,
 	}
 }
 
@@ -322,11 +330,15 @@ func (m *MapEngine) Clone() *MapEngine {
 	cells := make([]*MapCell, m.Length)
 	for i, cell := range m.Cells {
 		cells[i] = &MapCell{
-			Index:     cell.Index,
-			CellType:  cell.CellType,
-			IsBroken:  cell.IsBroken,
-			EventID:   cell.EventID,
-			FogActive: cell.FogActive,
+			Index:       cell.Index,
+			CellType:    cell.CellType,
+			IsBroken:    cell.IsBroken,
+			EventID:     cell.EventID,
+			FogActive:   cell.FogActive,
+			DrawType:    cell.DrawType,
+			ProbGood:    cell.ProbGood,
+			ProbNeutral: cell.ProbNeutral,
+			ProbBad:     cell.ProbBad,
 		}
 	}
 	return &MapEngine{

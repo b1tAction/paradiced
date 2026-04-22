@@ -7,7 +7,6 @@ import (
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/errors"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
-	"github.com/b1tAction/paradiced/pkg/rng"
 	"github.com/b1tAction/paradiced/pkg/util"
 )
 
@@ -579,9 +578,17 @@ func (a *DrawEventAction) Execute(ctx *ActionContext) error {
 			WithContext("reason", "event pool is nil")
 	}
 
-	// Draw event type from pool using player's LP for weight calculation
-	drawnType := ctx.DrawEngine.DrawFromPool(ctx.EventPool, rng.PoolTypeGood, a.TargetPlayer.LP)
-	a.DrawnType = constants.ParseEventType(drawnType)
+	// Draw event type from pool using probability weights and player's LP
+	result := ctx.DrawEngine.DrawWithProb(
+		ctx.EventPool,
+		ctx.ProbGood, ctx.ProbNeutral, ctx.ProbBad,
+		a.TargetPlayer.LP,
+	)
+	if result.Item != nil {
+		a.DrawnType = constants.ParseEventType(result.Item.Type)
+	} else {
+		a.DrawnType = constants.EventTypeNone
+	}
 	a.DrawnName = ""
 
 	return nil
@@ -652,9 +659,17 @@ func (a *DrawItemAction) Execute(ctx *ActionContext) error {
 		return errors.NewActionExecutionError("draw_item", "", "target player is nil", nil)
 	}
 
-	// Draw item type from pool using player's LP for weight calculation
-	drawnType := ctx.DrawEngine.DrawFromPool(ctx.ItemPool, rng.PoolTypeGood, a.TargetPlayer.LP)
-	a.DrawnType = constants.ParseItemType(drawnType)
+	// Draw item type from pool using probability weights and player's LP
+	result := ctx.DrawEngine.DrawWithProb(
+		ctx.ItemPool,
+		ctx.ProbGood, ctx.ProbNeutral, ctx.ProbBad,
+		a.TargetPlayer.LP,
+	)
+	if result.Item != nil {
+		a.DrawnType = constants.ParseItemType(result.Item.Type)
+	} else {
+		a.DrawnType = constants.ItemTypeNone
+	}
 
 	// Add drawn item to player's inventory
 	if a.DrawnType != constants.ItemTypeNone && a.DrawnType.IsValid() {

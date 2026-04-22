@@ -26,8 +26,8 @@ type Game struct {
 	Draw      *rng.DrawEngine     `json:"-"`   // Draw engine for random draws
 	Log       *gamelog.GameLog    `json:"log"` // Global game log for playback
 	RoundData *util.Metadata      `json:"-"`   // Round-level persistent data (cleared each round)
-	EventPool *rng.EvaluatedItemPool `json:"-"` // Event pool for DrawEventAction
-	ItemPool  *rng.EvaluatedItemPool `json:"-"` // Item pool for DrawItemAction
+	EventPool []*rng.EvaluatedItem `json:"-"`  // Event pool for DrawEventAction (all events)
+	ItemPool  []*rng.EvaluatedItem `json:"-"`  // Item pool for DrawItemAction (all items)
 	mutex     sync.RWMutex
 }
 

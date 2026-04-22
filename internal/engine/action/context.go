@@ -22,10 +22,14 @@ type ActionContext struct {
 	EventBus      *event.EventBus       // EventBus for interception (nil if no interception)
 	MapEngine     *gamemap.MapEngine    // MapEngine for movement calculation (direct type)
 	DrawEngine    *rng.DrawEngine       // DrawEngine for random draws (events, buffs, items)
-	EventPool     *rng.EvaluatedItemPool // Event pool for DrawEventAction
-	ItemPool      *rng.EvaluatedItemPool // Item pool for DrawItemAction
+	EventPool     []*rng.EvaluatedItem  // Event pool for DrawEventAction (all events)
+	ItemPool      []*rng.EvaluatedItem  // Item pool for DrawItemAction (all items)
 	ActionQueue   *Queue                // Queue for derived actions
 	CurrentPlayer *core.Player          // Current player (set by HSM, nil if not in turn)
+	// Probability weights for cell-based draws
+	ProbGood      float64               // Probability weight for Good pool
+	ProbNeutral   float64               // Probability weight for Neutral pool
+	ProbBad       float64               // Probability weight for Bad pool
 }
 
 // NewActionContext creates a new ActionContext with required components.
@@ -55,9 +59,17 @@ func NewActionContextWithPlayer(game protocol.Game, bus *event.EventBus, mapEngi
 }
 
 // SetPools sets the event and item pools for draw actions.
-func (ctx *ActionContext) SetPools(eventPool, itemPool *rng.EvaluatedItemPool) *ActionContext {
+func (ctx *ActionContext) SetPools(eventPool, itemPool []*rng.EvaluatedItem) *ActionContext {
 	ctx.EventPool = eventPool
 	ctx.ItemPool = itemPool
+	return ctx
+}
+
+// SetCellDraw sets the cell-based draw probabilities.
+func (ctx *ActionContext) SetCellDraw(probGood, probNeutral, probBad float64) *ActionContext {
+	ctx.ProbGood = probGood
+	ctx.ProbNeutral = probNeutral
+	ctx.ProbBad = probBad
 	return ctx
 }
 
