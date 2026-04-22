@@ -11,9 +11,10 @@ import (
 
 // Buff represents a buff instance attached to a player.
 type Buff struct {
-	Type     constants.BuffType `json:"type"`
-	ID       id.BuffID          `json:"id"` // Buff instance ID (UUID v7)
-	Duration int                `json:"duration"` // Remaining duration (-1 for permanent)
+	Type         constants.BuffType `json:"type"`
+	ID           id.BuffID          `json:"id"`            // Buff instance ID (UUID v7)
+	Duration     int                `json:"duration"`      // Remaining duration (-1 for permanent)
+	tickEligible bool               // Whether buff should be ticked at next turn end
 }
 
 // NewBuff creates a new Buff instance with auto-generated UUID v7 ID.
@@ -40,10 +41,16 @@ func (b *Buff) IsActive() bool {
 	return b.Duration > 0 || b.Duration == -1
 }
 
-// TickDuration decrements duration and returns whether buff is still active.
+// TickDuration decrements duration if tick-eligible, and returns whether buff is still active.
+// First call marks the buff as tick-eligible (without decrementing), so buffs acquired
+// mid-turn survive their first turn-end tick. Duration is only decremented on subsequent calls.
 func (b *Buff) TickDuration() bool {
 	if b.Duration > 0 {
-		b.Duration--
+		if b.tickEligible {
+			b.Duration--
+		} else {
+			b.tickEligible = true
+		}
 	}
 	return b.IsActive()
 }

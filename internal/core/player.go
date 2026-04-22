@@ -326,9 +326,10 @@ func (p *Player) Clone() *Player {
 	buffs := make([]*Buff, len(p.ActiveBuffs))
 	for i, b := range p.ActiveBuffs {
 		buffs[i] = &Buff{
-			Type:     b.Type,
-			ID:       b.ID,
-			Duration: b.Duration,
+			Type:         b.Type,
+			ID:           b.ID,
+			Duration:     b.Duration,
+			tickEligible: b.tickEligible,
 		}
 	}
 

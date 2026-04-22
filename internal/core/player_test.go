@@ -376,18 +376,77 @@ func TestGetBuff(t *testing.T) {
 
 func TestTickBuffs(t *testing.T) {
 	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
-	player.AddBuff(NewBuff(constants.BuffTypeCurse, 1)) // Only 1 turn left
-	player.AddBuff(NewBuff(constants.BuffTypeDivine, 3))
+	curseBuff := NewBuff(constants.BuffTypeCurse, 1) // Duration=1
+	divineBuff := NewBuff(constants.BuffTypeDivine, 3)
 
+	player.AddBuff(curseBuff)
+	player.AddBuff(divineBuff)
+
+	// First TickBuffs call: marks eligible, no decrement (simulates first turn-end)
 	expired := player.TickBuffs()
+	if len(expired) != 0 {
+		t.Errorf("first tick expired count = %d, expected 0 (new buffs not yet eligible)", len(expired))
+	}
+
+	// Second TickBuffs call: now eligible, curse expires (Duration 1→0)
+	expired = player.TickBuffs()
 	if len(expired) != 1 {
-		t.Errorf("expired count = %d, expected 1", len(expired))
+		t.Errorf("second tick expired count = %d, expected 1", len(expired))
 	}
 	if player.HasBuff(constants.BuffTypeCurse) {
-		t.Error("Curse buff should be expired")
+		t.Error("Curse buff should be expired after second tick")
 	}
 	if !player.HasBuff(constants.BuffTypeDivine) {
 		t.Error("Divine buff should still be active")
+	}
+}
+
+func TestTickBuffsNewBuffNotTicked(t *testing.T) {
+	// Buffs acquired mid-turn: first TickBuffs call marks eligible without decrement
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
+	buff := NewBuff(constants.BuffTypeCurse, 1) // Duration=1, tickEligible=false (default)
+
+	player.AddBuff(buff)
+	expired := player.TickBuffs()
+
+	// Buff should NOT expire because first call only marks eligible
+	if len(expired) != 0 {
+		t.Errorf("expired count = %d, expected 0 (new buff not ticked)", len(expired))
+	}
+	if !player.HasBuff(constants.BuffTypeCurse) {
+		t.Error("Curse buff should still be active (not ticked this turn)")
+	}
+	if buff.Duration != 1 {
+		t.Errorf("Duration = %d, expected 1 (not decremented)", buff.Duration)
+	}
+}
+
+func TestTickBuffsOnlyTickEligible(t *testing.T) {
+	// Buff that has already been marked eligible (first call done) should be ticked,
+	// while newly added buff should only be marked eligible without decrement
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
+	existingBuff := NewBuff(constants.BuffTypeCurse, 2)
+	newBuff := NewBuff(constants.BuffTypeDivine, 3)
+
+	player.AddBuff(existingBuff)
+	player.AddBuff(newBuff)
+
+	// First call: marks both eligible, no decrement
+	expired := player.TickBuffs()
+	if len(expired) != 0 {
+		t.Errorf("expired count = %d, expected 0", len(expired))
+	}
+
+	// Second call: decrements both
+	expired = player.TickBuffs()
+	if len(expired) != 0 {
+		t.Errorf("expired count = %d, expected 0", len(expired))
+	}
+	if existingBuff.Duration != 1 {
+		t.Errorf("existing buff Duration = %d, expected 1 (ticked)", existingBuff.Duration)
+	}
+	if newBuff.Duration != 2 {
+		t.Errorf("new buff Duration = %d, expected 2 (ticked)", newBuff.Duration)
 	}
 }
 

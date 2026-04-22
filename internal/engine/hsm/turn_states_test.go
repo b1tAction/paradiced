@@ -47,6 +47,65 @@ func TestTurnUpkeepState_Enter_NormalFlow(t *testing.T) {
 	}
 }
 
+func TestTurnUpkeepState_Enter_MarkBuffsTickEligible(t *testing.T) {
+	// Buffs acquired mid-turn have tickEligible=false by default.
+	// When TurnEnd calls TickBuffs, the first TickDuration call marks
+	// tickEligible=true without decrementing. This ensures mid-turn
+	// buffs survive their first turn-end tick.
+	game := engine.NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	// Add buff acquired in previous turn (tickEligible=false initially)
+	buff := core.NewBuff(constants.BuffTypeLost, 1)
+	game.ApplyBuffToPlayer(player, buff)
+
+	state := NewTurnUpkeepState()
+	ctx := NewStateContext().
+		WithHSM(NewHSM(game)).
+		WithPlayer(player)
+
+	state.Enter(ctx)
+
+	// Verify buff still has Duration=1 (TurnUpkeep doesn't tick buffs)
+	if buff.Duration != 1 {
+		t.Errorf("buff Duration = %d, expected 1 (not ticked at TurnUpkeep)", buff.Duration)
+	}
+}
+
+func TestTurnUpkeepState_Enter_BuffCreatedInBeforeTurnNotTickEligible(t *testing.T) {
+	// Buffs created during BeforeTurn phase will have tickEligible=false
+	// (set by NewBuff default). When TickBuffs is called at TurnEnd,
+	// the first TickDuration call will mark tickEligible=true without
+	// decrementing Duration, so they won't expire in the same turn.
+	game := engine.NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	// Add pre-existing buff (will be ticked properly after first TurnEnd)
+	existingBuff := core.NewBuff(constants.BuffTypeDivine, 3)
+	game.ApplyBuffToPlayer(player, existingBuff)
+
+	state := NewTurnUpkeepState()
+	ctx := NewStateContext().
+		WithHSM(NewHSM(game)).
+		WithPlayer(player)
+
+	state.Enter(ctx)
+
+	// Simulate adding a buff during BeforeTurn phase (after TurnUpkeep Enter)
+	newBuff := core.NewBuff(constants.BuffTypeCurse, 3)
+	player.AddBuff(newBuff)
+
+	// Both buffs should have original Duration (neither ticked at TurnUpkeep)
+	if existingBuff.Duration != 3 {
+		t.Errorf("existing buff Duration = %d, expected 3", existingBuff.Duration)
+	}
+	if newBuff.Duration != 3 {
+		t.Errorf("new buff Duration = %d, expected 3", newBuff.Duration)
+	}
+}
+
 func TestTurnUpkeepState_Enter_SkipTurn(t *testing.T) {
 	// Setup
 	game := engine.NewGame(id.NewGameID(), 0)
@@ -755,13 +814,17 @@ func TestTurnEndState_Enter_TickBuffs(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	game.AddPlayer(player)
 
-	// Add buff with 1 duration (will expire)
+	// Add buff with 1 duration - first TickDuration call marks eligible,
+	// second call decrements and expires
 	buff1 := core.NewBuff(constants.BuffTypeCurse, 1)
 	game.ApplyBuffToPlayer(player, buff1)
+	// Simulate previous turn-end tick: marks eligible without decrement
+	buff1.TickDuration()
 
-	// Add buff with 3 duration (won't expire)
+	// Add buff with 3 duration - same: first call marks, second call decrements
 	buff2 := core.NewBuff(constants.BuffTypeDivine, 3)
 	game.ApplyBuffToPlayer(player, buff2)
+	buff2.TickDuration()
 
 	state := NewTurnEndState()
 	ctx := NewStateContext().
@@ -770,12 +833,39 @@ func TestTurnEndState_Enter_TickBuffs(t *testing.T) {
 
 	state.Enter(ctx)
 
-	// Verify buff1 expired and unsubscribed
+	// Verify buff1 expired and unsubscribed (Duration 1→0)
 	if len(player.ActiveBuffs) != 1 {
 		t.Errorf("Player should have 1 buff remaining, got %d", len(player.ActiveBuffs))
 	}
 	if player.ActiveBuffs[0].Type != constants.BuffTypeDivine {
 		t.Errorf("Remaining buff should be Divine, got %s", string(player.ActiveBuffs[0].Type))
+	}
+}
+
+func TestTurnEndState_Enter_NewBuffNotTicked(t *testing.T) {
+	// Buffs acquired mid-turn (tickEligible=false) should NOT be ticked at TurnEnd.
+	// First TickDuration call marks eligible without decrementing.
+	game := engine.NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	// Add buff with 1 duration, newly created (tickEligible=false)
+	buff := core.NewBuff(constants.BuffTypeLost, 1)
+	game.ApplyBuffToPlayer(player, buff)
+
+	state := NewTurnEndState()
+	ctx := NewStateContext().
+		WithHSM(NewHSM(game)).
+		WithPlayer(player)
+
+	state.Enter(ctx)
+
+	// Buff should NOT expire because first TickDuration only marks eligible
+	if !player.HasBuff(constants.BuffTypeLost) {
+		t.Error("Lost buff should still be active (not ticked this turn)")
+	}
+	if buff.Duration != 1 {
+		t.Errorf("Lost buff Duration = %d, expected 1 (not decremented)", buff.Duration)
 	}
 }
 
