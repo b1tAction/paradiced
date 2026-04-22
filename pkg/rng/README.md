@@ -15,9 +15,9 @@
 ```go
 type PoolType int
 const (
-    PoolTypeGood    // Good池 (Evaluation > 65)
-    PoolTypeNeutral // Neutral池 (Evaluation 41-65)
-    PoolTypeBad     // Bad池 (Evaluation <= 40)
+    PoolTypeGood    // Good 池 (Evaluation > 65)
+    PoolTypeNeutral // Neutral 池 (Evaluation 41-65)
+    PoolTypeBad     // Bad 池 (Evaluation <= 40)
 )
 ```
 
@@ -29,15 +29,55 @@ engine := rng.NewDrawEngine(rand.New(rand.NewSource(seed)))
 // 从指定池抽取
 eventType := engine.DrawEvent(rng.PoolTypeGood, player.LP)
 buffType  := engine.DrawBuff(rng.PoolTypeBad, player.LP)
-itemType  := engine.DrawItem(player.LP)  // 道具都是Good
+itemType  := engine.DrawItem(player.LP)  // 道具都是 Good
+```
+
+### DrawWithProb - 概率加权抽取
+
+`DrawWithProb` 方法支持基于概率权重的抽取，用于地图格子的概率配置：
+
+```go
+// 从事件池抽取，根据三个概率权重选择池
+result := engine.DrawWithProb(
+    eventPool,           // []*EvaluatedItem
+    0.6, 0.3, 0.1,      // probGood, probNeutral, probBad
+    player.LP,          // 幸运值
+)
+
+// result: *CategoryDrawResult
+//   - Category: PoolType (Good/Neutral/Bad)
+//   - Item: *EvaluatedItem (抽中的项目)
+//   - FromAllItems: bool (是否从全部 items 抽取)
+```
+
+**概率总和 < 1.0 的处理**：
+
+当 `probGood + probNeutral + probBad < 1.0` 时，剩余概率表示从**全部 items**中抽取（不进行池过滤）：
+
+```go
+// 示例：30% Good, 30% Neutral, 30% Bad, 10% 从全部 items 抽取
+result := engine.DrawWithProb(items, 0.3, 0.3, 0.3, lp)
+// 有 10% 的概率直接从全部 items 抽取，不过滤池
+```
+
+### CategoryDrawResult
+
+概率抽取的结果结构：
+
+```go
+type CategoryDrawResult struct {
+    Category   PoolType       // 选中的池类型
+    Item       *EvaluatedItem // 抽中的项目
+    FromAllItems bool         // 是否从全部 items 抽取（当 total<1.0 时）
+}
 ```
 
 ## LP 影响机制
 
 | 池类型 | LP 效果 |
 |--------|---------|
-| Good | LP越高 → 高Evaluation权重越大 → 抽到更好的 |
-| Bad | LP越高 → 高Evaluation权重越大 → 抽到不那么坏的 |
+| Good | LP 越高 → 高 Evaluation 权重越大 → 抽到更好的 |
+| Bad | LP 越高 → 高 Evaluation 权重越大 → 抽到不那么坏的 |
 | Neutral | LP 影响较小 |
 
 **权重公式**：
@@ -64,19 +104,23 @@ badBuff := game.Draw.DrawBuff(rng.PoolTypeBad, player.LP)
 
 ```
 pkg/rng/
-├── draw_engine.go      # DrawEngine 实现
-├── draw_engine_test.go # 单元测试
-└── README.md           # 本文档
+├── draw_engine.go       # DrawEngine 实现（含 DrawWithProb）
+├── weighted_pool.go     # WeightedPool 实现
+├── luck_modifier.go     # LuckModifier 实现
+├── draw_engine_test.go  # 单元测试
+└── README.md            # 本文档
 ```
 
 ## 使用场景
 
 | 场景 | 池类型 | 说明 |
 |------|--------|------|
-| 毒瘴Buff效果 | PoolTypeBad | 每回合触发恶性事件 |
+| 毒瘴 Buff 效果 | PoolTypeBad | 每回合触发恶性事件 |
 | 捡到圣遗物 | DrawItem | 获得道具奖励 |
-| 神眷Buff奖励 | PoolTypeGood | 获得良性效果 |
-| 迷途/诅咒替换 | PoolTypeBad | 强制给予恶意Buff |
+| 神眷 Buff 奖励 | PoolTypeGood | 获得良性效果 |
+| 迷途/诅咒替换 | PoolTypeBad | 强制给予恶意 Buff |
+| **地图格子抽取** | DrawWithProb | 根据格子配置的 probGood/Neutral/Bad 进行概率抽取 |
+| **概率混合抽取** | DrawWithProb(total<1) | 部分概率从全部 items 抽取，部分从指定池抽取 |
 
 ## 测试
 

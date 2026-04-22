@@ -58,6 +58,7 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **Phase**: Trigger timing (HSM: BeforeTurn/OnLand/AfterTurn/PreMove; Action: PreDamage/PreEvent/PreRespawn/OnBuffApplied/OnBuffRemoved)
 - **Faction**: Player faction type (青龙/朱雀/白虎/玄武)
 - **CellType**: Map cell type (Normal, Fragile, Fog, Checkpoint, Boss, Event)
+- **DrawType**: Cell draw type (none/event/item) - specifies what to draw when landing on a cell
 - **StateID**: HSM state identifier (Global/Turn/Interrupt layers)
 - **EntryType**: GameLog entry type (action, state, mini_game, boss, decision)
 - **ActionSource**: Action source identifier (Buff/Item/Event/Faction/System)
@@ -134,8 +135,9 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 #### HSM System (`internal/engine/hsm`)
 - **HSM**: Hierarchical State Machine with three layers
 - **Global States**: MatchInit, RoundMiniGame, RoundPrep, TurnLoop, BossBattle, GameOver
-- **Turn States**: TurnUpkeep, MainAction, TurnMoving, TurnCheckpoint, TurnLanded, TurnEvent, TurnEnd
+- **Turn States**: TurnUpkeep, MainAction, TurnMoving, TurnCheckpoint, TurnLanded, TurnDraw, TurnEnd
 - **Interrupt States**: WaitDecision for user input
+- **TurnDrawState**: Unified draw state that handles both Event and Item draws based on cell's DrawType configuration. Entered from TurnLanded when cell has a valid DrawType (event/item) and prob settings.
 
 #### Map System (`internal/gamemap`)
 - **MapEngine**: Linear map generation and path calculation
@@ -146,6 +148,7 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **WeightedPool**: Weighted random draw
 - **LuckModifier**: Luck-based weight adjustment
 - **EventPool/ItemPool**: Predefined pools for game content
+- **DrawEngine**: Probability-based drawing with `DrawWithProb` method that supports weighted pool selection (Good/Neutral/Bad) and fallback to all items when total probability < 1.0
 
 ## Game Flow
 
@@ -162,8 +165,9 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 2. **MainAction**: Player can use items or faction skills
 3. **PreMove** (HSM publishes): TurnMovingState publishes PreMove, 迷途 handler modifies Steps via StepsModifier interface
 4. **OnLand** (HSM publishes): Trigger landing events
-5. **PreEvent** (Action publishes): DrawEventAction triggers PreEvent for 辟邪/玄武
-6. **AfterTurn** (HSM publishes): Tick Buff durations, trigger AfterTurn effects
+5. **TurnDraw** (HSM state): When landing on a cell with DrawType (event/item), enter TurnDraw state to perform probability-based draw
+6. **PreEvent** (Action publishes): DrawEventAction triggers PreEvent for 辟邪/玄武
+7. **AfterTurn** (HSM publishes): Tick Buff durations, trigger AfterTurn effects
 
 ## Development Guidelines
 
