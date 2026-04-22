@@ -1,0 +1,227 @@
+{
+  "length": 20,
+  "start_index": 0,
+  "end_index": 19,
+  "cells": [
+    {
+      "index": 0,
+      "cell_type": "checkpoint",
+      "is_broken": false,
+      "event_id": "",
+      "fog_active": false,
+      "draw_type": "item",
+      "prob_good": 1.0,
+      "prob_neutral": 0.0,
+      "prob_bad": 0.0
+    },
+    {
+      "index": 1,
+      "cell_type": "normal",
+      "is_broken": false,
+      "event_id": "",
+      "fog_active": false,
+      "draw_type": "event",
+      "prob_good": 0.3,
+      "prob_neutral": 0.5,
+      "prob_bad": 0.2
+    },
+    {
+      "index": 2,
+      "cell_type": "normal",
+      "is_broken": false,
+      "event_id": "",
+      "fog_active": false,
+      "draw_type": "event",
+      "prob_good": 0.3,
+      "prob_neutral": 0.5,
+      "prob_bad": 0.2
+    },
+    {
+      "index": 3,
+      "cell_type": "fragile",
+      "is_broken": false,
+      "event_id": "",
+      "fog_active": false,
+      "draw_type": "none",
+      "prob_good": 0.0,
+      "prob_neutral": 0.0,
+      "prob_bad": 0.0
+    },
+    {
+      "index": 4,
+      "cell_type": "normal",
+      "is_broken": false,
+      "event_id": "",
+      "fog_active": false,
+      "draw_type": "event",
+      "prob_good": 1.0,
+      "prob_neutral": 0.0,
+      "prob_bad": 0.0
+    },
+    {
+      "index": 5,
+      "cell_type": "fog",
+      "is_broken": false,
+      "event_id": "",
+      "fog_active": false,
+      "draw_type": "event",
+      "prob_good": 0.0,
+      "prob_neutral": 0.0,
+      "prob_bad": 1.0
+    },
+    {
+      "index": 6,
+      "cell_type": "normal",
+      "is_broken": false,
+      "event_id": "",
+      "fog_active": false,
+      "draw_type": "event",
+      "prob_good": 0.3,
+      "prob_neutral": 0.5,
+      "prob_bad": 0.2
+    },
+    {
+      "index": 7,
+      "cell_type": "event",
+      "is_broken": false,
+      "event_id": "herb",
+      "fog_active": false,
+      "draw_type": "event",
+      "prob_good": 1.0,
+      "prob_neutral": 0.0,
+      "prob_bad": 0.0
+    },
+    {
+      "index": 8,
+      "cell_type": "normal",
+      "is_broken": false,
+      "event_id": "",
+      "fog_active": false,
+      "draw_type": "event",
+      "prob_good": 0.3,
+      "prob_neutral": 0.5,
+      "prob_bad": 0.2
+    },
+    {
+      "index": 9,
+      "cell_type": "fragile",
+      "is_broken": false,
+      "event_id": "",
+      "fog_active": false,
+      "draw_type": "none",
+      "prob_good": 0.0,
+      "prob_neutral": 0.0,
+      "prob_bad": 0.0
+    },
+    {
+      "index": 10,
+      "cell_type": "checkpoint",
+      "is_broken": false,
+      "event_id": "",
+      "fog_active": false,
+      "draw_type": "item",
+      "prob_good": 1.0,
+      "prob_neutral": 0.0,
+      "prob_bad": 0.0
+    },
+    {
+      "index": 11,
+      "cell_type": "normal",
+      "is_broken": false,
+      "event_id": "",
+      "fog_active": false,
+      "draw_type": "event",
+      "prob_good": 0.3,
+      "prob_neutral": 0.5,
+      "prob_bad": 0.2
+    },
+    {
+      "index": 12,
+      "cell_type": "normal",
+      "is_broken": false,
+      "event_id": "",
+      "fog_active": false,
+      "draw_type": "event",
+      "prob_good": 0.0,
+      "prob_neutral": 1.0,
+      "prob_bad": 0.0
+    },
+    {
+      "index": 13,
+      "cell_type": "fog",
+      "is_broken": false,
+      "event_id": "",
+      "fog_active": false,
+      "draw_type": "event",
+      "prob_good": 0.2,
+      "prob_neutral": 0.3,
+      "prob_bad": 0.5
+    },
+    {
+      "index": 14,
+      "cell_type": "normal",
+      "is_broken": false,
+      "event_id": "",
+      "fog_active": false,
+      "draw_type": "event",
+      "prob_good": 0.3,
+      "prob_neutral": 0.5,
+      "prob_bad": 0.2
+    },
+    {
+      "index": 15,
+      "cell_type": "fragile",
+      "is_broken": false,
+      "event_id": "",
+      "fog_active": false,
+      "draw_type": "none",
+      "prob_good": 0.0,
+      "prob_neutral": 0.0,
+      "prob_bad": 0.0
+    },
+    {
+      "index": 16,
+      "cell_type": "normal",
+      "is_broken": false,
+      "event_id": "",
+      "fog_active": false,
+      "draw_type": "event",
+      "prob_good": 1.0,
+      "prob_neutral": 0.0,
+      "prob_bad": 0.0
+    },
+    {
+      "index": 17,
+      "cell_type": "normal",
+      "is_broken": false,
+      "event_id": "",
+      "fog_active": false,
+      "draw_type": "event",
+      "prob_good": 0.3,
+      "prob_neutral": 0.5,
+      "prob_bad": 0.2
+    },
+    {
+      "index": 18,
+      "cell_type": "normal",
+      "is_broken": false,
+      "event_id": "",
+      "fog_active": false,
+      "draw_type": "event",
+      "prob_good": 0.0,
+      "prob_neutral": 0.0,
+      "prob_bad": 1.0
+    },
+    {
+      "index": 19,
+      "cell_type": "boss",
+      "is_broken": false,
+      "event_id": "",
+      "fog_active": false,
+      "draw_type": "none",
+      "prob_good": 0.0,
+      "prob_neutral": 0.0,
+      "prob_bad": 0.0
+    }
+  ]
+}
