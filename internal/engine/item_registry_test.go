@@ -237,6 +237,28 @@ func TestGetItemName(t *testing.T) {
 	}
 }
 
+func TestBuildItemPool(t *testing.T) {
+	// BuildItemPool should produce an EvaluatedItem for every registered ItemDefinition
+	pool := BuildItemPool()
+
+	allTypes := GetAllItemTypes()
+	if len(pool) != len(allTypes) {
+		t.Fatalf("BuildItemPool returned %d items, but %d item types are registered", len(pool), len(allTypes))
+	}
+
+	// Verify each pool entry matches its Definition's Type and Eval
+	for _, item := range pool {
+		def := GetItemDefinition(constants.ItemType(item.Type))
+		if def == nil {
+			t.Errorf("pool entry Type=%s has no matching ItemDefinition", item.Type)
+			continue
+		}
+		if item.Eval != def.Eval {
+			t.Errorf("pool entry Type=%s Eval=%d, expected %d from Definition", item.Type, item.Eval, def.Eval)
+		}
+	}
+}
+
 func TestGetItemTypesByCategory(t *testing.T) {
 	goodItems := GetItemTypesByCategory("Good")
 	if len(goodItems) == 0 {

@@ -5,6 +5,7 @@ import (
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
 // EventHandlerConfig contains effect logic for Event.
@@ -129,6 +130,24 @@ func (r *EventRegistry) GetEventTypesByCategory(category string) []constants.Eve
 		return r.neutralEvents
 	}
 	return r.GetAllEventTypes()
+}
+
+// BuildEventPool builds an []*rng.EvaluatedItem pool from all registered EventDefinitions.
+// This is the single source of truth for event pool data — no need to manually
+// duplicate Type+Eval mappings elsewhere.
+func BuildEventPool() []*rng.EvaluatedItem {
+	return GlobalEventRegistry.buildEventPool()
+}
+
+func (r *EventRegistry) buildEventPool() []*rng.EvaluatedItem {
+	pool := make([]*rng.EvaluatedItem, 0, len(r.defs))
+	for _, def := range r.defs {
+		pool = append(pool, &rng.EvaluatedItem{
+			Type: string(def.Type),
+			Eval: def.Eval,
+		})
+	}
+	return pool
 }
 
 // ========== Event Handler Registration ==========

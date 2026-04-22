@@ -5,6 +5,7 @@ import (
 	"github.com/b1tAction/paradiced/internal/event"
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
 // ItemHandlerConfig contains effect logic and execution configuration.
@@ -132,6 +133,24 @@ func (r *ItemRegistry) GetItemTypesByCategory(category string) []constants.ItemT
 		return r.neutralItems
 	}
 	return r.GetAllItemTypes()
+}
+
+// BuildItemPool builds an []*rng.EvaluatedItem pool from all registered ItemDefinitions.
+// This is the single source of truth for item pool data — no need to manually
+// duplicate Type+Eval mappings elsewhere.
+func BuildItemPool() []*rng.EvaluatedItem {
+	return GlobalItemRegistry.buildItemPool()
+}
+
+func (r *ItemRegistry) buildItemPool() []*rng.EvaluatedItem {
+	pool := make([]*rng.EvaluatedItem, 0, len(r.defs))
+	for _, def := range r.defs {
+		pool = append(pool, &rng.EvaluatedItem{
+			Type: string(def.Type),
+			Eval: def.Eval,
+		})
+	}
+	return pool
 }
 
 // ========== Item Handler Registration ==========

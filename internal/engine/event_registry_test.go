@@ -495,6 +495,28 @@ func TestGetEventName(t *testing.T) {
 	}
 }
 
+func TestBuildEventPool(t *testing.T) {
+	// BuildEventPool should produce an EvaluatedItem for every registered EventDefinition
+	pool := BuildEventPool()
+
+	allTypes := GetAllEventTypes()
+	if len(pool) != len(allTypes) {
+		t.Fatalf("BuildEventPool returned %d items, but %d event types are registered", len(pool), len(allTypes))
+	}
+
+	// Verify each pool entry matches its Definition's Type and Eval
+	for _, item := range pool {
+		def := GetEventDefinition(constants.EventType(item.Type))
+		if def == nil {
+			t.Errorf("pool entry Type=%s has no matching EventDefinition", item.Type)
+			continue
+		}
+		if item.Eval != def.Eval {
+			t.Errorf("pool entry Type=%s Eval=%d, expected %d from Definition", item.Type, item.Eval, def.Eval)
+		}
+	}
+}
+
 func TestGetEventTypesByCategory(t *testing.T) {
 	goodEvents := GetEventTypesByCategory("Good")
 	if len(goodEvents) == 0 {

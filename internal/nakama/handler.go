@@ -137,6 +137,10 @@ func (h *NakamaMatchHandler) initializeGame() error {
 	gameID := id.NewGameID()
 	game := engine.NewGame(gameID, h.randomSeed)
 
+	// Initialize event and item pools from Registry definitions
+	game.EventPool = engine.BuildEventPool()
+	game.ItemPool = engine.BuildItemPool()
+
 	// Create HSM with game reference (HSM is single source of truth)
 	h.hsm = hsm.NewHSM(game)
 
