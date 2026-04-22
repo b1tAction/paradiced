@@ -30,6 +30,11 @@ type ActionContext struct {
 	ProbGood      float64               // Probability weight for Good pool
 	ProbNeutral   float64               // Probability weight for Neutral pool
 	ProbBad       float64               // Probability weight for Bad pool
+
+	// Buff lifecycle callbacks - injected by HSM layer (engine.Game)
+	// These handle EventBus subscription/unsubscription for Buff add/remove.
+	OnAddBuff    func(player *core.Player, buff *core.Buff)    // Called after AddBuffAction.Execute
+	OnRemoveBuff func(player *core.Player, buffType constants.BuffType) *core.Buff // Called by RemoveBuffAction.Execute
 }
 
 // NewActionContext creates a new ActionContext with required components.

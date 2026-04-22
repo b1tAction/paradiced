@@ -323,6 +323,12 @@ func (a *AddBuffAction) PostTriggerPhase() constants.Phase {
 func (a *AddBuffAction) Execute(ctx *ActionContext) error {
 	newBuff := core.NewBuff(a.BuffType, a.Duration)
 	a.TargetPlayer.AddBuff(newBuff)
+
+	// Subscribe buff to EventBus via lifecycle callback (handles phase subscriptions)
+	if ctx.OnAddBuff != nil {
+		ctx.OnAddBuff(a.TargetPlayer, newBuff)
+	}
+
 	return nil
 }
 
@@ -375,6 +381,16 @@ func (a *RemoveBuffAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *RemoveBuffAction) Execute(ctx *ActionContext) error {
+	// Unsubscribe buff from EventBus via lifecycle callback, then remove from player
+	if ctx.OnRemoveBuff != nil {
+		removed := ctx.OnRemoveBuff(a.TargetPlayer, a.BuffType)
+		// OnRemoveBuff already handles EventBus unsubscription and player.RemoveBuff
+		// If callback returned nil, fall through to direct removal
+		if removed != nil {
+			return nil
+		}
+	}
+
 	a.TargetPlayer.RemoveBuff(a.BuffType)
 	return nil
 }

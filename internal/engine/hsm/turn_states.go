@@ -647,6 +647,14 @@ func findFirstCheckpointInPath(path []int, mapEngine *gamemap.MapEngine) int {
 func newActionContextWithPools(game *engine.Game, bus *event.EventBus, mapEngine *gamemap.MapEngine, drawEngine *rng.DrawEngine, player *core.Player) *engineaction.ActionContext {
 	ctx := engineaction.NewActionContextWithPlayer(game, bus, mapEngine, drawEngine, player)
 	ctx.SetPools(game.EventPool, game.ItemPool)
+	ctx.OnAddBuff = func(p *core.Player, b *core.Buff) { game.SubscribeBuff(p, b) }
+	ctx.OnRemoveBuff = func(p *core.Player, bt constants.BuffType) *core.Buff {
+		buff := p.GetBuff(bt)
+		if buff != nil {
+			game.RemoveBuffFromPlayer(p, buff)
+		}
+		return buff
+	}
 	return ctx
 }
 
@@ -654,6 +662,14 @@ func newActionContextWithPools(game *engine.Game, bus *event.EventBus, mapEngine
 func newActionContextWithPoolsNoPlayer(game *engine.Game, bus *event.EventBus, mapEngine *gamemap.MapEngine, drawEngine *rng.DrawEngine) *engineaction.ActionContext {
 	ctx := engineaction.NewActionContext(game, bus, mapEngine, drawEngine)
 	ctx.SetPools(game.EventPool, game.ItemPool)
+	ctx.OnAddBuff = func(p *core.Player, b *core.Buff) { game.SubscribeBuff(p, b) }
+	ctx.OnRemoveBuff = func(p *core.Player, bt constants.BuffType) *core.Buff {
+		buff := p.GetBuff(bt)
+		if buff != nil {
+			game.RemoveBuffFromPlayer(p, buff)
+		}
+		return buff
+	}
 	return ctx
 }
 
