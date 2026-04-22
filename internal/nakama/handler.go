@@ -12,6 +12,7 @@ import (
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
+	"github.com/b1tAction/paradiced/pkg/resource"
 	"github.com/b1tAction/paradiced/pkg/rng"
 	"github.com/heroiclabs/nakama-common/runtime"
 )
@@ -139,9 +140,14 @@ func (h *NakamaMatchHandler) initializeGame() error {
 	// Create HSM with game reference (HSM is single source of truth)
 	h.hsm = hsm.NewHSM(game)
 
-	// Create MapEngine
-	h.mapEngine = gamemap.NewMapEngine(h.mapLength)
-	h.mapEngine.GenerateLinearMap(nil) // Default map with checkpoints
+	// Load map configuration from embedded resource (pkg/resource/default.json)
+	mapConfig, err := resource.LoadDefault()
+	if err != nil {
+		return err
+	}
+
+	// Build MapEngine from loaded configuration
+	h.mapEngine = mapConfig.BuildMapEngine()
 
 	// Register all states
 	if err := hsm.RegisterGlobalStates(h.hsm); err != nil {
