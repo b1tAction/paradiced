@@ -5,6 +5,7 @@ package id
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -121,4 +122,11 @@ func (id ID) Equal(other ID) bool {
 // ZeroID returns a zero/empty ID for the given prefix.
 func ZeroID(prefix string) ID {
 	return ID{prefix: prefix, uuid: uuid.Nil}
+}
+
+// TestUUID generates a valid UUID string for testing purposes.
+// Format: 00000000-0000-0000-0000-000000000XXX where XXX is the index.
+// This is useful for tests that need valid UUID format without external dependencies.
+func TestUUID(index int) string {
+	return fmt.Sprintf("00000000-0000-0000-0000-%012d", index)
 }

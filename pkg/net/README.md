@@ -151,8 +151,8 @@ type TurnSync struct {
 
 ```go
 type Player struct {
-    PlayerID    string `json:"player_id"`   // 玩家游戏内部 ID
-    ClientID    string `json:"client_id"`   // 客户端标识（用于客户端自识别）
+    PlayerID    string `json:"player_id"`   // 玩家游戏内部 ID（直接等于 Nakama userID）
+    DisplayName string `json:"display_name"` // 用户显示名称（fallback: PlayerID）
     Faction     string `json:"faction"`      // snake_case: "qing_long", "zhu_que"
     Position    int    `json:"position"`
     HP          int    `json:"hp"`

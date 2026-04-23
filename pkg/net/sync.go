@@ -123,18 +123,12 @@ type CellInfo struct {
 // Builder extracts known keys from core.Player.Metadata into typed fields.
 type Player struct {
 	// PlayerID is the player's game internal ID (UUID format).
+	// For Nakama: equals Nakama session.UserID (UUID format) - no separate ClientID.
 	// Matches core.Player.ID.UUID() format.
 	PlayerID string `json:"player_id"`
 
-	// ClientID is the client identifier for client-side self-identification.
-	// For Nakama: equals Nakama session.UserID (UUID format)
-	// For standalone: equals the player's session ID
-	// Security note: ClientID is only an identifier, not an authentication token.
-	// The server always extracts the real user ID from the WebSocket connection.
-	ClientID string `json:"client_id"`
-
 	// DisplayName is the user-provided display name for UI rendering.
-	// Falls back to ClientID (UUID) if not provided.
+	// Falls back to PlayerID (UUID) if not provided.
 	DisplayName string `json:"display_name"`
 
 	// Faction is the player's faction (snake_case: "qing_long", "zhu_que", "bai_hu", "xuan_wu").
@@ -237,7 +231,7 @@ type RankingEntry struct {
 	PlayerID string `json:"player_id"`
 
 	// DisplayName is the user-provided display name for UI rendering.
-	// Falls back to PlayerID (ClientID UUID) if not provided.
+	// Falls back to PlayerID (UUID) if not provided.
 	DisplayName string `json:"display_name"`
 
 	// Rank is the player's ranking (1-4).
