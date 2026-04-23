@@ -43,8 +43,7 @@ type CellInfo struct {
 
 // Player represents a player state snapshot.
 type Player struct {
-	PlayerID    string `json:"player_id"` // 玩家游戏 ID (UUID)
-	ClientID    string `json:"client_id"` // 客户端 ID (用于客户端识别自己)
+	PlayerID    string `json:"player_id"` // 玩家游戏 ID (直接等于前端 userID)
 	DisplayName string `json:"display_name"` // 用户显示名称
 	Faction     string `json:"faction"`
 	Position    int    `json:"position"`

@@ -404,13 +404,13 @@ func (p *AutoPlayPlayer) handleStateSync(ctx context.Context, data []byte) {
 	p.globalState = stateSync.GlobalState
 	p.currentPlayerID = stateSync.CurrentPlayerID
 
-	// Find own PlayerID from Players array by matching ClientID
-	// ClientID is injected by NakamaBroadcastAdapter for client-side turn matching
+	// Find own PlayerID from Players array
+	// PlayerID now equals the frontend userID, so we can directly match
 	for _, player := range stateSync.Players {
-		if player.ClientID == p.userID {
+		if player.PlayerID == p.userID {
 			// Found own player, store PlayerID for turn checking
 			p.playerID = player.PlayerID
-			p.logger.Info("Found own player", "player_id", p.playerID, "client_id", p.userID)
+			p.logger.Info("Found own player", "player_id", p.playerID, "user_id", p.userID)
 			break
 		}
 	}

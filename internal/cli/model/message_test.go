@@ -106,7 +106,6 @@ func TestStateSyncJSON(t *testing.T) {
 		Players: []Player{
 			{
 				PlayerID:    "player-001",
-				ClientID:    "user-001",
 				Faction:     "qing_long",
 				Position:    10,
 				HP:          8,
@@ -175,7 +174,6 @@ func TestStateSyncEmptyPlayers(t *testing.T) {
 func TestPlayerJSON(t *testing.T) {
 	player := Player{
 		PlayerID:    "player-001",
-		ClientID:    "user-001",
 		Faction:     "zhu_que",
 		Position:    25,
 		HP:          10,

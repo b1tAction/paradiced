@@ -344,7 +344,7 @@ func (ui *CLIUIAdapter) resolveDisplayName(playerID string) string {
 		return playerID
 	}
 	for _, player := range ui.stateSync.Players {
-		if player.PlayerID == playerID || player.ClientID == playerID {
+		if player.PlayerID == playerID {
 			name := player.DisplayName
 			if name == "" {
 				name = player.PlayerID
@@ -478,9 +478,10 @@ func (ui *CLIUIAdapter) OnMatchCreated(matchID string) {
 // ========== Helper Methods ==========
 
 // findMyPlayerID finds the player's game ID from StateSync.
+// PlayerID now equals the frontend userID, so we can directly match.
 func (ui *CLIUIAdapter) findMyPlayerID(state *model.StateSync) string {
 	for _, player := range state.Players {
-		if player.ClientID == ui.userID {
+		if player.PlayerID == ui.userID {
 			return player.PlayerID
 		}
 	}
@@ -491,7 +492,7 @@ func (ui *CLIUIAdapter) findMyPlayerID(state *model.StateSync) string {
 func (ui *CLIUIAdapter) displayPlayers(state *model.StateSync) {
 	fmt.Println("Players:")
 	for _, player := range state.Players {
-		isMe := player.ClientID == ui.userID
+		isMe := player.PlayerID == ui.userID
 		isCurrent := player.PlayerID == state.CurrentPlayerID
 
 		prefix := "  "

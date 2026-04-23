@@ -266,7 +266,8 @@ func TestAutoPlayPlayerLastError(t *testing.T) {
 func TestHandleStateSync(t *testing.T) {
 	mockSocket := NewMockSocketClient()
 	logger := nakama.NewLogger(false)
-	player := NewAutoPlayPlayerStandalone(mockSocket, "user-001", logger)
+	// userID now equals PlayerID for direct matching
+	player := NewAutoPlayPlayerStandalone(mockSocket, "player-001", logger)
 
 	// Simulate StateSync message
 	stateSync := model.StateSync{
@@ -278,12 +279,10 @@ func TestHandleStateSync(t *testing.T) {
 		Players: []model.Player{
 			{
 				PlayerID: "player-001",
-				ClientID: "user-001",
 				Faction:  "qing_long",
 			},
 			{
 				PlayerID: "player-002",
-				ClientID: "user-002",
 				Faction:  "zhu_que",
 			},
 		},

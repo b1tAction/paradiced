@@ -182,10 +182,11 @@ func (p *InteractivePlayer) handleStateSync(ctx context.Context, data []byte) {
 	p.stateSync = &stateSync
 
 	// Find own PlayerID from Players array
+	// PlayerID now equals the frontend userID, so we can directly match
 	for _, player := range stateSync.Players {
-		if player.ClientID == p.userID {
+		if player.PlayerID == p.userID {
 			p.playerID = player.PlayerID
-			p.logger.Debug("Found own player", "player_id", p.playerID, "client_id", p.userID)
+			p.logger.Debug("Found own player", "player_id", p.playerID, "user_id", p.userID)
 			break
 		}
 	}
@@ -474,7 +475,7 @@ func (p *InteractivePlayer) displayDetailedStatus() {
 
 	fmt.Println("My Status:")
 	for _, player := range state.Players {
-		if player.ClientID == p.userID {
+		if player.PlayerID == p.userID {
 			fmt.Printf("  PlayerID: %s\n", player.PlayerID)
 			fmt.Printf("  Faction: %s\n", player.Faction)
 			fmt.Printf("  Position: %d\n", player.Position)
@@ -502,7 +503,7 @@ func (p *InteractivePlayer) displayDetailedStatus() {
 	fmt.Println()
 	fmt.Println("Other Players:")
 	for _, player := range state.Players {
-		if player.ClientID != p.userID {
+		if player.PlayerID != p.userID {
 			isCurrent := player.PlayerID == state.CurrentPlayerID
 			currentMark := ""
 			if isCurrent {
