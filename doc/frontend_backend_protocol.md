@@ -114,9 +114,8 @@ for (const entry of turnSync.entries) {
 
 ```typescript
 interface Player {
-    player_id: string;     // 游戏内部 ID（UUID）
-    client_id: string;     // 客户端标识（用于自识别）
-    display_name: string;  // 用户显示名称（fallback: client_id）
+    player_id: string;     // 游戏内部 ID（UUID，直接等于前端 userID）
+    display_name: string;  // 用户显示名称（fallback: player_id）
     faction: string;       // 阵营（snake_case）
     position: number;      // 地图位置
     hp: number;            // 当前 HP
@@ -1032,8 +1031,7 @@ interface TurnSync {
 
 interface Player {
     player_id: string;
-    client_id: string;
-    display_name: string;  // 用户显示名称（fallback: client_id）
+    display_name: string;  // 用户显示名称（fallback: player_id）
     faction: string;
     position: number;
     hp: number;
