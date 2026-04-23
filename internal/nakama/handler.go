@@ -10,6 +10,7 @@ import (
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
 	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
+	pkgerrors "github.com/b1tAction/paradiced/pkg/errors"
 	"github.com/b1tAction/paradiced/pkg/id"
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/resource"
@@ -147,7 +148,7 @@ func (h *NakamaMatchHandler) initializeGame() error {
 	// Load map configuration from embedded resource (pkg/resource/default.json)
 	mapConfig, err := resource.LoadDefault()
 	if err != nil {
-		return err
+		return pkgerrors.Wrap(err, "NakamaHandler", "initializeGame.LoadDefault")
 	}
 
 	// Build MapEngine from loaded configuration
@@ -155,13 +156,13 @@ func (h *NakamaMatchHandler) initializeGame() error {
 
 	// Register all states
 	if err := hsm.RegisterGlobalStates(h.hsm); err != nil {
-		return err
+		return pkgerrors.Wrap(err, "NakamaHandler", "initializeGame.RegisterGlobalStates")
 	}
 	if err := hsm.RegisterTurnStates(h.hsm); err != nil {
-		return err
+		return pkgerrors.Wrap(err, "NakamaHandler", "initializeGame.RegisterTurnStates")
 	}
 	if err := hsm.RegisterInterruptStates(h.hsm); err != nil {
-		return err
+		return pkgerrors.Wrap(err, "NakamaHandler", "initializeGame.RegisterInterruptStates")
 	}
 
 	// Add players to game (access via HSM)
