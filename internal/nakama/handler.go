@@ -47,6 +47,9 @@ type NakamaMatchHandler struct {
 	// Start game signal (persisted across MatchLoop ticks)
 	startRequested bool // Set by HandleStartGame, checked in WaitingForHost state
 
+	// Map configuration (stored for StartGameAck broadcast)
+	mapConfig *pkgnet.MapConfig
+
 	// Configuration
 	maxPlayers  int    // Maximum players (default: 4)
 	mapLength   int    // Map length (default: 100)
@@ -151,8 +154,11 @@ func (h *NakamaMatchHandler) initializeGame() error {
 		return pkgerrors.Wrap(err, "NakamaHandler", "initializeGame.LoadDefault")
 	}
 
+	// Store map config for StartGameAck broadcast
+	h.mapConfig = mapConfig
+
 	// Build MapEngine from loaded configuration
-	h.mapEngine = mapConfig.BuildMapEngine()
+	h.mapEngine = resource.BuildMapEngineFromConfig(mapConfig)
 
 	// Register all states
 	if err := hsm.RegisterGlobalStates(h.hsm); err != nil {

@@ -256,3 +256,17 @@ func (a *NakamaBroadcastAdapter) SendWaitingSync(userID string, waiting *net.Wai
 
 	return a.handler.dispatcher.SendMessage(userID, int64(net.OpWaitingSync), data)
 }
+
+// BroadcastStartGameAck broadcasts game start acknowledgment with map config.
+func (a *NakamaBroadcastAdapter) BroadcastStartGameAck(ack *net.StartGameAck) error {
+	if a.handler.dispatcher == nil {
+		return nil // No dispatcher set
+	}
+
+	data, err := json.Marshal(ack)
+	if err != nil {
+		return err
+	}
+
+	return a.handler.dispatcher.BroadcastMessage(int64(net.OpStartGameAck), data)
+}

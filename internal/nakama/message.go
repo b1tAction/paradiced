@@ -486,6 +486,14 @@ func (h *NakamaMatchHandler) handleStartGame(sender string) error {
 	// This flag is persisted across MatchLoop ticks
 	h.startRequested = true
 
+	// Broadcast StartGameAck to all players with map configuration
+	if h.mapConfig != nil {
+		broadcastAdapter := NewNakamaBroadcastAdapter(h)
+		ack := &pkgnet.StartGameAck{MapConfig: *h.mapConfig}
+		broadcastAdapter.BroadcastStartGameAck(ack)
+		h.logInfo("handleStartGame: StartGameAck broadcasted", "map_length", h.mapConfig.Length, "cells", len(h.mapConfig.Cells))
+	}
+
 	logger.logResponse("OpStartGame", sender, "game starting")
 	return nil
 }
