@@ -28,6 +28,7 @@ const (
 	PhasePostBuffApplied Phase = "post_buff_applied" // After buff applied
 	PhasePreBuffRemoved  Phase = "pre_buff_removed"  // Before buff removed
 	PhasePostBuffRemoved Phase = "post_buff_removed" // After buff removed
+	PhasePreAction       Phase = "pre_action"        // Before any action execution (death mark interception)
 
 	// ========== Special Phases ==========
 
@@ -41,7 +42,7 @@ func (p Phase) IsValid() bool {
 		p == PhasePreDamage || p == PhasePreEvent || p == PhasePreMove ||
 		p == PhasePreRespawn || p == PhasePreBuffApplied || p == PhasePostBuffApplied ||
 		p == PhasePreBuffRemoved || p == PhasePostBuffRemoved ||
-		p == PhaseAnyTime || p == PhaseItemUsed
+		p == PhasePreAction || p == PhaseAnyTime || p == PhaseItemUsed
 }
 
 // NeedsSubscription determines if the Phase needs EventBus subscription.
@@ -59,5 +60,5 @@ func (p Phase) IsHSMPublished() bool {
 func (p Phase) IsActionPublished() bool {
 	return p == PhasePreDamage || p == PhasePreEvent || p == PhasePreMove ||
 		p == PhasePreRespawn || p == PhasePreBuffApplied || p == PhasePostBuffApplied ||
-		p == PhasePreBuffRemoved || p == PhasePostBuffRemoved
+		p == PhasePreBuffRemoved || p == PhasePostBuffRemoved || p == PhasePreAction
 }

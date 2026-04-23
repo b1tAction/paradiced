@@ -22,13 +22,17 @@ const (
 	BuffTypeRain     BuffType = "rain"     // Rain甘霖: HP+1 every 2 turns
 	BuffTypeExorcism BuffType = "exorcism" // Exorcism辟邪: immune to poison
 	BuffTypeFire     BuffType = "fire"     // Fire离火: ZhuQue passive
+
+	// Hidden Buffs (internal mechanism, not visible to player/client)
+	BuffTypeDeathMark BuffType = "death_mark" // DeathMark死亡标记: blocks actions after death
 )
 
 // IsValid checks if BuffType is valid.
 func (bt BuffType) IsValid() bool {
 	switch bt {
 	case BuffTypeCurse, BuffTypeLost, BuffTypeCorrupt, BuffTypePoison,
-		BuffTypeHidden, BuffTypeDivine, BuffTypeRain, BuffTypeExorcism, BuffTypeFire:
+		BuffTypeHidden, BuffTypeDivine, BuffTypeRain, BuffTypeExorcism,
+		BuffTypeFire, BuffTypeDeathMark:
 		return true
 	default:
 		return false
@@ -41,10 +45,14 @@ func (bt BuffType) IsPositive() bool {
 		bt == BuffTypeRain || bt == BuffTypeExorcism || bt == BuffTypeFire
 }
 
-// IsNegative checks if the Buff is negative.
 func (bt BuffType) IsNegative() bool {
 	return bt == BuffTypeCurse || bt == BuffTypeLost ||
 		bt == BuffTypeCorrupt || bt == BuffTypePoison
+}
+
+// IsHidden checks if the Buff is hidden (internal mechanism, not visible to player).
+func (bt BuffType) IsHidden() bool {
+	return bt == BuffTypeDeathMark
 }
 
 // ParseBuffType converts a string to BuffType.
@@ -69,6 +77,8 @@ func ParseBuffType(s string) BuffType {
 		return BuffTypeExorcism
 	case "fire":
 		return BuffTypeFire
+	case "death_mark":
+		return BuffTypeDeathMark
 	default:
 		return BuffTypeNone
 	}

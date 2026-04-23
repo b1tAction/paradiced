@@ -32,6 +32,8 @@ const (
 	ActionFellDown ActionType = "fell_down"
 	// ActionDrawItem represents drawing a random item (e.g. from CheckPoint treasure).
 	ActionDrawItem ActionType = "draw_item"
+	// ActionDeath represents player death event for client animation.
+	ActionDeath ActionType = "death"
 	// ActionUnknown represents an unknown action type.
 	ActionUnknown ActionType = "unknown"
 )
@@ -42,7 +44,7 @@ func (at ActionType) IsValid() bool {
 	case ActionDamage, ActionHeal, ActionModifyLP, ActionMove,
 		ActionAddBuff, ActionRemoveBuff, ActionRespawn, ActionSkipTurn,
 		ActionDrawEvent, ActionTeleport, ActionStealBuff, ActionFellDown,
-		ActionDrawItem:
+		ActionDrawItem, ActionDeath:
 		return true
 	default:
 		return false
@@ -79,6 +81,8 @@ func ParseActionType(s string) ActionType {
 		return ActionFellDown
 	case "draw_item":
 		return ActionDrawItem
+	case "death":
+		return ActionDeath
 	default:
 		return ActionUnknown
 	}
