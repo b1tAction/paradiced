@@ -482,6 +482,12 @@ func (h *GameTestHarness) AddItemToPlayer(player *core.Player, itemType constant
 	h.Game.SubscribeItem(player, item)
 }
 
+// KillPlayer sets a player to dead state for testing death/respawn scenarios.
+func (h *GameTestHarness) KillPlayer(player *core.Player) {
+	player.IsDead = true
+	player.HP = 0
+}
+
 // ========== State Verification ==========
 
 // VerifyPlayerHP checks if a player's HP matches the expected value.

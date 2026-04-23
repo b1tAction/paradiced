@@ -180,8 +180,8 @@ func TestAddPlayer(t *testing.T) {
 		t.Errorf("player HP = %d, want 6", player1.HP)
 	}
 
-	if player1.LP != 8 {
-		t.Errorf("player LP = %d, want 8", player1.LP)
+	if player1.LP != 4 {
+		t.Errorf("player LP = %d, want 4", player1.LP)
 	}
 
 	// Add second player

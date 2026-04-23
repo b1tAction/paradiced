@@ -42,9 +42,6 @@ func TestTurnUpkeepState_Enter_NormalFlow(t *testing.T) {
 	if state.skipTurn != false {
 		t.Error("skipTurn should be false for normal flow")
 	}
-	if state.isDead != false {
-		t.Error("isDead should be false for alive player")
-	}
 }
 
 func TestTurnUpkeepState_Enter_MarkBuffsTickEligible(t *testing.T) {
@@ -133,8 +130,9 @@ func TestTurnUpkeepState_Enter_SkipTurn(t *testing.T) {
 	}
 }
 
-func TestTurnUpkeepState_Enter_DeadPlayer(t *testing.T) {
-	// Setup
+func TestTurnEndState_Enter_DeadPlayer(t *testing.T) {
+	// Death detection and respawn are now handled in TurnEndState.
+	// When player.IsDead=true, TurnEndState executes DeathAction + RespawnAction.
 	game := engine.NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.IsDead = true
@@ -145,8 +143,8 @@ func TestTurnUpkeepState_Enter_DeadPlayer(t *testing.T) {
 	mapEngine := gamemap.NewMapEngine(100)
 	configs := map[int]constants.CellType{30: constants.CellTypeCheckpoint}
 	mapEngine.GenerateLinearMap(configs)
-	
-	state := NewTurnUpkeepState()
+
+	state := NewTurnEndState()
 	hsmInst := NewHSM(game)
 	hsmInst.SetMapEngine(mapEngine)
 	ctx := NewStateContext().
@@ -156,13 +154,12 @@ func TestTurnUpkeepState_Enter_DeadPlayer(t *testing.T) {
 	// Execute
 	state.Enter(ctx)
 
-	// Verify
-	if state.isDead != true {
-		t.Error("isDead should be true")
-	}
-	// Player should respawn at checkpoint
+	// Verify player respawned at checkpoint
 	if player.Position != 30 {
 		t.Errorf("Player should respawn at checkpoint 30, got %d", player.Position)
+	}
+	if player.IsDead != false {
+		t.Error("Player should not be dead after respawn")
 	}
 }
 
