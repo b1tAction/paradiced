@@ -1,7 +1,6 @@
 package hsm
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/b1tAction/paradiced/internal/core"
@@ -274,7 +273,6 @@ func (s *MainActionState) sendAvailable(ctx *StateContext) {
 func (s *MainActionState) Update(ctx *StateContext) StateID {
 	// Check if dice was rolled
 	if s.diceRolled {
-		fmt.Printf("[hsm] MainActionState.Update: diceRolled=%v, diceSteps=%d\n", s.diceRolled, s.diceSteps)
 		ctx.SetInt(KeyDiceSteps, s.diceSteps)
 		return StateTurnMoving
 	}
@@ -416,10 +414,8 @@ func (s *TurnMovingState) Enter(ctx *StateContext) {
 
 	// Get dice steps (from dice or remaining steps from TurnCheckpoint re-entry)
 	s.Steps = ctx.GetDiceSteps()
-	fmt.Printf("[hsm] TurnMovingState.Enter: dice_steps=%d, player_position=%d\n", s.Steps, player.Position)
 	if s.Steps == 0 {
 		// Zero steps, skip movement entirely
-		fmt.Printf("[hsm] TurnMovingState.Enter: zero steps, going to TurnLanded\n")
 		return
 	}
 
