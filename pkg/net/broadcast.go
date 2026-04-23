@@ -36,6 +36,10 @@ type BroadcastAdapter interface {
 	// SendFullSync sends complete state to a reconnecting player.
 	// Called when a player rejoins the match.
 	SendFullSync(playerID string, state *StateSync, turn *TurnSync) error
+
+	// BroadcastStartGameAck broadcasts game start acknowledgment with map config.
+	// Called when host starts the game (after OpStartGame received).
+	BroadcastStartGameAck(ack *StartGameAck) error
 }
 
 // MockBroadcastAdapter is a test implementation that captures messages.
@@ -67,6 +71,9 @@ type MockBroadcastAdapter struct {
 		State *StateSync
 		Turn  *TurnSync
 	}
+
+	// StartGameAcks captures BroadcastStartGameAck calls.
+	StartGameAcks []*StartGameAck
 }
 
 // NewMockBroadcastAdapter creates a new mock adapter.
@@ -83,6 +90,7 @@ func NewMockBroadcastAdapter() *MockBroadcastAdapter {
 			State *StateSync
 			Turn  *TurnSync
 		}),
+		StartGameAcks:  make([]*StartGameAck, 0),
 	}
 }
 
@@ -137,6 +145,12 @@ func (m *MockBroadcastAdapter) SendFullSync(playerID string, state *StateSync, t
 	return nil
 }
 
+// BroadcastStartGameAck captures start game ack.
+func (m *MockBroadcastAdapter) BroadcastStartGameAck(ack *StartGameAck) error {
+	m.StartGameAcks = append(m.StartGameAcks, ack)
+	return nil
+}
+
 // Clear resets all captured messages.
 func (m *MockBroadcastAdapter) Clear() {
 	m.StateSyncs = make([]*StateSync, 0)
@@ -150,4 +164,5 @@ func (m *MockBroadcastAdapter) Clear() {
 		State *StateSync
 		Turn  *TurnSync
 	})
+	m.StartGameAcks = make([]*StartGameAck, 0)
 }

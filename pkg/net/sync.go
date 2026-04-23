@@ -334,6 +334,63 @@ type WaitingPlayer struct {
 	IsHost bool `json:"is_host"`
 }
 
+// MapConfig represents the complete map configuration for game initialization.
+// This type is shared between pkg/net (protocol) and pkg/resource (loading).
+// Contains full cell details including draw_type and probabilities needed for client rendering.
+type MapConfig struct {
+	// Length is the total number of cells in the map.
+	Length int `json:"length"`
+
+	// StartIndex is the starting position index.
+	StartIndex int `json:"start_index"`
+
+	// EndIndex is the ending position index (boss/bottom cell).
+	EndIndex int `json:"end_index"`
+
+	// Cells contains all cell configurations with full details.
+	Cells []MapCellConfig `json:"cells"`
+}
+
+// MapCellConfig represents a single cell's complete configuration.
+// Includes draw_type and probability fields needed for client-side rendering.
+type MapCellConfig struct {
+	// Index is the cell position (0 to Length-1).
+	Index int `json:"index"`
+
+	// CellType is the cell type identifier (snake_case).
+	// Values: "normal", "fragile", "fog", "checkpoint", "boss", "event"
+	CellType string `json:"cell_type"`
+
+	// IsBroken indicates whether a Fragile cell is broken.
+	IsBroken bool `json:"is_broken"`
+
+	// EventID is the bound event ID for Event-type cells.
+	EventID string `json:"event_id"`
+
+	// FogActive indicates whether a Fog cell is currently active.
+	FogActive bool `json:"fog_active"`
+
+	// DrawType specifies what to draw when landing on this cell.
+	// Values: "none", "event", "item"
+	DrawType string `json:"draw_type"`
+
+	// ProbGood is the probability weight for drawing a good outcome.
+	ProbGood float64 `json:"prob_good"`
+
+	// ProbNeutral is the probability weight for drawing a neutral outcome.
+	ProbNeutral float64 `json:"prob_neutral"`
+
+	// ProbBad is the probability weight for drawing a bad outcome.
+	ProbBad float64 `json:"prob_bad"`
+}
+
+// StartGameAck represents the acknowledgment sent to all players when the host starts the game.
+// Contains the full map configuration so clients can render the map before StateSync arrives.
+type StartGameAck struct {
+	// MapConfig is the complete map configuration for this game session.
+	MapConfig MapConfig `json:"map_config"`
+}
+
 // NewLogEntry creates a simple log entry for protocol testing.
 // For production use, use gamelog.NewActionEntry instead.
 func NewLogEntry(actionType string, target string, source string) gamelog.LogEntry {

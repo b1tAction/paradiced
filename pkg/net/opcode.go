@@ -52,6 +52,10 @@ const (
 	// Data: WaitingSync (includes player list, can start status)
 	OpWaitingSync OpCode = 10
 
+	// OpStartGameAck broadcasts game start acknowledgment with map configuration.
+	// Data: StartGameAck (includes full MapConfig)
+	OpStartGameAck OpCode = 11
+
 	// ========== Client -> Server Messages ==========
 
 	// OpRollDice requests dice roll calculation from server.
@@ -92,6 +96,7 @@ func (op OpCode) String() string {
 		OpFullSync:             "full_sync",
 		OpActionRejected:       "action_rejected",
 		OpWaitingSync:          "waiting_sync",
+		OpStartGameAck:         "start_game_ack",
 		OpRollDice:             "roll_dice",
 		OpUseItem:              "use_item",
 		OpUseSkill:             "use_skill",
