@@ -114,14 +114,19 @@ func (b *Builder) BuildPlayer(p *core.Player) pkgnet.Player {
 }
 
 // BuildBuffs builds buff sync data from active buffs.
+// Hidden buffs are filtered out (not sent to client).
 func (b *Builder) BuildBuffs(activeBuffs []*core.Buff) []pkgnet.Buff {
-	result := make([]pkgnet.Buff, len(activeBuffs))
-	for i, bf := range activeBuffs {
-		result[i] = pkgnet.Buff{
+	result := make([]pkgnet.Buff, 0, len(activeBuffs))
+	for _, bf := range activeBuffs {
+		// Skip hidden buffs (internal mechanism, not visible to player)
+		if engine.IsHidden(bf.Type) {
+			continue
+		}
+		result = append(result, pkgnet.Buff{
 			Type:     string(bf.Type),
 			Name:     engine.GetBuffName(bf.Type),
 			Duration: bf.Duration,
-		}
+		})
 	}
 	return result
 }
