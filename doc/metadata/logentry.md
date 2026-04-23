@@ -136,6 +136,13 @@ for (const entry of turnSync.entries) {
 |------|------|------|------|-----------|
 | `checkpoint_pos` | int | 是 | 重生检查点位置 | 重生动画位置 |
 
+### death 类型
+
+| 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
+|------|------|------|------|-----------|
+| `position` | int | 是 | 死亡发生位置 | 死亡动画位置 |
+| `death_source` | string | 是 | 死亡来源标识 | 显示死亡原因（如"Buff_Corrupt"、"FragileCell"） |
+
 ### dice_roll 类型
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
@@ -190,9 +197,10 @@ interface LogEntry {
         from_pos?: number;
         to_pos?: number;
 
-        // fell_down/respawn
+        // fell_down/respawn/death
         position?: number;
         checkpoint_pos?: number;
+        death_source?: string;
 
         // steal_buff
         stolen_by?: string;
@@ -218,6 +226,7 @@ interface LogEntry {
 | MoveAction | `steps: steps`, `start_pos`, `end_pos`, `path` | `steps: 5` |
 | AddBuffAction | `buff_type`, `duration: duration` | `duration: 3` |
 | FellDownAction | `position`, `hp_change: -damage` | `hp_change: -10` |
+| DeathAction | `position`, `death_source` | `death_source: "Buff_Corrupt"` |
 
 ---
 

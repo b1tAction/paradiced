@@ -53,6 +53,8 @@ func ExecuteHPChange(ctx *ActionContext, target *Player) {
 | `draw_bad_event` | bool | Buff_Poison（毒瘴） | 抽取坏事件标志 | DrawEventAction |
 | `block_poison_effect` | bool | Buff_Exorcism（辟邪） | 阻挡毒效果标志 | Event Handler |
 | `buff_turn_counter` | int | Buff_Rain/Corrupt | 计数器（每N回合触发） | Buff Handler |
+| `applied_buff_type` | string | ActionContext (PostTrigger) | 被添加的Buff类型标识 | Divine/Curse Handler |
+| `removed_buff_type` | string | ActionContext (PreTrigger) / HSM (TurnEnd expiry) | 被移除的Buff类型标识 | Divine/Curse Handler |
 
 ### Event 效果信号
 
