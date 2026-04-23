@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/b1tAction/paradiced/internal/core"
+	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/b1tAction/paradiced/pkg/constants"
 )
 
@@ -15,12 +16,12 @@ func TestHandleMessageUnknownOpCode(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player and initialize
-	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 	handler.MatchInit()
 
 	// Send unknown opcode
 	data, _ := json.Marshal(map[string]string{"op_code": "unknown"})
-	err := handler.HandleMessage("user-001", data)
+	err := handler.HandleMessage(id.TestUUID(1), data)
 	if err != nil {
 		t.Errorf("HandleMessage with unknown opcode should return nil, got: %v", err)
 	}
@@ -30,7 +31,7 @@ func TestHandleMessageInvalidJSON(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Send invalid JSON - will return error from json.Unmarshal
-	err := handler.HandleMessage("user-001", []byte("invalid json"))
+	err := handler.HandleMessage(id.TestUUID(1), []byte("invalid json"))
 	// Error is expected for invalid JSON
 	_ = err // We accept either error or nil (implementation may vary)
 }
@@ -41,13 +42,13 @@ func TestHandleRollDiceNonCurrentPlayer(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add 2 players
-	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
-	handler.addPlayer("user-002", constants.FactionZhuQue, "user-002")
+	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
+	handler.addPlayer(id.TestUUID(2), constants.FactionZhuQue, id.TestUUID(2))
 	handler.MatchInit()
 
 	// Send roll dice from non-current player (user-002)
 	data, _ := json.Marshal(RollDiceRequest{OpCode: "1"}) // OpCode for RollDice
-	err := handler.HandleMessage("user-002", data)
+	err := handler.HandleMessage(id.TestUUID(2), data)
 	if err != nil {
 		t.Errorf("HandleMessage should return nil for non-current player, got: %v", err)
 	}
@@ -59,7 +60,7 @@ func TestHandleUseItem(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player with an item
-	player := handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	player := handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 	player.AddItem(core.NewItem(constants.ItemTypeAnyDoor))
 
 	handler.MatchInit()
@@ -71,7 +72,7 @@ func TestHandleUseItem(t *testing.T) {
 	})
 
 	// This should return nil even if item not found
-	err := handler.HandleMessage("user-001", data)
+	err := handler.HandleMessage(id.TestUUID(1), data)
 	if err != nil {
 		t.Errorf("HandleMessage should return nil, got: %v", err)
 	}
@@ -83,7 +84,7 @@ func TestHandleUseSkill(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player with charge
-	player := handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	player := handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 	player.SetChargeCount(1)
 
 	handler.MatchInit()
@@ -92,7 +93,7 @@ func TestHandleUseSkill(t *testing.T) {
 	// This test verifies message handling, not actual skill execution
 	data, _ := json.Marshal(UseSkillRequest{OpCode: "3"}) // OpCode for UseSkill
 
-	err := handler.HandleMessage("user-001", data)
+	err := handler.HandleMessage(id.TestUUID(1), data)
 	if err != nil {
 		t.Errorf("HandleMessage should return nil, got: %v", err)
 	}
@@ -107,7 +108,7 @@ func TestHandleUseSkillNoCharge(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player without charge
-	player := handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	player := handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 	player.SetChargeCount(0)
 
 	handler.MatchInit()
@@ -115,7 +116,7 @@ func TestHandleUseSkillNoCharge(t *testing.T) {
 	// Send use skill request
 	data, _ := json.Marshal(UseSkillRequest{OpCode: "3"})
 
-	err := handler.HandleMessage("user-001", data)
+	err := handler.HandleMessage(id.TestUUID(1), data)
 	if err != nil {
 		t.Errorf("HandleMessage should return nil, got: %v", err)
 	}
@@ -132,7 +133,7 @@ func TestHandleUserChoice(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player
-	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 	handler.MatchInit()
 
 	// Send user choice
@@ -142,7 +143,7 @@ func TestHandleUserChoice(t *testing.T) {
 		Choice:     1,
 	})
 
-	err := handler.HandleMessage("user-001", data)
+	err := handler.HandleMessage(id.TestUUID(1), data)
 	if err != nil {
 		t.Errorf("HandleMessage should return nil, got: %v", err)
 	}
@@ -154,7 +155,7 @@ func TestHandleMiniGameResult(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player
-	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 	handler.MatchInit()
 
 	// Send mini-game result
@@ -163,7 +164,7 @@ func TestHandleMiniGameResult(t *testing.T) {
 		Rank:   1,
 	})
 
-	err := handler.HandleMessage("user-001", data)
+	err := handler.HandleMessage(id.TestUUID(1), data)
 	if err != nil {
 		t.Errorf("HandleMessage should return nil, got: %v", err)
 	}
@@ -175,7 +176,7 @@ func TestHandleMessageNonExistingPlayer(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add one player
-	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 	handler.MatchInit()
 
 	// Send message from non-existing player
@@ -192,11 +193,11 @@ func TestHandleMessageWithOpRollDice(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player and initialize
-	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 	handler.MatchInit()
 
 	// Send RollDice via HandleMessageWithOp
-	err := handler.HandleMessageWithOp("user-001", int64(100), nil) // OpRollDice = 100
+	err := handler.HandleMessageWithOp(id.TestUUID(1), int64(100), nil) // OpRollDice = 100
 	if err != nil {
 		t.Errorf("HandleMessageWithOp with OpRollDice should return nil, got: %v", err)
 	}
@@ -208,13 +209,13 @@ func TestHandleMessageWithOpUnknown(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player and initialize
-	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 	handler.MatchInit()
 
 	// Send unknown opcode - HandleMessageWithOp will fallback to HandleMessage
 	// which requires valid JSON payload. Since data is nil, it will fail to parse.
 	// This is expected behavior - unknown opcode triggers fallback that needs valid JSON.
-	err := handler.HandleMessageWithOp("user-001", int64(999), nil)
+	err := handler.HandleMessageWithOp(id.TestUUID(1), int64(999), nil)
 	// Returns error from JSON parsing in HandleMessage fallback
 	_ = err // We accept that unknown opcode with nil data returns error
 }
@@ -225,11 +226,11 @@ func TestHandleMessageWithOpUseItemInvalidJSON(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player and initialize
-	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 	handler.MatchInit()
 
 	// Send UseItem with invalid JSON
-	err := handler.HandleMessageWithOp("user-001", int64(101), []byte("invalid json")) // OpUseItem = 101
+	err := handler.HandleMessageWithOp(id.TestUUID(1), int64(101), []byte("invalid json")) // OpUseItem = 101
 	if err == nil {
 		t.Error("HandleMessageWithOp with invalid JSON should return error")
 	}
@@ -241,12 +242,12 @@ func TestHandleMiniGameResultInvalidJSON(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player and initialize
-	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 	handler.MatchInit()
 
 	// Send invalid JSON
 	data := []byte("invalid json")
-	err := handler.HandleMessage("user-001", data)
+	err := handler.HandleMessage(id.TestUUID(1), data)
 	// Should not crash, may return error or nil
 	_ = err
 }
@@ -257,12 +258,12 @@ func TestHandleUserChoiceInvalidJSON(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player and initialize
-	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 	handler.MatchInit()
 
 	// Send invalid JSON for user choice
 	data := []byte("{\"op_code\": \"4\", \"decision_id\": \"dec-001\", \"choice\": \"invalid\"}")
-	err := handler.HandleMessage("user-001", data)
+	err := handler.HandleMessage(id.TestUUID(1), data)
 	// Should not crash, may return error
 	_ = err
 }
@@ -273,7 +274,7 @@ func TestHandleUseItemWithValidItem(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player with an item that has known ID
-	player := handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	player := handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 	item := core.NewItem(constants.ItemTypeAnyDoor)
 	player.AddItem(item)
 
@@ -285,7 +286,7 @@ func TestHandleUseItemWithValidItem(t *testing.T) {
 		ItemID: item.ID.UUID(),
 	})
 
-	err := handler.HandleMessage("user-001", data)
+	err := handler.HandleMessage(id.TestUUID(1), data)
 	if err != nil {
 		t.Errorf("HandleMessage should return nil, got: %v", err)
 	}
@@ -296,7 +297,7 @@ func TestHandleUseItemWithoutDispatcher(t *testing.T) {
 	// No dispatcher
 
 	// Add player with an item
-	player := handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	player := handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 	player.AddItem(core.NewItem(constants.ItemTypeAnyDoor))
 
 	handler.MatchInit()
@@ -307,7 +308,7 @@ func TestHandleUseItemWithoutDispatcher(t *testing.T) {
 		ItemID: "test-item-id",
 	})
 
-	err := handler.HandleMessage("user-001", data)
+	err := handler.HandleMessage(id.TestUUID(1), data)
 	// Should work even without dispatcher (dispatcher is nil-safe)
 	_ = err
 }
@@ -318,12 +319,12 @@ func TestHandleRollDiceNoCurrentPlayer(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add player but don't initialize (no current player)
-	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 
 	// Send roll dice - should reject because no current player
 	// but without HSM initialized, the behavior may differ
 	data, _ := json.Marshal(RollDiceRequest{OpCode: "1"})
-	err := handler.HandleMessage("user-001", data)
+	err := handler.HandleMessage(id.TestUUID(1), data)
 	// Without MatchInit, getCurrentPlayer returns nil
 	// But handleRollDice needs HSM initialized, so behavior may vary
 	_ = err // Accept any result - this tests that it doesn't crash
@@ -334,7 +335,7 @@ func TestHandleUseSkillNoDispatcher(t *testing.T) {
 	// No dispatcher
 
 	// Add player with charge
-	player := handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	player := handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 	player.SetChargeCount(1)
 
 	handler.MatchInit()
@@ -342,7 +343,7 @@ func TestHandleUseSkillNoDispatcher(t *testing.T) {
 	// Send use skill request - should not crash without dispatcher
 	data, _ := json.Marshal(UseSkillRequest{OpCode: "3"})
 
-	err := handler.HandleMessage("user-001", data)
+	err := handler.HandleMessage(id.TestUUID(1), data)
 	// Should work even without dispatcher
 	_ = err
 }

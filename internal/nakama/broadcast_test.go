@@ -225,8 +225,11 @@ func TestBroadcastMiniGameResult(t *testing.T) {
 	handler.WithDispatcher(mockDispatcher)
 
 	// Add players with display names for DisplayName injection testing
-	p1 := handler.addPlayer("user-001", constants.FactionQingLong, "Alice")
-	p2 := handler.addPlayer("user-002", constants.FactionZhuQue, "Bob")
+	// Use valid UUID format for userID since it's now parsed as PlayerID
+	userID1 := "00000000-0000-0000-0000-000000000001"
+	userID2 := "00000000-0000-0000-0000-000000000002"
+	p1 := handler.addPlayer(userID1, constants.FactionQingLong, "Alice")
+	p2 := handler.addPlayer(userID2, constants.FactionZhuQue, "Bob")
 
 	broadcastAdapter := NewNakamaBroadcastAdapter(handler)
 
@@ -252,15 +255,16 @@ func TestBroadcastMiniGameResult(t *testing.T) {
 		t.Errorf("OpCode = %d, want %d", broadcasts[0].OpCode, int64(net.OpMiniGameResult))
 	}
 
-	// Verify DisplayName injection and PlayerID -> UserID conversion
-	if result.Rankings[0].PlayerID != "user-001" {
-		t.Errorf("Rankings[0].PlayerID = %s, want user-001 (should be converted to UserID)", result.Rankings[0].PlayerID)
+	// Verify DisplayName injection (PlayerID is no longer converted, it equals userID)
+	// PlayerID should remain the same (UUID format)
+	if result.Rankings[0].PlayerID != userID1 {
+		t.Errorf("Rankings[0].PlayerID = %s, want %s", result.Rankings[0].PlayerID, userID1)
 	}
 	if result.Rankings[0].DisplayName != "Alice" {
 		t.Errorf("Rankings[0].DisplayName = %s, want Alice", result.Rankings[0].DisplayName)
 	}
-	if result.Rankings[1].PlayerID != "user-002" {
-		t.Errorf("Rankings[1].PlayerID = %s, want user-002 (should be converted to UserID)", result.Rankings[1].PlayerID)
+	if result.Rankings[1].PlayerID != userID2 {
+		t.Errorf("Rankings[1].PlayerID = %s, want %s", result.Rankings[1].PlayerID, userID2)
 	}
 	if result.Rankings[1].DisplayName != "Bob" {
 		t.Errorf("Rankings[1].DisplayName = %s, want Bob", result.Rankings[1].DisplayName)

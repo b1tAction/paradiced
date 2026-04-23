@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/id"
 )
 
 func TestNakamaMatchHandlerNew(t *testing.T) {
@@ -71,7 +72,7 @@ func TestNakamaMatchHandlerAddPlayer(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Add player
-	player := handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	player := handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 
 	if player == nil {
 		t.Fatal("addPlayer should return non-nil player")
@@ -81,7 +82,7 @@ func TestNakamaMatchHandlerAddPlayer(t *testing.T) {
 		t.Errorf("players count = %d, want 1", len(handler.players))
 	}
 
-	if handler.players["user-001"] != player {
+	if handler.players[id.TestUUID(1)] != player {
 		t.Error("player should be stored in players map")
 	}
 
@@ -89,7 +90,7 @@ func TestNakamaMatchHandlerAddPlayer(t *testing.T) {
 		t.Errorf("playerList count = %d, want 1", len(handler.playerList))
 	}
 
-	if handler.playerList[0] != "user-001" {
+	if handler.playerList[0] != id.TestUUID(1) {
 		t.Error("playerList should contain user-001")
 	}
 }
@@ -98,10 +99,10 @@ func TestNakamaMatchHandlerGetPlayer(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Add player
-	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 
 	// Get existing player
-	player := handler.GetPlayer("user-001")
+	player := handler.GetPlayer(id.TestUUID(1))
 	if player == nil {
 		t.Fatal("GetPlayer should return existing player")
 	}
@@ -127,7 +128,7 @@ func TestNakamaMatchHandlerGetRoundTurn(t *testing.T) {
 	}
 
 	// Add player first
-	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 
 	// Initialize game
 	err := handler.initializeGame()
@@ -152,10 +153,10 @@ func TestNakamaMatchHandlerInitializeGame(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 
 	// Add players
-	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
-	handler.addPlayer("user-002", constants.FactionZhuQue, "user-002")
-	handler.addPlayer("user-003", constants.FactionBaiHu, "user-003")
-	handler.addPlayer("user-004", constants.FactionXuanWu, "user-004")
+	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
+	handler.addPlayer(id.TestUUID(2), constants.FactionZhuQue, id.TestUUID(2))
+	handler.addPlayer(id.TestUUID(3), constants.FactionBaiHu, id.TestUUID(3))
+	handler.addPlayer(id.TestUUID(4), constants.FactionXuanWu, id.TestUUID(4))
 
 	// Initialize game
 	err := handler.initializeGame()

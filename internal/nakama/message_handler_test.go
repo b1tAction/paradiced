@@ -10,6 +10,7 @@ import (
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
 	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/id"
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 )
 
@@ -29,7 +30,7 @@ func setupHandlerWithPlayers(t *testing.T, count int) *NakamaMatchHandler {
 	}
 
 	for i := 0; i < count; i++ {
-	 userID := fmt.Sprintf("user-%03d", i+1)
+	 userID := id.TestUUID(i + 1)
 	 handler.addPlayer(userID, factions[i%4], userID)
 	}
 
@@ -102,13 +103,13 @@ func TestHandleMessageWithOp_RollDice(t *testing.T) {
 	mock.Clear()
 
 	// Send RollDice request from unknown player
-	err := handler.HandleMessageWithOp("user-999", int64(pkgnet.OpRollDice), []byte("{}"))
+	err := handler.HandleMessageWithOp(id.TestUUID(999), int64(pkgnet.OpRollDice), []byte("{}"))
 	if err != nil {
 	 // Error is expected but handler sends ActionRejected instead of returning error
 	}
 
 	// Verify ActionRejected was sent
-	verifyActionRejected(t, mock, "user-999", pkgnet.OpRollDice, constants.ErrPlayerNotFound)
+	verifyActionRejected(t, mock, id.TestUUID(999), pkgnet.OpRollDice, constants.ErrPlayerNotFound)
 }
 
 func TestHandleMessageWithOp_UseItem(t *testing.T) {
@@ -117,12 +118,12 @@ func TestHandleMessageWithOp_UseItem(t *testing.T) {
 	mock.Clear()
 
 	data := []byte(`{"op_code": "101", "item_id": "item-001"}`)
-	err := handler.HandleMessageWithOp("user-999", int64(pkgnet.OpUseItem), data)
+	err := handler.HandleMessageWithOp(id.TestUUID(999), int64(pkgnet.OpUseItem), data)
 	if err != nil {
 	 // Expected
 	}
 
-	verifyActionRejected(t, mock, "user-999", pkgnet.OpUseItem, constants.ErrPlayerNotFound)
+	verifyActionRejected(t, mock, id.TestUUID(999), pkgnet.OpUseItem, constants.ErrPlayerNotFound)
 }
 
 func TestHandleMessageWithOp_UseSkill(t *testing.T) {
@@ -130,12 +131,12 @@ func TestHandleMessageWithOp_UseSkill(t *testing.T) {
 	mock := getMockDispatcher(handler)
 	mock.Clear()
 
-	err := handler.HandleMessageWithOp("user-999", int64(pkgnet.OpUseSkill), []byte("{}"))
+	err := handler.HandleMessageWithOp(id.TestUUID(999), int64(pkgnet.OpUseSkill), []byte("{}"))
 	if err != nil {
 	 // Expected
 	}
 
-	verifyActionRejected(t, mock, "user-999", pkgnet.OpUseSkill, constants.ErrPlayerNotFound)
+	verifyActionRejected(t, mock, id.TestUUID(999), pkgnet.OpUseSkill, constants.ErrPlayerNotFound)
 }
 
 func TestHandleMessageWithOp_UserChoice(t *testing.T) {
@@ -144,12 +145,12 @@ func TestHandleMessageWithOp_UserChoice(t *testing.T) {
 	mock.Clear()
 
 	data := []byte(`{"op_code": "103", "decision_id": "dec-001", "choice": 0}`)
-	err := handler.HandleMessageWithOp("user-999", int64(pkgnet.OpUserChoice), data)
+	err := handler.HandleMessageWithOp(id.TestUUID(999), int64(pkgnet.OpUserChoice), data)
 	if err != nil {
 	 // Expected
 	}
 
-	verifyActionRejected(t, mock, "user-999", pkgnet.OpUserChoice, constants.ErrPlayerNotFound)
+	verifyActionRejected(t, mock, id.TestUUID(999), pkgnet.OpUserChoice, constants.ErrPlayerNotFound)
 }
 
 func TestHandleMessageWithOp_MiniGameResult(t *testing.T) {
@@ -158,12 +159,12 @@ func TestHandleMessageWithOp_MiniGameResult(t *testing.T) {
 	mock.Clear()
 
 	data := []byte(`{"op_code": "104", "rank": 1}`)
-	err := handler.HandleMessageWithOp("user-999", int64(pkgnet.OpMiniGameResultSubmit), data)
+	err := handler.HandleMessageWithOp(id.TestUUID(999), int64(pkgnet.OpMiniGameResultSubmit), data)
 	if err != nil {
 	 // Expected
 	}
 
-	verifyActionRejected(t, mock, "user-999", pkgnet.OpMiniGameResultSubmit, constants.ErrPlayerNotFound)
+	verifyActionRejected(t, mock, id.TestUUID(999), pkgnet.OpMiniGameResultSubmit, constants.ErrPlayerNotFound)
 }
 
 func TestHandleMessageWithOp_UnknownOpCode(t *testing.T) {
@@ -172,7 +173,7 @@ func TestHandleMessageWithOp_UnknownOpCode(t *testing.T) {
 	mock.Clear()
 
 	// Unknown OpCode should be handled gracefully
-	err := handler.HandleMessageWithOp("user-001", 999, []byte("{}"))
+	err := handler.HandleMessageWithOp(id.TestUUID(1), 999, []byte("{}"))
 	// Should not error, just log warning
 	if err != nil {
 	 t.Errorf("Unknown OpCode should not return error, got: %v", err)
@@ -188,20 +189,20 @@ func TestHandleMessage_PayloadRouting(t *testing.T) {
 
 	// Use payload-based routing with op_code string
 	data := []byte(`{"op_code": "100"}`)
-	err := handler.HandleMessage("user-999", data)
+	err := handler.HandleMessage(id.TestUUID(999), data)
 	if err != nil {
 	 // Expected
 	}
 
 	// Should route to handleRollDice and send rejection
-	verifyActionRejected(t, mock, "user-999", pkgnet.OpRollDice, constants.ErrPlayerNotFound)
+	verifyActionRejected(t, mock, id.TestUUID(999), pkgnet.OpRollDice, constants.ErrPlayerNotFound)
 }
 
 func TestHandleMessage_InvalidJSON(t *testing.T) {
 	handler := setupHandlerWithPlayers(t, 2)
 
 	// Invalid JSON should return error
-	err := handler.HandleMessage("user-001", []byte("invalid json"))
+	err := handler.HandleMessage(id.TestUUID(1), []byte("invalid json"))
 	if err == nil {
 	 t.Error("HandleMessage should return error for invalid JSON")
 	}
@@ -214,12 +215,12 @@ func TestHandleRollDice_PlayerNotFound(t *testing.T) {
 	mock := getMockDispatcher(handler)
 	mock.Clear()
 
-	err := handler.handleRollDice("user-999")
+	err := handler.handleRollDice(id.TestUUID(999))
 	if err != nil {
 	 // Expected error path sends ActionRejected
 	}
 
-	verifyActionRejected(t, mock, "user-999", pkgnet.OpRollDice, constants.ErrPlayerNotFound)
+	verifyActionRejected(t, mock, id.TestUUID(999), pkgnet.OpRollDice, constants.ErrPlayerNotFound)
 }
 
 func TestHandleRollDice_NotCurrentPlayer(t *testing.T) {
@@ -234,9 +235,9 @@ func TestHandleRollDice_NotCurrentPlayer(t *testing.T) {
 	}
 
 	// Find non-current player
-	nonCurrentPlayerID := "user-002"
-	if currentPlayerID == "user-002" {
-	 nonCurrentPlayerID = "user-001"
+	nonCurrentPlayerID := id.TestUUID(2)
+	if currentPlayerID == id.TestUUID(2) {
+	 nonCurrentPlayerID = id.TestUUID(1)
 	}
 
 	err := handler.handleRollDice(nonCurrentPlayerID)
@@ -282,12 +283,12 @@ func TestHandleUseItem_PlayerNotFound(t *testing.T) {
 	mock.Clear()
 
 	data := []byte(`{"op_code": "101", "item_id": "item-001"}`)
-	err := handler.handleUseItem("user-999", data)
+	err := handler.handleUseItem(id.TestUUID(999), data)
 	if err != nil {
 	 // Expected
 	}
 
-	verifyActionRejected(t, mock, "user-999", pkgnet.OpUseItem, constants.ErrPlayerNotFound)
+	verifyActionRejected(t, mock, id.TestUUID(999), pkgnet.OpUseItem, constants.ErrPlayerNotFound)
 }
 
 func TestHandleUseItem_NotCurrentPlayer(t *testing.T) {
@@ -300,9 +301,9 @@ func TestHandleUseItem_NotCurrentPlayer(t *testing.T) {
 	 t.Fatal("Should have current player")
 	}
 
-	nonCurrentPlayerID := "user-002"
-	if currentPlayerID == "user-002" {
-	 nonCurrentPlayerID = "user-001"
+	nonCurrentPlayerID := id.TestUUID(2)
+	if currentPlayerID == id.TestUUID(2) {
+	 nonCurrentPlayerID = id.TestUUID(1)
 	}
 
 	data := []byte(`{"op_code": "101", "item_id": "item-001"}`)
@@ -317,7 +318,7 @@ func TestHandleUseItem_NotCurrentPlayer(t *testing.T) {
 func TestHandleUseItem_InvalidJSON(t *testing.T) {
 	handler := setupHandlerWithPlayers(t, 2)
 
-	err := handler.handleUseItem("user-001", []byte("invalid json"))
+	err := handler.handleUseItem(id.TestUUID(1), []byte("invalid json"))
 	if err == nil {
 	 t.Error("handleUseItem should return error for invalid JSON")
 	}
@@ -356,12 +357,12 @@ func TestHandleUseSkill_PlayerNotFound(t *testing.T) {
 	mock := getMockDispatcher(handler)
 	mock.Clear()
 
-	err := handler.handleUseSkill("user-999")
+	err := handler.handleUseSkill(id.TestUUID(999))
 	if err != nil {
 	 // Expected
 	}
 
-	verifyActionRejected(t, mock, "user-999", pkgnet.OpUseSkill, constants.ErrPlayerNotFound)
+	verifyActionRejected(t, mock, id.TestUUID(999), pkgnet.OpUseSkill, constants.ErrPlayerNotFound)
 }
 
 func TestHandleUseSkill_NotCurrentPlayer(t *testing.T) {
@@ -374,9 +375,9 @@ func TestHandleUseSkill_NotCurrentPlayer(t *testing.T) {
 	 t.Fatal("Should have current player")
 	}
 
-	nonCurrentPlayerID := "user-002"
-	if currentPlayerID == "user-002" {
-	 nonCurrentPlayerID = "user-001"
+	nonCurrentPlayerID := id.TestUUID(2)
+	if currentPlayerID == id.TestUUID(2) {
+	 nonCurrentPlayerID = id.TestUUID(1)
 	}
 
 	err := handler.handleUseSkill(nonCurrentPlayerID)
@@ -461,12 +462,12 @@ func TestHandleUserChoice_PlayerNotFound(t *testing.T) {
 	mock.Clear()
 
 	data := []byte(`{"op_code": "103", "decision_id": "dec-001", "choice": 0}`)
-	err := handler.handleUserChoice("user-999", data)
+	err := handler.handleUserChoice(id.TestUUID(999), data)
 	if err != nil {
 	 // Expected
 	}
 
-	verifyActionRejected(t, mock, "user-999", pkgnet.OpUserChoice, constants.ErrPlayerNotFound)
+	verifyActionRejected(t, mock, id.TestUUID(999), pkgnet.OpUserChoice, constants.ErrPlayerNotFound)
 }
 
 func TestHandleUserChoice_NoPendingDecision(t *testing.T) {
@@ -480,18 +481,18 @@ func TestHandleUserChoice_NoPendingDecision(t *testing.T) {
 	}
 
 	data := []byte(`{"op_code": "103", "decision_id": "dec-001", "choice": 0}`)
-	err := handler.handleUserChoice("user-001", data)
+	err := handler.handleUserChoice(id.TestUUID(1), data)
 	if err != nil {
 	 // Expected
 	}
 
-	verifyActionRejected(t, mock, "user-001", pkgnet.OpUserChoice, constants.ErrInvalidState)
+	verifyActionRejected(t, mock, id.TestUUID(1), pkgnet.OpUserChoice, constants.ErrInvalidState)
 }
 
 func TestHandleUserChoice_InvalidJSON(t *testing.T) {
 	handler := setupHandlerWithPlayers(t, 2)
 
-	err := handler.handleUserChoice("user-001", []byte("invalid json"))
+	err := handler.handleUserChoice(id.TestUUID(1), []byte("invalid json"))
 	if err == nil {
 	 t.Error("handleUserChoice should return error for invalid JSON")
 	}
@@ -505,18 +506,18 @@ func TestHandleMiniGameResult_PlayerNotFound(t *testing.T) {
 	mock.Clear()
 
 	data := []byte(`{"op_code": "104", "rank": 1}`)
-	err := handler.handleMiniGameResult("user-999", data)
+	err := handler.handleMiniGameResult(id.TestUUID(999), data)
 	if err != nil {
 	 // Expected
 	}
 
-	verifyActionRejected(t, mock, "user-999", pkgnet.OpMiniGameResultSubmit, constants.ErrPlayerNotFound)
+	verifyActionRejected(t, mock, id.TestUUID(999), pkgnet.OpMiniGameResultSubmit, constants.ErrPlayerNotFound)
 }
 
 func TestHandleMiniGameResult_InvalidJSON(t *testing.T) {
 	handler := setupHandlerWithPlayers(t, 2)
 
-	err := handler.handleMiniGameResult("user-001", []byte("invalid json"))
+	err := handler.handleMiniGameResult(id.TestUUID(1), []byte("invalid json"))
 	if err == nil {
 	 t.Error("handleMiniGameResult should return error for invalid JSON")
 	}
@@ -535,12 +536,12 @@ func TestHandleMiniGameResult_InvalidState(t *testing.T) {
 	mock.Clear()
 
 	data := []byte(`{"op_code": "104", "rank": 1}`)
-	err := handler.handleMiniGameResult("user-001", data)
+	err := handler.handleMiniGameResult(id.TestUUID(1), data)
 	if err != nil {
 	 // Expected
 	}
 
-	verifyActionRejected(t, mock, "user-001", pkgnet.OpMiniGameResultSubmit, constants.ErrInvalidState)
+	verifyActionRejected(t, mock, id.TestUUID(1), pkgnet.OpMiniGameResultSubmit, constants.ErrInvalidState)
 }
 
 // ========== Request Types Tests ==========
@@ -677,12 +678,12 @@ func TestHandleMessage_ConcurrentRequests(t *testing.T) {
 
 	// Send messages from different players concurrently (simulated)
 	// Note: In real Nakama, messages are handled sequentially
-	err := handler.HandleMessageWithOp("user-001", int64(pkgnet.OpRollDice), []byte("{}"))
+	err := handler.HandleMessageWithOp(id.TestUUID(1), int64(pkgnet.OpRollDice), []byte("{}"))
 	// Result depends on current state
 	_ = err
 
 	// Just verify handler doesn't panic with concurrent-like usage
-	err = handler.HandleMessageWithOp("user-002", int64(pkgnet.OpRollDice), []byte("{}"))
+	err = handler.HandleMessageWithOp(id.TestUUID(2), int64(pkgnet.OpRollDice), []byte("{}"))
 	_ = err
 }
 
@@ -734,16 +735,16 @@ func TestHandleRollDice_NoCurrentPlayer(t *testing.T) {
 	handler.WithDispatcher(mock)
 
 	// Add player but don't initialize HSM
-	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 
 	// No HSM means no current player
-	err := handler.handleRollDice("user-001")
+	err := handler.handleRollDice(id.TestUUID(1))
 	if err != nil {
 	 // Expected - no current player
 	}
 
 	// Verify ActionRejected was sent
-	msgs := mock.GetMessages("user-001")
+	msgs := mock.GetMessages(id.TestUUID(1))
 	if len(msgs) == 0 {
 	 // May not have message if HSM is nil
 	 t.Log("No messages sent (HSM not initialized)")
@@ -755,10 +756,10 @@ func TestHandleUseItem_NoCurrentPlayer(t *testing.T) {
 	mock := NewMockDispatcherAdapter()
 	handler.WithDispatcher(mock)
 
-	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 
 	data := []byte(`{"op_code": "101", "item_id": "item-001"}`)
-	err := handler.handleUseItem("user-001", data)
+	err := handler.handleUseItem(id.TestUUID(1), data)
 	if err != nil {
 	 // Expected
 	}
@@ -769,9 +770,9 @@ func TestHandleUseSkill_NoCurrentPlayer(t *testing.T) {
 	mock := NewMockDispatcherAdapter()
 	handler.WithDispatcher(mock)
 
-	handler.addPlayer("user-001", constants.FactionQingLong, "user-001")
+	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 
-	err := handler.handleUseSkill("user-001")
+	err := handler.handleUseSkill(id.TestUUID(1))
 	if err != nil {
 	 // Expected
 	}
