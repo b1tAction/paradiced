@@ -83,12 +83,15 @@ func (r *BuffRegistry) RegisterBuff(def *core.BuffDefinition, config *BuffHandle
 	r.defs[def.Type] = def
 	r.names[def.Type] = def.Name
 
-	if def.Eval.IsGood() {
-		r.goodBuffs = append(r.goodBuffs, def.Type)
-	} else if def.Eval.IsBad() {
-		r.badBuffs = append(r.badBuffs, def.Type)
-	} else {
-		r.neutralBuffs = append(r.neutralBuffs, def.Type)
+	// Hidden buffs are not added to lottery pools
+	if !def.Hidden {
+		if def.Eval.IsGood() {
+			r.goodBuffs = append(r.goodBuffs, def.Type)
+		} else if def.Eval.IsBad() {
+			r.badBuffs = append(r.badBuffs, def.Type)
+		} else {
+			r.neutralBuffs = append(r.neutralBuffs, def.Type)
+		}
 	}
 
 	if config != nil {
@@ -155,6 +158,19 @@ func (r *BuffRegistry) HasBuffHandler(bt constants.BuffType) bool {
 	return ok && config != nil && config.Handler != nil
 }
 
+// IsHidden checks if a Buff type is hidden (not visible to player/client).
+func IsHidden(bt constants.BuffType) bool {
+	return GlobalBuffRegistry.IsHidden(bt)
+}
+
+func (r *BuffRegistry) IsHidden(bt constants.BuffType) bool {
+	def, ok := r.defs[bt]
+	if !ok {
+		return false
+	}
+	return def.Hidden
+}
+
 // GetBuffTypesByCategory returns Buff types by category.
 func GetBuffTypesByCategory(category string) []constants.BuffType {
 	return GlobalBuffRegistry.GetBuffTypesByCategory(category)
@@ -175,19 +191,19 @@ func (r *BuffRegistry) GetBuffTypesByCategory(category string) []constants.BuffT
 // ========== Buff Handler Registration ==========
 
 func registerAllBuffs() {
-	// Curse: LP-1 per turn for 3 turns
+	// Curse: LP-1 when applied, LP+1 revert when removed
 	GlobalBuffRegistry.RegisterBuff(&core.BuffDefinition{
 		Type:        constants.BuffTypeCurse,
 		Eval:        constants.EvaluationBad,
 		EnglishName: "Curse",
 		Name:        "诅咒",
-		Desc:        "接下来3回合LP-1",
+		Desc:        "LP-1 until removed",
 		Duration:    3,
 	}, &BuffHandlerConfig{
-		Phases:      []constants.Phase{constants.PhaseBeforeTurn},
+		Phases:      []constants.Phase{constants.PhasePostBuffApplied, constants.PhasePreBuffRemoved},
 		Priority:    50,
 		NeedConfirm: false,
-		Handler:     createModifyLPHandler(-1),
+		Handler:     handleCurseEffect,
 	})
 
 	// Lost: Reverse movement direction for 1 turn
@@ -250,19 +266,19 @@ func registerAllBuffs() {
 		Handler:     handleHiddenImmune,
 	})
 
-	// Divine: LP+1 per turn for 3 turns
+	// Divine: LP+1 when applied, LP-1 revert when removed
 	GlobalBuffRegistry.RegisterBuff(&core.BuffDefinition{
 		Type:        constants.BuffTypeDivine,
 		Eval:        constants.EvaluationVeryGood,
 		EnglishName: "Divine",
 		Name:        "神眷",
-		Desc:        "接下来3回合LP+1",
+		Desc:        "LP+1 until removed",
 		Duration:    3,
 	}, &BuffHandlerConfig{
-		Phases:      []constants.Phase{constants.PhaseBeforeTurn},
+		Phases:      []constants.Phase{constants.PhasePostBuffApplied, constants.PhasePreBuffRemoved},
 		Priority:    50,
 		NeedConfirm: false,
-		Handler:     createModifyLPHandler(1),
+		Handler:     handleDivineEffect,
 	})
 
 	// Rain: HP+1 every 2 turns for 4 turns
@@ -308,6 +324,23 @@ func registerAllBuffs() {
 		Priority:    10,
 		NeedConfirm: false,
 		Handler:     handleZhuQueFire,
+	})
+
+	// DeathMark: Hidden buff that blocks all subsequent actions after death.
+	// Not visible to client, not drawn in lottery pools.
+	GlobalBuffRegistry.RegisterBuff(&core.BuffDefinition{
+		Type:        constants.BuffTypeDeathMark,
+		Eval:        constants.EvaluationVeryBad,
+		EnglishName: "DeathMark",
+		Name:        "死亡标记",
+		Desc:        "死亡后阻止后续行动",
+		Duration:    1,
+		Hidden:      true,
+	}, &BuffHandlerConfig{
+		Phases:      []constants.Phase{constants.PhasePreAction},
+		Priority:    999,
+		NeedConfirm: false,
+		Handler:     handleDeathMarkBlock,
 	})
 }
 
@@ -453,6 +486,73 @@ func handleExorcismImmunePoison(phase constants.Phase, ctx *event.Context) error
 		return nil
 	}
 	ctx.SetBool("block_poison_effect", true)
+	return nil
+}
+
+func handleDeathMarkBlock(phase constants.Phase, ctx *event.Context) error {
+	if ctx == nil {
+		return nil
+	}
+	if phase != constants.PhasePreAction {
+		return nil
+	}
+	ctx.SetBool("action_blocked", true)
+	return nil
+}
+
+func handleDivineEffect(phase constants.Phase, ctx *event.Context) error {
+	if ctx == nil || ctx.Player == nil {
+		return nil
+	}
+	actionCtx := getActionCtxFromEventCtx(ctx)
+	if actionCtx == nil {
+		return nil
+	}
+
+	switch phase {
+	case constants.PhasePostBuffApplied:
+		// Only react when Divine buff is applied → LP+1
+		if raw, ok := ctx.Get("applied_buff_type"); ok {
+			if constants.BuffType(raw.(string)) == constants.BuffTypeDivine {
+				ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, "Buff_Divine"))
+			}
+		}
+	case constants.PhasePreBuffRemoved:
+		// Only react when Divine buff is removed → LP-1 revert
+		if raw, ok := ctx.Get("removed_buff_type"); ok {
+			if constants.BuffType(raw.(string)) == constants.BuffTypeDivine {
+				ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, -1, "Buff_Divine_Removal"))
+			}
+		}
+	}
+	return nil
+}
+
+func handleCurseEffect(phase constants.Phase, ctx *event.Context) error {
+	if ctx == nil || ctx.Player == nil {
+		return nil
+	}
+	actionCtx := getActionCtxFromEventCtx(ctx)
+	if actionCtx == nil {
+		return nil
+	}
+
+	switch phase {
+	case constants.PhasePostBuffApplied:
+		// Only react when Curse buff is applied → LP-1
+		if raw, ok := ctx.Get("applied_buff_type"); ok {
+			if constants.BuffType(raw.(string)) == constants.BuffTypeCurse {
+				ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, -1, "Buff_Curse"))
+			}
+		}
+	case constants.PhasePreBuffRemoved:
+		// Only react when Curse buff is removed → LP+1 revert
+		if raw, ok := ctx.Get("removed_buff_type"); ok {
+			if constants.BuffType(raw.(string)) == constants.BuffTypeCurse {
+				ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, "Buff_Curse_Removal"))
+			}
+		}
+	}
 	return nil
 }
 

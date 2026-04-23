@@ -43,14 +43,17 @@ func TestBuffHandlerConfigPhases(t *testing.T) {
 		needConfirm bool
 	}{
 		{constants.BuffTypeFire, constants.PhaseBeforeTurn, true, 10, false},
-		{constants.BuffTypeCurse, constants.PhaseBeforeTurn, true, 50, false},
-		{constants.BuffTypeDivine, constants.PhaseBeforeTurn, true, 50, false},
+		{constants.BuffTypeCurse, constants.PhasePostBuffApplied, true, 50, false},
+		{constants.BuffTypeCurse, constants.PhasePreBuffRemoved, true, 50, false},
+		{constants.BuffTypeDivine, constants.PhasePostBuffApplied, true, 50, false},
+		{constants.BuffTypeDivine, constants.PhasePreBuffRemoved, true, 50, false},
 		{constants.BuffTypeLost, constants.PhasePreMove, true, 100, false},
 		{constants.BuffTypeHidden, constants.PhasePreBuffApplied, true, 100, false},
 		{constants.BuffTypeRain, constants.PhaseAfterTurn, true, 50, false},
 		{constants.BuffTypeCorrupt, constants.PhaseAfterTurn, true, 50, false},
 		{constants.BuffTypeExorcism, constants.PhasePreEvent, true, 80, false},
 		{constants.BuffTypePoison, constants.PhaseBeforeTurn, true, 30, false},
+		{constants.BuffTypeDeathMark, constants.PhasePreAction, true, 999, false},
 	}
 
 	for _, tt := range tests {
@@ -135,8 +138,8 @@ func TestFireBuffHandlerNonBeforeTurnPhase(t *testing.T) {
 	if player.GetFireCounter() != 0 {
 		t.Errorf("FireCounter should be 0 when not BeforeTurn phase")
 	}
-	if player.LP != 5 {
-		t.Errorf("LP should not change when not BeforeTurn phase")
+	if player.LP != 4 {
+		t.Errorf("LP should be initial 4 (MaxLP=5 but InitLP=4 default), got %d", player.LP)
 	}
 }
 
@@ -152,9 +155,10 @@ func TestCurseBuffHandlerBehavior(t *testing.T) {
 	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
 	ctx.Set("action_context", actionCtx)
+	ctx.Set("applied_buff_type", string(constants.BuffTypeCurse))
 
 	handler := GetBuffHandlerConfig(constants.BuffTypeCurse).Handler
-	handler(constants.PhaseBeforeTurn, ctx)
+	handler(constants.PhasePostBuffApplied, ctx)
 
 	// Bridge derived actions and process
 	for _, da := range ctx.GetDerivedActions() {
@@ -181,9 +185,10 @@ func TestDivineBuffHandlerBehavior(t *testing.T) {
 	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
 	ctx.Set("action_context", actionCtx)
+	ctx.Set("applied_buff_type", string(constants.BuffTypeDivine))
 
 	handler := GetBuffHandlerConfig(constants.BuffTypeDivine).Handler
-	handler(constants.PhaseBeforeTurn, ctx)
+	handler(constants.PhasePostBuffApplied, ctx)
 
 	// Bridge derived actions and process
 	for _, da := range ctx.GetDerivedActions() {
@@ -392,17 +397,28 @@ func TestCurseAndDivineDerivedActions(t *testing.T) {
 
 	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 
-	ctx := event.NewContext(player)
-	ctx.Set("action_context", actionCtx)
+	ctxDivine := event.NewContext(player)
+	ctxDivine.Set("action_context", actionCtx)
+	ctxDivine.Set("applied_buff_type", string(constants.BuffTypeDivine))
 
-	GetBuffHandlerConfig(constants.BuffTypeDivine).Handler(constants.PhaseBeforeTurn, ctx)
-	GetBuffHandlerConfig(constants.BuffTypeCurse).Handler(constants.PhaseBeforeTurn, ctx)
+	ctxCurse := event.NewContext(player)
+	ctxCurse.Set("action_context", actionCtx)
+	ctxCurse.Set("applied_buff_type", string(constants.BuffTypeCurse))
 
-	if len(ctx.GetDerivedActions()) != 2 {
-		t.Fatalf("derived actions = %d, want 2", len(ctx.GetDerivedActions()))
+	GetBuffHandlerConfig(constants.BuffTypeDivine).Handler(constants.PhasePostBuffApplied, ctxDivine)
+	GetBuffHandlerConfig(constants.BuffTypeCurse).Handler(constants.PhasePostBuffApplied, ctxCurse)
+
+	totalDerived := len(ctxDivine.GetDerivedActions()) + len(ctxCurse.GetDerivedActions())
+	if totalDerived != 2 {
+		t.Fatalf("total derived actions = %d, want 2", totalDerived)
 	}
 
-	for _, d := range ctx.GetDerivedActions() {
+	for _, d := range ctxDivine.GetDerivedActions() {
+		if act, ok := d.(engineaction.Action); ok {
+			actionCtx.PushDerivedAction(act)
+		}
+	}
+	for _, d := range ctxCurse.GetDerivedActions() {
 		if act, ok := d.(engineaction.Action); ok {
 			actionCtx.PushDerivedAction(act)
 		}
@@ -526,13 +542,14 @@ func TestHandlerWithNilPlayer(t *testing.T) {
 }
 
 func TestModifyLPHandlerNilActionContext(t *testing.T) {
-	// createModifyLPHandler requires ActionContext
+	// Curse handler requires ActionContext for derived actions
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	ctx := event.NewContext(player)
+	ctx.Set("applied_buff_type", string(constants.BuffTypeCurse))
 	// No action_context set
 
 	handler := GetBuffHandlerConfig(constants.BuffTypeCurse).Handler
-	handler(constants.PhaseBeforeTurn, ctx)
+	handler(constants.PhasePostBuffApplied, ctx)
 
 	// Should not produce derived actions without ActionContext
 	if len(ctx.GetDerivedActions()) > 0 {
@@ -613,9 +630,10 @@ func TestPoisonHandlerNilPlayer(t *testing.T) {
 }
 
 func TestCurseHandlerWrongPhase(t *testing.T) {
-	// Curse handler should only work on PhaseBeforeTurn
+	// Curse handler should only work on PhasePostBuffApplied and PhasePreBuffRemoved
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	ctx := event.NewContext(player)
+	ctx.Set("applied_buff_type", string(constants.BuffTypeCurse))
 
 	handler := GetBuffHandlerConfig(constants.BuffTypeCurse).Handler
 	handler(constants.PhaseAfterTurn, ctx) // Wrong phase
@@ -627,9 +645,10 @@ func TestCurseHandlerWrongPhase(t *testing.T) {
 }
 
 func TestDivineHandlerWrongPhase(t *testing.T) {
-	// Divine handler should only work on PhaseBeforeTurn
+	// Divine handler should only work on PhasePostBuffApplied and PhasePreBuffRemoved
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	ctx := event.NewContext(player)
+	ctx.Set("applied_buff_type", string(constants.BuffTypeDivine))
 
 	handler := GetBuffHandlerConfig(constants.BuffTypeDivine).Handler
 	handler(constants.PhaseAfterTurn, ctx) // Wrong phase
