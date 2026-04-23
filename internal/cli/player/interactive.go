@@ -154,6 +154,8 @@ func (p *InteractivePlayer) handleMessage(ctx context.Context, msg *nakama.Socke
 		p.handleActionRejected(handlerCtx, msg.Data)
 	case nakama.OpWaitingSync:
 		p.handleWaitingSync(handlerCtx, msg.Data)
+	case nakama.OpStartGameAck:
+		p.handleStartGameAck(handlerCtx, msg.Data)
 	default:
 		p.logger.Debug("Received unknown message", "op_code", opCode)
 	}
@@ -395,6 +397,21 @@ func (p *InteractivePlayer) handleWaitingSync(ctx context.Context, data []byte) 
 		// User wants to start the game
 		p.sendStartGame(ctx)
 	}
+}
+
+func (p *InteractivePlayer) handleStartGameAck(ctx context.Context, data []byte) {
+	var ack model.StartGameAck
+	if err := json.Unmarshal(data, &ack); err != nil {
+		p.logger.Error("Failed to parse StartGameAck", "error", err)
+		p.uiAdapter.OnError(err)
+		return
+	}
+
+	p.logger.Debug("Received start game ack",
+		"map_length", ack.MapConfig.Length,
+		"cells", len(ack.MapConfig.Cells))
+
+	p.uiAdapter.OnStartGameAck(ctx, &ack)
 }
 
 // ========== Action Sending ==========

@@ -388,6 +388,8 @@ func (p *AutoPlayPlayer) handleMessage(ctx context.Context, msg *nakama.SocketMe
 		p.logger.Debug("Received TurnSync")
 	case nakama.OpActionRejected:
 		p.handleActionRejected(ctx, msg.Data)
+	case nakama.OpStartGameAck:
+		p.logger.Debug("Received StartGameAck (game start acknowledged)")
 	default:
 		p.logger.Debug("Received unknown message", "op_code", opCode)
 	}

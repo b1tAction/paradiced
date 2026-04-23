@@ -402,6 +402,7 @@ const (
 	OpFullSync        int64 = 8
 	OpActionRejected  int64 = 9
 	OpWaitingSync     int64 = 10
+	OpStartGameAck    int64 = 11
 
 	// Client -> Server: 100+
 	OpRollDice             int64 = 100

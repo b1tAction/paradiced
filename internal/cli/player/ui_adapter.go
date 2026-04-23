@@ -69,6 +69,10 @@ type PlayerUIAdapter interface {
 	// Returns true if host wants to start the game, false to keep waiting.
 	OnWaitingSync(ctx context.Context, waiting *model.WaitingSync) bool
 
+	// OnStartGameAck displays game start acknowledgment with map configuration.
+	// Called when server broadcasts StartGameAck after host starts the game.
+	OnStartGameAck(ctx context.Context, ack *model.StartGameAck)
+
 	// Clear clears the UI state (for reconnection/reset).
 	Clear()
 }

@@ -186,6 +186,32 @@ type WaitingPlayer struct {
 	IsHost      bool   `json:"is_host"`
 }
 
+// StartGameAck represents game start acknowledgment with full map configuration.
+type StartGameAck struct {
+	MapConfig MapConfig `json:"map_config"`
+}
+
+// MapConfig represents the complete map configuration for game initialization.
+type MapConfig struct {
+	Length     int            `json:"length"`
+	StartIndex int            `json:"start_index"`
+	EndIndex   int            `json:"end_index"`
+	Cells      []MapCellConfig `json:"cells"`
+}
+
+// MapCellConfig represents a single cell's complete configuration.
+type MapCellConfig struct {
+	Index       int     `json:"index"`
+	CellType    string  `json:"cell_type"`
+	IsBroken    bool    `json:"is_broken"`
+	EventID     string  `json:"event_id"`
+	FogActive   bool    `json:"fog_active"`
+	DrawType    string  `json:"draw_type"`
+	ProbGood    float64 `json:"prob_good"`
+	ProbNeutral float64 `json:"prob_neutral"`
+	ProbBad     float64 `json:"prob_bad"`
+}
+
 // ParseMessage parses a JSON message into the Message struct.
 func ParseMessage(data []byte) (*Message, error) {
 	var msg Message

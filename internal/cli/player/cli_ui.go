@@ -458,6 +458,26 @@ func (ui *CLIUIAdapter) OnConnected(matchID string) {
 	fmt.Println()
 }
 
+// OnStartGameAck displays game start acknowledgment with map info.
+func (ui *CLIUIAdapter) OnStartGameAck(ctx context.Context, ack *model.StartGameAck) {
+	fmt.Println()
+	fmt.Println("========== Game Started ==========")
+	fmt.Printf("Map: %d cells, start=%d, end=%d\n",
+		ack.MapConfig.Length, ack.MapConfig.StartIndex, ack.MapConfig.EndIndex)
+
+	// Show cell type summary
+	cellTypes := make(map[string]int)
+	for _, cell := range ack.MapConfig.Cells {
+		cellTypes[cell.CellType]++
+	}
+	fmt.Println("Cell types:")
+	for ct, count := range cellTypes {
+		fmt.Printf("  %s: %d\n", ct, count)
+	}
+	fmt.Println("==================================")
+	fmt.Println()
+}
+
 // OnPlayerJoined displays player join notification.
 func (ui *CLIUIAdapter) OnPlayerJoined(userID string, faction string) {
 	fmt.Println()
