@@ -35,6 +35,11 @@ type ActionContext struct {
 	// These handle EventBus subscription/unsubscription for Buff add/remove.
 	OnAddBuff    func(player *core.Player, buff *core.Buff)    // Called after AddBuffAction.Execute
 	OnRemoveBuff func(player *core.Player, buffType constants.BuffType) *core.Buff // Called by RemoveBuffAction.Execute
+
+	// GetBuffDuration returns the default duration for a Buff type from BuffDefinition.
+	// Injected by engine layer (BuffRegistry). Used by AddBuffAction/DeathAction to
+	// look up duration from definition instead of hardcoding it.
+	GetBuffDuration func(buffType constants.BuffType) int
 }
 
 // NewActionContext creates a new ActionContext with required components.
@@ -94,6 +99,28 @@ func (ctx *ActionContext) SetCurrentPlayer(player *core.Player) {
 // 7. Process any derived actions in queue
 // Returns first error from handlers or action execution.
 func (ctx *ActionContext) ExecuteAction(action Action) error {
+	// Step 0: PhasePreAction - death mark interception (only when CurrentPlayer.IsDead)
+	// Skip for buff lifecycle actions (RemoveBuffAction, RespawnAction) — these must
+	// execute even for dead players (buff expiry removal, respawn after death)
+	if ctx.EventBus != nil && ctx.CurrentPlayer != nil && ctx.CurrentPlayer.IsDead {
+		skipDeathCheck := false
+		if _, ok := action.(*RemoveBuffAction); ok {
+			skipDeathCheck = true
+		}
+
+		if !skipDeathCheck {
+			preCtx := event.NewContext(ctx.CurrentPlayer)
+			preCtx.Set("action_context", ctx)
+			preCtx.Set("current_action", action)
+			ctx.EventBus.Publish(constants.PhasePreAction, ctx.CurrentPlayer.ID.UUID(), preCtx)
+
+			// Check if action was blocked by DeathMark buff
+			if preCtx.GetBoolOrDefault("action_blocked", false) {
+				return nil // Action blocked - skip execution entirely
+			}
+		}
+	}
+
 	// Step 1: PreTrigger phase - interception
 	prePhase := action.PreTriggerPhase()
 	if prePhase != constants.PhaseAnyTime && ctx.EventBus != nil {
@@ -102,6 +129,11 @@ func (ctx *ActionContext) ExecuteAction(action Action) error {
 		triggerCtx := event.NewContext(ctx.CurrentPlayer)
 		triggerCtx.Set("current_action", action)
 		triggerCtx.Set("action_context", ctx)
+
+		// For RemoveBuffAction, set removed buff type for handler matching
+		if removeAction, ok := action.(*RemoveBuffAction); ok {
+			triggerCtx.Set("removed_buff_type", string(removeAction.BuffType))
+		}
 
 		// Publish to allow Buffs/Items to intercept/modify the action
 		ctx.EventBus.Publish(prePhase, action.Target(), triggerCtx)
@@ -139,23 +171,34 @@ func (ctx *ActionContext) ExecuteAction(action Action) error {
 	// Step 4: PostTrigger phase - lifecycle events
 	postPhase := action.PostTriggerPhase()
 	if postPhase != constants.PhaseAnyTime && ctx.EventBus != nil {
-		// Create context for post-trigger
-		triggerCtx := event.NewContext(ctx.CurrentPlayer)
-		triggerCtx.Set("current_action", action)
-		triggerCtx.Set("action_context", ctx)
+		// Skip PostTrigger for AddBuffAction duration-extend (not a new buff application)
+		if _, ok := action.(*AddBuffAction); ok && ctx.GetBoolOrDefault("buff_duration_extended", false) {
+			// Duration extended, skip PhasePostBuffApplied publication
+			// No derived actions from PostTrigger needed since buff was just extended, not newly applied
+		} else {
+			// Create context for post-trigger
+			triggerCtx := event.NewContext(ctx.CurrentPlayer)
+			triggerCtx.Set("current_action", action)
+			triggerCtx.Set("action_context", ctx)
 
-		// Publish for buff entry effects, death effects, chain reactions
-		ctx.EventBus.Publish(postPhase, action.Target(), triggerCtx)
+			// For AddBuffAction, set applied buff type for handler matching
+			if addAction, ok := action.(*AddBuffAction); ok {
+				triggerCtx.Set("applied_buff_type", string(addAction.BuffType))
+			}
 
-		// Check for handler errors
-		if triggerCtx.HasError() {
-			return triggerCtx.FirstError()
-		}
+			// Publish for buff entry effects, death effects, chain reactions
+			ctx.EventBus.Publish(postPhase, action.Target(), triggerCtx)
 
-		// Step 5: Collect derived actions from PostTrigger handler
-		for _, derived := range triggerCtx.GetDerivedActions() {
-			if execAction, ok := derived.(Action); ok {
-				ctx.PushDerivedAction(execAction)
+			// Check for handler errors
+			if triggerCtx.HasError() {
+				return triggerCtx.FirstError()
+			}
+
+			// Step 5: Collect derived actions from PostTrigger handler
+			for _, derived := range triggerCtx.GetDerivedActions() {
+				if execAction, ok := derived.(Action); ok {
+					ctx.PushDerivedAction(execAction)
+				}
 			}
 		}
 	}

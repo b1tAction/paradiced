@@ -132,9 +132,6 @@ func TestReverseClockHandlerBehavior(t *testing.T) {
 	if addBuffAction.BuffType != constants.BuffTypeLost {
 		t.Errorf("BuffType = %s, expected Lost", addBuffAction.BuffType)
 	}
-	if addBuffAction.Duration != 1 {
-		t.Errorf("Duration = %d, expected 1", addBuffAction.Duration)
-	}
 }
 
 func TestAnyDoorHandlerBehavior(t *testing.T) {

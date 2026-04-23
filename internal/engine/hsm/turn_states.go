@@ -36,11 +36,11 @@ func (s *BaseTurnState) CanTransitionTo(target StateID) bool {
 // ========== TurnUpkeepState ==========
 
 // TurnUpkeepState handles turn preparation and PhaseBeforeTurn trigger.
-// Checks SkipTurn/IsDead, triggers BeforeTurn phase effects.
+// Checks SkipTurn, triggers BeforeTurn phase effects.
+// Death detection and respawn are handled by TurnEndState (unified death handling).
 type TurnUpkeepState struct {
 	BaseTurnState
 	skipTurn  bool
-	isDead    bool
 	decisions []*event.Decision
 	actionCtx *engineaction.ActionContext
 }
@@ -50,7 +50,6 @@ func NewTurnUpkeepState() *TurnUpkeepState {
 	return &TurnUpkeepState{
 		BaseTurnState: BaseTurnState{id: StateTurnUpkeep},
 		skipTurn:      false,
-		isDead:        false,
 		decisions:     make([]*event.Decision, 0),
 	}
 }
@@ -79,21 +78,7 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 		game.Draw,
 	)
 
-	// Step 1: Check IsDead -> Respawn at checkpoint using RespawnAction
-	if player.IsDead {
-		if mapEngine != nil {
-			checkpoint := mapEngine.GetLastCheckpoint(player.Position)
-			respawnAction := engineaction.NewRespawnAction(player, checkpoint, "DeathRespawn")
-			if err := s.actionCtx.ExecuteAction(respawnAction); err != nil {
-				ctx.Error = errors.WrapHSMError(
-					err, "TurnUpkeep", 2, "Enter", "respawn action failed")
-				return
-			}
-		}
-		s.isDead = true
-	}
-
-	// Step 2: Check SkipTurn flag
+	// Step 1: Check SkipTurn flag
 	if player.SkipTurn {
 		player.SkipTurn = false // Clear flag
 		s.skipTurn = true
@@ -103,7 +88,7 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 		return // Skip all BeforeTurn effects
 	}
 
-	// Step 3: Trigger PhaseBeforeTurn
+	// Step 2: Trigger PhaseBeforeTurn
 	// HSM publishes this phase - Buff handlers respond and may return Actions
 	triggerCtx := event.NewContext(player)
 	triggerCtx.Set("action_context", s.actionCtx)
@@ -169,7 +154,6 @@ func (s *TurnUpkeepState) Update(ctx *StateContext) StateID {
 
 func (s *TurnUpkeepState) Exit(ctx *StateContext) {
 	s.skipTurn = false
-	s.isDead = false
 	s.decisions = make([]*event.Decision, 0)
 	if s.actionCtx != nil {
 		s.actionCtx.Clear()
@@ -643,13 +627,20 @@ func findFirstCheckpointInPath(path []int, mapEngine *gamemap.MapEngine) int {
 func newActionContextWithPools(game *engine.Game, bus *event.EventBus, mapEngine *gamemap.MapEngine, drawEngine *rng.DrawEngine, player *core.Player) *engineaction.ActionContext {
 	ctx := engineaction.NewActionContextWithPlayer(game, bus, mapEngine, drawEngine, player)
 	ctx.SetPools(game.EventPool, game.ItemPool)
-	ctx.OnAddBuff = func(p *core.Player, b *core.Buff) { game.SubscribeBuff(p, b) }
+	ctx.OnAddBuff = func(p *core.Player, b *core.Buff) { game.ApplyBuffToPlayer(p, b) }
 	ctx.OnRemoveBuff = func(p *core.Player, bt constants.BuffType) *core.Buff {
 		buff := p.GetBuff(bt)
 		if buff != nil {
 			game.RemoveBuffFromPlayer(p, buff)
 		}
 		return buff
+	}
+	ctx.GetBuffDuration = func(bt constants.BuffType) int {
+		def := engine.GetBuffDefinition(bt)
+		if def != nil {
+			return def.Duration
+		}
+		return 0
 	}
 	return ctx
 }
@@ -658,13 +649,20 @@ func newActionContextWithPools(game *engine.Game, bus *event.EventBus, mapEngine
 func newActionContextWithPoolsNoPlayer(game *engine.Game, bus *event.EventBus, mapEngine *gamemap.MapEngine, drawEngine *rng.DrawEngine) *engineaction.ActionContext {
 	ctx := engineaction.NewActionContext(game, bus, mapEngine, drawEngine)
 	ctx.SetPools(game.EventPool, game.ItemPool)
-	ctx.OnAddBuff = func(p *core.Player, b *core.Buff) { game.SubscribeBuff(p, b) }
+	ctx.OnAddBuff = func(p *core.Player, b *core.Buff) { game.ApplyBuffToPlayer(p, b) }
 	ctx.OnRemoveBuff = func(p *core.Player, bt constants.BuffType) *core.Buff {
 		buff := p.GetBuff(bt)
 		if buff != nil {
 			game.RemoveBuffFromPlayer(p, buff)
 		}
 		return buff
+	}
+	ctx.GetBuffDuration = func(bt constants.BuffType) int {
+		def := engine.GetBuffDefinition(bt)
+		if def != nil {
+			return def.Duration
+		}
+		return 0
 	}
 	return ctx
 }
@@ -789,6 +787,14 @@ func (s *TurnLandedState) Enter(ctx *StateContext) {
 	if err := runDerived(triggerCtx); err != nil {
 		ctx.Error = errors.WrapHSMError(
 			err, "TurnLanded", 2, "Enter", "derived action execution failed")
+		return
+	}
+
+	// Check if player died from landing effects (PhaseOnLand or derived actions)
+	// DeathAction is derived by DamageAction/FellDownAction and adds DeathMark buff.
+	// If dead: skip TurnDraw -> jump to TurnEnd for respawn.
+	if player.IsDead {
+		s.skipEvent = true
 		return
 	}
 
@@ -1010,19 +1016,35 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 		return
 	}
 
-	// Tick Buff durations
-	expiredBuffs := player.TickBuffs()
-
-	// Handle expired buffs (unsubscribe from EventBus)
-	for _, expired := range expiredBuffs {
-		game.UnsubscribeBuff(expired)
+	// Clean the Death Mask Buff
+	// Remove DeathMark buff before respawn (clears PhasePreAction block)
+	if player.HasBuff(constants.BuffTypeDeathMark) {
+		deathMark := player.GetBuff(constants.BuffTypeDeathMark)
+		if deathMark != nil {
+			game.RemoveBuffFromPlayer(player, deathMark)
+		}
 	}
 
-	// Check IsDead after AfterTurn effects - use RespawnAction
+	// Tick Buff durations (does NOT remove from player — removal via RemoveBuffAction)
+	expiredBuffs := player.TickBuffs()
+
+	// Remove expired buffs through Action system (RemoveBuffAction)
+	// This ensures PhasePreBuffRemoved is published for handler matching
+	for _, expired := range expiredBuffs {
+		removeAction := engineaction.NewRemoveBuffAction(player, expired.Type, "Buff_Expiry")
+		if err := s.actionCtx.ExecuteAction(removeAction); err != nil {
+			ctx.Error = errors.WrapHSMError(
+				err, "TurnEnd", 2, "Enter", "expired buff removal action failed")
+			return
+		}
+	}
+
+	// Check IsDead after AfterTurn effects -> cleanup DeathMark -> RespawnAction
 	if player.IsDead {
+		// Respawn at checkpoint
 		if mapEngine != nil {
 			checkpoint := mapEngine.GetLastCheckpoint(player.Position)
-			respawnAction := engineaction.NewRespawnAction(player, checkpoint, "AfterTurnRespawn")
+			respawnAction := engineaction.NewRespawnAction(player, checkpoint, "TurnEndRespawn")
 			if err := s.actionCtx.ExecuteAction(respawnAction); err != nil {
 				ctx.Error = errors.WrapHSMError(
 					err, "TurnEnd", 2, "Enter", "respawn action failed")

@@ -167,7 +167,7 @@ func registerAllItems() {
 		Phase:       constants.PhaseAnyTime,
 		Priority:    50,
 		NeedConfirm: true,
-		Handler:     createGiveBuffHandler(constants.BuffTypeLost, 1),
+		Handler:     createGiveBuffHandler(constants.BuffTypeLost),
 	})
 
 	// AnyDoor: Teleport to target player within 30 range
@@ -215,7 +215,7 @@ func registerAllItems() {
 
 // ========== Item Handler Helpers ==========
 
-func createGiveBuffHandler(buffType constants.BuffType, duration int) EffectHandler {
+func createGiveBuffHandler(buffType constants.BuffType) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) error {
 		if ctx == nil || ctx.Player == nil {
 			return nil
@@ -227,7 +227,7 @@ func createGiveBuffHandler(buffType constants.BuffType, duration int) EffectHand
 			return nil
 		}
 
-		ctx.AddDerivedAction(engineaction.NewAddBuffAction(ctx.Player, buffType, duration, "Item_Effect"))
+		ctx.AddDerivedAction(engineaction.NewAddBuffAction(ctx.Player, buffType, "Item_Effect"))
 		return nil
 	}
 }

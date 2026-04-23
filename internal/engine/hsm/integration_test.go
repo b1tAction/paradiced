@@ -53,6 +53,8 @@ func TestTurnFlow_GameLog_Integration(t *testing.T) {
 }
 
 // TestTurnFlow_BuffEffect_GameLog tests Buff effect triggers and GameLog recording.
+// Divine/Curse now trigger on PhasePostBuffApplied (when buff is applied) and
+// PhasePreBuffRemoved (when buff is removed), not PhaseBeforeTurn.
 func TestTurnFlow_BuffEffect_GameLog(t *testing.T) {
 	// Setup
 	game := engine.NewGame(id.NewGameID(), 0)
@@ -66,40 +68,34 @@ func TestTurnFlow_BuffEffect_GameLog(t *testing.T) {
 	player.Position = 10
 	game.AddPlayer(player)
 
-	// Add Divine buff (神眷: LP+1 each turn)
-	divineBuff := core.NewBuff(constants.BuffTypeDivine, 3)
-	player.AddBuff(divineBuff)
-
-	// Subscribe buff to EventBus
-	game.SubscribeBuff(player, divineBuff)
-
 	// Create ActionContext for executing Actions
 	mapAdapter := mapEngine
-	actionCtx := engineaction.NewActionContext(
+	actionCtx := engineaction.NewActionContextWithPlayer(
 		game,
 		game.Bus,
 		mapAdapter,
 		game.Draw,
+		player,
 	)
-
-	// Simulate BeforeTurn phase trigger
-	triggerCtx := event.NewContext(player)
-	triggerCtx.Set("action_context", actionCtx)
-
-	// Publish PhaseBeforeTurn
-	game.Bus.Publish(constants.PhaseBeforeTurn, player.ID.UUID(), triggerCtx)
-
-	// Bridge derived actions from triggerCtx to actionCtx and process
-	for _, derived := range triggerCtx.GetDerivedActions() {
-		if execAction, ok := derived.(engineaction.Action); ok {
-			actionCtx.PushDerivedAction(execAction)
+	actionCtx.OnAddBuff = func(p *core.Player, b *core.Buff) { game.ApplyBuffToPlayer(p, b) }
+	actionCtx.GetBuffDuration = func(bt constants.BuffType) int {
+		def := engine.GetBuffDefinition(bt)
+		if def != nil {
+			return def.Duration
 		}
+		return 0
 	}
-	actionCtx.ProcessQueue()
 
-	// Verify LP was modified (Divine buff: LP+1 through Action system)
+	// Add Divine buff via AddBuffAction (triggers PhasePostBuffApplied → LP+1)
+	addAction := engineaction.NewAddBuffAction(player, constants.BuffTypeDivine, "Test_Divine")
+	err := actionCtx.ExecuteAction(addAction)
+	if err != nil {
+		t.Fatalf("ExecuteAction(AddBuffAction) failed: %v", err)
+	}
+
+	// Verify LP was modified (Divine buff: LP+1 through PhasePostBuffApplied)
 	if player.LP != 4 {
-		t.Errorf("LP should be 4 after Divine buff, got %d", player.LP)
+		t.Errorf("LP should be 4 after Divine buff applied, got %d", player.LP)
 	}
 }
 
@@ -232,6 +228,7 @@ func TestTurnFlow_Damage_GameLog(t *testing.T) {
 }
 
 // TestTurnFlow_CompleteTurn tests a complete turn with multiple actions.
+// Divine/Curse now trigger LP changes on buff application/removal, not BeforeTurn.
 func TestTurnFlow_CompleteTurn(t *testing.T) {
 	// Setup
 	game := engine.NewGame(id.NewGameID(), 0)
@@ -245,35 +242,33 @@ func TestTurnFlow_CompleteTurn(t *testing.T) {
 	player.Position = 10
 	game.AddPlayer(player)
 
-	// Add Divine buff
-	divineBuff := core.NewBuff(constants.BuffTypeDivine, 3)
-	player.AddBuff(divineBuff)
-	game.SubscribeBuff(player, divineBuff)
-
 	mapAdapter := mapEngine
 
 	// === Step 1: Start Turn ===
 	game.Log.StartTurn(1, 0, player.ID.UUID())
 
-	// === Step 2: BeforeTurn Phase ===
-	actionCtx := engineaction.NewActionContext(
+	// === Step 2: Add Divine buff via AddBuffAction (triggers LP+1) ===
+	actionCtx := engineaction.NewActionContextWithPlayer(
 		game,
 		game.Bus,
 		mapAdapter,
 		game.Draw,
+		player,
 	)
-
-	triggerCtx := event.NewContext(player)
-	triggerCtx.Set("action_context", actionCtx)
-	game.Bus.Publish(constants.PhaseBeforeTurn, player.ID.UUID(), triggerCtx)
-
-	// Bridge derived actions from triggerCtx to actionCtx and process
-	for _, derived := range triggerCtx.GetDerivedActions() {
-		if execAction, ok := derived.(engineaction.Action); ok {
-			actionCtx.PushDerivedAction(execAction)
+	actionCtx.OnAddBuff = func(p *core.Player, b *core.Buff) { game.ApplyBuffToPlayer(p, b) }
+	actionCtx.GetBuffDuration = func(bt constants.BuffType) int {
+		def := engine.GetBuffDefinition(bt)
+		if def != nil {
+			return def.Duration
 		}
+		return 0
 	}
-	actionCtx.ProcessQueue()
+
+	addBuffAction := engineaction.NewAddBuffAction(player, constants.BuffTypeDivine, "Test_Divine")
+	err := actionCtx.ExecuteAction(addBuffAction)
+	if err != nil {
+		t.Fatalf("ExecuteAction(AddBuffAction) failed: %v", err)
+	}
 
 	// === Step 3: Simulate Movement ===
 	// MoveAction now reads from ActionContext.Metadata
@@ -309,6 +304,36 @@ func TestTurnFlow_CompleteTurn(t *testing.T) {
 
 	// Verify entries count
 	t.Logf("Segment has %d entries", len(segment.Entries))
+
+	// Find add_buff entry (Divine)
+	var addBuffEntry *gamelog.LogEntry
+	for i := range segment.Entries {
+		if segment.Entries[i].ActionType == "add_buff" {
+			addBuffEntry = &segment.Entries[i]
+			break
+		}
+	}
+
+	if addBuffEntry != nil {
+		if addBuffEntry.Metadata.GetStringOrDefault("buff_type", "") != "divine" {
+			t.Errorf("AddBuff buff_type should be divine, got %s", addBuffEntry.Metadata.GetStringOrDefault("buff_type", ""))
+		}
+	}
+
+	// Find modify_lp entry (Divine LP+1)
+	var modifyLPEntry *gamelog.LogEntry
+	for i := range segment.Entries {
+		if segment.Entries[i].ActionType == "modify_lp" {
+			modifyLPEntry = &segment.Entries[i]
+			break
+		}
+	}
+
+	if modifyLPEntry != nil {
+		if modifyLPEntry.Metadata.GetIntOrDefault("lp_change", 0) != 1 {
+			t.Errorf("ModifyLP lp_change should be 1 (Divine LP+1), got %d", modifyLPEntry.Metadata.GetIntOrDefault("lp_change", 0))
+		}
+	}
 
 	// Find move entry
 	var moveEntry *gamelog.LogEntry
@@ -348,7 +373,7 @@ func TestTurnFlow_CompleteTurn(t *testing.T) {
 		t.Errorf("HP should be 4 (5 - 1 damage), got %d", player.HP)
 	}
 	if player.LP != 4 {
-		t.Errorf("LP should be 4 (3 + 1 Divine), got %d", player.LP)
+		t.Errorf("LP should be 4 (3 + 1 Divine on application), got %d", player.LP)
 	}
 
 	// === Verify JSON Serialization ===

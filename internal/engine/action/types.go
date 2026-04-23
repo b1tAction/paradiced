@@ -70,6 +70,10 @@ func (a *DamageAction) Execute(ctx *ActionContext) error {
 	if err := a.TargetPlayer.ApplyDamage(a.Amount); err != nil {
 		return errors.NewActionExecutionError("damage", a.TargetPlayer.ID.UUID(), "failed to apply damage", err)
 	}
+	// Derive DeathAction if player died from this damage
+	if a.TargetPlayer.IsDead {
+		ctx.PushDerivedAction(NewDeathAction(a.TargetPlayer, a.SourceID, a.TargetPlayer.Position))
+	}
 	return nil
 }
 
@@ -183,6 +187,9 @@ func (a *ModifyLPAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *ModifyLPAction) Execute(ctx *ActionContext) error {
+	if a.TargetPlayer == nil {
+		return errors.NewActionExecutionError("modify_lp", "", "target player is nil", nil)
+	}
 	if a.Amount > 0 {
 		a.TargetPlayer.ModifyLP(a.Amount)
 	} else if a.Amount < 0 {
@@ -291,16 +298,14 @@ func (a *MoveAction) Overtook(player *core.Player) bool {
 type AddBuffAction struct {
 	TargetPlayer *core.Player       // Player receiving Buff
 	BuffType     constants.BuffType // Type of Buff to add
-	Duration     int                // Buff duration in turns
 	SourceID     string             // Source identifier
 }
 
 // NewAddBuffAction creates a new AddBuffAction.
-func NewAddBuffAction(target *core.Player, buffType constants.BuffType, duration int, sourceID string) *AddBuffAction {
+func NewAddBuffAction(target *core.Player, buffType constants.BuffType, sourceID string) *AddBuffAction {
 	return &AddBuffAction{
 		TargetPlayer: target,
 		BuffType:     buffType,
-		Duration:     duration,
 		SourceID:     sourceID,
 	}
 }
@@ -321,21 +326,41 @@ func (a *AddBuffAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *AddBuffAction) Execute(ctx *ActionContext) error {
-	newBuff := core.NewBuff(a.BuffType, a.Duration)
-	a.TargetPlayer.AddBuff(newBuff)
-
-	// Subscribe buff to EventBus via lifecycle callback (handles phase subscriptions)
-	if ctx.OnAddBuff != nil {
-		ctx.OnAddBuff(a.TargetPlayer, newBuff)
+	if a.TargetPlayer == nil {
+		return errors.NewActionExecutionError("add_buff", "", "target player is nil", nil)
+	}
+	if ctx.OnAddBuff == nil {
+		return errors.NewActionExecutionError("add_buff", "", "OnAddBuff callback is nil", nil)
+	}
+	if ctx.GetBuffDuration == nil {
+		return errors.NewActionExecutionError("add_buff", "", "GetBuffDuration callback is nil", nil)
 	}
 
+	duration := ctx.GetBuffDuration(a.BuffType)
+
+	// Check if player already has this buff type (duration extend)
+	if a.TargetPlayer.HasBuff(a.BuffType) {
+		// Duration extend: Player.AddBuff handles duration merge internally
+		// OnAddBuff should NOT be called (buff already subscribed on EventBus)
+		// PhasePostBuffApplied should NOT be published (not a new buff application)
+		newBuff := core.NewBuff(a.BuffType, duration)
+		if err := a.TargetPlayer.AddBuff(newBuff); err != nil {
+			return errors.NewActionExecutionError("add_buff", a.TargetPlayer.ID.UUID(), "failed to extend buff duration", err)
+		}
+		// Mark as duration-extend so ExecuteAction skips PostTrigger
+		ctx.SetBool("buff_duration_extended", true)
+		return nil
+	}
+
+	// New buff: full lifecycle (add + subscribe + PhasePostBuffApplied)
+	newBuff := core.NewBuff(a.BuffType, duration)
+	ctx.OnAddBuff(a.TargetPlayer, newBuff)
 	return nil
 }
 
 func (a *AddBuffAction) LogEntry() gamelog.LogEntry {
 	metadata := util.NewMetadata()
 	metadata.SetString("buff_type", string(a.BuffType))
-	metadata.SetInt("duration", a.Duration)
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
@@ -381,17 +406,14 @@ func (a *RemoveBuffAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *RemoveBuffAction) Execute(ctx *ActionContext) error {
-	// Unsubscribe buff from EventBus via lifecycle callback, then remove from player
-	if ctx.OnRemoveBuff != nil {
-		removed := ctx.OnRemoveBuff(a.TargetPlayer, a.BuffType)
-		// OnRemoveBuff already handles EventBus unsubscription and player.RemoveBuff
-		// If callback returned nil, fall through to direct removal
-		if removed != nil {
-			return nil
-		}
+	if a.TargetPlayer == nil {
+		return errors.NewActionExecutionError("remove_buff", "", "target player is nil", nil)
 	}
-
-	a.TargetPlayer.RemoveBuff(a.BuffType)
+	if ctx.OnRemoveBuff == nil {
+		return errors.NewActionExecutionError("remove_buff", "", "OnRemoveBuff callback is nil", nil)
+	}
+	// OnRemoveBuff handles EventBus unsubscription and player.RemoveBuff
+	ctx.OnRemoveBuff(a.TargetPlayer, a.BuffType)
 	return nil
 }
 
@@ -444,6 +466,9 @@ func (a *TeleportAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *TeleportAction) Execute(ctx *ActionContext) error {
+	if a.TargetPlayer == nil {
+		return errors.NewActionExecutionError("teleport", "", "target player is nil", nil)
+	}
 	a.TargetPlayer.Position = a.TargetPos
 	return nil
 }
@@ -811,6 +836,10 @@ func (a *FellDownAction) Execute(ctx *ActionContext) error {
 		if err := a.TargetPlayer.ApplyDamage(a.Damage); err != nil {
 			return errors.NewActionExecutionError("fell_down", a.TargetPlayer.ID.UUID(), "failed to apply fall damage", err)
 		}
+		// Derive DeathAction if player died from fall damage
+		if a.TargetPlayer.IsDead {
+			ctx.PushDerivedAction(NewDeathAction(a.TargetPlayer, a.SourceID, a.TargetPlayer.Position))
+		}
 	}
 	return nil
 }
@@ -819,6 +848,71 @@ func (a *FellDownAction) LogEntry() gamelog.LogEntry {
 	metadata := util.NewMetadata()
 	metadata.SetInt("position", a.Position)
 	metadata.SetInt("hp_change", -a.Damage)
+
+	return gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       constants.EntryTypeAction,
+		ActionType: string(a.Type()),
+		Target:     a.TargetPlayer.ID.UUID(),
+		Source:     a.SourceID,
+		Metadata:   metadata,
+	}
+}
+
+// ========== DeathAction ==========
+
+// DeathAction represents a player death event for client animation.
+// Pure rendering signal - does NOT modify IsDead (that's done by DamageAction/FellDownAction).
+// SourceID identifies what caused the death (e.g., "Buff_Corrupt", "FragileCell", "Event_Trap").
+type DeathAction struct {
+	TargetPlayer *core.Player // Player who died
+	SourceID     string       // What caused the death (for client rendering)
+	Position     int          // Where the death occurred (for client animation)
+}
+
+// NewDeathAction creates a new DeathAction.
+func NewDeathAction(target *core.Player, source string, position int) *DeathAction {
+	return &DeathAction{
+		TargetPlayer: target,
+		SourceID:     source,
+		Position:     position,
+	}
+}
+
+func (a *DeathAction) Type() constants.ActionType { return constants.ActionDeath }
+func (a *DeathAction) CanModify() bool            { return false }
+func (a *DeathAction) Source() string             { return a.SourceID }
+func (a *DeathAction) Target() string             { return a.TargetPlayer.ID.UUID() }
+
+// PreTriggerPhase returns PhaseAnyTime (death event is a notification, not interceptable).
+func (a *DeathAction) PreTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
+}
+
+// PostTriggerPhase returns PhaseAnyTime (no post-trigger for death).
+func (a *DeathAction) PostTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
+}
+
+func (a *DeathAction) Execute(ctx *ActionContext) error {
+	// Add DeathMark buff via OnAddBuff callback (like AddBuffAction)
+	// DeathMark blocks all subsequent Actions via PhasePreAction on EventBus.
+	if ctx.OnAddBuff == nil {
+		return errors.NewActionExecutionError("death", a.TargetPlayer.ID.UUID(), "OnAddBuff callback is nil", nil)
+	}
+	if ctx.GetBuffDuration == nil {
+		return errors.NewActionExecutionError("death", a.TargetPlayer.ID.UUID(), "GetBuffDuration callback is nil", nil)
+	}
+	duration := ctx.GetBuffDuration(constants.BuffTypeDeathMark)
+	deathMark := core.NewBuff(constants.BuffTypeDeathMark, duration)
+	ctx.OnAddBuff(a.TargetPlayer, deathMark)
+	return nil
+}
+
+func (a *DeathAction) LogEntry() gamelog.LogEntry {
+	metadata := util.NewMetadata()
+	metadata.SetInt("position", a.Position)
+	metadata.SetString("death_source", a.SourceID)
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),

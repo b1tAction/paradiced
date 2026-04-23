@@ -196,7 +196,7 @@ func registerAllEvents() {
 		Name:        "受到天使眷顾",
 		Desc:        "天使的祝福降临，获得神眷Buff",
 	}, &EventHandlerConfig{
-		Handler: createEventGiveBuffHandler(constants.BuffTypeDivine, 3),
+		Handler: createEventGiveBuffHandler(constants.BuffTypeDivine),
 	})
 
 	// Neutral Events (Evaluation 41-65)
@@ -220,7 +220,7 @@ func registerAllEvents() {
 		Name:        "麻了",
 		Desc:        "身体麻木，获得隐匿Buff",
 	}, &EventHandlerConfig{
-		Handler: createEventGiveBuffHandler(constants.BuffTypeHidden, 3),
+		Handler: createEventGiveBuffHandler(constants.BuffTypeHidden),
 	})
 
 	// TasteTest: Random buff effect
@@ -288,7 +288,7 @@ func registerAllEvents() {
 		Name:        "虔诚拜三拜",
 		Desc:        "拜路边的野佛，获得诅咒Buff",
 	}, &EventHandlerConfig{
-		Handler: createEventGiveBuffHandler(constants.BuffTypeCurse, 3),
+		Handler: createEventGiveBuffHandler(constants.BuffTypeCurse),
 	})
 
 	// LostWay: Give Lost buff
@@ -299,7 +299,7 @@ func registerAllEvents() {
 		Name:        "迷途",
 		Desc:        "迷失方向，获得迷途Buff",
 	}, &EventHandlerConfig{
-		Handler: createEventGiveBuffHandler(constants.BuffTypeLost, 1),
+		Handler: createEventGiveBuffHandler(constants.BuffTypeLost),
 	})
 
 	// Thunder: HP to 0 (death)
@@ -360,7 +360,7 @@ func createEventModifyLPHandler(amount int) EffectHandler {
 }
 
 // createEventGiveBuffHandler creates a handler that gives a Buff through Action system.
-func createEventGiveBuffHandler(buffType constants.BuffType, duration int) EffectHandler {
+func createEventGiveBuffHandler(buffType constants.BuffType) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) error {
 		if ctx == nil || ctx.Player == nil {
 			return nil
@@ -372,7 +372,7 @@ func createEventGiveBuffHandler(buffType constants.BuffType, duration int) Effec
 			return nil
 		}
 
-		ctx.AddDerivedAction(engineaction.NewAddBuffAction(ctx.Player, buffType, duration, "Event_Effect"))
+		ctx.AddDerivedAction(engineaction.NewAddBuffAction(ctx.Player, buffType, "Event_Effect"))
 		return nil
 	}
 }

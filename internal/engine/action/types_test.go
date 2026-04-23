@@ -275,7 +275,7 @@ func TestModifyLPAction(t *testing.T) {
 func TestAddBuffAction(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 
-	action := NewAddBuffAction(player, constants.BuffTypeDivine, 3, "Event_DivineGift")
+	action := NewAddBuffAction(player, constants.BuffTypeDivine, "Event_DivineGift")
 
 	if action.Type() != constants.ActionAddBuff {
 		t.Errorf("Type should be ActionAddBuff, got %s", action.Type())
@@ -288,6 +288,8 @@ func TestAddBuffAction(t *testing.T) {
 	}
 
 	ctx := NewActionContext(nil, nil, nil, nil)
+	ctx.OnAddBuff = func(p *core.Player, b *core.Buff) { p.AddBuff(b) }
+	ctx.GetBuffDuration = func(bt constants.BuffType) int { return 3 }
 	action.Execute(ctx)
 
 	if len(player.ActiveBuffs) != 1 {
@@ -320,6 +322,12 @@ func TestRemoveBuffAction(t *testing.T) {
 	action := NewRemoveBuffAction(player, constants.BuffTypeCurse, "Manual_Remove")
 
 	ctx := NewActionContext(nil, nil, nil, nil)
+	// Provide OnRemoveBuff callback (required - handles RemoveBuff + EventBus unsubscription)
+	ctx.OnRemoveBuff = func(p *core.Player, bt constants.BuffType) *core.Buff {
+		buff := p.GetBuff(bt)
+		p.RemoveBuff(bt)
+		return buff
+	}
 	action.Execute(ctx)
 
 	if len(player.ActiveBuffs) != 1 {
@@ -503,7 +511,7 @@ func TestActionContextExecuteAction(t *testing.T) {
 }
 
 func TestActionContextProcessQueue(t *testing.T) {
-	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 100})
 	player.HP = 100
 
 	ctx := NewActionContext(nil, nil, nil, nil)
@@ -790,7 +798,7 @@ func TestHealActionZeroAmount(t *testing.T) {
 func TestAddBuffActionFull(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 
-	action := NewAddBuffAction(player, constants.BuffTypeDivine, 3, "Event_Gift")
+	action := NewAddBuffAction(player, constants.BuffTypeDivine, "Event_Gift")
 
 	// Test all methods
 	if action.Type() != constants.ActionAddBuff {
@@ -810,6 +818,8 @@ func TestAddBuffActionFull(t *testing.T) {
 	}
 
 	ctx := NewActionContext(nil, nil, nil, nil)
+	ctx.OnAddBuff = func(p *core.Player, b *core.Buff) { p.AddBuff(b) }
+	ctx.GetBuffDuration = func(bt constants.BuffType) int { return 3 }
 	action.Execute(ctx)
 
 	entry := action.LogEntry()
@@ -844,6 +854,11 @@ func TestRemoveBuffActionFull(t *testing.T) {
 	}
 
 	ctx := NewActionContext(nil, nil, nil, nil)
+	ctx.OnRemoveBuff = func(p *core.Player, bt constants.BuffType) *core.Buff {
+		buff := p.GetBuff(bt)
+		p.RemoveBuff(bt)
+		return buff
+	}
 	action.Execute(ctx)
 
 	entry := action.LogEntry()
@@ -1198,7 +1213,7 @@ func TestActionPhases(t *testing.T) {
 		{"HealAction", NewHealAction(player, 10, "test"), constants.PhaseAnyTime, constants.PhaseAnyTime},
 		{"ModifyLPAction", NewModifyLPAction(player, 1, "test"), constants.PhaseAnyTime, constants.PhaseAnyTime},
 		{"MoveAction", NewMoveAction(player, 5, "test"), constants.PhaseAnyTime, constants.PhaseAnyTime},
-		{"AddBuffAction", NewAddBuffAction(player, constants.BuffTypeDivine, 3, "test"), constants.PhasePreBuffApplied, constants.PhasePostBuffApplied},
+		{"AddBuffAction", NewAddBuffAction(player, constants.BuffTypeDivine, "test"), constants.PhasePreBuffApplied, constants.PhasePostBuffApplied},
 		{"RemoveBuffAction", NewRemoveBuffAction(player, constants.BuffTypeDivine, "test"), constants.PhasePreBuffRemoved, constants.PhasePostBuffRemoved},
 		{"RespawnAction", NewRespawnAction(player, 50, "test"), constants.PhasePreRespawn, constants.PhaseAnyTime},
 		{"TeleportAction", NewTeleportAction(player, 20, "test"), constants.PhaseAnyTime, constants.PhaseAnyTime},
@@ -1452,9 +1467,12 @@ func TestRespawnActionExecute(t *testing.T) {
 func TestAddBuffActionExecute(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 
-	action := NewAddBuffAction(player, constants.BuffTypeDivine, 3, "test")
+	action := NewAddBuffAction(player, constants.BuffTypeDivine, "test")
 
 	ctx := NewActionContext(nil, nil, nil, nil)
+	// Provide OnAddBuff callback (required for buff lifecycle - handles AddBuff + EventBus subscription)
+	ctx.OnAddBuff = func(p *core.Player, b *core.Buff) { p.AddBuff(b) }
+	ctx.GetBuffDuration = func(bt constants.BuffType) int { return 3 }
 	err := action.Execute(ctx)
 
 	if err != nil {

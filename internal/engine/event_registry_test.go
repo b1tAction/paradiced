@@ -190,9 +190,6 @@ func TestDivineBlessEventHandler(t *testing.T) {
 	if addBuffAction.BuffType != constants.BuffTypeDivine {
 		t.Errorf("BuffType = %s, expected Divine", addBuffAction.BuffType)
 	}
-	if addBuffAction.Duration != 3 {
-		t.Errorf("Duration = %d, expected 3", addBuffAction.Duration)
-	}
 }
 
 func TestExchangeEventHandler(t *testing.T) {
@@ -397,9 +394,6 @@ func TestCurseBuddhaEventHandler(t *testing.T) {
 	if addBuffAction.BuffType != constants.BuffTypeCurse {
 		t.Errorf("BuffType = %s, expected Curse", addBuffAction.BuffType)
 	}
-	if addBuffAction.Duration != 3 {
-		t.Errorf("Duration = %d, expected 3", addBuffAction.Duration)
-	}
 }
 
 func TestLostWayEventHandler(t *testing.T) {
@@ -428,9 +422,6 @@ func TestLostWayEventHandler(t *testing.T) {
 	}
 	if addBuffAction.BuffType != constants.BuffTypeLost {
 		t.Errorf("BuffType = %s, expected Lost", addBuffAction.BuffType)
-	}
-	if addBuffAction.Duration != 1 {
-		t.Errorf("Duration = %d, expected 1", addBuffAction.Duration)
 	}
 }
 
