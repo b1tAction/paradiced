@@ -195,15 +195,9 @@ func TestGameSubscribeBuff(t *testing.T) {
 	buff := core.NewBuff(constants.BuffTypeCurse, 3)
 	game.SubscribeBuff(player, buff)
 
-	// 验证订阅已创建
-	config := GetBuffHandlerConfig(constants.BuffTypeCurse)
-	for _, phase := range config.GetPhases() {
-		if phase.NeedsSubscription() {
-			if game.Bus.GetSubscriptionCount() != 1 {
-				t.Errorf("Subscription count = %d, expected 1", game.Bus.GetSubscriptionCount())
-			}
-			// Subscription managed by EventBus via sourceID
-		}
+	// 验证订阅已创建 (Curse subscribes to PostBuffApplied + PreBuffRemoved = 2 subscriptions)
+	if game.Bus.GetSubscriptionCount() != 2 {
+		t.Errorf("Subscription count = %d, expected 2 (Curse: PostBuffApplied + PreBuffRemoved)", game.Bus.GetSubscriptionCount())
 	}
 }
 
@@ -232,19 +226,18 @@ func TestGameUnsubscribeBuff(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: playerID})
 	game.AddPlayer(player)
 
-	// 订阅 Buff
+	// 订阅 Buff (Curse subscribes to PostBuffApplied + PreBuffRemoved = 2 subs)
 	buff := core.NewBuff(constants.BuffTypeCurse, 3)
 	game.SubscribeBuff(player, buff)
 
 	initialCount := game.Bus.GetSubscriptionCount()
 
-	// 取消订阅
+	// 取消订阅 (removes all subscriptions for this buff)
 	game.UnsubscribeBuff(buff)
 
-	if game.Bus.GetSubscriptionCount() != initialCount-1 {
-		t.Errorf("Subscription count should decrease after unsubscribe")
+	if game.Bus.GetSubscriptionCount() != initialCount-2 {
+		t.Errorf("Subscription count should decrease by 2 after unsubscribe, got %d expected %d", game.Bus.GetSubscriptionCount(), initialCount-2)
 	}
-	// Subscription managed by EventBus via sourceID
 }
 
 func TestGameSubscribeBuffByPlayerAdd(t *testing.T) {
@@ -352,9 +345,9 @@ func TestGameMultipleBuffSubscriptions(t *testing.T) {
 	game.AddPlayer(player)
 
 	// 添加多个 Buff
-	buff1 := core.NewBuff(constants.BuffTypeCurse, 3)  // BeforeTurn
-	buff2 := core.NewBuff(constants.BuffTypeDivine, 3) // BeforeTurn
-	buff3 := core.NewBuff(constants.BuffTypeHidden, 3) // PreDamage
+	buff1 := core.NewBuff(constants.BuffTypeCurse, 3)  // PostBuffApplied + PreBuffRemoved = 2 subs
+	buff2 := core.NewBuff(constants.BuffTypeDivine, 3) // PostBuffApplied + PreBuffRemoved = 2 subs
+	buff3 := core.NewBuff(constants.BuffTypeHidden, 3) // PreBuffApplied = 1 sub
 
 	player.AddBuff(buff1)
 	player.AddBuff(buff2)
@@ -364,9 +357,9 @@ func TestGameMultipleBuffSubscriptions(t *testing.T) {
 	game.SubscribeBuff(player, buff2)
 	game.SubscribeBuff(player, buff3)
 
-	// 应该有 3 个订阅
-	if game.Bus.GetSubscriptionCount() != 3 {
-		t.Errorf("Subscription count = %d, expected 3", game.Bus.GetSubscriptionCount())
+	// Curse(2) + Divine(2) + Hidden(1) = 5 subscriptions
+	if game.Bus.GetSubscriptionCount() != 5 {
+		t.Errorf("Subscription count = %d, expected 5", game.Bus.GetSubscriptionCount())
 	}
 }
 
@@ -377,7 +370,7 @@ func TestGameMixedSubscriptions(t *testing.T) {
 	game.AddPlayer(player)
 
 	// 添加 Buff 和道具
-	buff := core.NewBuff(constants.BuffTypeCurse, 3)
+	buff := core.NewBuff(constants.BuffTypeCurse, 3) // PostBuffApplied + PreBuffRemoved = 2 subs
 	item := core.NewItem(constants.ItemTypeDiceUpgrade)
 
 	player.AddBuff(buff)
@@ -386,9 +379,9 @@ func TestGameMixedSubscriptions(t *testing.T) {
 	game.SubscribeBuff(player, buff)
 	game.SubscribeItem(player, item)
 
-	// 验证订阅数（两个都需要订阅）
-	if game.Bus.GetSubscriptionCount() != 2 {
-		t.Errorf("Subscription count = %d, expected 2", game.Bus.GetSubscriptionCount())
+	// Curse(2) + DiceUpgrade(1) = 3 subscriptions
+	if game.Bus.GetSubscriptionCount() != 3 {
+		t.Errorf("Subscription count = %d, expected 3", game.Bus.GetSubscriptionCount())
 	}
 }
 
@@ -495,9 +488,9 @@ func TestGameRemoveBuffFromPlayer(t *testing.T) {
 		t.Error("Player should not have Curse buff after removal")
 	}
 
-	// 验证订阅已取消
-	if game.Bus.GetSubscriptionCount() != initialSubCount-1 {
-		t.Errorf("Subscription count should decrease after removal")
+	// 验证订阅已取消 (Curse had 2 subscriptions: PostBuffApplied + PreBuffRemoved)
+	if game.Bus.GetSubscriptionCount() != initialSubCount-2 {
+		t.Errorf("Subscription count should decrease by 2 after removal, got %d expected %d", game.Bus.GetSubscriptionCount(), initialSubCount-2)
 	}
 }
 
