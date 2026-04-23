@@ -3,21 +3,27 @@ package nakama
 import (
 	"errors"
 
+	"github.com/b1tAction/paradiced/internal/engine/hsm"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	pkgerrors "github.com/b1tAction/paradiced/pkg/errors"
-	"github.com/b1tAction/paradiced/internal/engine/hsm"
 )
 
 // ErrorCodeForError maps internal error types to client-facing error codes.
 // This function is the central place for error code mapping.
 //
+// Mapping strategy: type-based classification with recursive unwrapping.
+// HSMError and InternalError wrap underlying errors; we unwrap them
+// to classify based on the root cause type, not message strings.
+//
 // Mapping rules:
 // - ValidationError         -> ErrInvalidParameter (1001)
 // - ActionExecutionError    -> ErrInternal (3001)
-// - HSMError (player nil)   -> ErrPlayerNotFound (2001)
-// - HSMError (invalid)      -> ErrInvalidState (1002)
-// - StateError (player nil) -> ErrPlayerNotFound (2001)
-// - InternalError           -> ErrInternal (3001)
+// - HSMError                -> unwrap Err, classify root cause
+//   - root ValidationError  -> ErrInvalidParameter
+//   - root InternalError    -> classify by context
+//   - no Err (message only) -> fallback message-based
+// - StateError              -> classify by Message (StateError has no Err)
+// - InternalError           -> unwrap Err, classify root cause
 // - Default                 -> ErrInternal (3001)
 func ErrorCodeForError(err error) constants.ErrorCode {
 	if err == nil {
@@ -36,20 +42,36 @@ func ErrorCodeForError(err error) constants.ErrorCode {
 		return constants.ErrInternal
 	}
 
-	// HSMError -> depends on message
+	// InternalError -> unwrap and classify root cause
+	var internalErr *pkgerrors.InternalError
+	if errors.As(err, &internalErr) {
+		if internalErr.Err != nil {
+			// Recursively classify the wrapped error
+			return ErrorCodeForError(internalErr.Err)
+		}
+		return constants.ErrInternal
+	}
+
+	// HSMError -> unwrap and classify underlying error
 	var hsmErr *pkgerrors.HSMError
 	if errors.As(err, &hsmErr) {
+		if hsmErr.Err != nil {
+			// Classify based on the wrapped error type
+			return ErrorCodeForError(hsmErr.Err)
+		}
+		// HSMError with no underlying error - use message-based fallback
+		// (only for cases where Message is the sole error indicator)
 		switch hsmErr.Message {
 		case "player is nil":
 			return constants.ErrPlayerNotFound
-		case "invalid state", "state execution failed":
-			return constants.ErrInvalidState
 		default:
-			return constants.ErrInternal
+			return constants.ErrInvalidState
 		}
 	}
 
-	// StateError -> depends on message
+	// StateError -> classify based on message
+	// StateError has no Err field, so message-based classification
+	// is the only option here.
 	var stateErr *hsm.StateError
 	if errors.As(err, &stateErr) {
 		switch stateErr.Message {
@@ -58,12 +80,6 @@ func ErrorCodeForError(err error) constants.ErrorCode {
 		default:
 			return constants.ErrInvalidState
 		}
-	}
-
-	// InternalError -> 3001
-	var internalErr *pkgerrors.InternalError
-	if errors.As(err, &internalErr) {
-		return constants.ErrInternal
 	}
 
 	// Default

@@ -35,26 +35,29 @@ func TestErrorCodeForActionExecutionError(t *testing.T) {
 }
 
 func TestErrorCodeForHSMErrorPlayerNil(t *testing.T) {
-	err := pkgerrors.NewHSMError("TurnUpkeep", 2, "Enter", errors.New("underlying error"), "player is nil")
+	// HSMError with nil Err falls through to message-based fallback
+	err := pkgerrors.NewHSMError("TurnUpkeep", 2, "Enter", nil, "player is nil")
 	code := ErrorCodeForError(err)
 	if code != constants.ErrPlayerNotFound {
-		t.Errorf("HSMError with 'player is nil' should return ErrPlayerNotFound (2001), got %d", code)
+		t.Errorf("HSMError with nil Err and 'player is nil' should return ErrPlayerNotFound (2001), got %d", code)
 	}
 }
 
 func TestErrorCodeForHSMErrorInvalidState(t *testing.T) {
-	err := pkgerrors.NewHSMError("TurnUpkeep", 2, "Enter", errors.New("underlying error"), "invalid state")
+	// HSMError with nil Err falls through to message-based fallback
+	err := pkgerrors.NewHSMError("TurnUpkeep", 2, "Enter", nil, "invalid state")
 	code := ErrorCodeForError(err)
 	if code != constants.ErrInvalidState {
-		t.Errorf("HSMError with 'invalid state' should return ErrInvalidState (1002), got %d", code)
+		t.Errorf("HSMError with nil Err and 'invalid state' should return ErrInvalidState (1002), got %d", code)
 	}
 }
 
 func TestErrorCodeForHSMErrorStateExecutionFailed(t *testing.T) {
-	err := pkgerrors.NewHSMError("TurnUpkeep", 2, "Enter", errors.New("underlying error"), "state execution failed")
+	// HSMError with nil Err falls through to message-based fallback
+	err := pkgerrors.NewHSMError("TurnUpkeep", 2, "Enter", nil, "state execution failed")
 	code := ErrorCodeForError(err)
 	if code != constants.ErrInvalidState {
-		t.Errorf("HSMError with 'state execution failed' should return ErrInvalidState (1002), got %d", code)
+		t.Errorf("HSMError with nil Err and 'state execution failed' should return ErrInvalidState (1002), got %d", code)
 	}
 }
 
@@ -121,6 +124,7 @@ func TestErrorCodeForInternalErrorWrappingOther(t *testing.T) {
 }
 
 func TestErrorCodeForHSMErrorAllMessageVariants(t *testing.T) {
+	// HSMError with nil Err uses message-based fallback classification
 	testCases := []struct {
 		message    string
 		expected   constants.ErrorCode
@@ -129,12 +133,33 @@ func TestErrorCodeForHSMErrorAllMessageVariants(t *testing.T) {
 		{"player is nil", constants.ErrPlayerNotFound, "player is nil"},
 		{"invalid state", constants.ErrInvalidState, "invalid state"},
 		{"state execution failed", constants.ErrInvalidState, "state execution failed"},
-		{"some other error", constants.ErrInternal, "other message"},
-		{"", constants.ErrInternal, "empty message"},
+		{"some other error", constants.ErrInvalidState, "other message"},
+		{"", constants.ErrInvalidState, "empty message"},
 	}
 
 	for _, tc := range testCases {
-		err := pkgerrors.NewHSMError("TurnUpkeep", 2, "Enter", errors.New("underlying"), tc.message)
+		err := pkgerrors.NewHSMError("TurnUpkeep", 2, "Enter", nil, tc.message)
+		code := ErrorCodeForError(err)
+		if code != tc.expected {
+			t.Errorf("%s: expected %d, got %d", tc.desc, tc.expected, code)
+		}
+	}
+}
+
+func TestErrorCodeForHSMErrorWithUnderlyingTypedErrors(t *testing.T) {
+	// HSMError wrapping typed errors: recursive unwrapping classifies by root cause type
+	testCases := []struct {
+		underlying error
+		expected   constants.ErrorCode
+		desc       string
+	}{
+		{pkgerrors.NewValidationError("field", "value", "invalid"), constants.ErrInvalidParameter, "HSMError wrapping ValidationError"},
+		{pkgerrors.NewInternalError("Component", "Method", nil), constants.ErrInternal, "HSMError wrapping InternalError with nil Err"},
+		{errors.New("generic error"), constants.ErrInternal, "HSMError wrapping generic error"},
+	}
+
+	for _, tc := range testCases {
+		err := pkgerrors.NewHSMError("TurnUpkeep", 2, "Enter", tc.underlying, "some message")
 		code := ErrorCodeForError(err)
 		if code != tc.expected {
 			t.Errorf("%s: expected %d, got %d", tc.desc, tc.expected, code)
