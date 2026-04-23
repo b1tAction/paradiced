@@ -164,9 +164,15 @@ func (h *NakamaMatchHandler) handleRollDice(sender string) error {
 		return err
 	}
 
+	// Check if state execution produced an error
+	if ctx.Error != nil {
+		logger.logError("OpRollDice", sender, ctx.Error)
+		h.logError("handleRollDice: state execution failed", "sender", sender, "error", ctx.Error)
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpRollDice, ErrorCodeForError(ctx.Error), ctx.Error.Error())
+	}
+
 	logger.logResponse("OpRollDice", sender, "dice rolled successfully")
-	h.logDebug("handleRollDice: OnRollDice returned", "error", err)
-	return err
+	return nil
 }
 
 // handleUseItem handles item usage request.
@@ -249,8 +255,15 @@ func (h *NakamaMatchHandler) handleUseItem(sender string, data []byte) error {
 		return err
 	}
 
+	// Check if state execution produced an error
+	if ctx.Error != nil {
+		logger.logError("OpUseItem", sender, ctx.Error)
+		h.logError("handleUseItem: state execution failed", "sender", sender, "error", ctx.Error)
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpUseItem, ErrorCodeForError(ctx.Error), ctx.Error.Error())
+	}
+
 	logger.logResponse("OpUseItem", sender, "item used successfully")
-	return err
+	return nil
 }
 
 // handleUseSkill handles faction skill usage request.
