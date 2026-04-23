@@ -50,8 +50,8 @@ mockDispatcher := nakama.NewMockDispatcherAdapter()
 handler.WithDispatcher(mockDispatcher)
 
 // 添加玩家
-handler.addPlayer("user-001", protocol.FactionQingLong)
-handler.addPlayer("user-002", protocol.FactionZhuQue)
+handler.addPlayer(id.TestUUID(1), protocol.FactionQingLong)
+handler.addPlayer(id.TestUUID(2), protocol.FactionZhuQue)
 
 // 初始化游戏
 handler.MatchInit()
@@ -90,14 +90,14 @@ func TestBroadcast(t *testing.T) {
 ```go
 // 客户端发送投骰子请求
 data, _ := json.Marshal(RollDiceRequest{OpCode: "1"})
-handler.HandleMessage("user-001", data)
+handler.HandleMessage(id.TestUUID(1), data)
 
 // 客户端发送道具使用请求
 data, _ := json.Marshal(UseItemRequest{
     OpCode: "2",
     ItemID: "item-uuid",
 })
-handler.HandleMessage("user-001", data)
+handler.HandleMessage(id.TestUUID(1), data)
 ```
 
 ## 消息 OpCode 路由
@@ -301,12 +301,12 @@ dispatcher.RefreshPresences()  // 刷新连接列表
 
 ```go
 // 玩家断线
-handler.HandlePresenceLeave("user-001")
-// 玩家仍在 players map 中，但 disconnected["user-001"] = true
+handler.HandlePresenceLeave(id.TestUUID(1))
+// 玩家仍在 players map 中，但 disconnected[id.TestUUID(1)] = true
 
 // 玩家重连
-handler.HandlePresenceJoin("user-001", nil)
-// disconnected["user-001"] = false
+handler.HandlePresenceJoin(id.TestUUID(1), nil)
+// disconnected[id.TestUUID(1)] = false
 // 发送完整状态同步 (FullSync) 给重连玩家
 ```
 

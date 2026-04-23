@@ -49,15 +49,14 @@ func (a *NakamaBroadcastAdapter) BroadcastStateSync(state *net.StateSync) error 
 		return nil // No dispatcher set
 	}
 
-	// Inject ClientID and DisplayName into each Player for client-side self-identification
-	// Each client will find themselves in the Players array by matching ClientID
+	// Inject DisplayName into each Player for client-side UI rendering.
+	// PlayerID already equals Nakama userID, so clients can self-identify by matching PlayerID.
 	if state != nil && a.handler != nil {
 		for i := range state.Players {
 			// Find Nakama userID for this player by matching PlayerID
 			for userID, player := range a.handler.players {
 				if player != nil && player.ID.UUID() == state.Players[i].PlayerID {
-					state.Players[i].ClientID = userID
-					// Extract display_name from Player.Metadata, fallback to userID
+					// Extract display_name from Player.Metadata, fallback to userID (which equals PlayerID)
 					state.Players[i].DisplayName = player.Metadata.GetStringOrDefault("display_name", userID)
 					break
 				}
@@ -130,27 +129,8 @@ func (a *NakamaBroadcastAdapter) BroadcastMiniGameStart(start *net.MiniGameStart
 		"game_type", start.GameType,
 		"players_count", len(start.Players))
 
-	// Convert PlayerID to UserID for client-side matching
-	// Clients will match their UserID against this array
-	if start != nil && a.handler != nil {
-		userIDs := make([]string, len(start.Players))
-		for i, playerID := range start.Players {
-			// Find UserID for this PlayerID
-			found := false
-			for userID, player := range a.handler.players {
-				if player != nil && player.ID.UUID() == playerID {
-					userIDs[i] = userID
-					found = true
-					break
-				}
-			}
-			if !found {
-				// Fallback to PlayerID if UserID not found
-				userIDs[i] = playerID
-			}
-		}
-		start.Players = userIDs
-	}
+	// PlayerID already equals Nakama userID, no conversion needed.
+	// The Players array already contains PlayerIDs which clients can match against.
 
 	data, err := json.Marshal(start)
 	if err != nil {
@@ -168,13 +148,12 @@ func (a *NakamaBroadcastAdapter) BroadcastMiniGameResult(result *net.MiniGameRes
 		return nil // No dispatcher set
 	}
 
-	// Convert PlayerID to ClientID in rankings for client-side matching,
-	// and inject DisplayName for UI rendering.
+	// Inject DisplayName for UI rendering.
+	// PlayerID already equals Nakama userID, no need for conversion.
 	if result != nil && a.handler != nil {
 		for i := range result.Rankings {
 			for userID, player := range a.handler.players {
 				if player != nil && player.ID.UUID() == result.Rankings[i].PlayerID {
-					result.Rankings[i].PlayerID = userID
 					result.Rankings[i].DisplayName = player.Metadata.GetStringOrDefault("display_name", userID)
 					break
 				}
@@ -196,21 +175,22 @@ func (a *NakamaBroadcastAdapter) BroadcastGameOver(over *net.GameOver) error {
 		return nil // No dispatcher set
 	}
 
-	// Convert PlayerID to ClientID for client-side matching
+	// Inject DisplayName for UI rendering.
+	// PlayerID already equals Nakama userID, no need for conversion.
 	if over != nil && a.handler != nil {
-		// Convert WinnerID
+		// Inject DisplayName for WinnerID
 		for userID, player := range a.handler.players {
 			if player != nil && player.ID.UUID() == over.WinnerID {
-				over.WinnerID = userID
+				over.WinnerID = player.Metadata.GetStringOrDefault("display_name", userID)
 				break
 			}
 		}
 
-		// Convert Stats PlayerIDs
+		// Inject DisplayName for Stats
 		for i := range over.Stats {
 			for userID, player := range a.handler.players {
 				if player != nil && player.ID.UUID() == over.Stats[i].PlayerID {
-					over.Stats[i].PlayerID = userID
+					over.Stats[i].PlayerID = player.Metadata.GetStringOrDefault("display_name", userID)
 					break
 				}
 			}

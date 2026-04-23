@@ -264,8 +264,9 @@ func (h *NakamaMatchHandler) getCurrentPlayer() *core.Player {
 // addPlayer adds a new player to the match.
 // Called during MatchInit or when players join.
 // displayName is stored in Player.Metadata for protocol synchronization.
+// Note: PlayerID is parsed from Nakama userID - they are the same ID for client-side matching.
 func (h *NakamaMatchHandler) addPlayer(userID string, faction constants.Faction, displayName string) *core.Player {
-	playerID := id.NewPlayerID()
+	playerID := id.MustParsePlayerID(userID)
 	player := core.NewPlayer(core.PlayerConfig{
 		ID:      playerID,
 		MaxHP:   6,
@@ -301,8 +302,10 @@ func (h *NakamaMatchHandler) assignFactions() {
 	// Buff initialization is handled by engine.InitializePlayerFactionBuffs().
 }
 
-// broadcastErrorState broadcasts an error state to all clients.
+// broadcastErrorState broadcasts an error state to all connected clients.
 // Used when a state execution error occurs during MatchLoop.
+// Returns nil for non-critical errors (MatchLoop continues) or the error
+// itself for critical errors (MatchLoop stops).
 func (h *NakamaMatchHandler) broadcastErrorState(errCode constants.ErrorCode, message string) error {
 	// Log error for debugging
 	if h.logger != nil {
@@ -311,6 +314,28 @@ func (h *NakamaMatchHandler) broadcastErrorState(errCode constants.ErrorCode, me
 			"message", message)
 	}
 
-	// Return error to stop MatchLoop - error will be handled by Nakama runtime
+	// Broadcast current state sync to all connected players
+	broadcastAdapter := NewNakamaBroadcastAdapter(h)
+	builder := net.NewBuilder(h.hsm)
+	if broadcastAdapter != nil && builder != nil {
+		stateSync := builder.BuildStateSync()
+		if stateSync != nil {
+			broadcastAdapter.BroadcastStateSync(stateSync)
+		}
+
+		// Send ActionRejected to all players so they know an error occurred
+		rejected := pkgnet.ActionRejected{
+			OpCode:    pkgnet.OpStateSync,
+			ErrorCode: errCode,
+			Reason:    errCode.ToReason(),
+			Message:   message,
+		}
+		for _, userID := range h.playerList {
+			broadcastAdapter.SendActionRejected(userID, &rejected)
+		}
+	}
+
+	// Return nil so MatchLoop continues running for non-critical errors.
+	// For critical system errors, the caller may decide to stop MatchLoop.
 	return nil
 }
