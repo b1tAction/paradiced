@@ -35,7 +35,7 @@ func TestMapConfigBuildMapEngine(t *testing.T) {
 		t.Fatalf("LoadDefault failed: %v", err)
 	}
 
-	engine := config.BuildMapEngine()
+	engine := BuildMapEngineFromConfig(config)
 
 	if engine.Length != 20 {
 		t.Errorf("engine.Length = %d, want 20", engine.Length)
