@@ -308,6 +308,11 @@ func (hsm *HSM) transitionGlobal(target State, ctx *StateContext) error {
 	ctx.StartTime = hsm.stateEnterTime
 	target.Enter(ctx)
 
+	// Check for Enter errors before proceeding
+	if ctx.Error != nil {
+		return ctx.Error
+	}
+
 	// Check if state wants immediate transition (auto-proceed)
 	nextID := target.Update(ctx)
 	if nextID != StateNone && nextID != target.ID() {
@@ -344,9 +349,12 @@ func (hsm *HSM) transitionTurn(target State, ctx *StateContext) error {
 	ctx.WithPlayer(hsm.turnPlayer)
 	ctx.StartTime = hsm.stateEnterTime
 
-	fmt.Printf("[hsm] transitionTurn: target=%s, dice_steps=%d\n", target.ID().String(), ctx.GetDiceSteps())
-
 	target.Enter(ctx)
+
+	// Check for Enter errors before proceeding
+	if ctx.Error != nil {
+		return ctx.Error
+	}
 
 	// Check for decisions requiring user input
 	if len(ctx.Decisions) > 0 {
@@ -377,6 +385,11 @@ func (hsm *HSM) transitionInterrupt(target State, ctx *StateContext) error {
 
 	ctx.StartTime = hsm.stateEnterTime
 	target.Enter(ctx)
+
+	// Check for Enter errors in interrupt state
+	if ctx.Error != nil {
+		return ctx.Error
+	}
 
 	return nil
 }
@@ -435,6 +448,12 @@ func (hsm *HSM) PopInterrupt(ctx *StateContext) error {
 	// Continue execution with restored context
 	entry.Context.StartTime = time.Now()
 	nextID := entry.State.Update(entry.Context)
+
+	// Check for errors in resumed state
+	if entry.Context.Error != nil {
+		return entry.Context.Error
+	}
+
 	if nextID != StateNone && nextID != entry.StateID {
 		return hsm.TransitionTo(nextID, entry.Context)
 	}
@@ -635,10 +654,7 @@ func (hsm *HSM) OnRollDice(steps int, ctx *StateContext) error {
 
 	// Trigger update to check for state transition
 	nextID := hsm.turnState.Update(ctx)
-	fmt.Printf("[hsm] OnRollDice: diceRolled=%v, steps=%d, nextID=%s, currentTurnStateID=%s\n",
-		hsm.turnState.(*MainActionState).diceRolled, steps, nextID.String(), hsm.turnStateID.String())
 	if nextID != StateNone && nextID != hsm.turnStateID {
-		fmt.Printf("[hsm] OnRollDice: transitioning to %s\n", nextID.String())
 		return hsm.TransitionTo(nextID, ctx)
 	}
 
