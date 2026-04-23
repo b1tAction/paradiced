@@ -67,11 +67,11 @@ func TestNewPlayer(t *testing.T) {
 	if player.Faction != constants.FactionQingLong {
 		t.Errorf("player.Faction = %s, expected QingLong", player.Faction)
 	}
-	if player.HP != 10 {
-		t.Errorf("player.HP = %d, expected 10", player.HP)
+	if player.HP != 6 {
+		t.Errorf("player.HP = %d, expected 6 (InitHP default)", player.HP)
 	}
-	if player.LP != 5 {
-		t.Errorf("player.LP = %d, expected 5", player.LP)
+	if player.LP != 4 {
+		t.Errorf("player.LP = %d, expected 4 (InitLP default)", player.LP)
 	}
 	if player.Position != 0 {
 		t.Errorf("player.Position = %d, expected 0", player.Position)
@@ -106,11 +106,11 @@ func TestNewPlayerDefaultConfig(t *testing.T) {
 	}
 
 	player := NewPlayer(config)
-	if player.HP != DefaultPlayerConfig.MaxHP {
-		t.Errorf("player.HP = %d, expected default %d", player.HP, DefaultPlayerConfig.MaxHP)
+	if player.HP != DefaultPlayerConfig.InitHP {
+		t.Errorf("player.HP = %d, expected default %d", player.HP, DefaultPlayerConfig.InitHP)
 	}
-	if player.LP != DefaultPlayerConfig.MaxLP {
-		t.Errorf("player.LP = %d, expected default %d", player.LP, DefaultPlayerConfig.MaxLP)
+	if player.LP != DefaultPlayerConfig.InitLP {
+		t.Errorf("player.LP = %d, expected default %d", player.LP, DefaultPlayerConfig.InitLP)
 	}
 }
 
@@ -132,8 +132,8 @@ func TestApplyDamage(t *testing.T) {
 	if player.IsDead {
 		t.Error("player should not be dead")
 	}
-	if player.HP != 7 {
-		t.Errorf("player.HP = %d, expected 7", player.HP)
+	if player.HP != 3 {
+		t.Errorf("player.HP = %d, expected 3", player.HP)
 	}
 }
 
@@ -180,8 +180,8 @@ func TestApplyDamageHiddenImmune(t *testing.T) {
 		t.Error("player with Hidden buff should be immune to damage")
 	}
 	// HP should remain initial value
-	if player.HP != DefaultPlayerConfig.MaxHP {
-		t.Errorf("player.HP = %d, expected %d (immune)", player.HP, DefaultPlayerConfig.MaxHP)
+	if player.HP != DefaultPlayerConfig.InitHP {
+		t.Errorf("player.HP = %d, expected %d (immune)", player.HP, DefaultPlayerConfig.InitHP)
 	}
 }
 
@@ -207,22 +207,22 @@ func TestHeal(t *testing.T) {
 func TestModifyLP(t *testing.T) {
 	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID(), MaxLP: 5})
 
-	// Increase LP
+	// Increase LP (InitLP=4, MaxLP=5)
 	player.ModifyLP(2)
-	if player.LP != 7 {
-		t.Errorf("player.LP = %d, expected 7", player.LP)
+	if player.LP != 5 {
+		t.Errorf("player.LP = %d, expected 5 (capped at MaxLP)", player.LP)
 	}
 
-	// Upper limit
+	// Already at max, stays at MaxLP
 	player.ModifyLP(5)
-	if player.LP != 8 {
-		t.Errorf("player.LP = %d, expected 8 (max)", player.LP)
+	if player.LP != 5 {
+		t.Errorf("player.LP = %d, expected 5 (max)", player.LP)
 	}
 
 	// Decrease LP
 	player.ModifyLP(-3)
-	if player.LP != 5 {
-		t.Errorf("player.LP = %d, expected 5", player.LP)
+	if player.LP != 2 {
+		t.Errorf("player.LP = %d, expected 2", player.LP)
 	}
 
 	// Lower limit
@@ -271,8 +271,8 @@ func TestRespawn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Respawn failed: %v", err)
 	}
-	if player.HP != DefaultPlayerConfig.MaxHP {
-		t.Errorf("player.HP = %d, expected %d", player.HP, DefaultPlayerConfig.MaxHP)
+	if player.HP != 10 {
+		t.Errorf("player.HP = %d, expected %d (p.MaxHP)", player.HP, 10)
 	}
 	if player.IsDead {
 		t.Error("player should not be dead after respawn")
@@ -588,7 +588,7 @@ func TestPlayerString(t *testing.T) {
 	player.AddBuff(NewBuff(constants.BuffTypeCurse, 3))
 
 	str := player.String()
-	expected := "Player{ID: " + testID.UUID() + ", Faction: qing_long, Pos: 20, HP: 10, LP: 5, Buffs: 1, Items: 1}"
+	expected := "Player{ID: " + testID.UUID() + ", Faction: qing_long, Pos: 20, HP: 6, LP: 4, Buffs: 1, Items: 1}"
 	if str != expected {
 		t.Errorf("String() = %s, expected %s", str, expected)
 	}

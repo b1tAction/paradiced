@@ -66,6 +66,7 @@ type BuffDefinition struct {
 	Name        string               `json:"name"`          // Chinese display name
 	Desc        string               `json:"desc"`          // Description text
 	Duration    int                  `json:"duration"`      // Default duration (-1 for permanent)
+	Hidden      bool                 `json:"hidden"`        // Hidden buff: no lottery, no client sync
 }
 
 // IsPositive checks if the buff is beneficial.

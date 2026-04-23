@@ -17,6 +17,8 @@ type Player struct {
 	Position       int               `json:"position"`     // Current position
 	HP             int               `json:"hp"`           // Health points
 	LP             int               `json:"lp"`           // Luck points (affects random events)
+	MaxHP		   int				 `json:"max_hp"`	   // Maximum health points
+	MaxLP		   int				 `json:"max_lp"`	   // Maximum luck points
 	Inventory      []*Item           `json:"inventory"`    // Item inventory
 	ActiveBuffs    []*Buff           `json:"active_buffs"` // Active buffs
 	IsDead         bool              `json:"is_dead"`      // Whether player is dead
@@ -28,6 +30,8 @@ type Player struct {
 type PlayerConfig struct {
 	ID       id.PlayerID
 	Faction  constants.Faction
+	InitHP	 int
+	InitLP	 int
 	MaxHP    int
 	MaxLP    int
 	StartPos int
@@ -35,6 +39,8 @@ type PlayerConfig struct {
 
 // DefaultPlayerConfig is the default player configuration.
 var DefaultPlayerConfig = PlayerConfig{
+	InitHP:   6,
+	InitLP:   4,
 	MaxHP:    6,
 	MaxLP:    8, // Consistent with ModifyLP LP range limit
 	StartPos: 0,
@@ -48,6 +54,12 @@ func NewPlayer(config PlayerConfig) *Player {
 	if config.MaxLP <= 0 {
 		config.MaxLP = DefaultPlayerConfig.MaxLP
 	}
+	if config.InitHP <= 0 {
+		config.InitHP = DefaultPlayerConfig.InitHP
+	}
+	if config.InitLP <= 0 {
+		config.InitLP = DefaultPlayerConfig.InitLP
+	}
 
 	// Generate ID if not provided
 	if config.ID.IsZero() {
@@ -58,8 +70,10 @@ func NewPlayer(config PlayerConfig) *Player {
 		ID:          config.ID,
 		Faction:     config.Faction,
 		Position:    config.StartPos,
-		HP:          config.MaxHP,
-		LP:          config.MaxLP,
+		HP:          config.InitHP,
+		LP:          config.InitLP,
+		MaxHP: 		 config.MaxHP,
+		MaxLP: 		 config.MaxLP,
 		Inventory:   make([]*Item, 0),
 		ActiveBuffs: make([]*Buff, 0),
 		IsDead:      false,
@@ -120,6 +134,9 @@ func (p *Player) Heal(amount int) error {
 		return pkgerrors.NewValidationError("heal_amount", amount, "must be non-negative")
 	}
 	p.HP += amount
+	if (p.HP > p.MaxHP) {
+		p.HP = p.MaxHP
+	}
 	return nil
 }
 
@@ -129,8 +146,8 @@ func (p *Player) ModifyLP(amount int) {
 	if p.LP < 0 {
 		p.LP = 0
 	}
-	if p.LP > 8 {
-		p.LP = 8
+	if p.LP > p.MaxLP {
+		p.LP = p.MaxLP
 	}
 }
 
@@ -154,7 +171,7 @@ func (p *Player) Respawn(respawnPos int) error {
 		return pkgerrors.NewValidationError("respawn_pos", respawnPos, "must be non-negative")
 	}
 	p.Position = respawnPos
-	p.HP = DefaultPlayerConfig.MaxHP
+	p.HP = p.MaxHP // Reset HP to player's MaxHP (not DefaultPlayerConfig.MaxHP)
 	p.IsDead = false
 	p.SkipTurn = false
 	return nil
@@ -171,6 +188,20 @@ func (p *Player) AddBuff(buffInstance *Buff) error {
 	if p.HasBuff(constants.BuffTypeHidden) && !buffInstance.Type.IsPositive() {
 		return nil
 	}
+
+	// Check if player already has a buff of the same type
+	existing := p.GetBuff(buffInstance.Type)
+	if existing != nil {
+		// Extend duration: add the new buff's duration to the existing one
+		// Permanent buffs (-1) stay permanent regardless
+		if existing.Duration != -1 && buffInstance.Duration != -1 {
+			existing.Duration += buffInstance.Duration
+		}
+		// Reset tickEligible so the extended duration survives the next tick
+		existing.tickEligible = false
+		return nil // Don't add new instance, duration was extended
+	}
+
 	p.ActiveBuffs = append(p.ActiveBuffs, buffInstance)
 	return nil
 }
@@ -207,12 +238,14 @@ func (p *Player) GetBuff(buffType constants.BuffType) *Buff {
 }
 
 // TickBuffs updates all buff durations, returns expired buffs.
+// TickBuffDurations decrements duration for tick-eligible buffs and returns expired ones.
+// Unlike TickBuffs, this does NOT remove expired buffs from ActiveBuffs —
+// removal should be handled by RemoveBuffAction through the Action system.
 func (p *Player) TickBuffs() []*Buff {
 	var expired []*Buff
-	for i := len(p.ActiveBuffs) - 1; i >= 0; i-- {
+	for i := range p.ActiveBuffs {
 		if !p.ActiveBuffs[i].TickDuration() {
 			expired = append(expired, p.ActiveBuffs[i])
-			p.ActiveBuffs = append(p.ActiveBuffs[:i], p.ActiveBuffs[i+1:]...)
 		}
 	}
 	return expired
@@ -339,6 +372,8 @@ func (p *Player) Clone() *Player {
 		Position:    p.Position,
 		HP:          p.HP,
 		LP:          p.LP,
+		MaxHP: 		 p.MaxHP,
+		MaxLP: 		 p.MaxLP,
 		Inventory:   inventory,
 		ActiveBuffs: buffs,
 		IsDead:      p.IsDead,
