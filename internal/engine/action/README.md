@@ -29,6 +29,11 @@ const (
     ActionTeleport   ActionType = "teleport"
     ActionStealBuff  ActionType = "steal_buff"
     ActionFellDown   ActionType = "fell_down"
+    ActionDrawItem   ActionType = "draw_item"
+    ActionDeath      ActionType = "death"
+    ActionBossDamage ActionType = "boss_damage"  // Player attacks Boss
+    ActionBossAttack ActionType = "boss_attack"  // Boss attacks player
+    ActionBossSkill  ActionType = "boss_skill"   // Boss uses skill
     ActionUnknown    ActionType = "unknown"
 )
 ```
@@ -158,6 +163,54 @@ type FellDownAction struct {
 ```
 
 - Fragile块坠落时使用
+
+### BossDamageAction
+
+```go
+type BossDamageAction struct {
+    SourcePlayer  *core.Player // Player attacking the boss
+    TargetPlayer  *core.Player // Boss player receiving damage
+    Damage        int          // Damage amount (dice steps, x2 if crit)
+    IsCrit        bool         // Whether this is a critical hit
+    SourceID      string       // "boss_damage"
+}
+```
+
+- `CanModify() = false` - Boss damage cannot be intercepted
+- `PreTriggerPhase() = PhaseAnyTime` - Player attacking Boss cannot be intercepted
+- Used when player is on Boss cell and rolls dice
+
+### BossAttackAction
+
+```go
+type BossAttackAction struct {
+    SourcePlayer *core.Player         // Boss player (attacker)
+    TargetPlayer *core.Player         // Player receiving damage
+    Damage       int                  // 1 for normal, 2 for crit
+    AttackType   constants.BossAttackType // "normal"/"crit"/"skill"
+    SourceID     string               // "boss_normal"/"boss_crit"
+}
+```
+
+- `CanModify() = false` - Boss attack cannot be modified
+- `PreTriggerPhase() = PhasePreDamage` - Can be intercepted by 隐匿 Buff
+- Used in Boss counter-attack (normal/crit attacks on players)
+
+### BossSkillAction
+
+```go
+type BossSkillAction struct {
+    SourcePlayer *core.Player         // Boss player
+    SkillType    constants.BossSkillType // "thunder"/"curse"/"lost"/"rest"
+    TargetIDs    []string             // Target player IDs
+    SourceID     string               // "boss_skill_thunder" etc.
+    Targets      []*core.Player       // Target players
+}
+```
+
+- `CanModify() = false` - Boss skills cannot be intercepted
+- `PreTriggerPhase() = PhaseAnyTime` - Boss skills cannot be intercepted
+- LogEntry record only; actual skill effect handled by BossRegistry skill handlers
 
 ## ActionContext
 

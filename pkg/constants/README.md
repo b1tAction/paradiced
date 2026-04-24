@@ -20,10 +20,14 @@ pkg/constants/
 ├── item.go         # ItemType - 道具类型
 ├── faction.go      # Faction - 四神兽阵营
 ├── cell.go         # CellType - 地图格子类型
+├── boss.go         # BossType, BossSkillType, BossAttackType, BossPlayerUUID - Boss相关类型
+├── action.go       # ActionType - Action 类型
 ├── state.go        # StateID - HSM 状态标识
 ├── entry.go        # EntryType - GameLog 条目类型
 ├── source.go       # ActionSource - Action 来源标识
 ├── evaluation.go   # Evaluation - 评分系统（int 类型）
+├── error_code.go   # ErrorCode - 错误码系统
+├── draw_type.go    # DrawType - 格子抽取类型
 ├── constants_test.go # 单元测试
 └── README.md       # 本文档
 ```
@@ -121,6 +125,41 @@ pkg/constants/
 | `CellTypeCheckpoint` | `checkpoint` | 检查点（重生点） |
 | `CellTypeBoss` | `boss` | Boss格子（终点） |
 
+### BossType - Boss 类型标识
+
+提供 `IsValid()` 方法。
+
+| 常量 | 值 | 说明 |
+|------|-----|------|
+| `BossTypeBeast` | `beast` | 凶兽（主Boss） |
+
+### BossSkillType - Boss 技能类型标识
+
+提供 `IsValid()`、`ParseBossSkillType()` 方法。
+
+| 常量 | 值 | 说明 |
+|------|-----|------|
+| `BossSkillThunder` | `thunder` | 天雷：AOE伤害2点 |
+| `BossSkillCurse` | `curse` | 诅咒：所有Boss格玩家获得诅咒Buff |
+| `BossSkillLost` | `lost` | 迷雾：所有Boss格玩家获得迷途Buff |
+| `BossSkillRest` | `rest` | 息：Boss恢复5HP |
+
+### BossAttackType - Boss 攻击类型标识
+
+提供 `IsValid()` 方法。
+
+| 常量 | 值 | 说明 |
+|------|-----|------|
+| `BossAttackNormal` | `normal` | 普通攻击：1点伤害 |
+| `BossAttackCrit` | `crit` | 暴击攻击：2点伤害 |
+| `BossAttackSkill` | `skill` | 技能攻击：随机Boss技能 |
+
+### BossPlayerUUID - Boss 固定UUID
+
+| 常量 | 值 | 说明 |
+|------|-----|------|
+| `BossPlayerUUID` | `beeeeeef-beef-beef-beef-beeeeeeeeeef` | Boss特殊玩家固定UUID |
+
 ### StateID - HSM 状态标识
 
 三层状态机结构，提供 `IsValid()`、`IsGlobalState()`、`IsTurnState()`、`IsInterruptState()`、`Layer()` 方法。
@@ -131,13 +170,13 @@ pkg/constants/
 | Layer 1 | `StateRoundMiniGame` | `round_mini_game` | 小游戏回合 |
 | Layer 1 | `StateRoundPrep` | `round_prep` | 回合准备 |
 | Layer 1 | `StateTurnLoop` | `turn_loop` | 行动循环 |
-| Layer 1 | `StateBossBattle` | `boss_battle` | Boss战 |
 | Layer 1 | `StateGameOver` | `game_over` | 游戏结束 |
 | Layer 2 | `StateTurnUpkeep` | `turn_upkeep` | 回合维护 |
 | Layer 2 | `StateMainAction` | `main_action` | 主要行动 |
 | Layer 2 | `StateTurnMoving` | `turn_moving` | 移动中 |
 | Layer 2 | `StateTurnLanded` | `turn_landed` | 落地处理 |
-| Layer 2 | `StateTurnEvent` | `turn_event` | 事件触发 |
+| Layer 2 | `StateTurnDraw` | `turn_draw` | 概率抽取 |
+| Layer 2 | `StateTurnBossBattle` | `turn_boss_battle` | Boss战斗 |
 | Layer 2 | `StateTurnEnd` | `turn_end` | 回合结束 |
 | Layer 3 | `StateWaitDecision` | `wait_decision` | 等待决策 |
 
@@ -155,13 +194,14 @@ pkg/constants/
 
 ### ActionSource - Action 来源标识
 
-提供 `IsValid()`、`IsBuff()`、`IsItem()`、`IsEvent()`、`IsFaction()`、`IsSystem()` 方法。
+提供 `IsValid()`、`IsBuff()`、`IsItem()`、`IsEvent()`、`IsFaction()`、`IsSystem()`、`IsBoss()` 方法。
 
 通过前缀判断来源类型：
 - `buff_*` - Buff 来源
 - `item_*` - Item 来源
 - `event_*` - Event 来源
 - `faction_*` - Faction 来源
+- `boss_*` - Boss 来源
 - `system_*` + 特殊值 - System 来源
 
 ### Evaluation - 评分系统
@@ -232,6 +272,10 @@ pkg/constants/
 | Evaluation | internal/core/types | pkg/constants | ✓ 已完成 |
 | ActionSource | - | pkg/constants | ✓ 已添加 |
 | ErrorCode | internal/nakama | pkg/constants | ✓ 已添加 |
+| BossType | - | pkg/constants | ✓ 已添加 |
+| BossSkillType | - | pkg/constants | ✓ 已添加 |
+| BossAttackType | - | pkg/constants | ✓ 已添加 |
+| BossPlayerUUID | - | pkg/constants | ✓ 已添加 |
 
 ## Metadata 契约
 

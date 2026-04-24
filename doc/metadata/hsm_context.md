@@ -57,7 +57,7 @@ func (ctx *StateContext) GetDiceSteps() int {
 |------|-----|------|----------|------|----------|
 | `KeySkipTurn` | `skip_turn` | bool | TurnUpkeep | 跳过剩余回合 | TurnEnd |
 | `KeyFellDown` | `fell_down` | bool | TurnMoving | 落坑标记 | TurnLanded |
-| `KeyReachedEnd` | `reached_end` | bool | TurnMoving | 到达Boss格子 | BossBattle |
+| `KeyReachedEnd` | `reached_end` | bool | TurnMoving | 到达Boss格子 | TurnBossBattle |
 | `KeyDiceSteps` | `dice_steps` | int | MainAction/TurnMoving | 骰子结果 | MoveAction |
 | `KeyTargetPos` | `target_pos` | int | TurnMoving | 目标位置 | MoveAction |
 
@@ -73,6 +73,8 @@ func (ctx *StateContext) GetDiceSteps() int {
 | 常量 | 值 | 类型 | 来源状态 | 用途 |
 |------|-----|------|----------|------|
 | `KeyBossTrigger` | `boss_trigger_player` | string | TurnLanded | 触发Boss战的玩家ID |
+| `KeyBossDefeated` | `boss_defeated` | bool | TurnBossBattle | Boss被击败标记（同时存于Game.RoundData） |
+| `KeyBossDefeatedBy` | `boss_defeated_by` | string | TurnBossBattle | 击败Boss的玩家ID（同时存于Game.RoundData） |
 | `KeyWinner` | `winner_id` | string | GameOver | 胜利玩家ID |
 
 ### 状态流标记
@@ -83,7 +85,6 @@ func (ctx *StateContext) GetDiceSteps() int {
 | `KeyMiniGameStarted` | `mini_game_started` | bool | RoundMiniGame | 小游戏阶段开始 |
 | `KeyWaitingForResults` | `waiting_for_results` | bool | RoundMiniGame | 等待小游戏结果 |
 | `KeyTurnLoopActive` | `turn_loop_active` | bool | TurnLoop | 回合循环活跃 |
-| `KeyBossBattleActive` | `boss_battle_active` | bool | BossBattle | Boss战活跃 |
 | `KeyGameOver` | `game_over` | bool | GameOver | 游戏结束 |
 
 ---
@@ -154,17 +155,21 @@ diceType := rankToDiceType(rank)
 ctx.SetDiceType("player-001", diceType)
 ```
 
-### TurnLanded → BossBattle
+### TurnBossBattle → TurnLoop (Boss被击败)
 
 ```go
-// TurnLanded 检查到达Boss
-if player.Position == mapEngine.GetLength()-1 {
-    ctx.SetReachedEnd(true)
-    ctx.SetString(KeyBossTrigger, player.ID.UUID())
+// TurnBossBattle 检测Boss死亡
+if bossPlayer.IsDead {
+    ctx.SetBool(KeyBossDefeated, true)
+    ctx.SetString(KeyBossDefeatedBy, player.ID.UUID())
+    game.RoundData.SetBool(KeyBossDefeated, true)
+    game.RoundData.SetString(KeyBossDefeatedBy, player.ID.UUID())
 }
 
-// BossBattle 获取触发者
-triggerID := ctx.GetStringOrDefault(KeyBossTrigger, "")
+// TurnLoop.Update 检查Boss被击败标记（跨tick需要检查RoundData）
+if game.RoundData.GetBoolOrDefault(KeyBossDefeated, false) {
+    return StateGameOver
+}
 ```
 
 ---

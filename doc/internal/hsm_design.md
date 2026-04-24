@@ -23,7 +23,7 @@
 | Adapter接口 | adapter.go | ✅ | EventBus/MapEngine/Game适配器 |
 | StateStack | state_stack.go | ✅ | 中断入栈/出栈机制 |
 | HSM主结构 | hsm.go | ✅ | 状态注册、转移、生命周期管理 |
-| 全局状态 | global_states.go | ✅ | 6个Layer 1状态实现 |
+| 全局状态 | global_states.go | ✅ | 5个Layer 1状态实现（BossBattle已移至Turn层） |
 | 单元测试 | *_test.go | ✅ | 55+测试用例 |
 
 ### Phase 2: 回合层状态 ✅ (已完成)
@@ -35,7 +35,8 @@
 | TurnMovingState | turn_states.go | ✅ | HSM预扫描路径、迷途修改Steps、CheckPoint拆分、FellDown处理 |
 | TurnCheckpointState | turn_states.go | ✅ | DrawItemAction（宝箱道具） |
 | TurnLandedState | turn_states.go | ✅ | CellType行为矩阵、PhaseOnLand触发 |
-| TurnEventState | turn_states.go | ✅ | PhasePreEvent触发、事件抽取 |
+| TurnDrawState | turn_states.go | ✅ | 概率抽取（DrawEvent/DrawItem） |
+| TurnBossBattleState | turn_states.go | ✅ | Boss战斗（玩家攻击/Boss反击）、Boss击败检测 |
 | TurnEndState | turn_states.go | ✅ | PhaseAfterTurn触发、TickBuffs、阵营充能 |
 
 ### Phase 3: 中断层状态 ✅ (已完成)
@@ -79,9 +80,7 @@ internal/engine/hsm/
 │                              ▼                     ▼            │
 │                       [等待小游戏结果]      State_Turn_Loop     │
 │                                                    │            │
-│                              State_Boss_Battle ◄──┼──► [循环]   │
-│                              │                     │            │
-│                              ▼                     ▼            │
+│                                                    ▼            │
 │                       State_Game_Over         [下一玩家]        │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -93,9 +92,8 @@ internal/engine/hsm/
 | `StateMatchInit` (100) | `MatchInitState` | 初始化标记、设置metadata | - | Update自动返回StateRoundMiniGame |
 | `StateRoundMiniGame` (101) | `RoundMiniGameState` | 等待小游戏排名 | - | 收到所有排名后返回StateRoundPrep |
 | `StateRoundPrep` (102) | `RoundPrepState` | 根据排名分配骰子、增加Round计数 | - | Update自动返回StateTurnLoop |
-| `StateTurnLoop` (103) | `TurnLoopState` | 管理回合队列、检查Boss触发 | - | StartPlayerTurn→StateTurnUpkeep；reachedEnd→StateBossBattle |
-| `StateBossBattle` (104) | `BossBattleState` | Boss战触发玩家记录 | - | OnBossDefeated→StateGameOver |
-| `StateGameOver` (105) | `GameOverState` | 终态，记录winner | - | 无转移（终态） |
+| `StateTurnLoop` (103) | `TurnLoopState` | 管理回合队列、检查Boss击败 | - | StartPlayerTurn→StateTurnUpkeep；BossDefeated→StateGameOver |
+| `StateGameOver` (104) | `GameOverState` | 终态，记录winner | - | 无转移（终态） |
 
 ### 🔄 第二层：玩家回合子层 (PlayerTurnState)
 
@@ -118,7 +116,10 @@ internal/engine/hsm/
 │       └──────────────────┴───────────────► S_TURN_LANDED        │
 │                                            │                     │
 │                                            ▼                     │
-│                                       S_TURN_EVENT               │
+│                                       S_TURN_DRAW               │
+│                                            │                     │
+│                                            ▼                     │
+│                                  S_TURN_BOSS_BATTLE (Boss格)     │
 │                                            │                     │
 │                                            ▼                     │
 │                                       S_TURN_END                 │
@@ -132,12 +133,14 @@ internal/engine/hsm/
 
 | StateID | 状态名称 | 行为 | Phase触发 | 转移条件 |
 |---------|----------|------|-----------|----------|
-| `S_TURN_UPKEEP` | 回合准备 | 检查SkipTurn、IsDead | `PhaseBeforeTurn` | 可行动→MainAction；不可→TurnEnd |
-| `S_MAIN_ACTION` | 主行动 | 等待道具/骰子选择 | `PhaseItemUsed`道具可用 | 收到RollDice→TurnMoving |
+| `S_TURN_UPKEEP` | 回合准备 | 检查SkipTurn、IsDead（Boss跳过BeforeTurn） | `PhaseBeforeTurn` | 可行动→MainAction；Boss→TurnBossBattle；不可→TurnEnd |
+| `S_MAIN_ACTION` | 主行动 | 等待道具/骰子选择（Boss格玩家→TurnBossBattle） | `PhaseItemUsed`道具可用 | 收到RollDice→TurnMoving/TurnBossBattle |
 | `S_TURN_MOVING` | 移动结算 | HSM预扫描路径、迷途处理、CheckPoint拆分 | HSM发布`PhasePreMove` | 正常→TurnLanded；坠落→TurnEnd；CheckPoint→TurnCheckpoint |
 | `S_TURN_CHECKPOINT` | CheckPoint结算 | DrawItemAction（宝箱道具） | - | →TurnMoving(remaining steps) |
-| `S_TURN_LANDED` | 落地结算 | CellType行为矩阵触发 | `PhaseOnLand` | Event/Normal→TurnEvent；Checkpoint/Boss→TurnEnd |
-| `S_TURN_END` | 回合收尾 | TickBuff、死亡检查 | `PhaseAfterTurn` | 完成后返回父状态 |
+| `S_TURN_LANDED` | 落地结算 | CellType行为矩阵触发 | `PhaseOnLand` | DrawType→TurnDraw；Boss→TurnBossBattle；Normal→TurnEnd |
+| `S_TURN_DRAW` | 概率抽取 | DrawEventAction/DrawItemAction | `PhasePreEvent`(DrawEvent) | →TurnEnd |
+| `S_TURN_BOSS_BATTLE` | Boss战斗 | 玩家攻击Boss/Boss反击 | - | →TurnEnd（Boss击败→GameOver） |
+| `S_TURN_END` | 回合收尾 | TickBuff、死亡检查（Boss跳过AfterTurn） | `PhaseAfterTurn` | 完成后返回父状态 |
 
 #### Phase 与发布者映射
 
@@ -302,24 +305,16 @@ S_TURN_LOOP (回合循环)
 ├── 行为
 │   ├── 管理回合队列
 │   ├── 启动当前玩家的子状态机
-│   ├── 监控玩家到达终点
+│   ├── Boss排在Players末尾（最后行动）
+│   ├── 检查Boss是否被击败
 ├── 子状态机
 │   └── PlayerTurnState (第二层)
 ├── 转移
 │   ├── 子状态机完成 → 下一玩家 (循环)
 │   ├── 所有玩家完成 → S_ROUND_MINIGAME (下一轮)
-│   ├── 任意玩家到达终点 → S_BOSS_BATTLE
+│   ├── Boss被击败 → S_GAME_OVER
 │
 
-S_BOSS_BATTLE (Boss战)
-├── 行为
-│   ├── 进入特殊战斗机制
-│   ├── 触发终点玩家与Boss对战
-│   └── 处理战斗结果
-├── 转移
-│   ├── Boss击败 → S_GAME_OVER (该玩家获胜)
-│   ├── Boss未击败 → 返回 S_TURN_LOOP (继续回合)
-│
 
 S_GAME_OVER (对局结束)
 ├── 行为
@@ -399,7 +394,7 @@ S_TURN_MOVING (移动结算)
 │   ├── 正常到达 → S_TURN_LANDED
 │   ├── CheckPoint 拆分 → S_TURN_CHECKPOINT
 │   ├── Fragile 坠落 → S_TURN_END (提前结束)
-│   ├── 到达终点 → 父状态转移至 S_BOSS_BATTLE
+│   ├── Boss格 → S_TURN_BOSS_BATTLE (玩家攻击Boss)
 
 
 S_TURN_CHECKPOINT (CheckPoint结算)
@@ -529,14 +524,24 @@ S_TURN_MOVING
 ├── 离开迷雾 → AddBuff(Exorcism, 5回合)
 ```
 
-### Boss 战触发
+### Boss 战（TurnBossBattleState）
 
 ```
-S_TURN_MOVING
-├── PathResult.ReachedEnd == true
-├── 父状态转移 → S_BOSS_BATTLE
-├── 保存触发玩家 → BossContext.TriggerPlayer
-└── Boss 战逻辑 → 特殊状态机
+S_TURN_BOSS_BATTLE (Boss战斗)
+├── 玩家攻击Boss分支
+│   ├── 骰子点数 = 基础伤害值
+│   ├── 暴击概率与骰子品质相关（Gold:30%, Silver:20%, Copper:10%, Wood:5%）
+│   ├── 暴击伤害 = 基础伤害 × 2
+│   ├── BossDamageAction → 对Boss HP造成伤害
+│   ├── Boss被击败 → KeyBossDefeated=true → GameOver
+├── Boss反击分支（Boss回合）
+│   ├── Boss格玩家 → Boss攻击（normal/crit/skill）
+│   ├── Boss格无玩家 → Boss回合空转
+│   ├── BossAttackAction → 对玩家造成伤害（可被隐匿拦截）
+│   ├── BossSkillAction → 从技能池随机抽取
+│   ├── 玩家死亡 → RespawnAction → 复活至检查点
+├── 转移
+│   └── → S_TURN_END
 ```
 
 ### 死亡复活
@@ -717,9 +722,9 @@ func (s *StateTurnEvent) Enter(ctx *StateContext) {
 2. 实现状态入栈/出栈机制
 3. 实现超时处理
 
-### Phase 4: 特殊状态
+### Phase 4: 特殊状态 ✅ (已完成)
 
-1. 实现 BossBattle 状态
+1. ✅ BossBattle 已移至 Turn 层（TurnBossBattleState）
 2. 实现断线重连快照
 3. 完善状态同步消息
 
@@ -742,7 +747,7 @@ func (s *StateTurnEvent) Enter(ctx *StateContext) {
 - Fragile 坠落打断流程
 - 迷雾区域触发
 - 死亡复活
-- Boss 战触发
+- Boss 战（TurnBossBattleState）
 - 断线重连
 
 ---
@@ -780,6 +785,9 @@ func (s *StateTurnEvent) Enter(ctx *StateContext) {
 | FellDownAction | "fell_down" | Delta=-Damage, Metadata(position) |
 | TeleportAction | "teleport" | Metadata(target_pos) |
 | StealBuffAction | "steal_buff" | Metadata(stolen_buff_type) |
+| BossDamageAction | "boss_damage" | Metadata(damage, is_crit, boss_remaining_hp) |
+| BossAttackAction | "boss_attack" | Metadata(attack_type, damage, target) |
+| BossSkillAction | "boss_skill" | Metadata(skill_type, targets) |
 
 ### Client 回放支持
 

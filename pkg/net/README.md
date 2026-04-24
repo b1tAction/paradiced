@@ -47,6 +47,9 @@ type TurnSync struct {
 | `fell_down` | `position: int`, `hp_change: int` |
 | `draw_event` | `event_type: string`, `event_name: string` |
 | `dice_roll` | `dice_type: string`, `dice_steps: int` |
+| `boss_damage` | `damage: int`, `is_crit: bool`, `boss_remaining_hp: int` |
+| `boss_attack` | `attack_type: string`, `damage: int`, `target: string` |
+| `boss_skill` | `skill_type: string`, `targets: string` |
 | `state` | `from: string`, `to: string` |
 
 完整契约见：[doc/metadata/logentry.md](../../doc/metadata/logentry.md)
@@ -152,7 +155,7 @@ type TurnSync struct {
 ```go
 type Player struct {
     PlayerID    string `json:"player_id"`   // 玩家游戏内部 ID（直接等于 Nakama userID）
-    DisplayName string `json:"display_name"` // 用户显示名称（fallback: PlayerID）
+    DisplayName string `json:"display_name"` // 用户显示名称（Boss: "Boss"，其他: fallback PlayerID）
     Faction     string `json:"faction"`      // snake_case: "qing_long", "zhu_que"
     Position    int    `json:"position"`
     HP          int    `json:"hp"`
@@ -163,6 +166,7 @@ type Player struct {
     FireCounter int    `json:"fire_counter"` // 朱雀火计数
     IsDead      bool   `json:"is_dead"`
     SkipTurn    bool   `json:"skip_turn"`
+    IsBoss      bool   `json:"is_boss,omitempty"` // Boss特殊玩家标识（仅Boss为true）
 }
 ```
 

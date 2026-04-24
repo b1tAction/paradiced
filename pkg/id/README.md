@@ -96,6 +96,11 @@ func GetBuff(id id.BuffID) *Buff        // 只接受 BuffID
 // 测试辅助函数
 // TestUUID 生成用于测试的合法 UUID
 testID := id.TestUUID(1)  // "00000000-0000-0000-0000-000000000001"
+
+// Boss 玩家检查
+bossID := id.MustParsePlayerID(constants.BossPlayerUUID)
+bossID.IsBoss()  // true
+normalID.IsBoss()  // false
 ```
 
 ## 设计限制

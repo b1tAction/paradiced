@@ -107,6 +107,8 @@ pkg/rng/
 ├── draw_engine.go       # DrawEngine 实现（含 DrawWithProb）
 ├── weighted_pool.go     # WeightedPool 实现
 ├── luck_modifier.go     # LuckModifier 实现
+├── dice.go              # DiceType/DiceManager 骰子系统
+├── boss.go              # Boss攻击计算（CalcBossAttackType、SelectBossTarget、CalcPlayerCrit）
 ├── draw_engine_test.go  # 单元测试
 └── README.md            # 本文档
 ```
@@ -121,6 +123,63 @@ pkg/rng/
 | 迷途/诅咒替换 | PoolTypeBad | 强制给予恶意 Buff |
 | **地图格子抽取** | DrawWithProb | 根据格子配置的 probGood/Neutral/Bad 进行概率抽取 |
 | **概率混合抽取** | DrawWithProb(total<1) | 部分概率从全部 items 抽取，部分从指定池抽取 |
+| **Boss攻击类型决定** | CalcBossAttackType | 根据avgLP决定Boss普通/暴击/技能攻击 |
+| **Boss目标选择** | SelectBossTarget | LP加权选择，LP越低越容易被攻击 |
+| **玩家暴击计算** | CalcPlayerCrit | 根据骰子品质计算暴击概率 |
+
+## Boss 攻击计算
+
+### BossAttackResult
+
+Boss攻击决策结果：
+
+```go
+type BossAttackResult struct {
+    AttackType string // "normal", "crit", or "skill"
+    SkillType  string // Skill type if AttackType is "skill"
+    Target     string // Target player ID
+    Damage     int    // Damage amount
+}
+```
+
+### CalcBossCritSkillProb
+
+Boss暴击/技能概率基于Boss格存活玩家的平均LP：
+
+```
+prob = 0.1 + 0.05 × (8 - avgLP)
+```
+
+| avgLP | 概率 |
+|-------|------|
+| 0 | 50% |
+| 4 | 30% |
+| 8 | 10% |
+
+### CalcBossAttackType
+
+当暴击/技能触发时，50%概率暴击，50%概率技能。技能从BossSkillPool等权重随机抽取。
+
+### SelectBossTarget
+
+Boss攻击目标使用LP加权选择：
+
+```
+weight = 1.0 + 0.3 × (8 - LP)
+```
+
+LP越低越容易被攻击。
+
+### CalcPlayerCritRate / CalcPlayerCrit
+
+玩家暴击概率基于骰子品质：
+
+| DiceType | 暴击率 |
+|----------|--------|
+| Gold | 30% |
+| Silver | 20% |
+| Copper | 10% |
+| Wood | 5% |
 
 ## 测试
 

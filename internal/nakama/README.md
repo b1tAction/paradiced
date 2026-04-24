@@ -272,8 +272,8 @@ broadcast.SendAvailable(playerID, available)
 ## Match 生命周期
 
 ```
-MatchInit → 初始化 Game/HSM/MapEngine → HSM 启动
-MatchLoop → 每帧更新 → HSM.Update → 状态转换
+MatchInit → 初始化 Game/HSM/MapEngine → Boss初始化 → HSM 启动
+MatchLoop → 每帧更新 → HSM.Update → Boss击败检测 → 状态转换
 MatchStop → 停止 HSM → 清理资源
 ```
 

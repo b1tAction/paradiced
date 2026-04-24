@@ -175,7 +175,40 @@ BUFF
  // AI Mode
 当人数不足最大人数上限时，可以选择AI玩家来进行游戏。AI玩家将根据预设的策略进行决策，例如购买房产、参与随机事件等。（但是AI无法参与小游戏，故可以只允许人类玩家加入）。
  Winning Mode
-- 某个玩家先达到终点，并杀死BOSS
+- 某个玩家先到达终点（Boss格），并击败Boss即获胜
+- Boss是特殊Player，固定UUID（beeeeeef-beef-beef-beef-beeeeeeeeeef），排在Players列表末尾
+- Boss不参与小游戏，不需要骰子
+- Boss HP=50，无LP
+
+### Boss战规则
+
+**玩家攻击Boss**：玩家到达Boss格后的回合流程：
+- TurnUpkeep → MainAction(掷骰) → TurnBossBattle(攻击Boss) → TurnEnd
+- 骰子点数 = 对Boss的基础伤害值
+- 暴击伤害 = 基础伤害 × 2，暴击概率与骰子品质相关（Gold:30%, Silver:20%, Copper:10%, Wood:5%）
+- 隐匿Buff不影响玩家对Boss的伤害
+
+**Boss反击**：Boss回合（排在所有玩家回合之后）：
+- TurnUpkeep(空) → TurnBossBattle(Boss反击) → TurnEnd
+- Boss反击前，如果没有玩家在Boss格，Boss回合空转（TurnUpkeep→TurnBossBattle→TurnEnd）
+- Boss攻击类型基于Boss格存活玩家的平均LP：
+  - 暴击/技能概率 = `0.1 + 0.05 × (8 - avgLP)`（avgLP=0→50%, avgLP=4→30%, avgLP=8→10%）
+  - 50%概率暴击，50%概率技能（当暴击/技能触发时）
+- Boss攻击目标：LP加权选择，LP越低越容易被攻击
+- Boss攻击（普通1点/暴击2点）可被隐匿Buff拦截（PhasePreDamage）
+
+**Boss技能池**（随机抽取，等权重）：
+| 技能 | 类型 | 效果 |
+|------|------|------|
+| 天雷(Thunder) | AOE伤害 | 所有Boss格玩家受到2点伤害 |
+| 诅咒(Curse) | Debuff | 所有Boss格玩家获得诅咒Buff |
+| 迷雾(Lost) | Debuff | 所有Boss格玩家获得迷途Buff |
+| 息(Rest) | 治疗 | Boss恢复5HP |
+
+**胜负规则**：
+- 击败Boss的玩家获胜 → GameOver
+- 玩家在Boss反击中死亡 → 复活至检查点，Boss战继续
+- Boss被击败后立即结束游戏，跳过AfterTurn效果
 
 联机功能
 [] TODO: 服务端用于同步数据？或者服务端负责存储、计算数据，客户端只获取同步数据进行渲染？

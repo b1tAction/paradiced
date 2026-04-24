@@ -160,5 +160,6 @@ TurnEndState.Enter(ctx)
 | TurnMoving | TurnMovingState.Enter (PhasePreMove) | - | - | - (纯移动，不单独广播) |
 | TurnCheckpoint | TurnCheckpointState.Enter | - | - | - (DrawItem，不单独广播) |
 | TurnLanded | TurnLandedState.Enter (PhaseOnLand) | - | - | - (落地，不单独广播) |
+| TurnBossBattle | TurnBossBattleState.Enter | BuildTurnSync + BuildStateSync | BroadcastTurnSync + BroadcastStateSync | OpTurnSync + OpStateSync |
 | TurnEnd | TurnEndState.Enter | BuildTurnSync + BuildStateSync | BroadcastTurnSync + BroadcastStateSync | OpTurnSync + OpStateSync |
 | GameOver | GameOverState.Enter | BuildStateSync | BroadcastGameOver | OpGameOver |

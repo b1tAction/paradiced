@@ -136,6 +136,29 @@ for (const entry of turnSync.entries) {
 |------|------|------|------|-----------|
 | `checkpoint_pos` | int | 是 | 重生检查点位置 | 重生动画位置 |
 
+### boss_damage 类型（玩家攻击Boss）
+
+| 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
+|------|------|------|------|-----------|
+| `damage` | int | 是 | 对Boss造成的伤害值 | 显示伤害数值动画 |
+| `is_crit` | bool | 是 | 是否暴击 | 暴击特效标识 |
+| `boss_remaining_hp` | int | 是 | Boss剩余HP | Boss血条更新 |
+
+### boss_attack 类型（Boss攻击玩家）
+
+| 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
+|------|------|------|------|-----------|
+| `attack_type` | string | 是 | 攻击类型（"normal"/"crit"） | 攻击类型动画 |
+| `damage` | int | 是 | 伤害值 | 显示伤害数值动画 |
+| `target` | string | 是 | 目标玩家ID | 目标标识 |
+
+### boss_skill 类型（Boss使用技能）
+
+| 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
+|------|------|------|------|-----------|
+| `skill_type` | string | 是 | 技能类型（"thunder"/"curse"/"lost"/"rest"） | 技能动画类型 |
+| `targets` | string | 是 | 目标玩家ID列表（逗号分隔） | 目标标识 |
+
 ### death 类型
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |

@@ -31,7 +31,8 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 │   │   ├── buff_registry.go # Buff Registry + HandlerConfig + handlers
 │   │   ├── item_registry.go # Item Registry + HandlerConfig + handlers
 │   │   ├── event_registry.go # Event Registry + HandlerConfig + handlers
-│   │   ├── action/     # Action system (DamageAction, HealAction, etc.)
+│   │   ├── boss_registry.go  # Boss Registry + BossDefinition + SkillHandlers
+│   │   ├── action/     # Action system (DamageAction, HealAction, BossDamageAction, etc.)
 │   │   └── hsm/        # Hierarchical State Machine
 │   ├── gamemap/        # Map system (Cell, MapEngine, PathResult)
 │   └── net/            # Sync data builder (Builder, test helper)
@@ -61,9 +62,13 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **DrawType**: Cell draw type (none/event/item) - specifies what to draw when landing on a cell
 - **StateID**: HSM state identifier (Global/Turn/Interrupt layers)
 - **EntryType**: GameLog entry type (action, state, mini_game, boss, decision)
-- **ActionSource**: Action source identifier (Buff/Item/Event/Faction/System)
+- **ActionSource**: Action source identifier (Buff/Item/Event/Faction/System/Boss)
 - **Evaluation**: 0-100 scoring system (Bad ≤40, Neutral 41-65, Good >65)
 - **ErrorCode**: Error codes for client-server communication (0=OK, 1xxx=validation, 2xxx=game logic, 3xxx=system, 4xxx=not found)
+- **BossType**: Boss entity type (beast)
+- **BossSkillType**: Boss skill type (thunder/curse/lost/rest)
+- **BossAttackType**: Boss attack type (normal/crit/skill)
+- **BossPlayerUUID**: Fixed UUID for Boss special player
 - All enums use string type with snake_case values for JSON compatibility
 - **Player**: Interface for player operations (Reader/Writer/Lite variants)
 - **Game**: Interface for game state access, includes GetGameLog()
@@ -73,7 +78,7 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 #### Action System (`internal/engine/action`)
 - **ActionType**: String type with snake_case naming (damage, heal, move, etc.)
 - **Action interface**: Core interface with PreTriggerPhase/PostTriggerPhase
-- **ExecutableAction**: Concrete implementations (DamageAction, HealAction, RespawnAction, FellDownAction, DrawItemAction, DrawEventAction, etc.)
+- **ExecutableAction**: Concrete implementations (DamageAction, HealAction, RespawnAction, FellDownAction, DrawItemAction, DrawEventAction, BossDamageAction, BossAttackAction, BossSkillAction, etc.)
 - **ActionContext**: Execution context with EventBus and global GameLog integration
 
 #### Protocol Layer (`pkg/net`)
@@ -134,8 +139,8 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 
 #### HSM System (`internal/engine/hsm`)
 - **HSM**: Hierarchical State Machine with three layers
-- **Global States**: MatchInit, RoundMiniGame, RoundPrep, TurnLoop, BossBattle, GameOver
-- **Turn States**: TurnUpkeep, MainAction, TurnMoving, TurnCheckpoint, TurnLanded, TurnDraw, TurnEnd
+- **Global States**: MatchInit, RoundMiniGame, RoundPrep, TurnLoop, GameOver
+- **Turn States**: TurnUpkeep, MainAction, TurnMoving, TurnCheckpoint, TurnLanded, TurnDraw, TurnBossBattle, TurnEnd
 - **Interrupt States**: WaitDecision for user input
 - **TurnDrawState**: Unified draw state that handles both Event and Item draws based on cell's DrawType configuration. Entered from TurnLanded when cell has a valid DrawType (event/item) and prob settings.
 
@@ -149,6 +154,7 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **LuckModifier**: Luck-based weight adjustment
 - **EventPool/ItemPool**: Predefined pools for game content
 - **DrawEngine**: Probability-based drawing with `DrawWithProb` method that supports weighted pool selection (Good/Neutral/Bad) and fallback to all items when total probability < 1.0
+- **Boss Attack Calculation**: CalcBossAttackType, SelectBossTarget, CalcPlayerCrit for Boss battle RNG
 
 ## Game Flow
 
@@ -161,13 +167,14 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 
 **Phase Design Principle: Who produces timing, who publishes Phase**
 
-1. **BeforeTurn** (HSM publishes): Trigger BeforeTurn phase effects (神眷/诅咒 LP±1, 离火 every 4 turns)
-2. **MainAction**: Player can use items or faction skills
+1. **BeforeTurn** (HSM publishes): Trigger BeforeTurn phase effects (神眷/诅咒 LP±1, 离火 every 4 turns). Boss player skips.
+2. **MainAction**: Player can use items or faction skills. If on Boss cell → TurnBossBattle.
 3. **PreMove** (HSM publishes): TurnMovingState publishes PreMove, 迷途 handler modifies Steps via StepsModifier interface
 4. **OnLand** (HSM publishes): Trigger landing events
 5. **TurnDraw** (HSM state): When landing on a cell with DrawType (event/item), enter TurnDraw state to perform probability-based draw
-6. **PreEvent** (Action publishes): DrawEventAction triggers PreEvent for 辟邪/玄武
-7. **AfterTurn** (HSM publishes): Tick Buff durations, trigger AfterTurn effects
+6. **TurnBossBattle** (HSM state): When player is on Boss cell, enter TurnBossBattle for player attack; Boss counter-attack on Boss's turn
+7. **PreEvent** (Action publishes): DrawEventAction triggers PreEvent for 辟邪/玄武
+8. **AfterTurn** (HSM publishes): Tick Buff durations, trigger AfterTurn effects. Boss player and Boss-defeated turn skip.
 
 ## Development Guidelines
 
@@ -322,6 +329,31 @@ Git Commit信息必须使用英文提交
 | 辟邪 (Exorcism) | PreEvent | Immune to poison |
 | 毒瘴 (Poison) | BeforeTurn | Bad event each turn |
 | 离火 (Fire) | BeforeTurn | ZhuQue passive, LP+1 every 4 turns |
+
+## Boss System
+
+| Property | Value |
+|----------|-------|
+| BossType | Beast (凶兽) |
+| Boss HP | 50 |
+| Boss LP | 0 (no LP) |
+| Boss UUID | `beeeeeef-beef-beef-beef-beeeeeeeeeef` |
+| Boss Position | Map end (Boss cell) |
+
+### Boss Skills (equal weight random draw)
+
+| Skill | Type | Effect |
+|-------|------|--------|
+| Thunder (天雷) | AOE damage | All Boss-cell players take 2 damage |
+| Curse (诅咒) | Debuff | All Boss-cell players get Curse buff |
+| Lost (迷雾) | Debuff | All Boss-cell players get Lost buff |
+| Rest (息) | Heal | Boss heals 5 HP |
+
+### Boss Attack Mechanics
+
+- Boss crit/skill probability: `0.1 + 0.05 × (8 - avgLP)`
+- Boss target selection: LP-weighted, lower LP = higher chance of being targeted
+- Player crit rate: based on dice quality (Gold:30%, Silver:20%, Copper:10%, Wood:5%)
 
 ## Related Documentation
 

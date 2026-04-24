@@ -16,8 +16,6 @@ HSM 包提供三层架构的状态机：
 │ Layer 1: Global States                                  │
 │ MatchInit → RoundMiniGame → RoundPrep → TurnLoop        │
 │                                    ↓                     │
-│                              BossBattle                   │
-│                                    ↓                     │
 │                               GameOver                   │
 └─────────────────────────────────────────────────────────┘
               │
@@ -27,6 +25,8 @@ HSM 包提供三层架构的状态机：
 │ TurnUpkeep → MainAction → TurnMoving → TurnLanded       │
 │                                            ↓             │
 │                                         TurnDraw         │
+│                                            ↓             │
+│                                     TurnBossBattle       │
 │                                            ↓             │
 │                                         TurnEnd          │
 └─────────────────────────────────────────────────────────┘
@@ -97,23 +97,23 @@ ctx.GetDiceSteps() // 返回 5
 | State | 描述 |
 |-------|------|
 | MatchInit | 初始化游戏：生成地图、分配阵营 |
-| RoundMiniGame | 小游戏阶段：所有玩家参与竞争 |
+| RoundMiniGame | 小游戏阶段：所有玩家参与竞争（Boss不参与） |
 | RoundPrep | 回合准备：根据排名分配骰子类型 |
-| TurnLoop | 回合循环：管理玩家回合轮转 |
-| BossBattle | Boss 战斗：玩家到达终点触发 |
+| TurnLoop | 回合循环：管理玩家回合轮转（Boss排在末尾） |
 | GameOver | 游戏结束：结算和排名 |
 
 ## Layer 2: Turn States
 
 | State | 描述 | Phase 触发 |
 |-------|------|-----------|
-| TurnUpkeep | 回合准备：检查死亡/跳过、触发 BeforeTurn | PhaseBeforeTurn |
+| TurnUpkeep | 回合准备：检查死亡/跳过、触发 BeforeTurn（Boss跳过） | PhaseBeforeTurn |
 | MainAction | 主要行动：等待骰子/道具/技能输入 | - |
 | TurnMoving | 移动处理：HSM 预扫描路径、迷途 Steps 修改、CheckPoint 拆分、FellDown | PhasePreMove (HSM 发布) |
 | TurnCheckpoint | CheckPoint 结算：DrawItemAction（宝箱道具） | - |
 | TurnLanded | 落地处理：CellType 行为矩阵、触发 OnLand、捕获 DrawType 配置 | PhaseOnLand |
 | TurnDraw | 概率抽取：根据 cell 的 DrawType 和 prob 配置进行事件/道具抽取 | PhasePreEvent (DrawEventAction) |
-| TurnEnd | 回合结束：触发 AfterTurn、TickBuffs | PhaseAfterTurn |
+| TurnBossBattle | Boss 战斗：玩家攻击Boss/Boss反击（Boss格玩家或Boss回合） | - |
+| TurnEnd | 回合结束：触发 AfterTurn、TickBuffs（Boss跳过AfterTurn） | PhaseAfterTurn |
 
 ### TurnDrawState 详解
 
@@ -139,6 +139,42 @@ TurnEnd
 - 使用 `rng.DrawEngine.DrawWithProb` 方法
 - 按照 probGood/probNeutral/probBad 的权重选择池
 - 如果概率总和 < 1.0，剩余概率从全部 items 中抽取（不进行池过滤）
+
+### TurnBossBattleState 详解
+
+`TurnBossBattleState` 是 Boss 战斗状态，根据当前玩家身份分两个分支：
+
+**状态转移**：
+```
+MainAction (玩家在Boss格掷骰)
+    ↓
+TurnBossBattle (玩家攻击Boss)
+    ↓
+TurnEnd
+
+TurnUpkeep (Boss回合)
+    ↓
+TurnBossBattle (Boss反击)
+    ↓
+TurnEnd
+```
+
+**玩家攻击Boss分支**：
+- 骰子点数 = 基础伤害值
+- 暴击伤害 = 基础伤害 × 2，暴击概率与骰子品质相关
+- Boss被击败 → 设置 BossDefeated 标记 → TurnEnd → TurnLoop → GameOver
+
+**Boss反击分支**：
+- Boss回合排在所有玩家回合之后
+- 如果没有玩家在Boss格，Boss回合空转
+- Boss攻击类型基于Boss格存活玩家的平均LP
+- Boss攻击（普通1点/暴击2点）可被隐匿Buff拦截（PhasePreDamage）
+- Boss技能从技能池随机抽取（等权重）
+
+**Boss击败后流程**：
+- `KeyBossDefeated` 同时存于 StateContext 和 Game.RoundData（跨tick持久化）
+- TurnLoop.Update() 检查 BossDefeated → 转移到 GameOver
+- Boss被击败后跳过 AfterTurn 效果
 
 ## Layer 3: Interrupt States
 
@@ -170,6 +206,7 @@ TurnMoving → HSM publishes PhasePreMove → CalculatePath → ExecuteAction(Mo
 TurnCheckpoint → ExecuteAction(DrawItemAction) → Execute → EventLog
 TurnLanded → 捕获 cell 配置 → 转移到 TurnDraw
 TurnDraw → ExecuteAction(DrawEventAction/DrawItemAction) → Execute → EventLog
+TurnBossBattle → ExecuteAction(BossDamageAction/BossAttackAction/BossSkillAction) → Execute → EventLog
 ```
 
 ## 使用示例
