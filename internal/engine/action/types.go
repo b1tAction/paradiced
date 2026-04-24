@@ -1,6 +1,7 @@
 package action
 
 import (
+	"strings"
 	"time"
 
 	"github.com/b1tAction/paradiced/internal/core"
@@ -920,6 +921,220 @@ func (a *DeathAction) LogEntry() gamelog.LogEntry {
 		ActionType: string(a.Type()),
 		Target:     a.TargetPlayer.ID.UUID(),
 		Source:     a.SourceID,
+		Metadata:   metadata,
+	}
+}
+
+// ========== BossDamageAction ==========
+
+// BossDamageAction represents a player attacking the Boss (damage to Boss player).
+// Used in TurnBossBattleState when a player on the Boss cell rolls dice.
+type BossDamageAction struct {
+	SourcePlayer  *core.Player // Player attacking the boss
+	TargetPlayer  *core.Player // Boss player receiving damage
+	Damage        int          // Damage amount (dice steps, x2 if crit)
+	IsCrit        bool         // Whether this is a critical hit
+	SourceID      string       // Source identifier (e.g., "boss_damage")
+}
+
+// NewBossDamageAction creates a new BossDamageAction.
+func NewBossDamageAction(source *core.Player, boss *core.Player, damage int, isCrit bool, sourceID string) *BossDamageAction {
+	return &BossDamageAction{
+		SourcePlayer: source,
+		TargetPlayer: boss,
+		Damage:       damage,
+		IsCrit:       isCrit,
+		SourceID:     sourceID,
+	}
+}
+
+func (a *BossDamageAction) Type() constants.ActionType { return constants.ActionBossDamage }
+func (a *BossDamageAction) CanModify() bool            { return false }
+func (a *BossDamageAction) Source() string             { return a.SourceID }
+func (a *BossDamageAction) Target() string             { return a.TargetPlayer.ID.UUID() }
+
+// PreTriggerPhase returns PhaseAnyTime (player attacking boss cannot be intercepted).
+func (a *BossDamageAction) PreTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
+}
+
+// PostTriggerPhase returns PhaseAnyTime (no post-trigger for boss damage).
+func (a *BossDamageAction) PostTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
+}
+
+func (a *BossDamageAction) Execute(ctx *ActionContext) error {
+	if a.TargetPlayer == nil {
+		return errors.NewActionExecutionError("boss_damage", "", "boss player is nil", nil)
+	}
+	if a.Damage <= 0 {
+		return nil
+	}
+
+	// Apply damage to boss player
+	if err := a.TargetPlayer.ApplyDamage(a.Damage); err != nil {
+		return errors.NewActionExecutionError("boss_damage", a.TargetPlayer.ID.UUID(), "failed to apply damage to boss", err)
+	}
+	return nil
+}
+
+func (a *BossDamageAction) LogEntry() gamelog.LogEntry {
+	metadata := util.NewMetadata()
+	metadata.SetInt("damage", a.Damage)
+	metadata.SetBool("is_crit", a.IsCrit)
+	metadata.SetInt("boss_remaining_hp", a.TargetPlayer.HP)
+
+	return gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       constants.EntryTypeBoss,
+		ActionType: string(a.Type()),
+		Target:     a.TargetPlayer.ID.UUID(),
+		Source:     a.SourcePlayer.ID.UUID(),
+		Metadata:   metadata,
+	}
+}
+
+// ========== BossAttackAction ==========
+
+// BossAttackAction represents the Boss attacking a player (normal or critical).
+// Used in TurnBossBattleState when the Boss player's turn executes an attack.
+type BossAttackAction struct {
+	SourcePlayer *core.Player         // Boss player (attacker)
+	TargetPlayer *core.Player         // Player receiving damage
+	Damage       int                  // Damage amount (1 for normal, 2 for crit)
+	AttackType   constants.BossAttackType // Attack type (normal/crit/skill)
+	SourceID     string               // Source identifier
+}
+
+// NewBossAttackAction creates a new BossAttackAction.
+func NewBossAttackAction(boss *core.Player, target *core.Player, damage int, attackType constants.BossAttackType, sourceID string) *BossAttackAction {
+	return &BossAttackAction{
+		SourcePlayer: boss,
+		TargetPlayer: target,
+		Damage:       damage,
+		AttackType:   attackType,
+		SourceID:     sourceID,
+	}
+}
+
+func (a *BossAttackAction) Type() constants.ActionType { return constants.ActionBossAttack }
+func (a *BossAttackAction) CanModify() bool            { return false }
+func (a *BossAttackAction) Source() string             { return a.SourceID }
+func (a *BossAttackAction) Target() string             { return a.TargetPlayer.ID.UUID() }
+
+// PreTriggerPhase returns PhasePreDamage (Boss damage can be intercepted by 隐匿).
+func (a *BossAttackAction) PreTriggerPhase() constants.Phase {
+	return constants.PhasePreDamage
+}
+
+// PostTriggerPhase returns PhaseAnyTime (no post-trigger for boss attack).
+func (a *BossAttackAction) PostTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
+}
+
+func (a *BossAttackAction) Execute(ctx *ActionContext) error {
+	if a.TargetPlayer == nil {
+		return errors.NewActionExecutionError("boss_attack", "", "target player is nil", nil)
+	}
+	if a.Damage <= 0 {
+		return nil
+	}
+
+	// Apply damage to target player
+	if err := a.TargetPlayer.ApplyDamage(a.Damage); err != nil {
+		return errors.NewActionExecutionError("boss_attack", a.TargetPlayer.ID.UUID(), "failed to apply damage", err)
+	}
+	// Derive DeathAction if player died
+	if a.TargetPlayer.IsDead {
+		ctx.PushDerivedAction(NewDeathAction(a.TargetPlayer, a.SourceID, a.TargetPlayer.Position))
+	}
+	return nil
+}
+
+func (a *BossAttackAction) LogEntry() gamelog.LogEntry {
+	metadata := util.NewMetadata()
+	metadata.SetString("attack_type", string(a.AttackType))
+	metadata.SetInt("damage", a.Damage)
+	metadata.SetString("target", a.TargetPlayer.ID.UUID())
+
+	return gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       constants.EntryTypeBoss,
+		ActionType: string(a.Type()),
+		Target:     a.TargetPlayer.ID.UUID(),
+		Source:     a.SourcePlayer.ID.UUID(),
+		Metadata:   metadata,
+	}
+}
+
+// ========== BossSkillAction ==========
+
+// BossSkillAction represents the Boss using a skill.
+// The actual skill effect is handled by BossRegistry skill handlers.
+type BossSkillAction struct {
+	SourcePlayer *core.Player         // Boss player
+	SkillType    constants.BossSkillType // Skill type
+	TargetIDs    []string             // Target player IDs
+	SourceID     string               // Source identifier
+	Targets      []*core.Player       // Target players (for handler execution)
+}
+
+// NewBossSkillAction creates a new BossSkillAction.
+func NewBossSkillAction(boss *core.Player, skillType constants.BossSkillType, targets []*core.Player, sourceID string) *BossSkillAction {
+	targetIDs := make([]string, len(targets))
+	for i, t := range targets {
+		targetIDs[i] = t.ID.UUID()
+	}
+	return &BossSkillAction{
+		SourcePlayer: boss,
+		SkillType:    skillType,
+		TargetIDs:    targetIDs,
+		SourceID:     sourceID,
+		Targets:      targets,
+	}
+}
+
+func (a *BossSkillAction) Type() constants.ActionType { return constants.ActionBossSkill }
+func (a *BossSkillAction) CanModify() bool            { return false }
+func (a *BossSkillAction) Source() string             { return a.SourceID }
+func (a *BossSkillAction) Target() string {
+	if len(a.TargetIDs) > 0 {
+		return a.TargetIDs[0] // Primary target
+	}
+	return ""
+}
+
+// PreTriggerPhase returns PhaseAnyTime (Boss skills cannot be intercepted).
+func (a *BossSkillAction) PreTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
+}
+
+// PostTriggerPhase returns PhaseAnyTime (no post-trigger for boss skill).
+func (a *BossSkillAction) PostTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
+}
+
+func (a *BossSkillAction) Execute(ctx *ActionContext) error {
+	// Boss skill execution is delegated to BossRegistry handlers.
+	// The handler is called by TurnBossBattleState, not here.
+	// This action is used as a LogEntry record only.
+	return nil
+}
+
+func (a *BossSkillAction) LogEntry() gamelog.LogEntry {
+	metadata := util.NewMetadata()
+	metadata.SetString("skill_type", string(a.SkillType))
+	// Store target IDs as comma-separated string
+	targetStrs := make([]string, len(a.TargetIDs))
+	copy(targetStrs, a.TargetIDs)
+	metadata.SetString("targets", strings.Join(targetStrs, ","))
+
+	return gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       constants.EntryTypeBoss,
+		ActionType: string(a.Type()),
+		Target:     a.Target(),
+		Source:     a.SourcePlayer.ID.UUID(),
 		Metadata:   metadata,
 	}
 }

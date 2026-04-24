@@ -34,6 +34,12 @@ const (
 	ActionDrawItem ActionType = "draw_item"
 	// ActionDeath represents player death event for client animation.
 	ActionDeath ActionType = "death"
+	// ActionBossDamage represents player attacking boss (damage to boss player).
+	ActionBossDamage ActionType = "boss_damage"
+	// ActionBossAttack represents boss attacking a player (normal/crit).
+	ActionBossAttack ActionType = "boss_attack"
+	// ActionBossSkill represents boss using a skill (AOE damage, buff, heal).
+	ActionBossSkill ActionType = "boss_skill"
 	// ActionUnknown represents an unknown action type.
 	ActionUnknown ActionType = "unknown"
 )
@@ -44,7 +50,8 @@ func (at ActionType) IsValid() bool {
 	case ActionDamage, ActionHeal, ActionModifyLP, ActionMove,
 		ActionAddBuff, ActionRemoveBuff, ActionRespawn, ActionSkipTurn,
 		ActionDrawEvent, ActionTeleport, ActionStealBuff, ActionFellDown,
-		ActionDrawItem, ActionDeath:
+		ActionDrawItem, ActionDeath, ActionBossDamage, ActionBossAttack,
+		ActionBossSkill:
 		return true
 	default:
 		return false
@@ -83,6 +90,12 @@ func ParseActionType(s string) ActionType {
 		return ActionDrawItem
 	case "death":
 		return ActionDeath
+	case "boss_damage":
+		return ActionBossDamage
+	case "boss_attack":
+		return ActionBossAttack
+	case "boss_skill":
+		return ActionBossSkill
 	default:
 		return ActionUnknown
 	}

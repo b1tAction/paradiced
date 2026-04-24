@@ -36,6 +36,15 @@ const (
 	SourceSystemFell    ActionSource = "system_fell"
 	SourceDeathRespawn  ActionSource = "death_respawn"
 	SourceFragileCell   ActionSource = "fragile_cell"
+
+	// Boss sources
+	SourceBossNormal       ActionSource = "boss_normal"       // Boss normal attack
+	SourceBossCrit         ActionSource = "boss_crit"         // Boss critical attack
+	SourceBossDamage       ActionSource = "boss_damage"       // Player attacks Boss
+	SourceBossSkillThunder ActionSource = "boss_skill_thunder" // Boss thunder skill
+	SourceBossSkillCurse   ActionSource = "boss_skill_curse"  // Boss curse skill
+	SourceBossSkillLost    ActionSource = "boss_skill_lost"   // Boss lost skill
+	SourceBossSkillRest    ActionSource = "boss_skill_rest"   // Boss rest skill
 )
 
 // IsValid checks if ActionSource is valid.
@@ -67,4 +76,9 @@ func (as ActionSource) IsFaction() bool {
 func (as ActionSource) IsSystem() bool {
 	return len(as) > 7 && as[:7] == "system_" ||
 		as == SourceDeathRespawn || as == SourceFragileCell
+}
+
+// IsBoss checks if source is from Boss.
+func (as ActionSource) IsBoss() bool {
+	return len(as) > 4 && as[:4] == "boss_"
 }

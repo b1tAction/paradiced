@@ -1,5 +1,7 @@
 package id
 
+import "github.com/b1tAction/paradiced/pkg/constants"
+
 // PlayerID represents a unique player identifier.
 type PlayerID struct{ ID }
 
@@ -25,6 +27,11 @@ func MustParsePlayerID(s string) PlayerID {
 // ZeroPlayerID returns an empty PlayerID.
 func ZeroPlayerID() PlayerID {
 	return PlayerID{ZeroID(playerPrefix)}
+}
+
+// IsBoss checks if this PlayerID belongs to the Boss special player.
+func (p PlayerID) IsBoss() bool {
+	return p.UUID() == constants.BossPlayerUUID
 }
 
 // UnmarshalJSON parses a pure UUID string into PlayerID.

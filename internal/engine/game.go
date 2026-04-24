@@ -19,16 +19,17 @@ import (
 // Round/Turn state is managed by HSM (single source of truth).
 // Game only stores data, not state.
 type Game struct {
-	ID        id.GameID           `json:"id"`
-	Bus       *event.EventBus     `json:"bus"`
-	Players   []*core.Player      `json:"players"`
-	RNG       *rand.Rand          `json:"-"`   // Game unique random source
-	Draw      *rng.DrawEngine     `json:"-"`   // Draw engine for random draws
-	Log       *gamelog.GameLog    `json:"log"` // Global game log for playback
-	RoundData *util.Metadata      `json:"-"`   // Round-level persistent data (cleared each round)
-	EventPool []*rng.EvaluatedItem `json:"-"`  // Event pool for DrawEventAction (all events)
-	ItemPool  []*rng.EvaluatedItem `json:"-"`  // Item pool for DrawItemAction (all items)
-	mutex     sync.RWMutex
+	ID           id.GameID            `json:"id"`
+	Bus          *event.EventBus      `json:"bus"`
+	Players      []*core.Player       `json:"players"`
+	RNG          *rand.Rand           `json:"-"`   // Game unique random source
+	Draw         *rng.DrawEngine      `json:"-"`   // Draw engine for random draws
+	Log          *gamelog.GameLog     `json:"log"` // Global game log for playback
+	RoundData    *util.Metadata       `json:"-"`   // Round-level persistent data (cleared each round)
+	EventPool    []*rng.EvaluatedItem `json:"-"`   // Event pool for DrawEventAction (all events)
+	ItemPool     []*rng.EvaluatedItem `json:"-"`   // Item pool for DrawItemAction (all items)
+	BossSkillPool []*rng.EvaluatedItem `json:"-"` // Boss skill pool for random draw
+	mutex        sync.RWMutex
 }
 
 // NewGame creates a new game instance.
@@ -310,4 +311,55 @@ func (g *Game) GetActiveBuffCount(playerID id.PlayerID) int {
 		return 0
 	}
 	return len(player.ActiveBuffs)
+}
+
+// ========== Boss Management ==========
+
+// GetBossPlayer returns the Boss player from the Players list.
+// Returns nil if Boss player is not found.
+func (g *Game) GetBossPlayer() *core.Player {
+	g.mutex.RLock()
+	defer g.mutex.RUnlock()
+
+	for _, p := range g.Players {
+		if p.ID.IsBoss() {
+			return p
+		}
+	}
+	return nil
+}
+
+// InitializeBoss creates the Boss player and adds it to the Players list.
+// Boss is always at the end of the Players list (last turn each round).
+// mapEndIndex: position of the Boss cell (map end).
+func (g *Game) InitializeBoss(mapEndIndex int) *core.Player {
+	bossDef := GlobalBossRegistry.GetBossDefinition(constants.BossTypeBeast)
+	if bossDef == nil {
+		return nil
+	}
+
+	// Boss uses fixed UUID, no faction, position at map end
+	bossID := id.MustParsePlayerID(constants.BossPlayerUUID)
+	bossConfig := core.PlayerConfig{
+		ID:       bossID,
+		Faction:  "",     // Boss has no faction
+		InitHP:   bossDef.MaxHP,
+		InitLP:   0,      // Boss has no LP
+		MaxHP:    bossDef.MaxHP,
+		MaxLP:    0,       // Boss has no LP
+		StartPos: mapEndIndex,
+	}
+
+	bossPlayer := core.NewPlayer(bossConfig)
+	// Boss player does NOT need EventBus subscriptions (no buffs/items)
+
+	// Add Boss at the end of Players list
+	g.mutex.Lock()
+	g.Players = append(g.Players, bossPlayer)
+	g.mutex.Unlock()
+
+	// Build Boss skill pool from registry
+	g.BossSkillPool = GlobalBossRegistry.BuildBossSkillPool()
+
+	return bossPlayer
 }
