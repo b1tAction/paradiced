@@ -24,8 +24,10 @@ const (
 	KeyDamage       = "damage"              // Damage amount
 	KeyMiniGameRank = "mini_game_rank"      // Mini-game ranking result prefix (used as "result_{playerID}")
 	KeyDiceType     = "dice_type"           // Dice type prefix (used as "dice_{playerID}")
-	KeyBossTrigger  = "boss_trigger_player" // Player who triggered boss battle
-	KeyWinner       = "winner_id"           // Winner player ID
+	KeyBossTrigger    = "boss_trigger_player" // Player who triggered boss battle
+	KeyBossDefeated   = "boss_defeated"        // Boss defeated flag
+	KeyBossDefeatedBy = "boss_defeated_by"     // Player ID who defeated the Boss
+	KeyWinner         = "winner_id"            // Winner player ID
 
 	// State flow markers
 	KeyInitialized       = "initialized"         // Match initialized flag

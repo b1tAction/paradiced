@@ -13,21 +13,21 @@ const (
 	StateRoundMiniGame                   // 102: Mini-game phase, wait for rankings
 	StateRoundPrep                       // 103: Round preparation, assign dice types
 	StateTurnLoop                        // 104: Turn loop, iterate through player turns
-	StateBossBattle                      // 105: Boss battle when player reaches end
-	StateGameOver                        // 106: Game ended, broadcast winner
+	StateGameOver                        // 105: Game ended, broadcast winner
 )
 
 // ========== Layer 2: Player Turn States ==========
 
 const (
 	// Turn layer states manage individual player turn flow
-	StateTurnUpkeep StateID = iota + 200 // 200: Turn preparation, check SkipTurn/IsDead, trigger PhaseBeforeTurn
-	StateMainAction                       // 201: Main action phase, wait for item/skill/dice
-	StateTurnMoving                       // 202: Movement phase, calculate path, handle Fragile/Fog
-	StateTurnLanded                       // 203: Landing phase, trigger PhaseOnLand
-	StateTurnDraw                         // 204: Draw phase, draw event/item based on cell config
-	StateTurnEnd                          // 205: Turn end phase, trigger PhaseAfterTurn, TickBuffs
-	StateTurnCheckpoint                   // 206: CheckPoint processing (DrawItem etc.)
+	StateTurnUpkeep      StateID = iota + 200 // 200: Turn preparation, check SkipTurn/IsDead, trigger PhaseBeforeTurn
+	StateMainAction                           // 201: Main action phase, wait for item/skill/dice
+	StateTurnMoving                           // 202: Movement phase, calculate path, handle Fragile/Fog
+	StateTurnLanded                           // 203: Landing phase, trigger PhaseOnLand
+	StateTurnDraw                             // 204: Draw phase, draw event/item based on cell config
+	StateTurnEnd                              // 205: Turn end phase, trigger PhaseAfterTurn, TickBuffs
+	StateTurnCheckpoint                       // 206: CheckPoint processing (DrawItem etc.)
+	StateTurnBossBattle                       // 207: Boss battle phase (player attacks Boss / Boss counter-attacks)
 )
 
 // ========== Layer 3: Interrupt States ==========
@@ -52,7 +52,6 @@ func (s StateID) String() string {
 		StateRoundMiniGame:  "RoundMiniGame",
 		StateRoundPrep:      "RoundPrep",
 		StateTurnLoop:       "TurnLoop",
-		StateBossBattle:     "BossBattle",
 		StateGameOver:       "GameOver",
 		StateTurnUpkeep:     "TurnUpkeep",
 		StateMainAction:     "MainAction",
@@ -61,6 +60,7 @@ func (s StateID) String() string {
 		StateTurnDraw:       "TurnDraw",
 		StateTurnEnd:        "TurnEnd",
 		StateTurnCheckpoint: "TurnCheckpoint",
+		StateTurnBossBattle: "TurnBossBattle",
 		StateWaitDecision:   "WaitDecision",
 		StateNone:           "None",
 		StateInvalid:        "Invalid",
@@ -83,7 +83,7 @@ func (s StateID) IsGlobalState() bool {
 
 // IsTurnState checks if state belongs to Layer 2 (Turn).
 func (s StateID) IsTurnState() bool {
-	return s >= StateTurnUpkeep && s <= StateTurnCheckpoint
+	return s >= StateTurnUpkeep && s <= StateTurnBossBattle
 }
 
 // IsInterruptState checks if state belongs to Layer 3 (Interrupt).

@@ -10,6 +10,7 @@ import (
 	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/errors"
+	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
@@ -78,6 +79,12 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 		game.Draw,
 	)
 
+	// Boss player: skip BeforeTurn effects (no Buffs/Items)
+	if player.ID.IsBoss() {
+		s.broadcastStateSync(ctx)
+		return
+	}
+
 	// Step 1: Check SkipTurn flag
 	if player.SkipTurn {
 		player.SkipTurn = false // Clear flag
@@ -136,6 +143,12 @@ func (s *TurnUpkeepState) broadcastStateSync(ctx *StateContext) {
 }
 
 func (s *TurnUpkeepState) Update(ctx *StateContext) StateID {
+	// Boss player: skip MainAction, go directly to TurnBossBattle
+	player := ctx.Player
+	if player != nil && player.ID.IsBoss() {
+		return StateTurnBossBattle
+	}
+
 	// Check if SkipTurn was set -> jump to TurnEnd
 	if s.skipTurn {
 		return StateTurnEnd
@@ -258,6 +271,13 @@ func (s *MainActionState) Update(ctx *StateContext) StateID {
 	// Check if dice was rolled
 	if s.diceRolled {
 		ctx.SetInt(KeyDiceSteps, s.diceSteps)
+
+		// Check if player is on Boss cell -> TurnBossBattle (player attacks Boss)
+		player := ctx.Player
+		if player != nil && s.isOnBossCell(ctx, player) {
+			return StateTurnBossBattle
+		}
+
 		return StateTurnMoving
 	}
 
@@ -267,6 +287,13 @@ func (s *MainActionState) Update(ctx *StateContext) StateID {
 		steps := s.defaultDiceRoll(ctx)
 		s.OnRollDice(ctx, steps)
 		ctx.SetInt(KeyDiceSteps, steps)
+
+		// Check if player is on Boss cell -> TurnBossBattle
+		player := ctx.Player
+		if player != nil && s.isOnBossCell(ctx, player) {
+			return StateTurnBossBattle
+		}
+
 		return StateTurnMoving
 	}
 
@@ -341,6 +368,24 @@ func (s *MainActionState) defaultDiceRoll(ctx *StateContext) int {
 	default:
 		return 2 // Wood dice: uniform distribution
 	}
+}
+
+// isOnBossCell checks if a player is on the Boss cell.
+func (s *MainActionState) isOnBossCell(ctx *StateContext, player *core.Player) bool {
+	game := ctx.GetGame()
+	mapEngine := ctx.GetMapEngine()
+	if game == nil || mapEngine == nil {
+		return false
+	}
+	bossPlayer := game.GetBossPlayer()
+	if bossPlayer == nil || bossPlayer.IsDead {
+		return false
+	}
+	cell, err := mapEngine.GetCell(player.Position)
+	if err != nil || cell == nil {
+		return false
+	}
+	return cell.CellType == constants.CellTypeBoss
 }
 
 // ========== TurnMovingState ==========
@@ -961,6 +1006,286 @@ func (s *TurnDrawState) Exit(ctx *StateContext) {
 	}
 }
 
+// ========== TurnBossBattleState ==========
+
+// TurnBossBattleState handles Boss battle actions.
+// Two branches based on current player identity:
+// - Player branch: player attacks Boss (dice damage, probability-based crit)
+// - Boss branch: Boss counter-attacks (normal/crit/skill based on avgLP)
+type TurnBossBattleState struct {
+	BaseTurnState
+	isPlayerBranch  bool // true = player attacking Boss, false = Boss counter-attacking
+	bossDefeated    bool // Boss was defeated in this state
+	actionCtx       *engineaction.ActionContext
+}
+
+// NewTurnBossBattleState creates a new TurnBossBattle state.
+func NewTurnBossBattleState() *TurnBossBattleState {
+	return &TurnBossBattleState{
+		BaseTurnState: BaseTurnState{id: StateTurnBossBattle},
+	}
+}
+
+func (s *TurnBossBattleState) Enter(ctx *StateContext) {
+	player := ctx.Player
+	if player == nil {
+		ctx.Error = errors.WrapHSMError(
+			errors.NewInternalError("HSM", "TurnBossBattle", nil),
+			"TurnBossBattle", 2, "Enter", "player is nil")
+		return
+	}
+
+	game := ctx.GetGame()
+	if game == nil {
+		ctx.Error = errors.WrapHSMError(
+			errors.NewInternalError("HSM", "TurnBossBattle", nil),
+			"TurnBossBattle", 2, "Enter", "game is nil")
+		return
+	}
+
+	// Determine branch: player vs Boss
+	s.isPlayerBranch = !player.ID.IsBoss()
+
+	// Create ActionContext
+	mapEngine := ctx.GetMapEngine()
+	s.actionCtx = newActionContextWithPoolsNoPlayer(
+		game,
+		game.Bus,
+		mapEngine,
+		game.Draw,
+	)
+
+	if s.isPlayerBranch {
+		s.enterPlayerBranch(ctx, player, game)
+	} else {
+		s.enterBossBranch(ctx, player, game, mapEngine)
+	}
+}
+
+// enterPlayerBranch handles the player attacking Boss.
+func (s *TurnBossBattleState) enterPlayerBranch(ctx *StateContext, player *core.Player, game *engine.Game) {
+	bossPlayer := game.GetBossPlayer()
+	if bossPlayer == nil || bossPlayer.IsDead {
+		// Boss not found or already dead, skip to TurnEnd
+		return
+	}
+
+	// Get dice steps from MainAction (already stored in context)
+	diceSteps := ctx.GetDiceSteps()
+	if diceSteps <= 0 {
+		diceSteps = 1 // Minimum damage
+	}
+
+	// Calculate player crit based on dice quality
+	diceType := ctx.GetDiceType(player.ID.UUID())
+	isCrit := rng.CalcPlayerCrit(game.RNG, diceType)
+
+	damage := diceSteps
+	if isCrit {
+		damage = diceSteps * 2
+	}
+
+	// Execute BossDamageAction (player attacks Boss)
+	bossDamageAction := engineaction.NewBossDamageAction(
+		player,
+		bossPlayer,
+		damage,
+		isCrit,
+		string(constants.SourceBossDamage),
+	)
+	if err := s.actionCtx.ExecuteAction(bossDamageAction); err != nil {
+		ctx.Error = errors.WrapHSMError(
+			err, "TurnBossBattle", 2, "Enter", "boss damage action failed")
+		return
+	}
+
+	// Check if Boss was defeated
+	if bossPlayer.IsDead {
+		s.bossDefeated = true
+		// Store in both StateContext (for same-tick access) and Game.RoundData (for cross-tick persistence)
+		ctx.SetBool(KeyBossDefeated, true)
+		ctx.SetString(KeyBossDefeatedBy, player.ID.UUID())
+		game.RoundData.SetBool(KeyBossDefeated, true)
+		game.RoundData.SetString(KeyBossDefeatedBy, player.ID.UUID())
+		ctx.SetString(KeyWinner, player.ID.UUID())
+	}
+}
+
+// enterBossBranch handles Boss counter-attack against players on Boss cell.
+func (s *TurnBossBattleState) enterBossBranch(ctx *StateContext, bossPlayer *core.Player, game *engine.Game, mapEngine *gamemap.MapEngine) {
+	if bossPlayer.IsDead {
+		// Boss is dead, skip counter-attack
+		return
+	}
+
+	// Find all alive players on the Boss cell
+	bossCellPlayers := s.findBossCellPlayers(game, mapEngine)
+	if len(bossCellPlayers) == 0 {
+		// No players on Boss cell, Boss idle turn
+		return
+	}
+
+	// Calculate average LP of boss-cell alive players
+	avgLP := s.calcAvgLP(bossCellPlayers)
+
+	// Determine Boss attack type based on avgLP
+	attackResult := rng.CalcBossAttackType(game.RNG, avgLP, game.BossSkillPool)
+
+	switch attackResult.AttackType {
+	case "normal", "crit":
+		// Single target attack (LP-weighted selection)
+		targetCandidates := s.buildTargetCandidates(bossCellPlayers)
+		targetID := rng.SelectBossTarget(game.RNG, targetCandidates)
+
+		targetPlayer := game.GetPlayer(id.MustParsePlayerID(targetID))
+		if targetPlayer == nil || targetPlayer.IsDead {
+			return // No valid target
+		}
+
+		attackType := constants.BossAttackNormal
+		sourceID := string(constants.SourceBossNormal)
+		if attackResult.AttackType == "crit" {
+			attackType = constants.BossAttackCrit
+			sourceID = string(constants.SourceBossCrit)
+		}
+
+		bossAttackAction := engineaction.NewBossAttackAction(
+			bossPlayer,
+			targetPlayer,
+			attackResult.Damage,
+			attackType,
+			sourceID,
+		)
+		if err := s.actionCtx.ExecuteAction(bossAttackAction); err != nil {
+			ctx.Error = errors.WrapHSMError(
+				err, "TurnBossBattle", 2, "Enter", "boss attack action failed")
+			return
+		}
+
+		// Check if target player died -> respawn at checkpoint
+		if targetPlayer.IsDead && mapEngine != nil {
+			checkpoint := mapEngine.GetLastCheckpoint(targetPlayer.Position)
+			respawnAction := engineaction.NewRespawnAction(targetPlayer, checkpoint, "BossAttackRespawn")
+			if err := s.actionCtx.ExecuteAction(respawnAction); err != nil {
+				ctx.Error = errors.WrapHSMError(
+					err, "TurnBossBattle", 2, "Enter", "respawn action failed")
+				return
+			}
+		}
+
+	case "skill":
+		// Boss uses a skill (all boss-cell players are targets)
+		skillType := constants.ParseBossSkillType(attackResult.SkillType)
+		if !skillType.IsValid() {
+			return // Invalid skill type
+		}
+
+		skillConfig := engine.GlobalBossRegistry.GetBossSkillHandler(skillType)
+		if skillConfig == nil || skillConfig.Handler == nil {
+			return // No handler registered
+		}
+
+		bossSkillAction := engineaction.NewBossSkillAction(
+			bossPlayer,
+			skillType,
+			bossCellPlayers,
+			"boss_skill_"+string(skillType),
+		)
+
+		// Execute skill via ActionContext (for LogEntry recording)
+		if err := s.actionCtx.ExecuteAction(bossSkillAction); err != nil {
+			ctx.Error = errors.WrapHSMError(
+				err, "TurnBossBattle", 2, "Enter", "boss skill action failed")
+			return
+		}
+
+		// Call the skill handler to push derived actions
+		if err := skillConfig.Handler(game, s.actionCtx, bossCellPlayers); err != nil {
+			ctx.Error = errors.WrapHSMError(
+				err, "TurnBossBattle", 2, "Enter", "boss skill handler failed")
+			return
+		}
+
+		// Process derived actions (AddBuff, Heal, BossAttack, etc.)
+		if err := s.actionCtx.ProcessQueue(); err != nil {
+			ctx.Error = errors.WrapHSMError(
+				err, "TurnBossBattle", 2, "Enter", "derived action processing failed")
+			return
+		}
+
+		// Check if any player died from Boss skill
+		for _, target := range bossCellPlayers {
+			if target.IsDead && mapEngine != nil {
+				checkpoint := mapEngine.GetLastCheckpoint(target.Position)
+				respawnAction := engineaction.NewRespawnAction(target, checkpoint, "BossSkillRespawn")
+				if err := s.actionCtx.ExecuteAction(respawnAction); err != nil {
+					ctx.Error = errors.WrapHSMError(
+						err, "TurnBossBattle", 2, "Enter", "respawn action failed")
+					return
+				}
+			}
+		}
+	}
+}
+
+func (s *TurnBossBattleState) Update(ctx *StateContext) StateID {
+	// If Boss defeated -> signal for GameOver (handled by TurnLoop)
+	// Normal flow -> TurnEnd
+	return StateTurnEnd
+}
+
+func (s *TurnBossBattleState) Exit(ctx *StateContext) {
+	s.isPlayerBranch = false
+	s.bossDefeated = false
+	if s.actionCtx != nil {
+		s.actionCtx.Clear()
+	}
+}
+
+// findBossCellPlayers returns all alive non-Boss players on the Boss cell.
+func (s *TurnBossBattleState) findBossCellPlayers(game *engine.Game, mapEngine *gamemap.MapEngine) []*core.Player {
+	var result []*core.Player
+	bossPlayer := game.GetBossPlayer()
+	if bossPlayer == nil {
+		return result
+	}
+	bossPosition := bossPlayer.Position
+
+	for _, p := range game.Players {
+		if p.ID.IsBoss() || p.IsDead {
+			continue
+		}
+		if p.Position == bossPosition {
+			result = append(result, p)
+		}
+	}
+	return result
+}
+
+// calcAvgLP calculates average LP of given players.
+func (s *TurnBossBattleState) calcAvgLP(players []*core.Player) float64 {
+	if len(players) == 0 {
+		return 0
+	}
+	total := 0
+	for _, p := range players {
+		total += p.LP
+	}
+	return float64(total) / float64(len(players))
+}
+
+// buildTargetCandidates builds BossTargetCandidate list for weighted selection.
+func (s *TurnBossBattleState) buildTargetCandidates(players []*core.Player) []rng.BossTargetCandidate {
+	candidates := make([]rng.BossTargetCandidate, len(players))
+	for i, p := range players {
+		candidates[i] = rng.BossTargetCandidate{
+			PlayerID: p.ID.UUID(),
+			LP:       p.LP,
+		}
+	}
+	return candidates
+}
+
 // ========== TurnEndState ==========
 
 // TurnEndState handles turn cleanup and PhaseAfterTurn trigger.
@@ -995,6 +1320,33 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 		mapEngine,
 		game.Draw,
 	)
+
+	// Boss player: skip AfterTurn effects, Buff ticking, faction charging
+	// Boss TurnEnd only broadcasts TurnSync and ends turn log
+	if player.ID.IsBoss() {
+		// Broadcast TurnSync (Boss counter-attack animation)
+		s.broadcastTurnSync(ctx)
+
+		// End turn log segment
+		if game != nil && game.Log != nil {
+			game.Log.EndTurn()
+		}
+
+		// Broadcast StateSync (final state after Boss turn)
+		s.broadcastStateSync(ctx)
+		return
+	}
+
+	// Boss defeated during this turn: skip AfterTurn effects
+	// Game will end immediately after this TurnEnd
+	if game != nil && game.RoundData != nil && game.RoundData.GetBoolOrDefault(KeyBossDefeated, false) {
+		s.broadcastTurnSync(ctx)
+		if game.Log != nil {
+			game.Log.EndTurn()
+		}
+		s.broadcastStateSync(ctx)
+		return
+	}
 
 	// Trigger PhaseAfterTurn
 	triggerCtx := event.NewContext(player)
@@ -1170,6 +1522,8 @@ func (f *TurnStateFactory) CreateState(id StateID) State {
 		return NewTurnLandedState()
 	case StateTurnDraw:
 		return NewTurnDrawState()
+	case StateTurnBossBattle:
+		return NewTurnBossBattleState()
 	case StateTurnEnd:
 		return NewTurnEndState()
 	default:
@@ -1191,6 +1545,7 @@ func RegisterTurnStates(hsm *HSM) error {
 		factory.CreateState(StateTurnCheckpoint),
 		factory.CreateState(StateTurnLanded),
 		factory.CreateState(StateTurnDraw),
+		factory.CreateState(StateTurnBossBattle),
 		factory.CreateState(StateTurnEnd),
 	}
 	return hsm.RegisterStates(states)

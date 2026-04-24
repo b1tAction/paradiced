@@ -13,7 +13,6 @@ func TestStateIDString(t *testing.T) {
 		{StateRoundMiniGame, "RoundMiniGame"},
 		{StateRoundPrep, "RoundPrep"},
 		{StateTurnLoop, "TurnLoop"},
-		{StateBossBattle, "BossBattle"},
 		{StateGameOver, "GameOver"},
 		{StateTurnUpkeep, "TurnUpkeep"},
 		{StateMainAction, "MainAction"},
@@ -37,9 +36,9 @@ func TestStateIDString(t *testing.T) {
 func TestStateIDIsValid(t *testing.T) {
 	validIDs := []StateID{
 		StateMatchInit, StateRoundMiniGame, StateRoundPrep, StateTurnLoop,
-		StateBossBattle, StateGameOver,
+		StateGameOver,
 		StateTurnUpkeep, StateMainAction, StateTurnMoving, StateTurnLanded,
-		StateTurnDraw, StateTurnEnd,
+		StateTurnDraw, StateTurnEnd, StateTurnCheckpoint, StateTurnBossBattle,
 		StateWaitDecision,
 		StateNone,
 	}
@@ -61,7 +60,7 @@ func TestStateIDIsValid(t *testing.T) {
 func TestStateIDIsGlobalState(t *testing.T) {
 	globalStates := []StateID{
 		StateMatchInit, StateRoundMiniGame, StateRoundPrep,
-		StateTurnLoop, StateBossBattle, StateGameOver,
+		StateTurnLoop, StateGameOver,
 	}
 
 	for _, id := range globalStates {
@@ -87,6 +86,7 @@ func TestStateIDIsTurnState(t *testing.T) {
 	turnStates := []StateID{
 		StateTurnUpkeep, StateMainAction, StateTurnMoving,
 		StateTurnLanded, StateTurnDraw, StateTurnEnd,
+		StateTurnCheckpoint, StateTurnBossBattle,
 	}
 
 	for _, id := range turnStates {

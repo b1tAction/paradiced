@@ -150,18 +150,27 @@ func (s *RoundMiniGameState) Enter(ctx *StateContext) {
 	if game != nil && game.RoundData != nil {
 		game.RoundData.Clear()
 	}
-	s.totalPlayers = len(game.Players)
+
+	// Count non-Boss players (Boss doesn't participate in MiniGame)
+	nonBossPlayers := 0
+	for _, p := range game.Players {
+		if !p.ID.IsBoss() {
+			nonBossPlayers++
+		}
+	}
+	s.totalPlayers = nonBossPlayers
 	s.resultsReceived = 0
 
 	ctx.SetBool(KeyMiniGameStarted, true)
 	ctx.SetBool(KeyWaitingForResults, true)
 
-	// Broadcast MiniGameStart to all clients
-	// Players array uses PlayerID, NakamaBroadcastAdapter will convert to UserID
+	// Broadcast MiniGameStart to all clients (excluding Boss)
 	if ctx.Broadcast != nil {
-		playerIDs := make([]string, len(game.Players))
-		for i, p := range game.Players {
-			playerIDs[i] = p.ID.UUID()
+		playerIDs := make([]string, 0, nonBossPlayers)
+		for _, p := range game.Players {
+			if !p.ID.IsBoss() {
+				playerIDs = append(playerIDs, p.ID.UUID())
+			}
 		}
 		start := &pkgnet.MiniGameStart{
 			GameType: "dice_race",
@@ -188,6 +197,10 @@ func (s *RoundMiniGameState) Exit(ctx *StateContext) {
 			rankings := make([]pkgnet.RankingEntry, 0, len(game.Players))
 
 			for idx, p := range game.Players {
+				// Skip Boss player - Boss doesn't participate in MiniGame
+				if p.ID.IsBoss() {
+					continue
+				}
 				rank := ctx.GetMiniGameRank(p.ID.UUID())
 				if rank <= 0 {
 					// Deterministic fallback for players without submission.
@@ -272,6 +285,11 @@ func (s *RoundPrepState) Enter(ctx *StateContext) {
 		players[i] = ranked[i].player
 	}
 	for _, player := range players {
+		// Boss does not participate in dice assignment
+		if player.ID.IsBoss() {
+			continue
+		}
+
 		// Default assignment based on position (will be updated by mini-game results)
 		rank := len(players) // Default to lowest rank
 		playerRank := ctx.GetMiniGameRank(player.ID.UUID())
@@ -305,7 +323,6 @@ type TurnLoopState struct {
 	BaseGlobalState
 	currentPlayerIndex int
 	turnsCompleted     int
-	reachedEnd         bool
 	pendingTurnStart   bool // Flag to start first player turn
 }
 
@@ -315,7 +332,6 @@ func NewTurnLoopState() *TurnLoopState {
 		BaseGlobalState:    BaseGlobalState{id: StateTurnLoop},
 		currentPlayerIndex: 0,
 		turnsCompleted:     0,
-		reachedEnd:         false,
 		pendingTurnStart:   false,
 	}
 }
@@ -327,7 +343,6 @@ func (s *TurnLoopState) Enter(ctx *StateContext) {
 	// Reset state
 	s.currentPlayerIndex = 0
 	s.turnsCompleted = 0
-	s.reachedEnd = false
 
 	if len(players) > 0 {
 		// Set first player as current turn player
@@ -343,11 +358,22 @@ func (s *TurnLoopState) Enter(ctx *StateContext) {
 
 func (s *TurnLoopState) Update(ctx *StateContext) StateID {
 	// Check for end conditions:
-	// 1. Player reached boss cell -> BossBattle
+	// 1. Boss defeated -> GameOver
 	// 2. All players completed turns -> Back to MiniGame (next round)
 
-	if s.reachedEnd {
-		return StateBossBattle
+	// Check if Boss was defeated during a turn
+	// Check both StateContext (same-tick) and Game.RoundData (cross-tick persistence)
+	if ctx.GetBoolOrDefault(KeyBossDefeated, false) {
+		return StateGameOver
+	}
+	game := ctx.GetGame()
+	if game != nil && game.RoundData != nil && game.RoundData.GetBoolOrDefault(KeyBossDefeated, false) {
+		// Copy from RoundData to StateContext for downstream states
+		winnerID := game.RoundData.GetStringOrDefault(KeyBossDefeatedBy, "")
+		ctx.SetBool(KeyBossDefeated, true)
+		ctx.SetString(KeyBossDefeatedBy, winnerID)
+		ctx.SetString(KeyWinner, winnerID)
+		return StateGameOver
 	}
 
 	// Auto-start first player turn if pending
@@ -366,6 +392,17 @@ func (s *TurnLoopState) Exit(ctx *StateContext) {
 	ctx.SetBool(KeyTurnLoopActive, false)
 	s.turnsCompleted = 0
 	s.currentPlayerIndex = 0
+}
+
+// CanTransitionTo defines valid transitions from TurnLoop.
+func (s *TurnLoopState) CanTransitionTo(target StateID) bool {
+	// TurnLoop can transition to:
+	// - GameOver (when Boss is defeated)
+	// - RoundMiniGame (when round completes)
+	// - Turn states (when starting player turn)
+	return target == StateGameOver ||
+		target == StateRoundMiniGame ||
+		target.IsTurnState()
 }
 
 // StartPlayerTurn initiates a player's turn (called by external controller).
@@ -398,81 +435,30 @@ func (s *TurnLoopState) OnTurnComplete(ctx *StateContext) {
 	s.turnsCompleted++
 	s.currentPlayerIndex++
 
-	// Check if player reached end
-	if ctx.HasReachedEnd() {
-		s.reachedEnd = true
-	}
-}
-
-// OnPlayerReachedEnd marks that a player reached the boss cell.
-func (s *TurnLoopState) OnPlayerReachedEnd() {
-	s.reachedEnd = true
-}
-
-// CanTransitionTo defines valid transitions from TurnLoop.
-func (s *TurnLoopState) CanTransitionTo(target StateID) bool {
-	// TurnLoop can transition to:
-	// - BossBattle (when player reaches end)
-	// - RoundMiniGame (when round completes)
-	// - Turn states (when starting player turn)
-	return target == StateBossBattle ||
-		target == StateRoundMiniGame ||
-		target.IsTurnState()
-}
-
-// BossBattleState - Boss Battle State
-// Handles end-game boss encounter.
-
-type BossBattleState struct {
-	BaseGlobalState
-	triggerPlayer *core.Player
-	bossDefeated  bool
-}
-
-// NewBossBattleState creates a new BossBattle state.
-func NewBossBattleState() *BossBattleState {
-	return &BossBattleState{
-		BaseGlobalState: BaseGlobalState{id: StateBossBattle},
-		bossDefeated:    false,
-	}
-}
-
-func (s *BossBattleState) Enter(ctx *StateContext) {
-	// Get the player who triggered boss battle
-	// This would be set by TurnLoop before transitioning
-	triggerID := ctx.GetStringOrDefault(KeyBossTrigger, "")
-	if triggerID != "" {
-		parsedID, err := id.ParsePlayerID(triggerID)
-		if err == nil {
-			s.triggerPlayer = ctx.GetGame().GetPlayer(parsedID)
+	// Check if Boss was defeated during this turn
+	// Check both StateContext and Game.RoundData
+	bossDefeated := ctx.GetBoolOrDefault(KeyBossDefeated, false)
+	if !bossDefeated {
+		game := ctx.GetGame()
+		if game != nil && game.RoundData != nil {
+			bossDefeated = game.RoundData.GetBoolOrDefault(KeyBossDefeated, false)
 		}
 	}
 
-	ctx.SetBool(KeyBossBattleActive, true)
-}
-
-func (s *BossBattleState) Update(ctx *StateContext) StateID {
-	// Wait for boss battle result
-	// In actual implementation, this would check for battle outcome
-
-	if s.bossDefeated {
-		return StateGameOver
+	if bossDefeated {
+		// Get winner from RoundData (more reliable than StateContext for cross-tick)
+		game := ctx.GetGame()
+		winnerID := ctx.GetStringOrDefault(KeyBossDefeatedBy, "")
+		if winnerID == "" && game != nil && game.RoundData != nil {
+			winnerID = game.RoundData.GetStringOrDefault(KeyBossDefeatedBy, "")
+		}
+		if winnerID != "" {
+			ctx.SetString(KeyWinner, winnerID)
+		}
 	}
-
-	return StateNone // Stay in boss battle
 }
 
-func (s *BossBattleState) Exit(ctx *StateContext) {
-	ctx.SetBool(KeyBossBattleActive, false)
-	s.triggerPlayer = nil
-}
-
-// OnBossDefeated marks boss as defeated.
-func (s *BossBattleState) OnBossDefeated() {
-	s.bossDefeated = true
-}
-
-// GameOverState - Game Over State
+// ========== GameOverState ==========
 // Final state, broadcasts winner and performs cleanup.
 
 type GameOverState struct {
@@ -553,8 +539,6 @@ func (f *GlobalStateFactory) CreateState(id StateID) State {
 		return NewRoundPrepState()
 	case StateTurnLoop:
 		return NewTurnLoopState()
-	case StateBossBattle:
-		return NewBossBattleState()
 	case StateGameOver:
 		return NewGameOverState()
 	default:
@@ -571,7 +555,6 @@ func RegisterGlobalStates(hsm *HSM) error {
 		factory.CreateState(StateRoundMiniGame),
 		factory.CreateState(StateRoundPrep),
 		factory.CreateState(StateTurnLoop),
-		factory.CreateState(StateBossBattle),
 		factory.CreateState(StateGameOver),
 	}
 	return hsm.RegisterStates(states)

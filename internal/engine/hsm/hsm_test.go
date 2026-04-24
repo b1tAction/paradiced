@@ -379,7 +379,7 @@ func TestHSMRestoreFromSnapshotUnknownState(t *testing.T) {
 	hsm := NewHSM(game)
 
 	snapshot := &HSMSnapshot{
-		GlobalStateID: StateBossBattle, // Not registered
+		GlobalStateID: StateID(999), // Not registered
 		Running:       true,
 	}
 

@@ -226,20 +226,19 @@ func TestStateTurnLoop(t *testing.T) {
 		t.Errorf("currentPlayerIndex should be 1, got %d", state.currentPlayerIndex)
 	}
 
-	// Test reached end marker via Metadata
-	ctx.SetReachedEnd(true)
+	// Test reached end marker via Metadata (now uses BossDefeated in RoundData)
+	winnerPlayer := game.Players[0]
+	game.RoundData.SetBool(KeyBossDefeated, true)
+	game.RoundData.SetString(KeyBossDefeatedBy, winnerPlayer.ID.UUID())
 	state.OnTurnComplete(ctx)
-	if !state.reachedEnd {
-		t.Error("reachedEnd should be true when ctx.HasReachedEnd()")
-	}
 
 	nextID = state.Update(ctx)
-	if nextID != StateBossBattle {
-		t.Errorf("Update should return BossBattle when reached, got %s", nextID.String())
+	if nextID != StateGameOver {
+		t.Errorf("Update should return GameOver when Boss defeated, got %s", nextID.String())
 	}
 
-	if !state.CanTransitionTo(StateBossBattle) {
-		t.Error("TurnLoop should transition to BossBattle")
+	if !state.CanTransitionTo(StateGameOver) {
+		t.Error("TurnLoop should transition to GameOver")
 	}
 	if !state.CanTransitionTo(StateRoundMiniGame) {
 		t.Error("TurnLoop should transition to RoundMiniGame")
@@ -251,50 +250,6 @@ func TestStateTurnLoop(t *testing.T) {
 	state.Exit(NewStateContext())
 	if state.turnsCompleted != 0 {
 		t.Error("turnsCompleted should be reset")
-	}
-}
-
-func TestStateBossBattle(t *testing.T) {
-	state := NewBossBattleState()
-
-	if state.ID() != StateBossBattle {
-		t.Errorf("BossBattleState.ID() = %s, want StateBossBattle", state.ID().String())
-	}
-
-	game := engine.NewGame(id.NewGameID(), 0)
-	triggerPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
-	game.AddPlayer(triggerPlayer)
-
-	ctx := NewStateContext().WithHSM(NewHSM(game))
-	ctx.SetString(KeyBossTrigger, triggerPlayer.ID.UUID())
-
-	state.Enter(ctx)
-
-	if state.triggerPlayer == nil {
-		t.Error("triggerPlayer should be set")
-	}
-	if !ctx.GetBoolOrDefault(KeyBossBattleActive, false) {
-		t.Error("boss_battle_active should be true")
-	}
-
-	nextID := state.Update(ctx)
-	if nextID != StateNone {
-		t.Errorf("Update should return StateNone while in battle, got %s", nextID.String())
-	}
-
-	state.OnBossDefeated()
-	if !state.bossDefeated {
-		t.Error("bossDefeated should be true")
-	}
-
-	nextID = state.Update(ctx)
-	if nextID != StateGameOver {
-		t.Errorf("Update should return GameOver when defeated, got %s", nextID.String())
-	}
-
-	state.Exit(NewStateContext())
-	if state.triggerPlayer != nil {
-		t.Error("triggerPlayer should be nil after exit")
 	}
 }
 
@@ -339,7 +294,7 @@ func TestGlobalStateFactory(t *testing.T) {
 
 	globalIDs := []StateID{
 		StateMatchInit, StateRoundMiniGame, StateRoundPrep,
-		StateTurnLoop, StateBossBattle, StateGameOver,
+		StateTurnLoop, StateGameOver,
 	}
 
 	for _, id := range globalIDs {
@@ -367,7 +322,7 @@ func TestRegisterGlobalStates(t *testing.T) {
 		t.Errorf("RegisterGlobalStates failed: %v", err)
 	}
 
-	for _, id := range []StateID{StateMatchInit, StateRoundMiniGame, StateRoundPrep, StateTurnLoop, StateBossBattle, StateGameOver} {
+	for _, id := range []StateID{StateMatchInit, StateRoundMiniGame, StateRoundPrep, StateTurnLoop, StateGameOver} {
 		if hsm.GetState(id) == nil {
 			t.Errorf("State %s should be registered", id.String())
 		}
