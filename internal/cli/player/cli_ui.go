@@ -198,7 +198,8 @@ func (ui *CLIUIAdapter) OnMiniGameResult(ctx context.Context, result *model.Mini
 func (ui *CLIUIAdapter) OnGameOver(ctx context.Context, gameOver *model.GameOver) {
 	fmt.Println()
 	fmt.Println("========== GAME OVER ==========")
-	fmt.Printf("Winner: %s\n", gameOver.WinnerID)
+	winnerName := ui.resolveDisplayName(gameOver.WinnerID)
+	fmt.Printf("Winner: %s (defeated the Boss!)\n", winnerName)
 	fmt.Println()
 
 	fmt.Println("Player Stats:")
@@ -328,6 +329,28 @@ func (ui *CLIUIAdapter) displayLogEntry(entry gamelog.LogEntry) {
 		diceSteps := entry.Metadata.GetIntOrDefault("dice_steps", 0)
 		fmt.Printf("  [dice_roll] %s rolled %s dice: %d steps\n", targetName, diceType, diceSteps)
 
+	case entry.ActionType == "boss_damage":
+		damage := entry.Metadata.GetIntOrDefault("damage", 0)
+		isCrit := entry.Metadata.GetBoolOrDefault("is_crit", false)
+		bossHP := entry.Metadata.GetIntOrDefault("boss_remaining_hp", 0)
+		critMark := ""
+		if isCrit {
+			critMark = " [CRIT!]"
+		}
+		fmt.Printf("  [boss_damage] Boss HP-%d%s (remaining: %d) by %s\n",
+			damage, critMark, bossHP, source)
+
+	case entry.ActionType == "boss_attack":
+		attackType := entry.Metadata.GetStringOrDefault("attack_type", "")
+		damage := entry.Metadata.GetIntOrDefault("damage", 0)
+		fmt.Printf("  [boss_attack] %s: Boss attacked %s (%s) HP-%d\n",
+			source, targetName, attackType, damage)
+
+	case entry.ActionType == "boss_skill":
+		skillType := entry.Metadata.GetStringOrDefault("skill_type", "")
+		targetsStr := entry.Metadata.GetStringOrDefault("targets", "")
+		fmt.Printf("  [boss_skill] Boss used %s on %s\n", skillType, targetsStr)
+
 	default:
 		// Generic fallback for unknown entry types
 		typeStr := string(entry.Type)
@@ -340,6 +363,10 @@ func (ui *CLIUIAdapter) displayLogEntry(entry gamelog.LogEntry) {
 
 // resolveDisplayName maps a player ID to a display name using cached StateSync.
 func (ui *CLIUIAdapter) resolveDisplayName(playerID string) string {
+	// Boss player has a fixed display name
+	if playerID == constants.BossPlayerUUID {
+		return "Boss"
+	}
 	if ui.stateSync == nil {
 		return playerID
 	}
@@ -512,6 +539,17 @@ func (ui *CLIUIAdapter) findMyPlayerID(state *model.StateSync) string {
 func (ui *CLIUIAdapter) displayPlayers(state *model.StateSync) {
 	fmt.Println("Players:")
 	for _, player := range state.Players {
+		// Boss player has special display format
+		if player.IsBoss {
+			bossStatus := ""
+			if player.IsDead {
+				bossStatus = " [DEFEATED]"
+			}
+			fmt.Printf("  * Boss HP:%d/50 Pos:%d%s\n",
+				player.HP, player.Position, bossStatus)
+			continue
+		}
+
 		isMe := player.PlayerID == ui.userID
 		isCurrent := player.PlayerID == state.CurrentPlayerID
 

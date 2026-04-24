@@ -55,6 +55,7 @@ type Player struct {
 	FireCounter int    `json:"fire_counter"`
 	IsDead      bool   `json:"is_dead"`
 	SkipTurn    bool   `json:"skip_turn"`
+	IsBoss      bool   `json:"is_boss,omitempty"` // Boss player identification
 }
 
 // Buff represents a buff state for synchronization.

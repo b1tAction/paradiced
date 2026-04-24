@@ -53,6 +53,11 @@ func (a *NakamaBroadcastAdapter) BroadcastStateSync(state *net.StateSync) error 
 	// PlayerID already equals Nakama userID, so clients can self-identify by matching PlayerID.
 	if state != nil && a.handler != nil {
 		for i := range state.Players {
+			// Boss player has fixed display name
+			if state.Players[i].IsBoss {
+				state.Players[i].DisplayName = "Boss"
+				continue
+			}
 			// Find Nakama userID for this player by matching PlayerID
 			for userID, player := range a.handler.players {
 				if player != nil && player.ID.UUID() == state.Players[i].PlayerID {

@@ -160,6 +160,10 @@ type Player struct {
 
 	// SkipTurn indicates the player will skip this turn.
 	SkipTurn bool `json:"skip_turn"`
+
+	// IsBoss indicates this is the Boss special player.
+	// Only true for the Boss entity at the end of the Players list.
+	IsBoss bool `json:"is_boss,omitempty"`
 }
 
 // Buff represents a buff state for synchronization.

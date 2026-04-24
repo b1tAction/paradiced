@@ -186,6 +186,10 @@ func (p *InteractivePlayer) handleStateSync(ctx context.Context, data []byte) {
 	// Find own PlayerID from Players array
 	// PlayerID now equals the frontend userID, so we can directly match
 	for _, player := range stateSync.Players {
+		// Skip Boss player - it's not a human player
+		if player.IsBoss {
+			continue
+		}
 		if player.PlayerID == p.userID {
 			p.playerID = player.PlayerID
 			p.logger.Debug("Found own player", "player_id", p.playerID, "user_id", p.userID)

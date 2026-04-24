@@ -321,6 +321,49 @@ func TestHandleStateSyncInvalidJSON(t *testing.T) {
 	}
 }
 
+func TestHandleStateSyncWithBossPlayer(t *testing.T) {
+	mockSocket := NewMockSocketClient()
+	logger := nakama.NewLogger(false)
+	player := NewAutoPlayPlayerStandalone(mockSocket, "player-001", logger)
+
+	// StateSync with Boss player included in Players array
+	stateSync := model.StateSync{
+		GlobalState:     "turn_loop",
+		TurnState:       "main_action",
+		CurrentPlayerID: "player-001",
+		Round:           1,
+		Turn:            2,
+		Players: []model.Player{
+			{
+				PlayerID: "player-001",
+				Faction:  "qing_long",
+			},
+			{
+				PlayerID: "player-002",
+				Faction:  "zhu_que",
+			},
+			{
+				PlayerID:    "beeeeeef-beef-beef-beef-beeeeeeeeeef",
+				Faction:     "",
+				HP:          50,
+				IsBoss:      true,
+			},
+		},
+	}
+
+	ctx := context.Background()
+	data, _ := json.Marshal(stateSync)
+	player.handleStateSync(ctx, data)
+
+	// Verify playerID is still correctly found (not confused by Boss)
+	player.mu.RLock()
+	pID := player.playerID
+	player.mu.RUnlock()
+	if pID != "player-001" {
+		t.Errorf("playerID = %s, expected player-001 (Boss should be excluded)", pID)
+	}
+}
+
 func TestHandleAvailableRollDice(t *testing.T) {
 	mockSocket := NewMockSocketClient()
 	logger := nakama.NewLogger(false)

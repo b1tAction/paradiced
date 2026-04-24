@@ -183,6 +183,12 @@ func (h *NakamaMatchHandler) initializeGame() error {
 		}
 	}
 
+	// Initialize Boss player (always at end of Players list)
+	if h.mapEngine != nil {
+		mapEndIndex := h.mapEngine.Length - 1
+		game.InitializeBoss(mapEndIndex)
+	}
+
 	return nil
 }
 

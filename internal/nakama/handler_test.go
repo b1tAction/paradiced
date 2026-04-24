@@ -180,9 +180,9 @@ func TestNakamaMatchHandlerInitializeGame(t *testing.T) {
 		t.Fatal("mapEngine should be created after initialization")
 	}
 
-	// Verify players added to game
-	if len(game.Players) != 4 {
-		t.Errorf("game.Players count = %d, want 4", len(game.Players))
+	// Verify players added to game (4 human players + 1 Boss)
+	if len(game.Players) != 5 {
+		t.Errorf("game.Players count = %d, want 5 (4 human + 1 Boss)", len(game.Players))
 	}
 }
 

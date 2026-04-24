@@ -127,17 +127,40 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 			// Mark turn as complete
 			turnLoopState.OnTurnComplete(ctx)
 
-			// Start next player's turn
-			nextState := turnLoopState.StartPlayerTurn(ctx)
-			if nextState != hsm.StateNone {
-				if h.logger != nil {
-					h.logger.Debug("MatchLoop: starting next player turn", "next_state", nextState.String())
-				}
-				h.hsm.TransitionTo(nextState, ctx)
+			// Check if Boss was defeated during this turn
+			game := h.hsm.GetGame()
+			bossDefeated := ctx.GetBoolOrDefault(hsm.KeyBossDefeated, false)
+			if !bossDefeated && game != nil && game.RoundData != nil {
+				bossDefeated = game.RoundData.GetBoolOrDefault(hsm.KeyBossDefeated, false)
+			}
 
-				// Re-get current player after turn change
-				currentPlayer = h.getCurrentPlayer()
-				ctx.Player = currentPlayer
+			if bossDefeated {
+				// Boss defeated -> transition to GameOver
+				if h.logger != nil {
+					h.logger.Info("MatchLoop: Boss defeated, transitioning to GameOver")
+				}
+				// Copy winner info from RoundData to StateContext
+				winnerID := ctx.GetStringOrDefault(hsm.KeyBossDefeatedBy, "")
+				if winnerID == "" && game != nil && game.RoundData != nil {
+					winnerID = game.RoundData.GetStringOrDefault(hsm.KeyBossDefeatedBy, "")
+				}
+				if winnerID != "" {
+					ctx.SetString(hsm.KeyWinner, winnerID)
+				}
+				h.hsm.TransitionTo(hsm.StateGameOver, ctx)
+			} else {
+				// Start next player's turn
+				nextState := turnLoopState.StartPlayerTurn(ctx)
+				if nextState != hsm.StateNone {
+					if h.logger != nil {
+						h.logger.Debug("MatchLoop: starting next player turn", "next_state", nextState.String())
+					}
+					h.hsm.TransitionTo(nextState, ctx)
+
+					// Re-get current player after turn change
+					currentPlayer = h.getCurrentPlayer()
+					ctx.Player = currentPlayer
+				}
 			}
 		}
 	}

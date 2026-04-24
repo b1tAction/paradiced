@@ -409,6 +409,10 @@ func (p *AutoPlayPlayer) handleStateSync(ctx context.Context, data []byte) {
 	// Find own PlayerID from Players array
 	// PlayerID now equals the frontend userID, so we can directly match
 	for _, player := range stateSync.Players {
+		// Skip Boss player - it's not a human player
+		if player.IsBoss {
+			continue
+		}
 		if player.PlayerID == p.userID {
 			// Found own player, store PlayerID for turn checking
 			p.playerID = player.PlayerID

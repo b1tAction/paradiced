@@ -54,9 +54,9 @@ func TestMatchInit(t *testing.T) {
 		t.Fatal("mapEngine should be created after MatchInit")
 	}
 
-	// Verify players in game
-	if len(game.Players) != 4 {
-		t.Errorf("game.Players count = %d, want 4", len(game.Players))
+	// Verify players in game (4 human + 1 Boss)
+	if len(game.Players) != 5 {
+		t.Errorf("game.Players count = %d, want 5 (4 human + 1 Boss)", len(game.Players))
 	}
 }
 
@@ -268,8 +268,8 @@ func TestMatchInitWithMinimumPlayers(t *testing.T) {
 		t.Fatal("game should be created")
 	}
 
-	if len(game.Players) != 2 {
-		t.Errorf("game.Players count = %d, want 2", len(game.Players))
+	if len(game.Players) != 3 {
+		t.Errorf("game.Players count = %d, want 3 (2 human + 1 Boss)", len(game.Players))
 	}
 }
 

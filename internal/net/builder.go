@@ -110,6 +110,7 @@ func (b *Builder) BuildPlayer(p *core.Player) pkgnet.Player {
 		FireCounter: p.GetFireCounter(),
 		IsDead:      p.IsDead,
 		SkipTurn:    p.SkipTurn,
+		IsBoss:      p.ID.IsBoss(),
 	}
 }
 

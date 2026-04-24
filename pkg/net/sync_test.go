@@ -470,6 +470,72 @@ func TestNewLogEntry(t *testing.T) {
 	}
 }
 
+func TestPlayerIsBossField(t *testing.T) {
+	// Normal player: IsBoss=false, omitempty means field not in JSON
+	normalPlayer := Player{
+		PlayerID: "player-001",
+		Faction:  "qing_long",
+		HP:       6,
+		LP:       5,
+		IsBoss:   false,
+	}
+
+	jsonBytes, err := json.Marshal(normalPlayer)
+	if err != nil {
+		t.Fatalf("json.Marshal() error: %v", err)
+	}
+	jsonStr := string(jsonBytes)
+	if strings.Contains(jsonStr, "is_boss") {
+		t.Errorf("Normal player JSON should not contain is_boss field (omitempty), got: %s", jsonStr)
+	}
+
+	// Boss player: IsBoss=true, should appear in JSON
+	bossPlayer := Player{
+		PlayerID:    "beeeeeef-beef-beef-beef-beeeeeeeeeef",
+		Faction:     "",
+		HP:          50,
+		LP:          0,
+		IsBoss:      true,
+		IsDead:      false,
+	}
+
+	jsonBytes, err = json.Marshal(bossPlayer)
+	if err != nil {
+		t.Fatalf("json.Marshal() error: %v", err)
+	}
+	jsonStr = string(jsonBytes)
+	if !strings.Contains(jsonStr, `"is_boss":true`) {
+		t.Errorf("Boss player JSON should contain is_boss:true, got: %s", jsonStr)
+	}
+
+	// Roundtrip: Boss player unmarshals correctly
+	var parsed Player
+	err = json.Unmarshal(jsonBytes, &parsed)
+	if err != nil {
+		t.Fatalf("json.Unmarshal() error: %v", err)
+	}
+	if !parsed.IsBoss {
+		t.Errorf("parsed.IsBoss = false, want true")
+	}
+	if parsed.HP != 50 {
+		t.Errorf("parsed.HP = %d, want 50", parsed.HP)
+	}
+	if parsed.PlayerID != "beeeeeef-beef-beef-beef-beeeeeeeeeef" {
+		t.Errorf("parsed.PlayerID = %s, want beeeeeef-beef-beef-beef-beeeeeeeeeef", parsed.PlayerID)
+	}
+
+	// Roundtrip: Normal player with explicit is_boss:false in JSON
+	jsonWithBossFalse := `{"player_id":"p1","faction":"zhu_que","hp":6,"lp":5,"is_boss":false}`
+	var parsedNormal Player
+	err = json.Unmarshal([]byte(jsonWithBossFalse), &parsedNormal)
+	if err != nil {
+		t.Fatalf("json.Unmarshal() error: %v", err)
+	}
+	if parsedNormal.IsBoss {
+		t.Errorf("parsedNormal.IsBoss = true, want false")
+	}
+}
+
 func TestActionRejectedWithErrorCode(t *testing.T) {
 	rejected := &ActionRejected{
 		OpCode:    OpRollDice,

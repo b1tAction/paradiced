@@ -358,9 +358,9 @@ func TestMatchFullPlayerJoin(t *testing.T) {
 		t.Error("hsm should be initialized when match is full")
 	}
 
-	// Verify all 4 players are in game
-	if len(game.Players) != 4 {
-		t.Errorf("game.Players count = %d, want 4", len(game.Players))
+	// Verify all 4 human players + Boss are in game
+	if len(game.Players) != 5 {
+		t.Errorf("game.Players count = %d, want 5 (4 human + 1 Boss)", len(game.Players))
 	}
 }
 
