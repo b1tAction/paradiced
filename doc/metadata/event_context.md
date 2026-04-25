@@ -131,17 +131,17 @@ ActionContext.ExecuteAction() 将 Context.Metadata 传递给 EventBus：
 
 ```go
 // internal/engine/action/context.go
-func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
+func (ctx *ActionContext) ExecuteAction(action Action) error {
     // PreTrigger phase
-    triggerCtx := event.NewContext(ctx.Game.GetCurrentPlayer())
+    triggerCtx := event.NewContext(action.TargetPlayer())
     triggerCtx.Set("current_action", action)
     triggerCtx.Set("action_context", ctx)
-    
+
     ctx.EventBus.Publish(prePhase, action.Target(), triggerCtx)
-    
-    // 检查阻挡
+
+    // Check for blocking
     if triggerCtx.GetBoolOrDefault("action_blocked", false) {
-        // 动作被阻挡，处理派生Action后返回
+        // Action blocked, process derived actions then return
         return nil
     }
 }

@@ -48,7 +48,7 @@ internal/engine/
 ├── item_registry.go  # Item Registry + HandlerConfig + handlers
 ├── event_registry.go # Event Registry + HandlerConfig + handlers
 ├── action/           # Action系统实现（DamageAction、HealAction、RespawnAction等）
-│   ├── action.go     # ExecutableAction接口
+│   ├── action.go     # Action接口（含TargetPlayer方法）
 │   ├── types.go      # 具体Action类型实现
 │   ├── context.go    # ActionContext（与全局GameLog集成）
 │   ├── queue.go      # 衍生动作队列
@@ -187,7 +187,8 @@ Buff 的生命周期 Phase（`PhasePostBuffApplied`、`PhasePreBuffRemoved`）�
 ```go
 // EffectHandler 是统一的效果处理函数签名
 // Handler 使用 ctx.SetInt/SetBool/SetString 信号意图，engine层通过Action执行
-type EffectHandler func(phase constants.Phase, ctx *event.Context)
+// 返回 error 用于错误向上传播至 HSM 层
+type EffectHandler func(phase constants.Phase, ctx *event.Context) error
 
 // 注册示例：离火 Buff
 GlobalBuffRegistry.RegisterBuff(&BuffDefinition{...}, &BuffHandlerConfig{
@@ -300,25 +301,31 @@ internal/engine:   91.8% statements
 
 ```go
 // ActionContext.ExecuteAction() 流程
-func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
+func (ctx *ActionContext) ExecuteAction(action Action) error {
     // 1. PreTrigger阶段 - 发布Phase供拦截
     if action.PreTriggerPhase() != PhaseAnyTime {
-        ctx.EventBus.Publish(action.PreTriggerPhase(), action.Target(), ctx)
+        triggerCtx := event.NewContext(action.TargetPlayer())
+        triggerCtx.Set("current_action", action)
+        triggerCtx.Set("action_context", ctx)
+        ctx.EventBus.Publish(action.PreTriggerPhase(), action.Target(), triggerCtx)
     }
-    
+
     // 2. 执行 Action
     action.Execute(ctx)
-    
+
     // 3. PostTrigger阶段 - 发布Phase供生命周期事件
     if action.PostTriggerPhase() != PhaseAnyTime {
-        ctx.EventBus.Publish(action.PostTriggerPhase(), action.Target(), ctx)
+        triggerCtx := event.NewContext(action.TargetPlayer())
+        triggerCtx.Set("current_action", action)
+        triggerCtx.Set("action_context", ctx)
+        ctx.EventBus.Publish(action.PostTriggerPhase(), action.Target(), triggerCtx)
     }
-    
+
     // 4. 记录到全局日志
     if ctx.Game != nil {
         ctx.Game.GetGameLog().AddEntry(action.LogEntry())
     }
-    
+
     return nil
 }
 ```

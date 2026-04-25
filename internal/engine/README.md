@@ -35,7 +35,7 @@ internal/engine/
 ├── item_registry_test.go # Item Registry 单元测试
 ├── event_registry_test.go # Event Registry 单元测试
 └── action/            # Action 子包
-    ├── action.go      # ExecutableAction 接口定义
+    ├── action.go      # Action 接口定义（含TargetPlayer方法）
     ├── types.go       # 具体Action类型实现
     ├── context.go     # ActionContext 执行上下文
     ├── queue.go       # Queue 衍生动作队列

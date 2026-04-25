@@ -34,9 +34,8 @@ internal/engine (实现protocol.Game)
 
 ```go
 type Game interface {
-    GetCurrentPlayer() interface{}
-    GetPlayer(id id.PlayerID) interface{}
-    GetPlayers() []interface{}
+    GetPlayerInterface(id id.PlayerID) interface{}
+    GetPlayersInterface() []interface{}
     GetGameLog() *gamelog.GameLog // 获取全局游戏日志
 }
 ```
@@ -44,6 +43,8 @@ type Game interface {
 使用`interface{}`返回类型是因为：
 - action包无法导入core包（会造成循环依赖）
 - 调用方需要自行做类型断言转换为`*core.Player`
+
+注意：`GetCurrentPlayer()` 已移除。Action 的目标玩家通过 `Action.TargetPlayer()` 方法获取，不再依赖 Game 接口。
 
 ### MapEngine接口
 
@@ -81,15 +82,15 @@ type MapEngine interface {
 type ActionContext struct {
     Game        protocol.Game      // 使用接口避免循环依赖
     EventBus    *event.EventBus
-    MapEngine   protocol.MapEngine
+    MapEngine   *gamemap.MapEngine // 直接类型引用（无循环依赖）
+    DrawEngine  *rng.DrawEngine    // 直接类型引用
 }
 
-// 使用时做类型断言
-func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
-    currentPlayer, ok := ctx.Game.GetCurrentPlayer().(*core.Player)
-    if !ok || currentPlayer == nil {
-        currentPlayer = nil
-    }
+// 使用 Action.TargetPlayer() 获取目标玩家（不再依赖 Game.GetCurrentPlayer）
+func (ctx *ActionContext) ExecuteAction(action Action) error {
+    triggerCtx := event.NewContext(action.TargetPlayer())
+    triggerCtx.Set("current_action", action)
+    triggerCtx.Set("action_context", ctx)
     // ...
 }
 ```
@@ -106,9 +107,7 @@ func NewGameWrapper(game *engine.Game) protocol.Game {
     return &GameWrapper{game: game}
 }
 
-func (w *GameWrapper) GetCurrentPlayer() interface{} {
-    return w.game.GetCurrentPlayer()
-}
+// GetCurrentPlayer 已移除 - Action 目标玩家通过 Action.TargetPlayer() 获取
 ```
 
 ## 相关文档

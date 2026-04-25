@@ -118,14 +118,14 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 ActionContext 自动将日志写入全局 GameLog：
 
 ```go
-func (ctx *ActionContext) ExecuteAction(action ExecutableAction) error {
+func (ctx *ActionContext) ExecuteAction(action Action) error {
     // ... 执行 Action ...
-    
+
     // 自动记录到全局日志
     if ctx.Game != nil {
         ctx.Game.GetGameLog().AddEntry(action.LogEntry())
     }
-    
+
     return nil
 }
 ```

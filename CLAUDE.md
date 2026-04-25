@@ -56,7 +56,7 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **BuffType**: Buff identifiers with IsPositive/IsNegative classification
 - **EventType**: Event identifiers for random events
 - **ItemType**: Item identifiers for consumables
-- **Phase**: Trigger timing (HSM: BeforeTurn/OnLand/AfterTurn/PreMove; Action: PreDamage/PreEvent/PreRespawn/OnBuffApplied/OnBuffRemoved)
+- **Phase**: Trigger timing (HSM: BeforeTurn/OnLand/AfterTurn/PreMove; Action: PreDamage/PreEvent/PreRespawn/PostBuffApplied/PreBuffRemoved)
 - **Faction**: Player faction type (青龙/朱雀/白虎/玄武)
 - **CellType**: Map cell type (Normal, Fragile, Fog, Checkpoint, Boss, Event)
 - **DrawType**: Cell draw type (none/event/item) - specifies what to draw when landing on a cell
@@ -77,8 +77,8 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 
 #### Action System (`internal/engine/action`)
 - **ActionType**: String type with snake_case naming (damage, heal, move, etc.)
-- **Action interface**: Core interface with PreTriggerPhase/PostTriggerPhase
-- **ExecutableAction**: Concrete implementations (DamageAction, HealAction, RespawnAction, FellDownAction, DrawItemAction, DrawEventAction, BossDamageAction, BossAttackAction, BossSkillAction, etc.)
+- **Action interface**: Core interface with PreTriggerPhase/PostTriggerPhase/TargetPlayer
+- **Action implementations**: Concrete implementations (DamageAction, HealAction, RespawnAction, FellDownAction, DrawItemAction, DrawEventAction, BossDamageAction, BossAttackAction, BossSkillAction, etc.)
 - **ActionContext**: Execution context with EventBus and global GameLog integration
 
 #### Protocol Layer (`pkg/net`)
