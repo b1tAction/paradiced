@@ -6,6 +6,7 @@ import (
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/engine"
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
+	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
 )
@@ -1212,5 +1213,599 @@ func TestScenarioBuff_Hidden_ImmuneBossAttack(t *testing.T) {
 	}
 	if player.IsDead {
 		t.Error("Player should NOT be dead when Hidden buff is active during Boss attack")
+	}
+}
+
+// ========== Scenario Group G: Lost Buff Reverse Movement ==========
+
+// TestScenarioBuff_Lost_ReverseMovement verifies that 迷途 (Lost) buff
+// reverses movement direction via StepsModifier interface.
+// The Lost handler subscribes to PhasePreMove and flips Steps from positive
+// to negative when TurnMovingState publishes PhasePreMove.
+// This test simulates the PhasePreMove publish flow manually.
+func TestScenarioBuff_Lost_ReverseMovement(t *testing.T) {
+	harness := NewGameTestHarness(&HarnessConfig{
+		Seed:        42,
+		PlayerCount: 2,
+		Factions:    []constants.Faction{constants.FactionQingLong, constants.FactionZhuQue},
+		InitialHP:   6,
+		InitialLP:   3,
+	})
+
+	player := harness.Players[0]
+
+	// Add Lost buff to player (duration 1 turn)
+	harness.AddBuffToPlayer(player, constants.BuffTypeLost, 1)
+
+	if !player.HasBuff(constants.BuffTypeLost) {
+		t.Fatal("Player should have Lost buff after AddBuffToPlayer")
+	}
+
+	// Simulate PhasePreMove publish with StepsModifier
+	// TurnMovingState.Enter() does this with itself as StepsModifier
+	// Here we use a mock to verify the handler flips Steps
+	actionCtx := newActionContextWithPools(
+		harness.Game,
+		harness.Game.Bus,
+		harness.MapEngine,
+		harness.Game.Draw,
+	)
+
+	mockSteps := &testStepsModifier{steps: 5}
+
+	triggerCtx := event.NewContext(player)
+	triggerCtx.Set("action_context", actionCtx)
+	triggerCtx.Set("current_state", mockSteps)
+
+	harness.Game.Bus.Publish(constants.PhasePreMove, player.ID.UUID(), triggerCtx)
+
+	// Lost handler should have reversed steps: 5 → -5
+	if mockSteps.steps != -5 {
+		t.Errorf("Lost buff should reverse Steps from 5 to -5, got steps=%d", mockSteps.steps)
+	}
+
+	// Verify reverse_movement flag was set by handler
+	if !triggerCtx.GetBoolOrDefault("reverse_movement", false) {
+		t.Error("reverse_movement flag should be set by Lost handler")
+	}
+}
+
+// testStepsModifier implements StepsModifier for scenario tests.
+type testStepsModifier struct {
+	steps int
+}
+
+func (m *testStepsModifier) GetSteps() int  { return m.steps }
+func (m *testStepsModifier) SetSteps(s int) { m.steps = s }
+
+// ========== Scenario Group H: Exorcism Immune Poison ==========
+
+// TestScenarioBuff_Exorcism_ImmunePoison verifies that 辟邪 (Exorcism) buff
+// blocks Poison's bad event draw via PhasePreEvent.
+// When both Exorcism and Poison buffs are active, the Poison handler sets
+// draw_bad_event in PhaseBeforeTurn, but Exorcism handler sets
+// block_poison_effect in PhasePreEvent.
+func TestScenarioBuff_Exorcism_ImmunePoison(t *testing.T) {
+	harness := NewGameTestHarness(&HarnessConfig{
+		Seed:        42,
+		PlayerCount: 2,
+		Factions:    []constants.Faction{constants.FactionQingLong, constants.FactionZhuQue},
+		InitialHP:   6,
+		InitialLP:   3,
+	})
+
+	player := harness.Players[0]
+
+	// Add Exorcism buff (duration 5) and Poison buff (duration 3)
+	harness.AddBuffToPlayer(player, constants.BuffTypeExorcism, 5)
+	harness.AddBuffToPlayer(player, constants.BuffTypePoison, 3)
+
+	if !player.HasBuff(constants.BuffTypeExorcism) {
+		t.Fatal("Player should have Exorcism buff")
+	}
+	if !player.HasBuff(constants.BuffTypePoison) {
+		t.Fatal("Player should have Poison buff")
+	}
+
+	actionCtx := newActionContextWithPools(
+		harness.Game,
+		harness.Game.Bus,
+		harness.MapEngine,
+		harness.Game.Draw,
+	)
+
+	// Simulate PhaseBeforeTurn publish (Poison handler sets draw_bad_event)
+	beforeTurnCtx := event.NewContext(player)
+	beforeTurnCtx.Set("action_context", actionCtx)
+	harness.Game.Bus.Publish(constants.PhaseBeforeTurn, player.ID.UUID(), beforeTurnCtx)
+
+	// Poison handler should set draw_bad_event flag
+	if !beforeTurnCtx.GetBoolOrDefault("draw_bad_event", false) {
+		t.Error("Poison handler should set draw_bad_event flag in PhaseBeforeTurn")
+	}
+
+	// Simulate PhasePreEvent publish (Exorcism handler sets block_poison_effect)
+	preEventCtx := event.NewContext(player)
+	preEventCtx.Set("action_context", actionCtx)
+	harness.Game.Bus.Publish(constants.PhasePreEvent, player.ID.UUID(), preEventCtx)
+
+	// Exorcism handler should set block_poison_effect flag
+	if !preEventCtx.GetBoolOrDefault("block_poison_effect", false) {
+		t.Error("Exorcism handler should set block_poison_effect flag in PhasePreEvent")
+	}
+}
+
+// ========== Scenario Group I: Divine/Curse Removal Revert ==========
+
+// TestScenarioBuff_Divine_LPRevertOnRemoval verifies that 神眷 (Divine) buff
+// reverts LP-1 when removed via RemoveBuffAction (PhasePreBuffRemoved).
+// Divine: LP+1 on applied, LP-1 revert on removed.
+func TestScenarioBuff_Divine_LPRevertOnRemoval(t *testing.T) {
+	harness := NewGameTestHarness(&HarnessConfig{
+		Seed:        42,
+		PlayerCount: 2,
+		Factions:    []constants.Faction{constants.FactionQingLong, constants.FactionZhuQue},
+		InitialHP:   6,
+		InitialLP:   3,
+	})
+
+	player := harness.Players[0]
+	initialLP := player.LP
+
+	actionCtx := newActionContextWithPools(
+		harness.Game,
+		harness.Game.Bus,
+		harness.MapEngine,
+		harness.Game.Draw,
+	)
+
+	harness.Game.Log.StartTurn(1, 0, player.ID.UUID())
+
+	// Step 1: Add Divine buff → LP+1
+	addAction := engineaction.NewAddBuffAction(player, constants.BuffTypeDivine, "TestDivine")
+	if err := actionCtx.ExecuteAction(addAction); err != nil {
+		t.Fatalf("Add Divine buff failed: %v", err)
+	}
+
+	lpAfterApply := player.LP
+	if lpAfterApply != initialLP+1 {
+		t.Fatalf("LP should be initial+1 after Divine applied, got LP=%d (initial=%d)", lpAfterApply, initialLP)
+	}
+
+	// Step 2: Remove Divine buff → LP-1 revert
+	removeAction := engineaction.NewRemoveBuffAction(player, constants.BuffTypeDivine, "TestRemoval")
+	if err := actionCtx.ExecuteAction(removeAction); err != nil {
+		t.Fatalf("Remove Divine buff failed: %v", err)
+	}
+
+	// LP should revert to initial value
+	if player.LP != initialLP {
+		t.Errorf("LP should revert to initial after Divine removed, got LP=%d (expected %d)", player.LP, initialLP)
+	}
+
+	// Divine buff should be gone
+	if player.HasBuff(constants.BuffTypeDivine) {
+		t.Error("Divine buff should be removed after RemoveBuffAction")
+	}
+}
+
+// TestScenarioBuff_Curse_LPRevertOnRemoval verifies that 诅咒 (Curse) buff
+// reverts LP+1 when removed via RemoveBuffAction (PhasePreBuffRemoved).
+// Curse: LP-1 on applied, LP+1 revert on removed.
+func TestScenarioBuff_Curse_LPRevertOnRemoval(t *testing.T) {
+	harness := NewGameTestHarness(&HarnessConfig{
+		Seed:        42,
+		PlayerCount: 2,
+		Factions:    []constants.Faction{constants.FactionQingLong, constants.FactionZhuQue},
+		InitialHP:   6,
+		InitialLP:   3,
+		MaxLP:       8,
+	})
+
+	player := harness.Players[0]
+	initialLP := player.LP
+
+	actionCtx := newActionContextWithPools(
+		harness.Game,
+		harness.Game.Bus,
+		harness.MapEngine,
+		harness.Game.Draw,
+	)
+
+	harness.Game.Log.StartTurn(1, 0, player.ID.UUID())
+
+	// Step 1: Add Curse buff → LP-1
+	addAction := engineaction.NewAddBuffAction(player, constants.BuffTypeCurse, "TestCurse")
+	if err := actionCtx.ExecuteAction(addAction); err != nil {
+		t.Fatalf("Add Curse buff failed: %v", err)
+	}
+
+	lpAfterApply := player.LP
+	if lpAfterApply != initialLP-1 {
+		t.Fatalf("LP should be initial-1 after Curse applied, got LP=%d (initial=%d)", lpAfterApply, initialLP)
+	}
+
+	// Step 2: Remove Curse buff → LP+1 revert
+	removeAction := engineaction.NewRemoveBuffAction(player, constants.BuffTypeCurse, "TestRemoval")
+	if err := actionCtx.ExecuteAction(removeAction); err != nil {
+		t.Fatalf("Remove Curse buff failed: %v", err)
+	}
+
+	// LP should revert to initial value
+	if player.LP != initialLP {
+		t.Errorf("LP should revert to initial after Curse removed, got LP=%d (expected %d)", player.LP, initialLP)
+	}
+
+	// Curse buff should be gone
+	if player.HasBuff(constants.BuffTypeCurse) {
+		t.Error("Curse buff should be removed after RemoveBuffAction")
+	}
+}
+
+// ========== Scenario Group J: Rain/Corrupt Every-2-Turns ==========
+
+// TestScenarioBuff_Rain_Every2TurnsHeal verifies that 甘霖 (Rain) buff
+// heals HP+1 every 2 turns via AfterTurn handler with everyNTurns counter.
+// The counter is stored in event.Context.Metadata, so it persists across
+// handler calls within the same event context.
+// First call: counter=1 (<2) → no heal
+// Second call: counter reaches 2 → heal, counter resets
+func TestScenarioBuff_Rain_Every2TurnsHeal(t *testing.T) {
+	harness := NewGameTestHarness(&HarnessConfig{
+		Seed:        42,
+		PlayerCount: 2,
+		Factions:    []constants.Faction{constants.FactionQingLong, constants.FactionZhuQue},
+		InitialHP:   6,
+		InitialLP:   3,
+	})
+
+	player := harness.Players[0]
+
+	// Add Rain buff (duration 4)
+	harness.AddBuffToPlayer(player, constants.BuffTypeRain, 4)
+
+	if !player.HasBuff(constants.BuffTypeRain) {
+		t.Fatal("Player should have Rain buff")
+	}
+
+	actionCtx := newActionContextWithPools(
+		harness.Game,
+		harness.Game.Bus,
+		harness.MapEngine,
+		harness.Game.Draw,
+	)
+
+	harness.Game.Log.StartTurn(1, 0, player.ID.UUID())
+
+	initialHP := player.HP
+
+	// Use the same event context for both handler calls (counter persists in context)
+	triggerCtx := event.NewContext(player)
+	triggerCtx.Set("action_context", actionCtx)
+
+	// First AfterTurn trigger: counter increments to 1 (<2 → no heal)
+	handler := engine.GetBuffHandlerConfig(constants.BuffTypeRain).Handler
+	if err := handler(constants.PhaseAfterTurn, triggerCtx); err != nil {
+		t.Fatalf("Rain handler first call failed: %v", err)
+	}
+
+	// Should have no derived actions on first trigger
+	if len(triggerCtx.GetDerivedActions()) != 0 {
+		t.Errorf("Rain should NOT produce derived actions on first AfterTurn (counter=1 <2), got %d", len(triggerCtx.GetDerivedActions()))
+	}
+
+	// Counter should be 1 in context
+	counter1, _ := triggerCtx.GetInt("buff_turn_counter")
+	if counter1 != 1 {
+		t.Errorf("buff_turn_counter should be 1 after first AfterTurn, got %d", counter1)
+	}
+
+	// Second AfterTurn trigger: counter reaches 2 → heal
+	if err := handler(constants.PhaseAfterTurn, triggerCtx); err != nil {
+		t.Fatalf("Rain handler second call failed: %v", err)
+	}
+
+	// Should have derived HealAction on second trigger (counter reached 2)
+	derivedActions := triggerCtx.GetDerivedActions()
+	if len(derivedActions) == 0 {
+		t.Fatal("Rain should produce derived HealAction on second AfterTurn (counter reaches 2)")
+	}
+
+	// Process derived actions
+	for _, derived := range derivedActions {
+		if execAction, ok := derived.(engineaction.Action); ok {
+			actionCtx.PushDerivedAction(execAction)
+		}
+	}
+	if err := actionCtx.ProcessQueue(); err != nil {
+		t.Fatalf("ProcessQueue after second AfterTurn failed: %v", err)
+	}
+
+	// HP should increase by 1 after second AfterTurn
+	if player.HP != initialHP+1 {
+		t.Errorf("Rain should heal HP+1 on second AfterTurn, got HP=%d (expected %d)", player.HP, initialHP+1)
+	}
+}
+
+// TestScenarioBuff_Corrupt_Every2TurnsDamage verifies that 腐化 (Corrupt) buff
+// damages HP-1 every 2 turns via AfterTurn handler with everyNTurns counter.
+// The counter is stored in event.Context.Metadata, so it persists across
+// handler calls within the same event context.
+// First call: counter=1 (<2) → no damage
+// Second call: counter reaches 2 → HP-1, counter resets
+func TestScenarioBuff_Corrupt_Every2TurnsDamage(t *testing.T) {
+	harness := NewGameTestHarness(&HarnessConfig{
+		Seed:        42,
+		PlayerCount: 2,
+		Factions:    []constants.Faction{constants.FactionQingLong, constants.FactionZhuQue},
+		InitialHP:   6,
+		InitialLP:   3,
+	})
+
+	player := harness.Players[0]
+
+	// Add Corrupt buff (duration 4)
+	harness.AddBuffToPlayer(player, constants.BuffTypeCorrupt, 4)
+
+	if !player.HasBuff(constants.BuffTypeCorrupt) {
+		t.Fatal("Player should have Corrupt buff")
+	}
+
+	actionCtx := newActionContextWithPools(
+		harness.Game,
+		harness.Game.Bus,
+		harness.MapEngine,
+		harness.Game.Draw,
+	)
+
+	harness.Game.Log.StartTurn(1, 0, player.ID.UUID())
+
+	initialHP := player.HP
+
+	// Use the same event context for both handler calls (counter persists in context)
+	triggerCtx := event.NewContext(player)
+	triggerCtx.Set("action_context", actionCtx)
+
+	// First AfterTurn trigger: counter=1, <2 → no damage
+	handler := engine.GetBuffHandlerConfig(constants.BuffTypeCorrupt).Handler
+	if err := handler(constants.PhaseAfterTurn, triggerCtx); err != nil {
+		t.Fatalf("Corrupt handler first call failed: %v", err)
+	}
+
+	// Should have no derived actions on first trigger
+	if len(triggerCtx.GetDerivedActions()) != 0 {
+		t.Errorf("Corrupt should NOT produce derived actions on first AfterTurn (counter=1 <2), got %d", len(triggerCtx.GetDerivedActions()))
+	}
+
+	// Second AfterTurn trigger: counter reaches 2 → HP-1
+	if err := handler(constants.PhaseAfterTurn, triggerCtx); err != nil {
+		t.Fatalf("Corrupt handler second call failed: %v", err)
+	}
+
+	// Should have derived DamageAction on second trigger (counter reached 2)
+	derivedActions := triggerCtx.GetDerivedActions()
+	if len(derivedActions) == 0 {
+		t.Fatal("Corrupt should produce derived DamageAction on second AfterTurn (counter reaches 2)")
+	}
+
+	// Process derived actions
+	for _, derived := range derivedActions {
+		if execAction, ok := derived.(engineaction.Action); ok {
+			actionCtx.PushDerivedAction(execAction)
+		}
+	}
+	if err := actionCtx.ProcessQueue(); err != nil {
+		t.Fatalf("ProcessQueue after second AfterTurn failed: %v", err)
+	}
+
+	// HP should decrease by 1 after second AfterTurn
+	if player.HP != initialHP-1 {
+		t.Errorf("Corrupt should damage HP-1 on second AfterTurn, got HP=%d (expected %d)", player.HP, initialHP-1)
+	}
+}
+
+// ========== Scenario Group K: Thunder Death Event ==========
+
+// TestScenarioEvent_Thunder_Death verifies that 雷劫 (Thunder) event
+// causes player death through the Action system.
+// Thunder handler adds DamageAction(currentHP) as derived action,
+// which reduces HP to 0 → triggers DeathAction → adds DeathMark.
+func TestScenarioEvent_Thunder_Death(t *testing.T) {
+	harness := NewGameTestHarness(&HarnessConfig{
+		Seed:        42,
+		PlayerCount: 2,
+		Factions:    []constants.Faction{constants.FactionQingLong, constants.FactionZhuQue},
+		InitialHP:   5,
+		InitialLP:   3,
+	})
+
+	player := harness.Players[0]
+
+	actionCtx := newActionContextWithPools(
+		harness.Game,
+		harness.Game.Bus,
+		harness.MapEngine,
+		harness.Game.Draw,
+	)
+
+	harness.Game.Log.StartTurn(1, 0, player.ID.UUID())
+
+	initialHP := player.HP
+
+	// Simulate Thunder event handler
+	// Thunder handler: DamageAction(currentHP) → death
+	thunderCtx := event.NewContext(player)
+	thunderCtx.Set("action_context", actionCtx)
+
+	// Directly invoke Thunder handler
+	handler := engine.GetEventHandlerConfig(constants.EventTypeThunder).Handler
+	if err := handler(constants.PhaseAnyTime, thunderCtx); err != nil {
+		t.Fatalf("Thunder handler failed: %v", err)
+	}
+
+	// Thunder should produce DamageAction(currentHP) as derived action
+	derivedActions := thunderCtx.GetDerivedActions()
+	if len(derivedActions) == 0 {
+		t.Fatal("Thunder handler should produce DamageAction as derived action")
+	}
+
+	// Verify instant_death flag
+	if !thunderCtx.GetBoolOrDefault("instant_death", false) {
+		t.Error("Thunder handler should set instant_death flag")
+	}
+
+	// Process derived actions (DamageAction → ApplyDamage → DeathAction → DeathMark)
+	for _, derived := range derivedActions {
+		if execAction, ok := derived.(engineaction.Action); ok {
+			actionCtx.PushDerivedAction(execAction)
+		}
+	}
+	if err := actionCtx.ProcessQueue(); err != nil {
+		t.Fatalf("ProcessQueue for Thunder derived actions failed: %v", err)
+	}
+
+	// Player should be dead
+	if !player.IsDead {
+		t.Errorf("Player should be dead after Thunder event, HP=%d (initial=%d)", player.HP, initialHP)
+	}
+
+	// Player should have DeathMark buff
+	if !player.HasBuff(constants.BuffTypeDeathMark) {
+		t.Error("Player should have DeathMark buff after death from Thunder event")
+	}
+
+	// HP should be 0
+	if player.HP != 0 {
+		t.Errorf("Player HP should be 0 after Thunder death, got HP=%d", player.HP)
+	}
+}
+
+// ========== Scenario Group L: Buff Duration Extension ==========
+
+// TestScenarioBuff_DurationExtension verifies that when AddBuffAction is applied
+// to a player who already has the same BuffType, the buff duration is extended
+// instead of creating a new buff instance.
+// The buff_duration_extended flag is set in ActionContext.Metadata to skip
+// PhasePostBuffApplied publication (not a new buff application).
+func TestScenarioBuff_DurationExtension(t *testing.T) {
+	harness := NewGameTestHarness(&HarnessConfig{
+		Seed:        42,
+		PlayerCount: 2,
+		Factions:    []constants.Faction{constants.FactionQingLong, constants.FactionZhuQue},
+		InitialHP:   6,
+		InitialLP:   3,
+		MaxLP:       8,
+	})
+
+	player := harness.Players[0]
+	initialLP := player.LP
+
+	actionCtx := newActionContextWithPools(
+		harness.Game,
+		harness.Game.Bus,
+		harness.MapEngine,
+		harness.Game.Draw,
+	)
+
+	harness.Game.Log.StartTurn(1, 0, player.ID.UUID())
+
+	// Step 1: Add Divine buff first time (duration 3 from registry)
+	addAction1 := engineaction.NewAddBuffAction(player, constants.BuffTypeDivine, "TestDivine1")
+	if err := actionCtx.ExecuteAction(addAction1); err != nil {
+		t.Fatalf("First AddBuffAction(Divine) failed: %v", err)
+	}
+
+	// Divine applied → LP+1
+	lpAfterFirstApply := player.LP
+	if lpAfterFirstApply != initialLP+1 {
+		t.Fatalf("LP should be initial+1 after first Divine applied, got LP=%d", lpAfterFirstApply)
+	}
+
+	// Count Divine buff instances (should be exactly 1)
+	divineCount := 0
+	for _, b := range player.ActiveBuffs {
+		if b.Type == constants.BuffTypeDivine {
+			divineCount++
+		}
+	}
+	if divineCount != 1 {
+		t.Errorf("Should have exactly 1 Divine buff instance after first apply, got %d", divineCount)
+	}
+
+	// Clear actionCtx metadata before second apply
+	actionCtx.Clear()
+
+	// Step 2: Add Divine buff again → should extend duration, NOT create new instance
+	addAction2 := engineaction.NewAddBuffAction(player, constants.BuffTypeDivine, "TestDivine2")
+	if err := actionCtx.ExecuteAction(addAction2); err != nil {
+		t.Fatalf("Second AddBuffAction(Divine) failed: %v", err)
+	}
+
+	// Duration extension should NOT trigger LP+1 again (no PhasePostBuffApplied)
+	lpAfterSecondApply := player.LP
+	if lpAfterSecondApply != initialLP+1 {
+		t.Errorf("LP should remain initial+1 after duration extension (no second LP+1), got LP=%d", lpAfterSecondApply)
+	}
+
+	// Should still have exactly 1 Divine buff instance
+	divineCount2 := 0
+	for _, b := range player.ActiveBuffs {
+		if b.Type == constants.BuffTypeDivine {
+			divineCount2++
+		}
+	}
+	if divineCount2 != 1 {
+		t.Errorf("Should have exactly 1 Divine buff instance after duration extension, got %d", divineCount2)
+	}
+
+	// Verify buff_duration_extended flag was set
+	if !actionCtx.GetBoolOrDefault("buff_duration_extended", false) {
+		t.Error("buff_duration_extended flag should be set in ActionContext.Metadata after duration extension")
+	}
+}
+
+// ========== Scenario Group M: Poison Bad Event Draw ==========
+
+// TestScenarioBuff_Poison_BadEventDraw verifies that 毒瘴 (Poison) buff
+// triggers the draw_bad_event flag during PhaseBeforeTurn.
+// The handler sets draw_bad_event=true which signals HSM to force a bad event draw.
+func TestScenarioBuff_Poison_BadEventDraw(t *testing.T) {
+	harness := NewGameTestHarness(&HarnessConfig{
+		Seed:        42,
+		PlayerCount: 2,
+		Factions:    []constants.Faction{constants.FactionQingLong, constants.FactionZhuQue},
+		InitialHP:   6,
+		InitialLP:   3,
+	})
+
+	player := harness.Players[0]
+
+	// Add Poison buff (duration 3)
+	harness.AddBuffToPlayer(player, constants.BuffTypePoison, 3)
+
+	if !player.HasBuff(constants.BuffTypePoison) {
+		t.Fatal("Player should have Poison buff")
+	}
+
+	actionCtx := newActionContextWithPools(
+		harness.Game,
+		harness.Game.Bus,
+		harness.MapEngine,
+		harness.Game.Draw,
+	)
+
+	// Simulate PhaseBeforeTurn publish
+	triggerCtx := event.NewContext(player)
+	triggerCtx.Set("action_context", actionCtx)
+	harness.Game.Bus.Publish(constants.PhaseBeforeTurn, player.ID.UUID(), triggerCtx)
+
+	// Poison handler should set draw_bad_event flag
+	if !triggerCtx.GetBoolOrDefault("draw_bad_event", false) {
+		t.Error("Poison handler should set draw_bad_event=true in PhaseBeforeTurn")
+	}
+
+	// Verify no handler errors
+	if triggerCtx.HasError() {
+		t.Errorf("PhaseBeforeTurn handler should not produce errors: %v", triggerCtx.FirstError())
 	}
 }
