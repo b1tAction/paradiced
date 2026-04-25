@@ -15,9 +15,7 @@ import (
 // TestScenarioBuff_Divine_LPIncrementOnApplied verifies that 神眷 (Divine) buff
 // increases LP by 1 when applied (via PhasePostBuffApplied).
 // Divine now triggers LP+1 on buff application, LP-1 revert on buff removal.
-// WIP: test isolation issue - TypeCurse subscription interferes with TypeDivine test
 func TestScenarioBuff_Divine_LPIncrementOnApplied(t *testing.T) {
-	t.Skip("WIP: test isolation issue - TypeCurse subscription interferes with TypeDivine test")
 	harness := NewGameTestHarness(&HarnessConfig{
 		Seed:        42,
 		PlayerCount: 2,
@@ -35,7 +33,6 @@ func TestScenarioBuff_Divine_LPIncrementOnApplied(t *testing.T) {
 		harness.Game.Bus,
 		harness.MapEngine,
 		harness.Game.Draw,
-		player,
 	)
 
 	harness.Game.Log.StartTurn(1, 0, player.ID.UUID())
@@ -58,9 +55,7 @@ func TestScenarioBuff_Divine_LPIncrementOnApplied(t *testing.T) {
 // TestScenarioBuff_Curse_LPDecrementOnApplied verifies that 诅咒 (Curse) buff
 // decreases LP by 1 when applied (via PhasePostBuffApplied).
 // Curse now triggers LP-1 on buff application, LP+1 revert on buff removal.
-// WIP: test isolation issue - TypeCurse subscription interferes with TypeDivine test
 func TestScenarioBuff_Curse_LPDecrementOnApplied(t *testing.T) {
-	t.Skip("WIP: test isolation issue - TypeCurse subscription interferes with TypeDivine test")
 	harness := NewGameTestHarness(&HarnessConfig{
 		Seed:        42,
 		PlayerCount: 2,
@@ -78,7 +73,6 @@ func TestScenarioBuff_Curse_LPDecrementOnApplied(t *testing.T) {
 		harness.Game.Bus,
 		harness.MapEngine,
 		harness.Game.Draw,
-		player,
 	)
 
 	harness.Game.Log.StartTurn(1, 0, player.ID.UUID())
@@ -492,7 +486,6 @@ func TestScenarioDeath_DamageActionDerivesDeathAction(t *testing.T) {
 		harness.Game.Bus,
 		harness.MapEngine,
 		harness.Game.Draw,
-		player,
 	)
 
 	// Start turn log for GameLog recording
@@ -564,7 +557,6 @@ func TestScenarioDeath_FellDownActionDerivesDeathAction(t *testing.T) {
 		harness.Game.Bus,
 		harness.MapEngine,
 		harness.Game.Draw,
-		player,
 	)
 
 	harness.Game.Log.StartTurn(1, 0, player.ID.UUID())
@@ -623,7 +615,6 @@ func TestScenarioDeath_DeathMarkBlocksSubsequentActions(t *testing.T) {
 		harness.Game.Bus,
 		harness.MapEngine,
 		harness.Game.Draw,
-		player,
 	)
 
 	harness.Game.Log.StartTurn(1, 0, player.ID.UUID())
@@ -663,7 +654,9 @@ func TestScenarioDeath_RespawnRemovesDeathMark(t *testing.T) {
 		PlayerCount: 2,
 		Factions:    []constants.Faction{constants.FactionQingLong, constants.FactionZhuQue},
 		InitialHP:   3,
+		MaxHP:       3,
 		InitialLP:   3,
+		MaxLP:       3,
 		// Add a checkpoint at position 30
 		CellTypeOverrides: map[int]constants.CellType{30: constants.CellTypeCheckpoint},
 	})
@@ -677,7 +670,6 @@ func TestScenarioDeath_RespawnRemovesDeathMark(t *testing.T) {
 		harness.Game.Bus,
 		harness.MapEngine,
 		harness.Game.Draw,
-		player,
 	)
 
 	harness.Game.Log.StartTurn(1, 0, player.ID.UUID())
@@ -758,7 +750,6 @@ func TestScenarioDeath_LethalDamageNonKillingDoesNotDeriveDeathAction(t *testing
 		harness.Game.Bus,
 		harness.MapEngine,
 		harness.Game.Draw,
-		player,
 	)
 
 	harness.Game.Log.StartTurn(1, 0, player.ID.UUID())

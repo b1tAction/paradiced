@@ -38,8 +38,14 @@ type HarnessConfig struct {
 	// InitialHP sets starting HP for all players (default 6).
 	InitialHP int
 
+	// MaxHP sets maximum HP for all players (default 8).
+	MaxHP int
+
 	// InitialLP sets starting LP for all players (default 3).
 	InitialLP int
+
+	// MaxLP sets maximum LP for all players (default 8).
+	MaxLP int
 
 	// InitialPosition sets starting position for all players (default 0).
 	InitialPosition int
@@ -59,7 +65,9 @@ func DefaultHarnessConfig() *HarnessConfig {
 			constants.FactionXuanWu,
 		},
 		InitialHP:        6,
+		MaxHP:            8,
 		InitialLP:        3,
+		MaxLP:            8,
 		InitialPosition:  0,
 	}
 }
@@ -104,8 +112,14 @@ func NewGameTestHarness(config *HarnessConfig) *GameTestHarness {
 	if config.InitialHP <= 0 {
 		config.InitialHP = 6
 	}
+	if config.MaxHP <= 0 {
+		config.MaxHP = 8
+	}
 	if config.InitialLP <= 0 {
 		config.InitialLP = 3
+	}
+	if config.MaxLP <= 0 {
+		config.MaxLP = 8
 	}
 
 	// Create Game instance
@@ -153,8 +167,8 @@ func NewGameTestHarness(config *HarnessConfig) *GameTestHarness {
 	for i := 0; i < config.PlayerCount; i++ {
 		player := core.NewPlayer(core.PlayerConfig{
 			ID:      id.NewPlayerID(),
-			MaxHP:   config.InitialHP,
-			MaxLP:   config.InitialLP,
+			MaxHP:   config.MaxHP,
+			MaxLP:   config.MaxLP,
 			Faction: factions[i],
 		})
 		player.HP = config.InitialHP

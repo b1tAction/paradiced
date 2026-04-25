@@ -1053,36 +1053,7 @@ func TestRespawnActionFull(t *testing.T) {
 	}
 }
 
-// ========== ActionContextWithPlayer Tests ==========
-
-func TestNewActionContextWithPlayer(t *testing.T) {
-	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
-
-	ctx := NewActionContextWithPlayer(nil, nil, nil, nil, player)
-
-	if ctx == nil {
-		t.Fatal("NewActionContextWithPlayer should return non-nil")
-	}
-	if ctx.CurrentPlayer != player {
-		t.Error("CurrentPlayer should be set to provided player")
-	}
-}
-
-func TestActionContextSetCurrentPlayer(t *testing.T) {
-	ctx := NewActionContext(nil, nil, nil, nil)
-	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
-
-	// Initially nil
-	if ctx.CurrentPlayer != nil {
-		t.Error("CurrentPlayer should initially be nil")
-	}
-
-	ctx.SetCurrentPlayer(player)
-
-	if ctx.CurrentPlayer != player {
-		t.Error("CurrentPlayer should be set after SetCurrentPlayer")
-	}
-}
+// ========== ActionContext Tests ==========
 
 func TestActionContextGetGameLogNil(t *testing.T) {
 	// Without game
@@ -1286,7 +1257,7 @@ func TestExecuteActionWithEventBus(t *testing.T) {
 	player.HP = 100
 
 	bus := event.NewEventBus("test-game")
-	ctx := NewActionContextWithPlayer(nil, bus, nil, nil, player)
+	ctx := NewActionContext(nil, bus, nil, nil)
 	ctx.Game = &mockGame{log: gamelog.NewGameLog()}
 
 	action := NewDamageAction(player, 10, "test")
