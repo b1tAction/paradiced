@@ -52,7 +52,6 @@ func ExecuteHPChange(ctx *ActionContext, target *Player) {
 | `current_state` | StepsModifier | HSM (TurnMoving) | 当前移动状态实例（迷途修改Steps） | 迷途handler |
 | `draw_bad_event` | bool | Buff_Poison（毒瘴） | 抽取坏事件标志 | DrawEventAction |
 | `block_poison_effect` | bool | Buff_Exorcism（辟邪） | 阻挡毒效果标志 | Event Handler |
-| `buff_turn_counter` | int | Buff_Rain/Corrupt | 计数器（每N回合触发） | Buff Handler |
 | `applied_buff_type` | string | ActionContext (PostTrigger) | 被添加的Buff类型标识 | Divine/Curse Handler |
 | `removed_buff_type` | string | ActionContext (PreTrigger) / HSM (TurnEnd expiry) | 被移除的Buff类型标识 | Divine/Curse Handler |
 
@@ -98,17 +97,20 @@ func hiddenHandler(phase constants.Phase, ctx *event.Context) {
 
 ```go
 // internal/engine/buff_registry.go
-func rainHandler(phase constants.Phase, ctx *event.Context) {
-    // 获取计数器
-    counter, _ := ctx.GetInt("buff_turn_counter")
-    counter++
-    ctx.SetInt("buff_turn_counter", counter)
-    
-    // 每2回合触发HP+1
-    if counter >= 2 {
-        ctx.SetInt("hp_change", 1)
-        // engine层通过 ctx.AddDerivedAction 添加派生Action
-        ctx.SetInt("buff_turn_counter", 0) // 重置
+func createEveryNTurnsHandler(everyN int, buffType constants.BuffType, innerHandler EffectHandler) EffectHandler {
+    return func(phase constants.Phase, ctx *event.Context) error {
+        // 计数器存储在 Buff.Metadata（跨回合持久化）
+        buff := ctx.Player.GetBuff(buffType)
+        counter := buff.GetIntOrDefault("buff_turn_counter", 0)
+        counter++
+        buff.SetInt("buff_turn_counter", counter)
+
+        // 每2回合触发HP+1
+        if counter >= everyN {
+            innerHandler(phase, ctx) // 添加 HealAction derived action
+            buff.SetInt("buff_turn_counter", 0) // 重置
+        }
+        return nil
     }
 }
 ```

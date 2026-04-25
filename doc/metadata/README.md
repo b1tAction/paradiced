@@ -21,6 +21,7 @@
 | `event_context.md` | `event.Context.Metadata` | 内部 | EventBus Handler之间传递意图信号 |
 | `hsm_context.md` | `hsm.StateContext.Metadata` | 内部 | HSM状态之间传递数据（tick级） |
 | `action_context.md` | `action.ActionContext.Metadata` | 内部 | Action执行上下文数据 |
+| `buff.md` | `core.Buff.Metadata` | 内部 | Buff实例状态存储（如everyNTurns计数器） |
 
 ## 数据分层设计
 

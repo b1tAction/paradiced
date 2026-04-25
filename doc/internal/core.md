@@ -90,6 +90,7 @@ type BuffDefinition struct {
     Name        string               `json:"name"`
     Desc        string               `json:"desc"`
     Duration    int                  `json:"duration"`      // -1 表示永久
+    Hidden      bool                 `json:"hidden"`        // 隐藏Buff：无抽签，不发送给客户端
 }
 ```
 
@@ -126,15 +127,24 @@ type ItemDefinition struct {
 
 ```go
 type Buff struct {
-    Type            constants.BuffType `json:"type"`
-    ID              id.BuffID          `json:"id"`
-    Duration        int                `json:"duration"`
-    Charge          int                `json:"charge"`
-    SubscriptionIDs []string           `json:"subscription_ids"` // 支持多Phase订阅
+    Type         constants.BuffType `json:"type"`
+    ID           id.BuffID          `json:"id"`
+    Duration     int                `json:"duration"`       // 剩余回合数，-1表示永久
+    tickEligible bool               // 是否应在下回合结束时tick（内部状态）
+    *util.Metadata `json:"metadata"` // Per-buff状态存储（如everyNTurns计数器）
 }
 
 func NewBuff(buffType constants.BuffType, duration int) *Buff
+func NewBuffWithID(buffType constants.BuffType, buffID id.BuffID, duration int) *Buff
+func (b *Buff) IsActive() bool
+func (b *Buff) TickDuration() bool
 ```
+
+**Buff.Metadata 字段契约**（内部使用，不发送给客户端）：
+
+| 字段 | 类型 | 来源 | 用途 |
+|------|------|------|------|
+| `buff_turn_counter` | int | everyNTurns handler | 甘霖/腐化每N回合触发计数器 |
 
 ### Item
 
