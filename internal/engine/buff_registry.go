@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"fmt"
+
 	"github.com/b1tAction/paradiced/internal/core"
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/internal/event"
@@ -348,15 +350,19 @@ func registerAllBuffs() {
 
 func createModifyLPHandler(amount int) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) error {
-		if ctx == nil || ctx.Player == nil {
-			return nil
+		if ctx == nil {
+			return fmt.Errorf("handler: event context is nil")
+		}
+		if ctx.Player == nil {
+			return fmt.Errorf("handler: player is nil in event context")
 		}
 
 		// Must use Action system - no direct modification
-		actionCtx := getActionCtxFromEventCtx(ctx)
-		if actionCtx == nil {
-			return nil
+		actionCtx, err := getActionCtxFromEventCtx(ctx)
+		if err != nil {
+			return err
 		}
+		_ = actionCtx // ActionContext used for derived action processing
 
 		ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, amount, "Buff_Effect"))
 		return nil
@@ -365,15 +371,22 @@ func createModifyLPHandler(amount int) EffectHandler {
 
 func createModifyHPHandler(amount int) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) error {
-		if ctx == nil || ctx.Player == nil || amount == 0 {
-			return nil
+		if ctx == nil {
+			return fmt.Errorf("handler: event context is nil")
+		}
+		if ctx.Player == nil {
+			return fmt.Errorf("handler: player is nil in event context")
+		}
+		if amount == 0 {
+			return nil // No change needed
 		}
 
 		// Must use Action system - no direct modification
-		actionCtx := getActionCtxFromEventCtx(ctx)
-		if actionCtx == nil {
-			return nil
+		actionCtx, err := getActionCtxFromEventCtx(ctx)
+		if err != nil {
+			return err
 		}
+		_ = actionCtx // ActionContext used for derived action processing
 
 		if amount > 0 {
 			ctx.AddDerivedAction(engineaction.NewHealAction(ctx.Player, amount, "Buff_Effect"))
@@ -409,17 +422,21 @@ func handleZhuQueFire(phase constants.Phase, ctx *event.Context) error {
 	if phase != constants.PhaseBeforeTurn {
 		return nil
 	}
-	if ctx == nil || ctx.Player == nil {
-		return nil
+	if ctx == nil {
+		return fmt.Errorf("handler: event context is nil")
+	}
+	if ctx.Player == nil {
+		return fmt.Errorf("handler: player is nil in event context")
 	}
 
 	newCount := ctx.Player.IncrementFireCounter()
 	if newCount >= 4 {
 		// Must use Action system - no direct modification
-		actionCtx := getActionCtxFromEventCtx(ctx)
-		if actionCtx == nil {
-			return nil
+		actionCtx, err := getActionCtxFromEventCtx(ctx)
+		if err != nil {
+			return err
 		}
+		_ = actionCtx // ActionContext used for derived action processing
 
 		ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, "Buff_Fire"))
 		ctx.Player.SetFireCounter(0)
@@ -432,18 +449,18 @@ func handleLostReverse(phase constants.Phase, ctx *event.Context) error {
 		return nil
 	}
 	if ctx == nil {
-		return nil
+		return fmt.Errorf("handler: event context is nil")
 	}
 
 	// Get TurnMovingState from context (passed as StepsModifier interface)
 	raw, ok := ctx.Get("current_state")
 	if !ok {
-		return nil
+		return nil // No current_state in context (e.g. test scenario without HSM state)
 	}
 
 	movingState, ok := raw.(StepsModifier)
 	if !ok || movingState == nil {
-		return nil
+		return nil // Not a StepsModifier, skip
 	}
 
 	// Reverse steps (prevent double-flip: if Steps < 0, it's already reversed)
@@ -460,7 +477,7 @@ func handleHiddenImmune(phase constants.Phase, ctx *event.Context) error {
 		return nil
 	}
 	if ctx == nil {
-		return nil
+		return fmt.Errorf("handler: event context is nil")
 	}
 	ctx.SetBool("action_blocked", true)
 	ctx.SetString("blocked_by", "Buff_Hidden")
@@ -469,7 +486,7 @@ func handleHiddenImmune(phase constants.Phase, ctx *event.Context) error {
 
 func handlePoisonBadEvent(phase constants.Phase, ctx *event.Context) error {
 	if ctx == nil {
-		return nil
+		return fmt.Errorf("handler: event context is nil")
 	}
 	if phase != constants.PhaseBeforeTurn {
 		return nil
@@ -480,7 +497,7 @@ func handlePoisonBadEvent(phase constants.Phase, ctx *event.Context) error {
 
 func handleExorcismImmunePoison(phase constants.Phase, ctx *event.Context) error {
 	if ctx == nil {
-		return nil
+		return fmt.Errorf("handler: event context is nil")
 	}
 	if phase != constants.PhasePreEvent {
 		return nil
@@ -491,7 +508,7 @@ func handleExorcismImmunePoison(phase constants.Phase, ctx *event.Context) error
 
 func handleDeathMarkBlock(phase constants.Phase, ctx *event.Context) error {
 	if ctx == nil {
-		return nil
+		return fmt.Errorf("handler: event context is nil")
 	}
 	if phase != constants.PhasePreAction {
 		return nil
@@ -501,13 +518,17 @@ func handleDeathMarkBlock(phase constants.Phase, ctx *event.Context) error {
 }
 
 func handleDivineEffect(phase constants.Phase, ctx *event.Context) error {
-	if ctx == nil || ctx.Player == nil {
-		return nil
+	if ctx == nil {
+		return fmt.Errorf("handler: event context is nil")
 	}
-	actionCtx := getActionCtxFromEventCtx(ctx)
-	if actionCtx == nil {
-		return nil
+	if ctx.Player == nil {
+		return fmt.Errorf("handler: player is nil in event context")
 	}
+	actionCtx, err := getActionCtxFromEventCtx(ctx)
+	if err != nil {
+		return err
+	}
+	_ = actionCtx // ActionContext used for derived action processing
 
 	switch phase {
 	case constants.PhasePostBuffApplied:
@@ -529,13 +550,17 @@ func handleDivineEffect(phase constants.Phase, ctx *event.Context) error {
 }
 
 func handleCurseEffect(phase constants.Phase, ctx *event.Context) error {
-	if ctx == nil || ctx.Player == nil {
-		return nil
+	if ctx == nil {
+		return fmt.Errorf("handler: event context is nil")
 	}
-	actionCtx := getActionCtxFromEventCtx(ctx)
-	if actionCtx == nil {
-		return nil
+	if ctx.Player == nil {
+		return fmt.Errorf("handler: player is nil in event context")
 	}
+	actionCtx, err := getActionCtxFromEventCtx(ctx)
+	if err != nil {
+		return err
+	}
+	_ = actionCtx // ActionContext used for derived action processing
 
 	switch phase {
 	case constants.PhasePostBuffApplied:
@@ -556,16 +581,22 @@ func handleCurseEffect(phase constants.Phase, ctx *event.Context) error {
 	return nil
 }
 
-func getActionCtxFromEventCtx(ctx *event.Context) *engineaction.ActionContext {
+func getActionCtxFromEventCtx(ctx *event.Context) (*engineaction.ActionContext, error) {
 	if ctx == nil {
-		return nil
+		return nil, fmt.Errorf("handler: event context is nil")
 	}
 
 	raw, ok := ctx.Get("action_context")
 	if !ok {
-		return nil
+		return nil, fmt.Errorf("handler: action_context not found in event context")
 	}
 
-	actionCtx, _ := raw.(*engineaction.ActionContext)
-	return actionCtx
+	actionCtx, ok := raw.(*engineaction.ActionContext)
+	if !ok {
+		return nil, fmt.Errorf("handler: action_context is not ActionContext type")
+	}
+	if actionCtx == nil {
+		return nil, fmt.Errorf("handler: action_context is nil")
+	}
+	return actionCtx, nil
 }

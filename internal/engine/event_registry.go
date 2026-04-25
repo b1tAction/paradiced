@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"fmt"
+
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/event"
@@ -319,15 +321,22 @@ func registerAllEvents() {
 // createEventModifyHPHandler creates a handler that modifies HP through Action system.
 func createEventModifyHPHandler(amount int) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) error {
-		if ctx == nil || ctx.Player == nil || amount == 0 {
+		if ctx == nil {
+			return fmt.Errorf("handler: event context is nil")
+		}
+		if ctx.Player == nil {
+			return fmt.Errorf("handler: player is nil in event context")
+		}
+		if amount == 0 {
 			return nil
 		}
 
 		// Check ActionContext exists
-		actionCtx := getActionCtxFromEventCtx(ctx)
-		if actionCtx == nil {
-			return nil
+		actionCtx, err := getActionCtxFromEventCtx(ctx)
+		if err != nil {
+			return err
 		}
+		_ = actionCtx // ActionContext used for derived action processing
 
 		source := "Event_Effect"
 
@@ -343,15 +352,19 @@ func createEventModifyHPHandler(amount int) EffectHandler {
 // createEventModifyLPHandler creates a handler that modifies LP through Action system.
 func createEventModifyLPHandler(amount int) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) error {
-		if ctx == nil || ctx.Player == nil {
-			return nil
+		if ctx == nil {
+			return fmt.Errorf("handler: event context is nil")
+		}
+		if ctx.Player == nil {
+			return fmt.Errorf("handler: player is nil in event context")
 		}
 
 		// Check ActionContext exists
-		actionCtx := getActionCtxFromEventCtx(ctx)
-		if actionCtx == nil {
-			return nil
+		actionCtx, err := getActionCtxFromEventCtx(ctx)
+		if err != nil {
+			return err
 		}
+		_ = actionCtx // ActionContext used for derived action processing
 
 		source := "Event_Effect"
 		ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, amount, source))
@@ -362,15 +375,19 @@ func createEventModifyLPHandler(amount int) EffectHandler {
 // createEventGiveBuffHandler creates a handler that gives a Buff through Action system.
 func createEventGiveBuffHandler(buffType constants.BuffType) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) error {
-		if ctx == nil || ctx.Player == nil {
-			return nil
+		if ctx == nil {
+			return fmt.Errorf("handler: event context is nil")
+		}
+		if ctx.Player == nil {
+			return fmt.Errorf("handler: player is nil in event context")
 		}
 
 		// Check ActionContext exists
-		actionCtx := getActionCtxFromEventCtx(ctx)
-		if actionCtx == nil {
-			return nil
+		actionCtx, err := getActionCtxFromEventCtx(ctx)
+		if err != nil {
+			return err
 		}
+		_ = actionCtx // ActionContext used for derived action processing
 
 		ctx.AddDerivedAction(engineaction.NewAddBuffAction(ctx.Player, buffType, "Event_Effect"))
 		return nil

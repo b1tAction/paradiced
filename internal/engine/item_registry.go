@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"fmt"
+
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/event"
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
@@ -217,15 +219,19 @@ func registerAllItems() {
 
 func createGiveBuffHandler(buffType constants.BuffType) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) error {
-		if ctx == nil || ctx.Player == nil {
-			return nil
+		if ctx == nil {
+			return fmt.Errorf("handler: event context is nil")
+		}
+		if ctx.Player == nil {
+			return fmt.Errorf("handler: player is nil in event context")
 		}
 
 		// Check ActionContext exists
-		actionCtx := getActionCtxFromEventCtx(ctx)
-		if actionCtx == nil {
-			return nil
+		actionCtx, err := getActionCtxFromEventCtx(ctx)
+		if err != nil {
+			return err
 		}
+		_ = actionCtx // ActionContext used for derived action processing
 
 		ctx.AddDerivedAction(engineaction.NewAddBuffAction(ctx.Player, buffType, "Item_Effect"))
 		return nil
@@ -233,15 +239,19 @@ func createGiveBuffHandler(buffType constants.BuffType) EffectHandler {
 }
 
 func handleTeleport(phase constants.Phase, ctx *event.Context) error {
-	if ctx == nil || ctx.Player == nil {
-		return nil
+	if ctx == nil {
+		return fmt.Errorf("handler: event context is nil")
+	}
+	if ctx.Player == nil {
+		return fmt.Errorf("handler: player is nil in event context")
 	}
 
 	// Check ActionContext exists
-	actionCtx := getActionCtxFromEventCtx(ctx)
-	if actionCtx == nil {
-		return nil
+	actionCtx, err := getActionCtxFromEventCtx(ctx)
+	if err != nil {
+		return err
 	}
+	_ = actionCtx // ActionContext used for derived action processing
 
 	targetID, _ := ctx.GetString("target_id")
 	if targetID == "" {
