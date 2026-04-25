@@ -329,6 +329,7 @@ Git Commit信息必须使用英文提交
 | 辟邪 (Exorcism) | PreEvent | Immune to poison |
 | 毒瘴 (Poison) | BeforeTurn | Bad event each turn |
 | 离火 (Fire) | BeforeTurn | ZhuQue passive, LP+1 every 4 turns |
+| 死亡标记 (DeathMark) | PreAction (Hidden) | Block all actions for dead players (exempt: RespawnAction, RemoveBuffAction(DeathMark)) |
 
 ## Boss System
 

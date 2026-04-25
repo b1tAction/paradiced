@@ -47,7 +47,7 @@ func ExecuteHPChange(ctx *ActionContext, target *Player) {
 | 字段 | 类型 | 来源Buff | 用途 | 目标 |
 |------|------|----------|------|------|
 | `blocked_by` | string | Buff_Hidden（隐匿） | 阻挡来源标识 | LogEntry.Metadata |
-| `action_blocked` | bool | Buff_Hidden | 动作被阻挡标志 | ActionContext |
+| `action_blocked` | bool | Buff_Hidden / Buff_DeathMark | 动作被阻挡标志 | ActionContext |
 | `reverse_movement` | bool | Buff_Lost（迷途） | 反向移动标志（仅日志/调试） | LogEntry.Metadata |
 | `current_state` | StepsModifier | HSM (TurnMoving) | 当前移动状态实例（迷途修改Steps） | 迷途handler |
 | `draw_bad_event` | bool | Buff_Poison（毒瘴） | 抽取坏事件标志 | DrawEventAction |

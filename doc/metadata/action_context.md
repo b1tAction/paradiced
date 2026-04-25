@@ -61,19 +61,33 @@ type ActionContext struct {
 
 ### 使用场景
 
-这些字段在 `ExecuteAction()` 中设置，传递给 EventBus PreTrigger/PostTrigger：
+这些字段在 `ExecuteAction()` 中设置，传递给 EventBus。除了 PreTrigger/PostTrigger 外，
+Step 0 (PhasePreAction) 也使用这些字段进行死亡拦截：
 
 ```go
 func (ctx *ActionContext) ExecuteAction(action Action) error {
+    // Step 0: PhasePreAction - 死亡拦截
+    // DeathMark handler 根据 current_action 判断是否阻拦：
+    // - RespawnAction: 不阻拦（必须执行）
+    // - RemoveBuffAction(DeathMark): 不阻拦（移除自身不应阻拦）
+    // - 其他Action: 阻拦
+    if targetPlayer != nil && targetPlayer.IsDead {
+        preCtx := event.NewContext(targetPlayer)
+        preCtx.Set("current_action", action)
+        preCtx.Set("action_context", ctx)
+        ctx.EventBus.Publish(constants.PhasePreAction, targetPlayer.ID.UUID(), preCtx)
+        if preCtx.GetBoolOrDefault("action_blocked", false) {
+            // 阻拦时仍收集衍生Action
+            return nil
+        }
+    }
+
     // PreTrigger phase - 使用 action.TargetPlayer() 创建触发上下文
     triggerCtx := event.NewContext(action.TargetPlayer())
     triggerCtx.Set("current_action", action)   // 当前Action
     triggerCtx.Set("action_context", ctx)       // ActionContext引用
 
     ctx.EventBus.Publish(prePhase, action.Target(), triggerCtx)
-
-    // Handler 可通过 action_context 访问游戏数据
-    // Handler 可通过 current_action 获取Action详情
 
     // PostTrigger phase - 同样使用 action.TargetPlayer()
     triggerCtx := event.NewContext(action.TargetPlayer())
