@@ -91,6 +91,11 @@ func (ctx *ActionContext) ExecuteAction(action Action) error {
 			preCtx.Set("current_action", action)
 			ctx.EventBus.Publish(constants.PhasePreAction, targetPlayer.ID.UUID(), preCtx)
 
+			// Check for handler errors in PhasePreAction
+			if preCtx.HasError() {
+				return preCtx.FirstError()
+			}
+
 			// Check if action was blocked by DeathMark buff
 			if preCtx.GetBoolOrDefault("action_blocked", false) {
 				// Action blocked by DeathMark, but still process any derived actions
