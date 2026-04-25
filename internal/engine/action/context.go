@@ -80,27 +80,26 @@ func (ctx *ActionContext) SetCellDraw(probGood, probNeutral, probBad float64) *A
 // Returns first error from handlers or action execution.
 func (ctx *ActionContext) ExecuteAction(action Action) error {
 	// Step 0: PhasePreAction - death mark interception
-	// If the action's target player is dead (has DeathMark buff), block the action.
-	// Skip for buff lifecycle actions (RemoveBuffAction, RespawnAction) — these must
-	// execute even for dead players (buff expiry removal, respawn after death).
+	// If the action's target player is dead (has DeathMark buff), publish PhasePreAction.
+	// The DeathMark handler decides whether to block based on action type:
+	// RespawnAction and RemoveBuffAction(DeathMark) are exempted by the handler.
 	if ctx.EventBus != nil {
 		targetPlayer := action.TargetPlayer()
 		if targetPlayer != nil && targetPlayer.IsDead {
-			skipDeathCheck := false
-			if _, ok := action.(*RemoveBuffAction); ok {
-				skipDeathCheck = true
-			}
+			preCtx := event.NewContext(targetPlayer)
+			preCtx.Set("action_context", ctx)
+			preCtx.Set("current_action", action)
+			ctx.EventBus.Publish(constants.PhasePreAction, targetPlayer.ID.UUID(), preCtx)
 
-			if !skipDeathCheck {
-				preCtx := event.NewContext(targetPlayer)
-				preCtx.Set("action_context", ctx)
-				preCtx.Set("current_action", action)
-				ctx.EventBus.Publish(constants.PhasePreAction, targetPlayer.ID.UUID(), preCtx)
-
-				// Check if action was blocked by DeathMark buff
-				if preCtx.GetBoolOrDefault("action_blocked", false) {
-					return nil // Action blocked - skip execution entirely
+			// Check if action was blocked by DeathMark buff
+			if preCtx.GetBoolOrDefault("action_blocked", false) {
+				// Action blocked by DeathMark, but still process any derived actions
+				for _, derived := range preCtx.GetDerivedActions() {
+					if execAction, ok := derived.(Action); ok {
+						ctx.PushDerivedAction(execAction)
+					}
 				}
+				return nil
 			}
 		}
 	}
