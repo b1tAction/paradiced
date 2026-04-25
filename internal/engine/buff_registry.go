@@ -235,7 +235,7 @@ func registerAllBuffs() {
 		Phases:      []constants.Phase{constants.PhaseAfterTurn},
 		Priority:    50,
 		NeedConfirm: false,
-		Handler:     createEveryNTurnsHandler(2, createModifyHPHandler(-1)),
+		Handler:     createEveryNTurnsHandler(2, constants.BuffTypeCorrupt, createModifyHPHandler(-1)),
 	})
 
 	// Poison: Bad event each turn for 3 turns
@@ -295,7 +295,7 @@ func registerAllBuffs() {
 		Phases:      []constants.Phase{constants.PhaseAfterTurn},
 		Priority:    50,
 		NeedConfirm: false,
-		Handler:     createEveryNTurnsHandler(2, createModifyHPHandler(1)),
+		Handler:     createEveryNTurnsHandler(2, constants.BuffTypeRain, createModifyHPHandler(1)),
 	})
 
 	// Exorcism: Immune to poison buff for 5 turns
@@ -397,20 +397,29 @@ func createModifyHPHandler(amount int) EffectHandler {
 	}
 }
 
-func createEveryNTurnsHandler(everyN int, innerHandler EffectHandler) EffectHandler {
+func createEveryNTurnsHandler(everyN int, buffType constants.BuffType, innerHandler EffectHandler) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) error {
 		if ctx == nil {
 			return nil
 		}
-		counter, _ := ctx.GetInt("buff_turn_counter")
+		if ctx.Player == nil {
+			return fmt.Errorf("handler: player is nil in event context")
+		}
+
+		// Read counter from Buff.Metadata (persists across turns)
+		buff := ctx.Player.GetBuff(buffType)
+		if buff == nil {
+			return nil // Buff not active, skip
+		}
+		counter := buff.GetIntOrDefault("buff_turn_counter", 0)
 		counter++
-		ctx.SetInt("buff_turn_counter", counter)
+		buff.SetInt("buff_turn_counter", counter)
 
 		if counter >= everyN {
 			if err := innerHandler(phase, ctx); err != nil {
 				return err
 			}
-			ctx.SetInt("buff_turn_counter", 0)
+			buff.SetInt("buff_turn_counter", 0) // Reset counter
 		}
 		return nil
 	}

@@ -5,6 +5,7 @@ package core
 import (
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
+	"github.com/b1tAction/paradiced/pkg/util"
 )
 
 // ========== Buff Instance ==========
@@ -15,6 +16,7 @@ type Buff struct {
 	ID           id.BuffID          `json:"id"`            // Buff instance ID (UUID v7)
 	Duration     int                `json:"duration"`      // Remaining duration (-1 for permanent)
 	tickEligible bool               // Whether buff should be ticked at next turn end
+	*util.Metadata `json:"metadata"` // Per-buff state storage (e.g. everyNTurns counter)
 }
 
 // NewBuff creates a new Buff instance with auto-generated UUID v7 ID.
@@ -23,6 +25,7 @@ func NewBuff(buffType constants.BuffType, duration int) *Buff {
 		Type:     buffType,
 		ID:       id.NewBuffID(),
 		Duration: duration,
+		Metadata: util.NewMetadata(),
 	}
 }
 
@@ -33,6 +36,7 @@ func NewBuffWithID(buffType constants.BuffType, buffID id.BuffID, duration int) 
 		Type:     buffType,
 		ID:       buffID,
 		Duration: duration,
+		Metadata: util.NewMetadata(),
 	}
 }
 
