@@ -109,7 +109,7 @@ func registerAllBossData() {
 		MaxHP:       50,
 	})
 
-	// Thunder: AOE damage 2 to all boss-cell players
+	// Thunder: AOE damage 3 to all boss-cell players
 	GlobalBossRegistry.RegisterBossSkill(&BossSkillHandlerConfig{
 		Type: constants.BossSkillThunder,
 		Handler: func(game *Game, actionCtx *engineaction.ActionContext, targets []*core.Player) error {
@@ -118,7 +118,7 @@ func registerAllBossData() {
 				attackAction := engineaction.NewBossAttackAction(
 					bossPlayer,
 					target,
-					2,
+					3,
 					constants.BossAttackSkill,
 					string(constants.SourceBossSkillThunder),
 				)
@@ -140,19 +140,7 @@ func registerAllBossData() {
 		},
 	})
 
-	// Lost: add lost buff to all boss-cell players
-	GlobalBossRegistry.RegisterBossSkill(&BossSkillHandlerConfig{
-		Type: constants.BossSkillLost,
-		Handler: func(game *Game, actionCtx *engineaction.ActionContext, targets []*core.Player) error {
-			for _, target := range targets {
-				addBuffAction := engineaction.NewAddBuffAction(target, constants.BuffTypeLost, string(constants.SourceBossSkillLost))
-				actionCtx.PushDerivedAction(addBuffAction)
-			}
-			return nil
-		},
-	})
-
-	// Rest: Boss heals 5 HP
+	// Rest: Boss heals 20 HP
 	GlobalBossRegistry.RegisterBossSkill(&BossSkillHandlerConfig{
 		Type: constants.BossSkillRest,
 		Handler: func(game *Game, actionCtx *engineaction.ActionContext, targets []*core.Player) error {
@@ -160,8 +148,21 @@ func registerAllBossData() {
 			if bossPlayer == nil || bossPlayer.IsDead {
 				return nil
 			}
-			healAction := engineaction.NewHealAction(bossPlayer, 5, string(constants.SourceBossSkillRest))
+			healAction := engineaction.NewHealAction(bossPlayer, 20, string(constants.SourceBossSkillRest))
 			actionCtx.PushDerivedAction(healAction)
+			return nil
+		},
+	})
+
+	// Thorns: Add thorns buff to Boss itself (reflect 30% damage to attacking player)
+	GlobalBossRegistry.RegisterBossSkill(&BossSkillHandlerConfig{
+		Type: constants.BossSkillThorns,
+		Handler: func(game *Game, actionCtx *engineaction.ActionContext, targets []*core.Player) error {
+			bossPlayer := game.GetBossPlayer()
+			if bossPlayer != nil {
+				addBuffAction := engineaction.NewAddBuffAction(bossPlayer, constants.BuffTypeThorns, string(constants.SourceBossSkillThorns))
+				actionCtx.PushDerivedAction(addBuffAction)
+			}
 			return nil
 		},
 	})

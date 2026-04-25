@@ -952,7 +952,7 @@ func (a *BossDamageAction) Source() string             { return a.SourceID }
 func (a *BossDamageAction) Target() string             { return a.targetPlayer.ID.UUID() }
 func (a *BossDamageAction) TargetPlayer() *core.Player { return a.targetPlayer }
 func (a *BossDamageAction) PreTriggerPhase() constants.Phase {
-	return constants.PhaseAnyTime
+	return constants.PhasePreDamage // Thorns handler intercepts at PreDamage on BossPlayer
 }
 
 // PostTriggerPhase returns PhaseAnyTime (no post-trigger for boss damage).
@@ -972,6 +972,11 @@ func (a *BossDamageAction) Execute(ctx *ActionContext) error {
 	if err := a.targetPlayer.ApplyDamage(a.Damage); err != nil {
 		return errors.NewActionExecutionError("boss_damage", a.targetPlayer.ID.UUID(), "failed to apply damage to boss", err)
 	}
+
+	// Thorns reflect is handled by BuffThorns handler via EventBus (PhasePreDamage).
+	// The PreTrigger publishes PhasePreDamage to BossPlayer, and Thorns handler
+	// pushes a derived BossAttackAction for reflect damage to the attacking player.
+
 	return nil
 }
 

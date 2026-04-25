@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/b1tAction/paradiced/internal/core"
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
@@ -85,8 +86,8 @@ func (r *BuffRegistry) RegisterBuff(def *core.BuffDefinition, config *BuffHandle
 	r.defs[def.Type] = def
 	r.names[def.Type] = def.Name
 
-	// Hidden buffs are not added to lottery pools
-	if !def.Hidden {
+	// Buffs that are not drawn from lottery pools (IsDraw=false) are excluded
+	if def.Type.IsDraw() {
 		if def.Eval.IsGood() {
 			r.goodBuffs = append(r.goodBuffs, def.Type)
 		} else if def.Eval.IsBad() {
@@ -162,15 +163,11 @@ func (r *BuffRegistry) HasBuffHandler(bt constants.BuffType) bool {
 
 // IsHidden checks if a Buff type is hidden (not visible to player/client).
 func IsHidden(bt constants.BuffType) bool {
-	return GlobalBuffRegistry.IsHidden(bt)
+	return bt.IsHidden()
 }
 
 func (r *BuffRegistry) IsHidden(bt constants.BuffType) bool {
-	def, ok := r.defs[bt]
-	if !ok {
-		return false
-	}
-	return def.Hidden
+	return bt.IsHidden()
 }
 
 // GetBuffTypesByCategory returns Buff types by category.
@@ -328,6 +325,24 @@ func registerAllBuffs() {
 		Handler:     handleZhuQueFire,
 	})
 
+	// Thorns: Boss skill buff — reflect 30% damage back to attacking player.
+	// Not drawn from lottery pools (IsBoss=true). Buff is on BossPlayer.
+	// Reflect is handled via EventBus (PhasePreDamage) — BuffThorns handler
+	// subscribes to PhasePreDamage on BossPlayer, pushes derived BossAttackAction.
+	GlobalBuffRegistry.RegisterBuff(&core.BuffDefinition{
+		Type:        constants.BuffTypeThorns,
+		Eval:        constants.EvaluationNeutral,
+		EnglishName: "Thorns",
+		Name:        "反刺",
+		Desc:        "Boss给自己施加反刺，玩家攻击Boss时受到30%反伤",
+		Duration:    2,
+	}, &BuffHandlerConfig{
+		Phases:      []constants.Phase{constants.PhasePreDamage},
+		Priority:    50,
+		NeedConfirm: false,
+		Handler:     handleThornsReflect,
+	})
+
 	// DeathMark: Hidden buff that blocks all subsequent actions after death.
 	// Not visible to client, not drawn in lottery pools.
 	GlobalBuffRegistry.RegisterBuff(&core.BuffDefinition{
@@ -337,7 +352,6 @@ func registerAllBuffs() {
 		Name:        "死亡标记",
 		Desc:        "死亡后阻止后续行动",
 		Duration:    1,
-		Hidden:      true,
 	}, &BuffHandlerConfig{
 		Phases:      []constants.Phase{constants.PhasePreAction},
 		Priority:    999,
@@ -488,6 +502,17 @@ func handleHiddenImmune(phase constants.Phase, ctx *event.Context) error {
 	if ctx == nil {
 		return fmt.Errorf("handler: event context is nil")
 	}
+
+	// Only block non-positive, non-Boss buffs.
+	// IsBoss buffs (Thorns, DeathMark) are forced by game mechanics and bypass Hidden immunity.
+	// Positive buffs (Divine, Rain, Exorcism) should also pass through.
+	if raw, ok := ctx.Get("applied_buff_type"); ok {
+		buffType := constants.BuffType(raw.(string))
+		if buffType.IsPositive() || buffType.IsBoss() {
+			return nil // Allow positive and Boss buffs through
+		}
+	}
+
 	ctx.SetBool("action_blocked", true)
 	ctx.SetString("blocked_by", "Buff_Hidden")
 	return nil
@@ -615,6 +640,50 @@ func handleCurseEffect(phase constants.Phase, ctx *event.Context) error {
 			}
 		}
 	}
+	return nil
+}
+
+// thornsReflectRate is the damage reflect rate for the Thorns buff (30%).
+const thornsReflectRate = 0.3
+
+func handleThornsReflect(phase constants.Phase, ctx *event.Context) error {
+	if phase != constants.PhasePreDamage {
+		return nil
+	}
+	if ctx == nil || ctx.Player == nil {
+		return nil
+	}
+
+	// Get BossDamageAction from context
+	raw, ok := ctx.Get("current_action")
+	if !ok {
+		return nil
+	}
+	bossDamageAction, ok := raw.(*engineaction.BossDamageAction)
+	if !ok || bossDamageAction == nil {
+		return nil
+	}
+
+	// Only reflect if BossPlayer has Thorns buff
+	if !ctx.Player.HasBuff(constants.BuffTypeThorns) {
+		return nil
+	}
+
+	reflectDamage := int(math.Round(float64(bossDamageAction.Damage) * thornsReflectRate))
+	if reflectDamage <= 0 {
+		return nil
+	}
+
+	// Push derived BossAttackAction (Boss→attacking player, reflect damage)
+	// This goes through PhasePreDamage → Hidden on attacking player can block reflect
+	reflectAction := engineaction.NewBossAttackAction(
+		ctx.Player,                    // BossPlayer (source of reflect)
+		bossDamageAction.SourcePlayer, // attacking player (target of reflect)
+		reflectDamage,
+		constants.BossAttackSkill,
+		string(constants.SourceThornsReflect),
+	)
+	ctx.AddDerivedAction(reflectAction)
 	return nil
 }
 
