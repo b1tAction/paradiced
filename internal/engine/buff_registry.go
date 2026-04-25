@@ -513,6 +513,34 @@ func handleDeathMarkBlock(phase constants.Phase, ctx *event.Context) error {
 	if phase != constants.PhasePreAction {
 		return nil
 	}
+
+	// Get the current action from context
+	raw, ok := ctx.Get("current_action")
+	if !ok {
+		// No action info, block by default
+		ctx.SetBool("action_blocked", true)
+		return nil
+	}
+	action, ok := raw.(engineaction.Action)
+	if !ok {
+		ctx.SetBool("action_blocked", true)
+		return nil
+	}
+
+	// RespawnAction must execute even for dead players
+	if _, isRespawn := action.(*engineaction.RespawnAction); isRespawn {
+		return nil // Don't block respawn
+	}
+
+	// RemoveBuffAction for DeathMark itself must execute
+	// (removing own DeathMark should not block itself)
+	if removeAction, isRemove := action.(*engineaction.RemoveBuffAction); isRemove {
+		if removeAction.BuffType == constants.BuffTypeDeathMark {
+			return nil // Don't block DeathMark removal
+		}
+	}
+
+	// Block all other actions for dead players
 	ctx.SetBool("action_blocked", true)
 	return nil
 }
