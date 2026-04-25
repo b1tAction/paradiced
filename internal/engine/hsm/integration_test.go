@@ -70,12 +70,11 @@ func TestTurnFlow_BuffEffect_GameLog(t *testing.T) {
 
 	// Create ActionContext for executing Actions
 	mapAdapter := mapEngine
-	actionCtx := engineaction.NewActionContextWithPlayer(
+	actionCtx := engineaction.NewActionContext(
 		game,
 		game.Bus,
 		mapAdapter,
 		game.Draw,
-		player,
 	)
 	actionCtx.OnAddBuff = func(p *core.Player, b *core.Buff) { game.ApplyBuffToPlayer(p, b) }
 	actionCtx.GetBuffDuration = func(bt constants.BuffType) int {
@@ -248,12 +247,11 @@ func TestTurnFlow_CompleteTurn(t *testing.T) {
 	game.Log.StartTurn(1, 0, player.ID.UUID())
 
 	// === Step 2: Add Divine buff via AddBuffAction (triggers LP+1) ===
-	actionCtx := engineaction.NewActionContextWithPlayer(
+	actionCtx := engineaction.NewActionContext(
 		game,
 		game.Bus,
 		mapAdapter,
 		game.Draw,
-		player,
 	)
 	actionCtx.OnAddBuff = func(p *core.Player, b *core.Buff) { game.ApplyBuffToPlayer(p, b) }
 	actionCtx.GetBuffDuration = func(bt constants.BuffType) int {

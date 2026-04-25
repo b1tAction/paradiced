@@ -72,7 +72,7 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 
 	// Create ActionContext for executing Actions
 	mapEngine := ctx.GetMapEngine()
-	s.actionCtx = newActionContextWithPoolsNoPlayer(
+	s.actionCtx = newActionContextWithPools(
 		game,
 		game.Bus,
 		mapEngine,
@@ -215,7 +215,7 @@ func (s *MainActionState) Enter(ctx *StateContext) {
 	// Initialize action context
 	game := ctx.GetGame()
 	mapEngine := ctx.GetMapEngine()
-	s.actionCtx = newActionContextWithPoolsNoPlayer(
+	s.actionCtx = newActionContextWithPools(
 		game,
 		game.Bus,
 		mapEngine,
@@ -456,7 +456,6 @@ func (s *TurnMovingState) Enter(ctx *StateContext) {
 		game.Bus,
 		mapEngine,
 		game.Draw,
-		player,
 	)
 
 	// Step 1: HSM publishes PhasePreMove (迷途 handler modifies s.Steps directly)
@@ -627,7 +626,6 @@ func (s *TurnCheckpointState) Enter(ctx *StateContext) {
 		game.Bus,
 		mapEngine,
 		game.Draw,
-		player,
 	)
 
 	// Execute DrawItemAction at CheckPoint (auto draw, no interception)
@@ -669,29 +667,7 @@ func findFirstCheckpointInPath(path []int, mapEngine *gamemap.MapEngine) int {
 }
 
 // newActionContextWithPools creates an ActionContext with pool data from Game.
-func newActionContextWithPools(game *engine.Game, bus *event.EventBus, mapEngine *gamemap.MapEngine, drawEngine *rng.DrawEngine, player *core.Player) *engineaction.ActionContext {
-	ctx := engineaction.NewActionContextWithPlayer(game, bus, mapEngine, drawEngine, player)
-	ctx.SetPools(game.EventPool, game.ItemPool)
-	ctx.OnAddBuff = func(p *core.Player, b *core.Buff) { game.ApplyBuffToPlayer(p, b) }
-	ctx.OnRemoveBuff = func(p *core.Player, bt constants.BuffType) *core.Buff {
-		buff := p.GetBuff(bt)
-		if buff != nil {
-			game.RemoveBuffFromPlayer(p, buff)
-		}
-		return buff
-	}
-	ctx.GetBuffDuration = func(bt constants.BuffType) int {
-		def := engine.GetBuffDefinition(bt)
-		if def != nil {
-			return def.Duration
-		}
-		return 0
-	}
-	return ctx
-}
-
-// newActionContextWithPoolsNoPlayer creates an ActionContext with pool data from Game (no current player).
-func newActionContextWithPoolsNoPlayer(game *engine.Game, bus *event.EventBus, mapEngine *gamemap.MapEngine, drawEngine *rng.DrawEngine) *engineaction.ActionContext {
+func newActionContextWithPools(game *engine.Game, bus *event.EventBus, mapEngine *gamemap.MapEngine, drawEngine *rng.DrawEngine) *engineaction.ActionContext {
 	ctx := engineaction.NewActionContext(game, bus, mapEngine, drawEngine)
 	ctx.SetPools(game.EventPool, game.ItemPool)
 	ctx.OnAddBuff = func(p *core.Player, b *core.Buff) { game.ApplyBuffToPlayer(p, b) }
@@ -788,7 +764,7 @@ func (s *TurnLandedState) Enter(ctx *StateContext) {
 	// Create ActionContext
 	game := ctx.GetGame()
 	mapEngine := ctx.GetMapEngine()
-	s.actionCtx = newActionContextWithPoolsNoPlayer(
+	s.actionCtx = newActionContextWithPools(
 		game,
 		game.Bus,
 		mapEngine,
@@ -956,7 +932,7 @@ func (s *TurnDrawState) Enter(ctx *StateContext) {
 	// Create ActionContext
 	game := ctx.GetGame()
 	mapEngine := ctx.GetMapEngine()
-	s.actionCtx = newActionContextWithPoolsNoPlayer(
+	s.actionCtx = newActionContextWithPools(
 		game,
 		game.Bus,
 		mapEngine,
@@ -1048,7 +1024,7 @@ func (s *TurnBossBattleState) Enter(ctx *StateContext) {
 
 	// Create ActionContext
 	mapEngine := ctx.GetMapEngine()
-	s.actionCtx = newActionContextWithPoolsNoPlayer(
+	s.actionCtx = newActionContextWithPools(
 		game,
 		game.Bus,
 		mapEngine,
@@ -1314,7 +1290,7 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 	// Create ActionContext
 	game := ctx.GetGame()
 	mapEngine := ctx.GetMapEngine()
-	s.actionCtx = newActionContextWithPoolsNoPlayer(
+	s.actionCtx = newActionContextWithPools(
 		game,
 		game.Bus,
 		mapEngine,
