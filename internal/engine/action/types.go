@@ -16,7 +16,7 @@ import (
 // DamageAction represents HP reduction.
 // Can be intercepted by shields/隐匿 to reduce or block damage.
 type DamageAction struct {
-	TargetPlayer *core.Player // Player receiving damage
+	targetPlayer *core.Player // Player receiving damage
 	SourceID     string       // Source identifier (e.g., "Buff_Curse", "Event_Trap")
 	Amount       int          // Damage amount (can be modified by interceptors)
 	IsPiercing   bool         // True if ignores shields (cannot be intercepted)
@@ -26,7 +26,7 @@ type DamageAction struct {
 // NewDamageAction creates a new DamageAction.
 func NewDamageAction(target *core.Player, amount int, sourceID string) *DamageAction {
 	return &DamageAction{
-		TargetPlayer: target,
+		targetPlayer: target,
 		SourceID:     sourceID,
 		Amount:       amount,
 		IsPiercing:   false,
@@ -36,7 +36,7 @@ func NewDamageAction(target *core.Player, amount int, sourceID string) *DamageAc
 // NewPiercingDamageAction creates a piercing DamageAction that cannot be intercepted.
 func NewPiercingDamageAction(target *core.Player, amount int, sourceID string) *DamageAction {
 	return &DamageAction{
-		TargetPlayer: target,
+		targetPlayer: target,
 		SourceID:     sourceID,
 		Amount:       amount,
 		IsPiercing:   true,
@@ -46,9 +46,8 @@ func NewPiercingDamageAction(target *core.Player, amount int, sourceID string) *
 func (a *DamageAction) Type() constants.ActionType { return constants.ActionDamage }
 func (a *DamageAction) CanModify() bool            { return !a.IsPiercing && a.Amount > 0 }
 func (a *DamageAction) Source() string             { return a.SourceID }
-func (a *DamageAction) Target() string             { return a.TargetPlayer.ID.UUID() }
-
-// PreTriggerPhase returns PhasePreDamage for interception by shields/隐匿.
+func (a *DamageAction) Target() string             { return a.targetPlayer.ID.UUID() }
+func (a *DamageAction) TargetPlayer() *core.Player { return a.targetPlayer }
 func (a *DamageAction) PreTriggerPhase() constants.Phase {
 	if a.IsPiercing {
 		return constants.PhaseAnyTime // Piercing damage cannot be intercepted
@@ -65,15 +64,15 @@ func (a *DamageAction) Execute(ctx *ActionContext) error {
 	if a.Amount <= 0 {
 		return nil // Already blocked by interception
 	}
-	if a.TargetPlayer == nil {
+	if a.targetPlayer == nil {
 		return errors.NewActionExecutionError("damage", "", "target player is nil", nil)
 	}
-	if err := a.TargetPlayer.ApplyDamage(a.Amount); err != nil {
-		return errors.NewActionExecutionError("damage", a.TargetPlayer.ID.UUID(), "failed to apply damage", err)
+	if err := a.targetPlayer.ApplyDamage(a.Amount); err != nil {
+		return errors.NewActionExecutionError("damage", a.targetPlayer.ID.UUID(), "failed to apply damage", err)
 	}
 	// Derive DeathAction if player died from this damage
-	if a.TargetPlayer.IsDead {
-		ctx.PushDerivedAction(NewDeathAction(a.TargetPlayer, a.SourceID, a.TargetPlayer.Position))
+	if a.targetPlayer.IsDead {
+		ctx.PushDerivedAction(NewDeathAction(a.targetPlayer, a.SourceID, a.targetPlayer.Position))
 	}
 	return nil
 }
@@ -88,7 +87,7 @@ func (a *DamageAction) LogEntry() gamelog.LogEntry {
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
-		Target:     a.TargetPlayer.ID.UUID(),
+		Target:     a.targetPlayer.ID.UUID(),
 		Source:     a.SourceID,
 		Metadata:   metadata,
 	}
@@ -99,7 +98,7 @@ func (a *DamageAction) LogEntry() gamelog.LogEntry {
 // HealAction represents HP restoration.
 // Can be intercepted to modify amount (e.g., healing reduction debuff).
 type HealAction struct {
-	TargetPlayer *core.Player // Player receiving healing
+	targetPlayer *core.Player // Player receiving healing
 	SourceID     string       // Source identifier (e.g., "Buff_甘霖", "Item_HealingPotion")
 	Amount       int          // Heal amount (can be modified)
 }
@@ -107,7 +106,7 @@ type HealAction struct {
 // NewHealAction creates a new HealAction.
 func NewHealAction(target *core.Player, amount int, sourceID string) *HealAction {
 	return &HealAction{
-		TargetPlayer: target,
+		targetPlayer: target,
 		SourceID:     sourceID,
 		Amount:       amount,
 	}
@@ -116,9 +115,8 @@ func NewHealAction(target *core.Player, amount int, sourceID string) *HealAction
 func (a *HealAction) Type() constants.ActionType { return constants.ActionHeal }
 func (a *HealAction) CanModify() bool            { return a.Amount > 0 }
 func (a *HealAction) Source() string             { return a.SourceID }
-func (a *HealAction) Target() string             { return a.TargetPlayer.ID.UUID() }
-
-// PreTriggerPhase returns PhaseAnyTime (healing typically not intercepted).
+func (a *HealAction) Target() string             { return a.targetPlayer.ID.UUID() }
+func (a *HealAction) TargetPlayer() *core.Player { return a.targetPlayer }
 func (a *HealAction) PreTriggerPhase() constants.Phase {
 	return constants.PhaseAnyTime
 }
@@ -132,10 +130,10 @@ func (a *HealAction) Execute(ctx *ActionContext) error {
 	if a.Amount <= 0 {
 		return nil
 	}
-	if a.TargetPlayer == nil {
+	if a.targetPlayer == nil {
 		return errors.NewActionExecutionError("heal", "", "target player is nil", nil)
 	}
-	a.TargetPlayer.Heal(a.Amount)
+	a.targetPlayer.Heal(a.Amount)
 	return nil
 }
 
@@ -147,7 +145,7 @@ func (a *HealAction) LogEntry() gamelog.LogEntry {
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
-		Target:     a.TargetPlayer.ID.UUID(),
+		Target:     a.targetPlayer.ID.UUID(),
 		Source:     a.SourceID,
 		Metadata:   metadata,
 	}
@@ -158,7 +156,7 @@ func (a *HealAction) LogEntry() gamelog.LogEntry {
 // ModifyLPAction represents Luck Point modification.
 // LP affects event pool weight distribution.
 type ModifyLPAction struct {
-	TargetPlayer *core.Player // Player receiving LP modification
+	targetPlayer *core.Player // Player receiving LP modification
 	SourceID     string       // Source identifier (e.g., "Buff_神眷", "Buff_诅咒")
 	Amount       int          // LP amount (+1 or -1)
 }
@@ -166,7 +164,7 @@ type ModifyLPAction struct {
 // NewModifyLPAction creates a new ModifyLPAction.
 func NewModifyLPAction(target *core.Player, amount int, sourceID string) *ModifyLPAction {
 	return &ModifyLPAction{
-		TargetPlayer: target,
+		targetPlayer: target,
 		SourceID:     sourceID,
 		Amount:       amount,
 	}
@@ -175,9 +173,8 @@ func NewModifyLPAction(target *core.Player, amount int, sourceID string) *Modify
 func (a *ModifyLPAction) Type() constants.ActionType { return constants.ActionModifyLP }
 func (a *ModifyLPAction) CanModify() bool            { return false } // LP changes cannot be intercepted
 func (a *ModifyLPAction) Source() string             { return a.SourceID }
-func (a *ModifyLPAction) Target() string             { return a.TargetPlayer.ID.UUID() }
-
-// PreTriggerPhase returns PhaseAnyTime (LP changes cannot be intercepted).
+func (a *ModifyLPAction) Target() string             { return a.targetPlayer.ID.UUID() }
+func (a *ModifyLPAction) TargetPlayer() *core.Player { return a.targetPlayer }
 func (a *ModifyLPAction) PreTriggerPhase() constants.Phase {
 	return constants.PhaseAnyTime
 }
@@ -188,13 +185,13 @@ func (a *ModifyLPAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *ModifyLPAction) Execute(ctx *ActionContext) error {
-	if a.TargetPlayer == nil {
+	if a.targetPlayer == nil {
 		return errors.NewActionExecutionError("modify_lp", "", "target player is nil", nil)
 	}
 	if a.Amount > 0 {
-		a.TargetPlayer.ModifyLP(a.Amount)
+		a.targetPlayer.ModifyLP(a.Amount)
 	} else if a.Amount < 0 {
-		a.TargetPlayer.ModifyLP(a.Amount)
+		a.targetPlayer.ModifyLP(a.Amount)
 	}
 	return nil
 }
@@ -207,7 +204,7 @@ func (a *ModifyLPAction) LogEntry() gamelog.LogEntry {
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
-		Target:     a.TargetPlayer.ID.UUID(),
+		Target:     a.targetPlayer.ID.UUID(),
 		Source:     a.SourceID,
 		Metadata:   metadata,
 	}
@@ -219,7 +216,7 @@ func (a *ModifyLPAction) LogEntry() gamelog.LogEntry {
 // Pure movement: only sets player position. Path calculation is done by HSM layer.
 // Path data is passed via ActionContext.Metadata (target_pos, path).
 type MoveAction struct {
-	TargetPlayer *core.Player   // Player moving
+	targetPlayer *core.Player   // Player moving
 	Steps        int            // Movement steps (may be negative for reverse/迷途)
 	SourceID     string         // Source identifier (e.g., "DiceRoll", "DiceRollCheckpoint")
 	// Internal fields populated during Execute() from ctx.Metadata (for LogEntry)
@@ -230,7 +227,7 @@ type MoveAction struct {
 // NewMoveAction creates a new MoveAction.
 func NewMoveAction(target *core.Player, steps int, sourceID string) *MoveAction {
 	return &MoveAction{
-		TargetPlayer: target,
+		targetPlayer: target,
 		Steps:        steps,
 		SourceID:     sourceID,
 	}
@@ -239,9 +236,8 @@ func NewMoveAction(target *core.Player, steps int, sourceID string) *MoveAction 
 func (a *MoveAction) Type() constants.ActionType { return constants.ActionMove }
 func (a *MoveAction) CanModify() bool            { return a.Steps != 0 }
 func (a *MoveAction) Source() string             { return a.SourceID }
-func (a *MoveAction) Target() string             { return a.TargetPlayer.ID.UUID() }
-
-// PreTriggerPhase returns PhaseAnyTime (PhasePreMove is published by HSM, not MoveAction).
+func (a *MoveAction) Target() string             { return a.targetPlayer.ID.UUID() }
+func (a *MoveAction) TargetPlayer() *core.Player { return a.targetPlayer }
 func (a *MoveAction) PreTriggerPhase() constants.Phase {
 	return constants.PhaseAnyTime
 }
@@ -252,16 +248,16 @@ func (a *MoveAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *MoveAction) Execute(ctx *ActionContext) error {
-	if a.TargetPlayer == nil {
+	if a.targetPlayer == nil {
 		return errors.NewActionExecutionError("move", "", "target player is nil", nil)
 	}
 
 	// Read target_pos and path from ActionContext.Metadata (set by HSM TurnMovingState)
-	a.targetPos = ctx.GetIntOrDefault("target_pos", a.TargetPlayer.Position+a.Steps)
+	a.targetPos = ctx.GetIntOrDefault("target_pos", a.targetPlayer.Position+a.Steps)
 	a.path = ctx.GetIntSliceOrDefault("path", nil)
 
 	// Pure movement: just set player position
-	a.TargetPlayer.Position = a.targetPos
+	a.targetPlayer.Position = a.targetPos
 	return nil
 }
 
@@ -272,7 +268,7 @@ func (a *MoveAction) LogEntry() gamelog.LogEntry {
 		startPos = a.path[0]
 	}
 	metadata.SetInt("start_pos", startPos)
-	metadata.SetInt("end_pos", a.TargetPlayer.Position)
+	metadata.SetInt("end_pos", a.targetPlayer.Position)
 	metadata.Set("path", a.path)
 	metadata.SetInt("steps", a.Steps)
 
@@ -280,7 +276,7 @@ func (a *MoveAction) LogEntry() gamelog.LogEntry {
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
-		Target:     a.TargetPlayer.ID.UUID(),
+		Target:     a.targetPlayer.ID.UUID(),
 		Source:     a.SourceID,
 		Metadata:   metadata,
 	}
@@ -297,7 +293,7 @@ func (a *MoveAction) Overtook(player *core.Player) bool {
 
 // AddBuffAction represents adding a Buff to player.
 type AddBuffAction struct {
-	TargetPlayer *core.Player       // Player receiving Buff
+	targetPlayer *core.Player       // Player receiving Buff
 	BuffType     constants.BuffType // Type of Buff to add
 	SourceID     string             // Source identifier
 }
@@ -305,7 +301,7 @@ type AddBuffAction struct {
 // NewAddBuffAction creates a new AddBuffAction.
 func NewAddBuffAction(target *core.Player, buffType constants.BuffType, sourceID string) *AddBuffAction {
 	return &AddBuffAction{
-		TargetPlayer: target,
+		targetPlayer: target,
 		BuffType:     buffType,
 		SourceID:     sourceID,
 	}
@@ -314,9 +310,8 @@ func NewAddBuffAction(target *core.Player, buffType constants.BuffType, sourceID
 func (a *AddBuffAction) Type() constants.ActionType { return constants.ActionAddBuff }
 func (a *AddBuffAction) CanModify() bool            { return false } // Buff addition cannot be intercepted
 func (a *AddBuffAction) Source() string             { return a.SourceID }
-func (a *AddBuffAction) Target() string             { return a.TargetPlayer.ID.UUID() }
-
-// PreTriggerPhase returns PhasePreBuffApplied.
+func (a *AddBuffAction) Target() string             { return a.targetPlayer.ID.UUID() }
+func (a *AddBuffAction) TargetPlayer() *core.Player { return a.targetPlayer }
 func (a *AddBuffAction) PreTriggerPhase() constants.Phase {
 	return constants.PhasePreBuffApplied
 }
@@ -327,7 +322,7 @@ func (a *AddBuffAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *AddBuffAction) Execute(ctx *ActionContext) error {
-	if a.TargetPlayer == nil {
+	if a.targetPlayer == nil {
 		return errors.NewActionExecutionError("add_buff", "", "target player is nil", nil)
 	}
 	if ctx.OnAddBuff == nil {
@@ -340,13 +335,13 @@ func (a *AddBuffAction) Execute(ctx *ActionContext) error {
 	duration := ctx.GetBuffDuration(a.BuffType)
 
 	// Check if player already has this buff type (duration extend)
-	if a.TargetPlayer.HasBuff(a.BuffType) {
+	if a.targetPlayer.HasBuff(a.BuffType) {
 		// Duration extend: Player.AddBuff handles duration merge internally
 		// OnAddBuff should NOT be called (buff already subscribed on EventBus)
 		// PhasePostBuffApplied should NOT be published (not a new buff application)
 		newBuff := core.NewBuff(a.BuffType, duration)
-		if err := a.TargetPlayer.AddBuff(newBuff); err != nil {
-			return errors.NewActionExecutionError("add_buff", a.TargetPlayer.ID.UUID(), "failed to extend buff duration", err)
+		if err := a.targetPlayer.AddBuff(newBuff); err != nil {
+			return errors.NewActionExecutionError("add_buff", a.targetPlayer.ID.UUID(), "failed to extend buff duration", err)
 		}
 		// Mark as duration-extend so ExecuteAction skips PostTrigger
 		ctx.SetBool("buff_duration_extended", true)
@@ -355,7 +350,7 @@ func (a *AddBuffAction) Execute(ctx *ActionContext) error {
 
 	// New buff: full lifecycle (add + subscribe + PhasePostBuffApplied)
 	newBuff := core.NewBuff(a.BuffType, duration)
-	ctx.OnAddBuff(a.TargetPlayer, newBuff)
+	ctx.OnAddBuff(a.targetPlayer, newBuff)
 	return nil
 }
 
@@ -367,7 +362,7 @@ func (a *AddBuffAction) LogEntry() gamelog.LogEntry {
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
-		Target:     a.TargetPlayer.ID.UUID(),
+		Target:     a.targetPlayer.ID.UUID(),
 		Source:     a.SourceID,
 		Metadata:   metadata,
 	}
@@ -377,7 +372,7 @@ func (a *AddBuffAction) LogEntry() gamelog.LogEntry {
 
 // RemoveBuffAction represents removing a Buff from player.
 type RemoveBuffAction struct {
-	TargetPlayer *core.Player       // Player losing Buff
+	targetPlayer *core.Player       // Player losing Buff
 	BuffType     constants.BuffType // Type of Buff to remove
 	SourceID     string             // Source identifier
 }
@@ -385,7 +380,7 @@ type RemoveBuffAction struct {
 // NewRemoveBuffAction creates a new RemoveBuffAction.
 func NewRemoveBuffAction(target *core.Player, buffType constants.BuffType, sourceID string) *RemoveBuffAction {
 	return &RemoveBuffAction{
-		TargetPlayer: target,
+		targetPlayer: target,
 		BuffType:     buffType,
 		SourceID:     sourceID,
 	}
@@ -394,9 +389,8 @@ func NewRemoveBuffAction(target *core.Player, buffType constants.BuffType, sourc
 func (a *RemoveBuffAction) Type() constants.ActionType { return constants.ActionRemoveBuff }
 func (a *RemoveBuffAction) CanModify() bool            { return false }
 func (a *RemoveBuffAction) Source() string             { return a.SourceID }
-func (a *RemoveBuffAction) Target() string             { return a.TargetPlayer.ID.UUID() }
-
-// PreTriggerPhase returns PhasePreBuffRemoved for death effects/亡语.
+func (a *RemoveBuffAction) Target() string             { return a.targetPlayer.ID.UUID() }
+func (a *RemoveBuffAction) TargetPlayer() *core.Player { return a.targetPlayer }
 func (a *RemoveBuffAction) PreTriggerPhase() constants.Phase {
 	return constants.PhasePreBuffRemoved
 }
@@ -407,14 +401,14 @@ func (a *RemoveBuffAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *RemoveBuffAction) Execute(ctx *ActionContext) error {
-	if a.TargetPlayer == nil {
+	if a.targetPlayer == nil {
 		return errors.NewActionExecutionError("remove_buff", "", "target player is nil", nil)
 	}
 	if ctx.OnRemoveBuff == nil {
 		return errors.NewActionExecutionError("remove_buff", "", "OnRemoveBuff callback is nil", nil)
 	}
 	// OnRemoveBuff handles EventBus unsubscription and player.RemoveBuff
-	ctx.OnRemoveBuff(a.TargetPlayer, a.BuffType)
+	ctx.OnRemoveBuff(a.targetPlayer, a.BuffType)
 	return nil
 }
 
@@ -426,7 +420,7 @@ func (a *RemoveBuffAction) LogEntry() gamelog.LogEntry {
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
-		Target:     a.TargetPlayer.ID.UUID(),
+		Target:     a.targetPlayer.ID.UUID(),
 		Source:     a.SourceID,
 		Metadata:   metadata,
 	}
@@ -437,7 +431,7 @@ func (a *RemoveBuffAction) LogEntry() gamelog.LogEntry {
 // TeleportAction represents instant teleport to specific position.
 // Used by items like 任意门.
 type TeleportAction struct {
-	TargetPlayer *core.Player // Player teleporting
+	targetPlayer *core.Player // Player teleporting
 	TargetPos    int          // Destination position
 	SourceID     string       // Source identifier (e.g., "Item_AnyDoor")
 }
@@ -445,7 +439,7 @@ type TeleportAction struct {
 // NewTeleportAction creates a new TeleportAction.
 func NewTeleportAction(target *core.Player, targetPos int, sourceID string) *TeleportAction {
 	return &TeleportAction{
-		TargetPlayer: target,
+		targetPlayer: target,
 		TargetPos:    targetPos,
 		SourceID:     sourceID,
 	}
@@ -454,9 +448,8 @@ func NewTeleportAction(target *core.Player, targetPos int, sourceID string) *Tel
 func (a *TeleportAction) Type() constants.ActionType { return constants.ActionTeleport }
 func (a *TeleportAction) CanModify() bool            { return false }
 func (a *TeleportAction) Source() string             { return a.SourceID }
-func (a *TeleportAction) Target() string             { return a.TargetPlayer.ID.UUID() }
-
-// PreTriggerPhase returns PhaseAnyTime (teleport not intercepted).
+func (a *TeleportAction) Target() string             { return a.targetPlayer.ID.UUID() }
+func (a *TeleportAction) TargetPlayer() *core.Player { return a.targetPlayer }
 func (a *TeleportAction) PreTriggerPhase() constants.Phase {
 	return constants.PhaseAnyTime
 }
@@ -467,23 +460,23 @@ func (a *TeleportAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *TeleportAction) Execute(ctx *ActionContext) error {
-	if a.TargetPlayer == nil {
+	if a.targetPlayer == nil {
 		return errors.NewActionExecutionError("teleport", "", "target player is nil", nil)
 	}
-	a.TargetPlayer.Position = a.TargetPos
+	a.targetPlayer.Position = a.TargetPos
 	return nil
 }
 
 func (a *TeleportAction) LogEntry() gamelog.LogEntry {
 	metadata := util.NewMetadata()
-	metadata.SetInt("from_pos", a.TargetPlayer.Position)
+	metadata.SetInt("from_pos", a.targetPlayer.Position)
 	metadata.SetInt("to_pos", a.TargetPos)
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
-		Target:     a.TargetPlayer.ID.UUID(),
+		Target:     a.targetPlayer.ID.UUID(),
 		Source:     a.SourceID,
 		Metadata:   metadata,
 	}
@@ -494,7 +487,7 @@ func (a *TeleportAction) LogEntry() gamelog.LogEntry {
 // StealBuffAction represents stealing a Buff from another player.
 // Used by 白虎"劫运" faction passive.
 type StealBuffAction struct {
-	TargetPlayer *core.Player // Player being stolen from
+	targetPlayer *core.Player // Player being stolen from
 	SourcePlayer *core.Player // Player stealing (owner of 白虎 faction)
 	SourceID     string       // Source identifier (e.g., "Faction_BaiHu")
 	StolenBuff   *core.Buff   // Buff that was stolen (set after execution)
@@ -503,7 +496,7 @@ type StealBuffAction struct {
 // NewStealBuffAction creates a new StealBuffAction.
 func NewStealBuffAction(target, source *core.Player, sourceID string) *StealBuffAction {
 	return &StealBuffAction{
-		TargetPlayer: target,
+		targetPlayer: target,
 		SourcePlayer: source,
 		SourceID:     sourceID,
 	}
@@ -512,9 +505,8 @@ func NewStealBuffAction(target, source *core.Player, sourceID string) *StealBuff
 func (a *StealBuffAction) Type() constants.ActionType { return constants.ActionStealBuff }
 func (a *StealBuffAction) CanModify() bool            { return false }
 func (a *StealBuffAction) Source() string             { return a.SourceID }
-func (a *StealBuffAction) Target() string             { return a.TargetPlayer.ID.UUID() }
-
-// PreTriggerPhase returns PhaseAnyTime (steal not intercepted).
+func (a *StealBuffAction) Target() string             { return a.targetPlayer.ID.UUID() }
+func (a *StealBuffAction) TargetPlayer() *core.Player { return a.targetPlayer }
 func (a *StealBuffAction) PreTriggerPhase() constants.Phase {
 	return constants.PhaseAnyTime
 }
@@ -526,19 +518,19 @@ func (a *StealBuffAction) PostTriggerPhase() constants.Phase {
 
 func (a *StealBuffAction) Execute(ctx *ActionContext) error {
 	// Steal a random buff from target
-	if a.TargetPlayer == nil {
+	if a.targetPlayer == nil {
 		return errors.NewActionExecutionError("steal_buff", "", "target player is nil", nil)
 	}
 	if a.SourcePlayer == nil {
 		return errors.NewActionExecutionError("steal_buff", "", "source player is nil", nil)
 	}
-	if len(a.TargetPlayer.ActiveBuffs) == 0 {
+	if len(a.targetPlayer.ActiveBuffs) == 0 {
 		return nil // No buffs to steal
 	}
 
 	// Take first buff (in real implementation, would be random selection)
-	stolen := a.TargetPlayer.ActiveBuffs[0]
-	a.TargetPlayer.RemoveBuff(stolen.Type)
+	stolen := a.targetPlayer.ActiveBuffs[0]
+	a.targetPlayer.RemoveBuff(stolen.Type)
 	a.SourcePlayer.AddBuff(stolen)
 	a.StolenBuff = stolen
 
@@ -559,7 +551,7 @@ func (a *StealBuffAction) LogEntry() gamelog.LogEntry {
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
-		Target:     a.TargetPlayer.ID.UUID(),
+		Target:     a.targetPlayer.ID.UUID(),
 		Source:     a.SourceID,
 		Metadata:   metadata,
 	}
@@ -570,7 +562,7 @@ func (a *StealBuffAction) LogEntry() gamelog.LogEntry {
 // DrawEventAction represents drawing a random event.
 // Can be intercepted by 辟邪/玄武 to block bad events.
 type DrawEventAction struct {
-	TargetPlayer *core.Player        // Player drawing event
+	targetPlayer *core.Player        // Player drawing event
 	SourceID     string              // Source identifier
 	DrawnType    constants.EventType // Event type drawn (set after Execute)
 	DrawnName    string              // Event name (set after Execute)
@@ -579,7 +571,7 @@ type DrawEventAction struct {
 // NewDrawEventAction creates a new DrawEventAction.
 func NewDrawEventAction(target *core.Player, sourceID string) *DrawEventAction {
 	return &DrawEventAction{
-		TargetPlayer: target,
+		targetPlayer: target,
 		SourceID:     sourceID,
 	}
 }
@@ -587,9 +579,8 @@ func NewDrawEventAction(target *core.Player, sourceID string) *DrawEventAction {
 func (a *DrawEventAction) Type() constants.ActionType { return constants.ActionDrawEvent }
 func (a *DrawEventAction) CanModify() bool            { return true }
 func (a *DrawEventAction) Source() string             { return a.SourceID }
-func (a *DrawEventAction) Target() string             { return a.TargetPlayer.ID.UUID() }
-
-// PreTriggerPhase returns PhasePreEvent for interception by 辟邪/玄武.
+func (a *DrawEventAction) Target() string             { return a.targetPlayer.ID.UUID() }
+func (a *DrawEventAction) TargetPlayer() *core.Player { return a.targetPlayer }
 func (a *DrawEventAction) PreTriggerPhase() constants.Phase {
 	return constants.PhasePreEvent
 }
@@ -600,7 +591,7 @@ func (a *DrawEventAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *DrawEventAction) Execute(ctx *ActionContext) error {
-	if a.TargetPlayer == nil {
+	if a.targetPlayer == nil {
 		return errors.NewActionExecutionError("draw_event", "", "target player is nil", nil)
 	}
 
@@ -624,7 +615,7 @@ func (a *DrawEventAction) Execute(ctx *ActionContext) error {
 	result := ctx.DrawEngine.DrawWithProb(
 		ctx.EventPool,
 		ctx.ProbGood, ctx.ProbNeutral, ctx.ProbBad,
-		a.TargetPlayer.LP,
+		a.targetPlayer.LP,
 	)
 	if result.Item != nil {
 		a.DrawnType = constants.ParseEventType(result.Item.Type)
@@ -641,7 +632,7 @@ func (a *DrawEventAction) LogEntry() gamelog.LogEntry {
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
-		Target:     a.TargetPlayer.ID.UUID(),
+		Target:     a.targetPlayer.ID.UUID(),
 		Source:     a.SourceID,
 		Metadata:   util.NewMetadata(),
 	}
@@ -659,7 +650,7 @@ func (a *DrawEventAction) LogEntry() gamelog.LogEntry {
 // DrawItemAction represents drawing a random item (e.g. from CheckPoint treasure).
 // No interception - auto draw, cannot be blocked.
 type DrawItemAction struct {
-	TargetPlayer *core.Player          // Player drawing item
+	targetPlayer *core.Player          // Player drawing item
 	SourceID     string                // Source identifier (e.g., "CheckpointTreasure")
 	DrawnType    constants.ItemType    // Item type drawn (set after Execute)
 }
@@ -667,7 +658,7 @@ type DrawItemAction struct {
 // NewDrawItemAction creates a new DrawItemAction.
 func NewDrawItemAction(target *core.Player, sourceID string) *DrawItemAction {
 	return &DrawItemAction{
-		TargetPlayer: target,
+		targetPlayer: target,
 		SourceID:     sourceID,
 	}
 }
@@ -675,9 +666,8 @@ func NewDrawItemAction(target *core.Player, sourceID string) *DrawItemAction {
 func (a *DrawItemAction) Type() constants.ActionType { return constants.ActionDrawItem }
 func (a *DrawItemAction) CanModify() bool            { return false }
 func (a *DrawItemAction) Source() string             { return a.SourceID }
-func (a *DrawItemAction) Target() string             { return a.TargetPlayer.ID.UUID() }
-
-// PreTriggerPhase returns PhaseAnyTime (draw item cannot be intercepted).
+func (a *DrawItemAction) Target() string             { return a.targetPlayer.ID.UUID() }
+func (a *DrawItemAction) TargetPlayer() *core.Player { return a.targetPlayer }
 func (a *DrawItemAction) PreTriggerPhase() constants.Phase {
 	return constants.PhaseAnyTime
 }
@@ -697,7 +687,7 @@ func (a *DrawItemAction) Execute(ctx *ActionContext) error {
 		return errors.NewInternalError("DrawItemAction", "Execute", nil).
 			WithContext("reason", "item pool is nil")
 	}
-	if a.TargetPlayer == nil {
+	if a.targetPlayer == nil {
 		return errors.NewActionExecutionError("draw_item", "", "target player is nil", nil)
 	}
 
@@ -705,7 +695,7 @@ func (a *DrawItemAction) Execute(ctx *ActionContext) error {
 	result := ctx.DrawEngine.DrawWithProb(
 		ctx.ItemPool,
 		ctx.ProbGood, ctx.ProbNeutral, ctx.ProbBad,
-		a.TargetPlayer.LP,
+		a.targetPlayer.LP,
 	)
 	if result.Item != nil {
 		a.DrawnType = constants.ParseItemType(result.Item.Type)
@@ -716,7 +706,7 @@ func (a *DrawItemAction) Execute(ctx *ActionContext) error {
 	// Add drawn item to player's inventory
 	if a.DrawnType != constants.ItemTypeNone && a.DrawnType.IsValid() {
 		newItem := core.NewItem(a.DrawnType)
-		a.TargetPlayer.AddItem(newItem)
+		a.targetPlayer.AddItem(newItem)
 	}
 
 	return nil
@@ -730,7 +720,7 @@ func (a *DrawItemAction) LogEntry() gamelog.LogEntry {
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
-		Target:     a.TargetPlayer.ID.UUID(),
+		Target:     a.targetPlayer.ID.UUID(),
 		Source:     a.SourceID,
 		Metadata:   metadata,
 	}
@@ -741,7 +731,7 @@ func (a *DrawItemAction) LogEntry() gamelog.LogEntry {
 // RespawnAction represents player respawn at checkpoint.
 // Used when player dies and needs to respawn.
 type RespawnAction struct {
-	TargetPlayer  *core.Player // Player respawning
+	targetPlayer  *core.Player // Player respawning
 	CheckpointPos int          // Position to respawn at
 	SourceID      string       // Source identifier (e.g., "DeathRespawn", "FragileRespawn")
 }
@@ -749,7 +739,7 @@ type RespawnAction struct {
 // NewRespawnAction creates a new RespawnAction.
 func NewRespawnAction(target *core.Player, checkpointPos int, sourceID string) *RespawnAction {
 	return &RespawnAction{
-		TargetPlayer:  target,
+		targetPlayer:  target,
 		CheckpointPos: checkpointPos,
 		SourceID:      sourceID,
 	}
@@ -758,9 +748,8 @@ func NewRespawnAction(target *core.Player, checkpointPos int, sourceID string) *
 func (a *RespawnAction) Type() constants.ActionType { return constants.ActionRespawn }
 func (a *RespawnAction) CanModify() bool            { return false }
 func (a *RespawnAction) Source() string             { return a.SourceID }
-func (a *RespawnAction) Target() string             { return a.TargetPlayer.ID.UUID() }
-
-// PreTriggerPhase returns PhasePreRespawn (respawn can be intercepted by Undying等).
+func (a *RespawnAction) Target() string             { return a.targetPlayer.ID.UUID() }
+func (a *RespawnAction) TargetPlayer() *core.Player { return a.targetPlayer }
 func (a *RespawnAction) PreTriggerPhase() constants.Phase {
 	return constants.PhasePreRespawn
 }
@@ -771,10 +760,10 @@ func (a *RespawnAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *RespawnAction) Execute(ctx *ActionContext) error {
-	if a.TargetPlayer == nil {
+	if a.targetPlayer == nil {
 		return errors.NewActionExecutionError("respawn", "", "target player is nil", nil)
 	}
-	a.TargetPlayer.Respawn(a.CheckpointPos)
+	a.targetPlayer.Respawn(a.CheckpointPos)
 	return nil
 }
 
@@ -786,7 +775,7 @@ func (a *RespawnAction) LogEntry() gamelog.LogEntry {
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
-		Target:     a.TargetPlayer.ID.UUID(),
+		Target:     a.targetPlayer.ID.UUID(),
 		Source:     a.SourceID,
 		Metadata:   metadata,
 	}
@@ -797,7 +786,7 @@ func (a *RespawnAction) LogEntry() gamelog.LogEntry {
 // FellDownAction represents player falling from Fragile cell.
 // Used when player lands on a broken fragile cell.
 type FellDownAction struct {
-	TargetPlayer *core.Player // Player falling
+	targetPlayer *core.Player // Player falling
 	Position     int          // Position where player fell
 	Damage       int          // Damage amount from falling
 	SourceID     string       // Source identifier (e.g., "FragileCell")
@@ -806,7 +795,7 @@ type FellDownAction struct {
 // NewFellDownAction creates a new FellDownAction.
 func NewFellDownAction(target *core.Player, position int, damage int, sourceID string) *FellDownAction {
 	return &FellDownAction{
-		TargetPlayer: target,
+		targetPlayer: target,
 		Position:     position,
 		Damage:       damage,
 		SourceID:     sourceID,
@@ -816,9 +805,8 @@ func NewFellDownAction(target *core.Player, position int, damage int, sourceID s
 func (a *FellDownAction) Type() constants.ActionType { return constants.ActionFellDown }
 func (a *FellDownAction) CanModify() bool            { return false }
 func (a *FellDownAction) Source() string             { return a.SourceID }
-func (a *FellDownAction) Target() string             { return a.TargetPlayer.ID.UUID() }
-
-// PreTriggerPhase returns PhaseAnyTime (fell down not intercepted).
+func (a *FellDownAction) Target() string             { return a.targetPlayer.ID.UUID() }
+func (a *FellDownAction) TargetPlayer() *core.Player { return a.targetPlayer }
 func (a *FellDownAction) PreTriggerPhase() constants.Phase {
 	return constants.PhaseAnyTime
 }
@@ -829,17 +817,17 @@ func (a *FellDownAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *FellDownAction) Execute(ctx *ActionContext) error {
-	if a.TargetPlayer == nil {
+	if a.targetPlayer == nil {
 		return errors.NewActionExecutionError("fell_down", "", "target player is nil", nil)
 	}
 	// Falling damage
 	if a.Damage > 0 {
-		if err := a.TargetPlayer.ApplyDamage(a.Damage); err != nil {
-			return errors.NewActionExecutionError("fell_down", a.TargetPlayer.ID.UUID(), "failed to apply fall damage", err)
+		if err := a.targetPlayer.ApplyDamage(a.Damage); err != nil {
+			return errors.NewActionExecutionError("fell_down", a.targetPlayer.ID.UUID(), "failed to apply fall damage", err)
 		}
 		// Derive DeathAction if player died from fall damage
-		if a.TargetPlayer.IsDead {
-			ctx.PushDerivedAction(NewDeathAction(a.TargetPlayer, a.SourceID, a.TargetPlayer.Position))
+		if a.targetPlayer.IsDead {
+			ctx.PushDerivedAction(NewDeathAction(a.targetPlayer, a.SourceID, a.targetPlayer.Position))
 		}
 	}
 	return nil
@@ -854,7 +842,7 @@ func (a *FellDownAction) LogEntry() gamelog.LogEntry {
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
-		Target:     a.TargetPlayer.ID.UUID(),
+		Target:     a.targetPlayer.ID.UUID(),
 		Source:     a.SourceID,
 		Metadata:   metadata,
 	}
@@ -866,7 +854,7 @@ func (a *FellDownAction) LogEntry() gamelog.LogEntry {
 // Pure rendering signal - does NOT modify IsDead (that's done by DamageAction/FellDownAction).
 // SourceID identifies what caused the death (e.g., "Buff_Corrupt", "FragileCell", "Event_Trap").
 type DeathAction struct {
-	TargetPlayer *core.Player // Player who died
+	targetPlayer *core.Player // Player who died
 	SourceID     string       // What caused the death (for client rendering)
 	Position     int          // Where the death occurred (for client animation)
 }
@@ -874,7 +862,7 @@ type DeathAction struct {
 // NewDeathAction creates a new DeathAction.
 func NewDeathAction(target *core.Player, source string, position int) *DeathAction {
 	return &DeathAction{
-		TargetPlayer: target,
+		targetPlayer: target,
 		SourceID:     source,
 		Position:     position,
 	}
@@ -883,9 +871,8 @@ func NewDeathAction(target *core.Player, source string, position int) *DeathActi
 func (a *DeathAction) Type() constants.ActionType { return constants.ActionDeath }
 func (a *DeathAction) CanModify() bool            { return false }
 func (a *DeathAction) Source() string             { return a.SourceID }
-func (a *DeathAction) Target() string             { return a.TargetPlayer.ID.UUID() }
-
-// PreTriggerPhase returns PhaseAnyTime (death event is a notification, not interceptable).
+func (a *DeathAction) Target() string             { return a.targetPlayer.ID.UUID() }
+func (a *DeathAction) TargetPlayer() *core.Player { return a.targetPlayer }
 func (a *DeathAction) PreTriggerPhase() constants.Phase {
 	return constants.PhaseAnyTime
 }
@@ -899,14 +886,14 @@ func (a *DeathAction) Execute(ctx *ActionContext) error {
 	// Add DeathMark buff via OnAddBuff callback (like AddBuffAction)
 	// DeathMark blocks all subsequent Actions via PhasePreAction on EventBus.
 	if ctx.OnAddBuff == nil {
-		return errors.NewActionExecutionError("death", a.TargetPlayer.ID.UUID(), "OnAddBuff callback is nil", nil)
+		return errors.NewActionExecutionError("death", a.targetPlayer.ID.UUID(), "OnAddBuff callback is nil", nil)
 	}
 	if ctx.GetBuffDuration == nil {
-		return errors.NewActionExecutionError("death", a.TargetPlayer.ID.UUID(), "GetBuffDuration callback is nil", nil)
+		return errors.NewActionExecutionError("death", a.targetPlayer.ID.UUID(), "GetBuffDuration callback is nil", nil)
 	}
 	duration := ctx.GetBuffDuration(constants.BuffTypeDeathMark)
 	deathMark := core.NewBuff(constants.BuffTypeDeathMark, duration)
-	ctx.OnAddBuff(a.TargetPlayer, deathMark)
+	ctx.OnAddBuff(a.targetPlayer, deathMark)
 	return nil
 }
 
@@ -919,7 +906,7 @@ func (a *DeathAction) LogEntry() gamelog.LogEntry {
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeAction,
 		ActionType: string(a.Type()),
-		Target:     a.TargetPlayer.ID.UUID(),
+		Target:     a.targetPlayer.ID.UUID(),
 		Source:     a.SourceID,
 		Metadata:   metadata,
 	}
@@ -931,7 +918,7 @@ func (a *DeathAction) LogEntry() gamelog.LogEntry {
 // Used in TurnBossBattleState when a player on the Boss cell rolls dice.
 type BossDamageAction struct {
 	SourcePlayer  *core.Player // Player attacking the boss
-	TargetPlayer  *core.Player // Boss player receiving damage
+	targetPlayer  *core.Player // Boss player receiving damage
 	Damage        int          // Damage amount (dice steps, x2 if crit)
 	IsCrit        bool         // Whether this is a critical hit
 	SourceID      string       // Source identifier (e.g., "boss_damage")
@@ -941,7 +928,7 @@ type BossDamageAction struct {
 func NewBossDamageAction(source *core.Player, boss *core.Player, damage int, isCrit bool, sourceID string) *BossDamageAction {
 	return &BossDamageAction{
 		SourcePlayer: source,
-		TargetPlayer: boss,
+		targetPlayer: boss,
 		Damage:       damage,
 		IsCrit:       isCrit,
 		SourceID:     sourceID,
@@ -951,9 +938,8 @@ func NewBossDamageAction(source *core.Player, boss *core.Player, damage int, isC
 func (a *BossDamageAction) Type() constants.ActionType { return constants.ActionBossDamage }
 func (a *BossDamageAction) CanModify() bool            { return false }
 func (a *BossDamageAction) Source() string             { return a.SourceID }
-func (a *BossDamageAction) Target() string             { return a.TargetPlayer.ID.UUID() }
-
-// PreTriggerPhase returns PhaseAnyTime (player attacking boss cannot be intercepted).
+func (a *BossDamageAction) Target() string             { return a.targetPlayer.ID.UUID() }
+func (a *BossDamageAction) TargetPlayer() *core.Player { return a.targetPlayer }
 func (a *BossDamageAction) PreTriggerPhase() constants.Phase {
 	return constants.PhaseAnyTime
 }
@@ -964,7 +950,7 @@ func (a *BossDamageAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *BossDamageAction) Execute(ctx *ActionContext) error {
-	if a.TargetPlayer == nil {
+	if a.targetPlayer == nil {
 		return errors.NewActionExecutionError("boss_damage", "", "boss player is nil", nil)
 	}
 	if a.Damage <= 0 {
@@ -972,8 +958,8 @@ func (a *BossDamageAction) Execute(ctx *ActionContext) error {
 	}
 
 	// Apply damage to boss player
-	if err := a.TargetPlayer.ApplyDamage(a.Damage); err != nil {
-		return errors.NewActionExecutionError("boss_damage", a.TargetPlayer.ID.UUID(), "failed to apply damage to boss", err)
+	if err := a.targetPlayer.ApplyDamage(a.Damage); err != nil {
+		return errors.NewActionExecutionError("boss_damage", a.targetPlayer.ID.UUID(), "failed to apply damage to boss", err)
 	}
 	return nil
 }
@@ -982,13 +968,13 @@ func (a *BossDamageAction) LogEntry() gamelog.LogEntry {
 	metadata := util.NewMetadata()
 	metadata.SetInt("damage", a.Damage)
 	metadata.SetBool("is_crit", a.IsCrit)
-	metadata.SetInt("boss_remaining_hp", a.TargetPlayer.HP)
+	metadata.SetInt("boss_remaining_hp", a.targetPlayer.HP)
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeBoss,
 		ActionType: string(a.Type()),
-		Target:     a.TargetPlayer.ID.UUID(),
+		Target:     a.targetPlayer.ID.UUID(),
 		Source:     a.SourcePlayer.ID.UUID(),
 		Metadata:   metadata,
 	}
@@ -1000,7 +986,7 @@ func (a *BossDamageAction) LogEntry() gamelog.LogEntry {
 // Used in TurnBossBattleState when the Boss player's turn executes an attack.
 type BossAttackAction struct {
 	SourcePlayer *core.Player         // Boss player (attacker)
-	TargetPlayer *core.Player         // Player receiving damage
+	targetPlayer *core.Player         // Player receiving damage
 	Damage       int                  // Damage amount (1 for normal, 2 for crit)
 	AttackType   constants.BossAttackType // Attack type (normal/crit/skill)
 	SourceID     string               // Source identifier
@@ -1010,7 +996,7 @@ type BossAttackAction struct {
 func NewBossAttackAction(boss *core.Player, target *core.Player, damage int, attackType constants.BossAttackType, sourceID string) *BossAttackAction {
 	return &BossAttackAction{
 		SourcePlayer: boss,
-		TargetPlayer: target,
+		targetPlayer: target,
 		Damage:       damage,
 		AttackType:   attackType,
 		SourceID:     sourceID,
@@ -1020,9 +1006,8 @@ func NewBossAttackAction(boss *core.Player, target *core.Player, damage int, att
 func (a *BossAttackAction) Type() constants.ActionType { return constants.ActionBossAttack }
 func (a *BossAttackAction) CanModify() bool            { return false }
 func (a *BossAttackAction) Source() string             { return a.SourceID }
-func (a *BossAttackAction) Target() string             { return a.TargetPlayer.ID.UUID() }
-
-// PreTriggerPhase returns PhasePreDamage (Boss damage can be intercepted by 隐匿).
+func (a *BossAttackAction) Target() string             { return a.targetPlayer.ID.UUID() }
+func (a *BossAttackAction) TargetPlayer() *core.Player { return a.targetPlayer }
 func (a *BossAttackAction) PreTriggerPhase() constants.Phase {
 	return constants.PhasePreDamage
 }
@@ -1033,7 +1018,7 @@ func (a *BossAttackAction) PostTriggerPhase() constants.Phase {
 }
 
 func (a *BossAttackAction) Execute(ctx *ActionContext) error {
-	if a.TargetPlayer == nil {
+	if a.targetPlayer == nil {
 		return errors.NewActionExecutionError("boss_attack", "", "target player is nil", nil)
 	}
 	if a.Damage <= 0 {
@@ -1041,12 +1026,12 @@ func (a *BossAttackAction) Execute(ctx *ActionContext) error {
 	}
 
 	// Apply damage to target player
-	if err := a.TargetPlayer.ApplyDamage(a.Damage); err != nil {
-		return errors.NewActionExecutionError("boss_attack", a.TargetPlayer.ID.UUID(), "failed to apply damage", err)
+	if err := a.targetPlayer.ApplyDamage(a.Damage); err != nil {
+		return errors.NewActionExecutionError("boss_attack", a.targetPlayer.ID.UUID(), "failed to apply damage", err)
 	}
 	// Derive DeathAction if player died
-	if a.TargetPlayer.IsDead {
-		ctx.PushDerivedAction(NewDeathAction(a.TargetPlayer, a.SourceID, a.TargetPlayer.Position))
+	if a.targetPlayer.IsDead {
+		ctx.PushDerivedAction(NewDeathAction(a.targetPlayer, a.SourceID, a.targetPlayer.Position))
 	}
 	return nil
 }
@@ -1055,13 +1040,13 @@ func (a *BossAttackAction) LogEntry() gamelog.LogEntry {
 	metadata := util.NewMetadata()
 	metadata.SetString("attack_type", string(a.AttackType))
 	metadata.SetInt("damage", a.Damage)
-	metadata.SetString("target", a.TargetPlayer.ID.UUID())
+	metadata.SetString("target", a.targetPlayer.ID.UUID())
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
 		Type:       constants.EntryTypeBoss,
 		ActionType: string(a.Type()),
-		Target:     a.TargetPlayer.ID.UUID(),
+		Target:     a.targetPlayer.ID.UUID(),
 		Source:     a.SourcePlayer.ID.UUID(),
 		Metadata:   metadata,
 	}
@@ -1103,6 +1088,7 @@ func (a *BossSkillAction) Target() string {
 	}
 	return ""
 }
+func (a *BossSkillAction) TargetPlayer() *core.Player { return a.SourcePlayer } // Boss is the actor
 
 // PreTriggerPhase returns PhaseAnyTime (Boss skills cannot be intercepted).
 func (a *BossSkillAction) PreTriggerPhase() constants.Phase {

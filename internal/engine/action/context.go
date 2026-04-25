@@ -14,7 +14,6 @@ import (
 // ActionContext provides context for action execution.
 // Contains references to game engine, event bus, and map engine for executing actions.
 // Embeds util.Metadata for extensible type-safe key-value storage.
-// CurrentPlayer is set by HSM when creating the context (from HSM.GetTurnPlayer()).
 type ActionContext struct {
 	*util.Metadata // Embedded for extensible storage
 
@@ -25,7 +24,6 @@ type ActionContext struct {
 	EventPool     []*rng.EvaluatedItem  // Event pool for DrawEventAction (all events)
 	ItemPool      []*rng.EvaluatedItem  // Item pool for DrawItemAction (all items)
 	ActionQueue   *Queue                // Queue for derived actions
-	CurrentPlayer *core.Player          // Current player (set by HSM, nil if not in turn)
 	// Probability weights for cell-based draws
 	ProbGood      float64               // Probability weight for Good pool
 	ProbNeutral   float64               // Probability weight for Neutral pool
@@ -45,26 +43,12 @@ type ActionContext struct {
 // NewActionContext creates a new ActionContext with required components.
 func NewActionContext(game protocol.Game, bus *event.EventBus, mapEngine *gamemap.MapEngine, drawEngine *rng.DrawEngine) *ActionContext {
 	return &ActionContext{
-		Metadata:      util.NewMetadata(),
-		Game:          game,
-		EventBus:      bus,
-		MapEngine:     mapEngine,
-		DrawEngine:    drawEngine,
-		ActionQueue:   NewQueue(),
-		CurrentPlayer: nil, // Set separately via SetCurrentPlayer
-	}
-}
-
-// NewActionContextWithPlayer creates a new ActionContext with current player.
-func NewActionContextWithPlayer(game protocol.Game, bus *event.EventBus, mapEngine *gamemap.MapEngine, drawEngine *rng.DrawEngine, player *core.Player) *ActionContext {
-	return &ActionContext{
-		Metadata:      util.NewMetadata(),
-		Game:          game,
-		EventBus:      bus,
-		MapEngine:     mapEngine,
-		DrawEngine:    drawEngine,
-		ActionQueue:   NewQueue(),
-		CurrentPlayer: player,
+		Metadata:    util.NewMetadata(),
+		Game:        game,
+		EventBus:    bus,
+		MapEngine:   mapEngine,
+		DrawEngine:  drawEngine,
+		ActionQueue: NewQueue(),
 	}
 }
 
@@ -83,40 +67,40 @@ func (ctx *ActionContext) SetCellDraw(probGood, probNeutral, probBad float64) *A
 	return ctx
 }
 
-// SetCurrentPlayer sets the current player for trigger context.
-func (ctx *ActionContext) SetCurrentPlayer(player *core.Player) {
-	ctx.CurrentPlayer = player
-}
-
 // ExecuteAction executes an action with interception support.
 // Flow:
-// 1. PreTrigger phase - publish for interception (if not PhaseAnyTime)
-// 2. Collect derived actions from handler into queue
-// 3. Execute the (possibly modified) action
-// 4. PostTrigger phase - publish for lifecycle events (if not PhaseAnyTime)
-// 5. Collect derived actions from post-trigger handler
-// 6. Record in global game log
-// 7. Process any derived actions in queue
+// 1. PreAction death check - block actions for dead target players
+// 2. PreTrigger phase - publish for interception (if not PhaseAnyTime)
+// 3. Collect derived actions from handler into queue
+// 4. Execute the (possibly modified) action
+// 5. PostTrigger phase - publish for lifecycle events (if not PhaseAnyTime)
+// 6. Collect derived actions from post-trigger handler
+// 7. Record in global game log
+// 8. Process any derived actions in queue
 // Returns first error from handlers or action execution.
 func (ctx *ActionContext) ExecuteAction(action Action) error {
-	// Step 0: PhasePreAction - death mark interception (only when CurrentPlayer.IsDead)
+	// Step 0: PhasePreAction - death mark interception
+	// If the action's target player is dead (has DeathMark buff), block the action.
 	// Skip for buff lifecycle actions (RemoveBuffAction, RespawnAction) — these must
-	// execute even for dead players (buff expiry removal, respawn after death)
-	if ctx.EventBus != nil && ctx.CurrentPlayer != nil && ctx.CurrentPlayer.IsDead {
-		skipDeathCheck := false
-		if _, ok := action.(*RemoveBuffAction); ok {
-			skipDeathCheck = true
-		}
+	// execute even for dead players (buff expiry removal, respawn after death).
+	if ctx.EventBus != nil {
+		targetPlayer := action.TargetPlayer()
+		if targetPlayer != nil && targetPlayer.IsDead {
+			skipDeathCheck := false
+			if _, ok := action.(*RemoveBuffAction); ok {
+				skipDeathCheck = true
+			}
 
-		if !skipDeathCheck {
-			preCtx := event.NewContext(ctx.CurrentPlayer)
-			preCtx.Set("action_context", ctx)
-			preCtx.Set("current_action", action)
-			ctx.EventBus.Publish(constants.PhasePreAction, ctx.CurrentPlayer.ID.UUID(), preCtx)
+			if !skipDeathCheck {
+				preCtx := event.NewContext(targetPlayer)
+				preCtx.Set("action_context", ctx)
+				preCtx.Set("current_action", action)
+				ctx.EventBus.Publish(constants.PhasePreAction, targetPlayer.ID.UUID(), preCtx)
 
-			// Check if action was blocked by DeathMark buff
-			if preCtx.GetBoolOrDefault("action_blocked", false) {
-				return nil // Action blocked - skip execution entirely
+				// Check if action was blocked by DeathMark buff
+				if preCtx.GetBoolOrDefault("action_blocked", false) {
+					return nil // Action blocked - skip execution entirely
+				}
 			}
 		}
 	}
@@ -124,9 +108,8 @@ func (ctx *ActionContext) ExecuteAction(action Action) error {
 	// Step 1: PreTrigger phase - interception
 	prePhase := action.PreTriggerPhase()
 	if prePhase != constants.PhaseAnyTime && ctx.EventBus != nil {
-		// Create context for interception
-		// Use CurrentPlayer set by HSM (from HSM.GetTurnPlayer())
-		triggerCtx := event.NewContext(ctx.CurrentPlayer)
+		// Create context for interception using action's target player
+		triggerCtx := event.NewContext(action.TargetPlayer())
 		triggerCtx.Set("current_action", action)
 		triggerCtx.Set("action_context", ctx)
 
@@ -176,8 +159,8 @@ func (ctx *ActionContext) ExecuteAction(action Action) error {
 			// Duration extended, skip PhasePostBuffApplied publication
 			// No derived actions from PostTrigger needed since buff was just extended, not newly applied
 		} else {
-			// Create context for post-trigger
-			triggerCtx := event.NewContext(ctx.CurrentPlayer)
+			// Create context for post-trigger using action's target player
+			triggerCtx := event.NewContext(action.TargetPlayer())
 			triggerCtx.Set("current_action", action)
 			triggerCtx.Set("action_context", ctx)
 

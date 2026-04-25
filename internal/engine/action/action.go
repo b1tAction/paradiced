@@ -1,6 +1,7 @@
 package action
 
 import (
+	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
 )
@@ -23,8 +24,12 @@ type Action interface {
 	// Source returns the source identifier (Buff ID, Item ID, Event ID, Faction ID).
 	Source() string
 
-	// Target returns the target player ID.
+	// Target returns the target player ID (UUID).
 	Target() string
+
+	// TargetPlayer returns the target player instance.
+	// Used for creating event.Context in PreTrigger/PostTrigger phases.
+	TargetPlayer() *core.Player
 
 	// PreTriggerPhase returns the Phase to publish BEFORE action execution.
 	// Used for interception (e.g., PhasePreDamage for shields/隐匿).
