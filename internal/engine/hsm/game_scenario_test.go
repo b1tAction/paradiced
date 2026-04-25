@@ -869,3 +869,79 @@ func TestScenarioDeath_DeathActionLogEntryMetadata(t *testing.T) {
 		t.Errorf("Metadata death_source should be 'Buff_Corrupt', got '%s'", deathSource)
 	}
 }
+
+// TestScenarioDeath_RespawnWithDeathMarkPresent verifies that
+// RespawnAction can execute even when DeathMark buff is present.
+// This is the Boss turn scenario: Boss kills player → DeathAction adds DeathMark →
+// HSM attempts RespawnAction immediately → DeathMark handler must NOT block RespawnAction.
+// Previously, RespawnAction was blocked by DeathMark because PhasePreAction
+// death check did not exempt RespawnAction (only RemoveBuffAction was exempted).
+func TestScenarioDeath_RespawnWithDeathMarkPresent(t *testing.T) {
+	harness := NewGameTestHarness(&HarnessConfig{
+		Seed:        42,
+		PlayerCount: 2,
+		Factions:    []constants.Faction{constants.FactionQingLong, constants.FactionZhuQue},
+		InitialHP:   3,
+		MaxHP:       3,
+		InitialLP:   3,
+		MaxLP:       3,
+		CellTypeOverrides: map[int]constants.CellType{30: constants.CellTypeCheckpoint},
+	})
+
+	player := harness.Players[0]
+	player.Position = 50
+
+	// Create ActionContext with callbacks
+	actionCtx := newActionContextWithPools(
+		harness.Game,
+		harness.Game.Bus,
+		harness.MapEngine,
+		harness.Game.Draw,
+	)
+
+	harness.Game.Log.StartTurn(1, 0, player.ID.UUID())
+
+	// Step 1: Kill the player with BossAttackAction (simulating Boss turn)
+	bossPlayer := harness.Game.InitializeBoss(harness.MapEngine.Length - 1)
+	if bossPlayer == nil {
+		t.Fatal("Failed to initialize Boss player")
+	}
+	bossAttackAction := engineaction.NewBossAttackAction(
+		bossPlayer,
+		player,
+		10, // lethal damage
+		constants.BossAttackNormal,
+		"boss_normal",
+	)
+	err := actionCtx.ExecuteAction(bossAttackAction)
+	if err != nil {
+		t.Fatalf("ExecuteAction(BossAttackAction) failed: %v", err)
+	}
+
+	if !player.IsDead {
+		t.Fatal("Player should be dead after Boss attack")
+	}
+	if !player.HasBuff(constants.BuffTypeDeathMark) {
+		t.Fatal("Player should have DeathMark buff after death")
+	}
+
+	// Step 2: Attempt RespawnAction immediately (as BossBattleState would do)
+	// This must succeed even though DeathMark is still present.
+	checkpoint := harness.MapEngine.GetLastCheckpoint(player.Position)
+	respawnAction := engineaction.NewRespawnAction(player, checkpoint, "BossAttackRespawn")
+	err = actionCtx.ExecuteAction(respawnAction)
+	if err != nil {
+		t.Fatalf("ExecuteAction(RespawnAction) should succeed with DeathMark present, got: %v", err)
+	}
+
+	// Verify respawn state
+	if player.IsDead {
+		t.Error("Player should NOT be dead after respawn")
+	}
+	if player.HP != 3 {
+		t.Errorf("Player HP should be reset to MaxHP(3), got %d", player.HP)
+	}
+	if player.Position != checkpoint {
+		t.Errorf("Player position should be checkpoint(%d), got %d", checkpoint, player.Position)
+	}
+}
