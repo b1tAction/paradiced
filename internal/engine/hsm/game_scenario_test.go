@@ -945,3 +945,210 @@ func TestScenarioDeath_RespawnWithDeathMarkPresent(t *testing.T) {
 		t.Errorf("Player position should be checkpoint(%d), got %d", checkpoint, player.Position)
 	}
 }
+
+// ========== Scenario Group C: Hidden Buff Immunity ==========
+
+// TestScenarioBuff_Hidden_ImmuneDamage verifies that Hidden (隐匿) buff
+// grants damage immunity — player takes no HP damage when Hidden buff is active.
+func TestScenarioBuff_Hidden_ImmuneDamage(t *testing.T) {
+	harness := NewGameTestHarness(&HarnessConfig{
+		Seed:        42,
+		PlayerCount: 2,
+		Factions:    []constants.Faction{constants.FactionQingLong, constants.FactionZhuQue},
+		InitialHP:   6,
+		InitialLP:   3,
+	})
+
+	player := harness.Players[0]
+
+	// Add Hidden buff to player (duration 3 turns)
+	actionCtx := newActionContextWithPools(
+		harness.Game,
+		harness.Game.Bus,
+		harness.MapEngine,
+		harness.Game.Draw,
+	)
+
+	harness.Game.Log.StartTurn(1, 0, player.ID.UUID())
+
+	// Step 1: Add Hidden buff to player
+	addHiddenAction := engineaction.NewAddBuffAction(player, constants.BuffTypeHidden, "TestHidden")
+	if err := actionCtx.ExecuteAction(addHiddenAction); err != nil {
+		t.Fatalf("ExecuteAction(AddBuffAction(Hidden)) failed: %v", err)
+	}
+
+	if !player.HasBuff(constants.BuffTypeHidden) {
+		t.Fatal("Player should have Hidden buff after AddBuffAction")
+	}
+
+	// Step 2: Attempt damage on Hidden player
+	initialHP := player.HP
+	damageAction := engineaction.NewDamageAction(player, 5, "TestAttack")
+	if err := actionCtx.ExecuteAction(damageAction); err != nil {
+		t.Fatalf("ExecuteAction(DamageAction) failed: %v", err)
+	}
+
+	// DamageAction should have been intercepted by Hidden buff (blocked at PhasePreBuffApplied level)
+	// OR ApplyDamage should return nil due to HasBuff(Hidden) check
+	// Either way, HP should not change
+	if player.HP != initialHP {
+		t.Errorf("Player HP should not change when Hidden buff is active, got HP=%d (expected %d)", player.HP, initialHP)
+	}
+	if player.IsDead {
+		t.Error("Player should NOT be dead when Hidden buff is active")
+	}
+}
+
+// TestScenarioBuff_Hidden_BlockNegativeBuff verifies that Hidden (隐匿) buff
+// blocks the application of negative buffs via EventBus interception.
+func TestScenarioBuff_Hidden_BlockNegativeBuff(t *testing.T) {
+	harness := NewGameTestHarness(&HarnessConfig{
+		Seed:        42,
+		PlayerCount: 2,
+		Factions:    []constants.Faction{constants.FactionQingLong, constants.FactionZhuQue},
+	})
+
+	player := harness.Players[0]
+
+	actionCtx := newActionContextWithPools(
+		harness.Game,
+		harness.Game.Bus,
+		harness.MapEngine,
+		harness.Game.Draw,
+	)
+
+	harness.Game.Log.StartTurn(1, 0, player.ID.UUID())
+
+	// Step 1: Add Hidden buff first
+	addHiddenAction := engineaction.NewAddBuffAction(player, constants.BuffTypeHidden, "TestHidden")
+	if err := actionCtx.ExecuteAction(addHiddenAction); err != nil {
+		t.Fatalf("Add Hidden buff failed: %v", err)
+	}
+
+	// Step 2: Try to add a negative buff (Curse) while Hidden
+	addCurseAction := engineaction.NewAddBuffAction(player, constants.BuffTypeCurse, "TestCurseAttempt")
+	if err := actionCtx.ExecuteAction(addCurseAction); err != nil {
+		t.Fatalf("ExecuteAction(AddBuffAction(Curse)) returned error: %v", err)
+	}
+
+	// Curse should be blocked by Hidden at PhasePreBuffApplied
+	if player.HasBuff(constants.BuffTypeCurse) {
+		t.Error("Curse buff should NOT be applied when player has Hidden buff")
+	}
+}
+
+// ========== Scenario Group D: DeathMark + Buff Removal ==========
+
+// TestScenarioDeath_DeathMarkBlockRemoveOtherBuff verifies that
+// DeathMark blocks RemoveBuffAction for non-DeathMark buffs.
+// When a dead player has Divine buff, removing Divine should be blocked
+// because DeathMark blocks all non-exempt actions.
+func TestScenarioDeath_DeathMarkBlockRemoveOtherBuff(t *testing.T) {
+	harness := NewGameTestHarness(&HarnessConfig{
+		Seed:        42,
+		PlayerCount: 2,
+		Factions:    []constants.Faction{constants.FactionQingLong, constants.FactionZhuQue},
+		InitialHP:   3,
+		InitialLP:   3,
+	})
+
+	player := harness.Players[0]
+
+	actionCtx := newActionContextWithPools(
+		harness.Game,
+		harness.Game.Bus,
+		harness.MapEngine,
+		harness.Game.Draw,
+	)
+
+	harness.Game.Log.StartTurn(1, 0, player.ID.UUID())
+
+	// Step 1: Add Divine buff to player
+	addDivineAction := engineaction.NewAddBuffAction(player, constants.BuffTypeDivine, "TestDivine")
+	if err := actionCtx.ExecuteAction(addDivineAction); err != nil {
+		t.Fatalf("Add Divine buff failed: %v", err)
+	}
+
+	if !player.HasBuff(constants.BuffTypeDivine) {
+		t.Fatal("Player should have Divine buff")
+	}
+
+	// Step 2: Kill the player
+	damageAction := engineaction.NewDamageAction(player, 10, "TestKill")
+	actionCtx.ExecuteAction(damageAction)
+
+	if !player.IsDead {
+		t.Fatal("Player should be dead")
+	}
+	if !player.HasBuff(constants.BuffTypeDeathMark) {
+		t.Fatal("Player should have DeathMark buff")
+	}
+
+	// Step 3: Try to remove Divine buff — should be blocked by DeathMark
+	removeDivineAction := engineaction.NewRemoveBuffAction(player, constants.BuffTypeDivine, "Buff_Expiry")
+	if err := actionCtx.ExecuteAction(removeDivineAction); err != nil {
+		t.Fatalf("ExecuteAction should not return error for blocked action: %v", err)
+	}
+
+	// Divine buff should still be present (removal was blocked)
+	if !player.HasBuff(constants.BuffTypeDivine) {
+		t.Error("Divine buff removal should be blocked by DeathMark — Divine should still be present")
+	}
+}
+
+// ========== Scenario Group E: StealBuff (BaiHu 劫运) ==========
+
+// TestScenarioStealBuff_BaiHuStealsBuff verifies that StealBuffAction
+// transfers a buff from target player to source player.
+func TestScenarioStealBuff_BaiHuStealsBuff(t *testing.T) {
+	harness := NewGameTestHarness(&HarnessConfig{
+		Seed:        42,
+		PlayerCount: 2,
+		Factions:    []constants.Faction{constants.FactionQingLong, constants.FactionBaiHu},
+		InitialHP:   6,
+		InitialLP:   3,
+	})
+
+	target := harness.Players[0] // QingLong (victim)
+	stealer := harness.Players[1] // BaiHu (stealer)
+
+	actionCtx := newActionContextWithPools(
+		harness.Game,
+		harness.Game.Bus,
+		harness.MapEngine,
+		harness.Game.Draw,
+	)
+
+	harness.Game.Log.StartTurn(1, 0, target.ID.UUID())
+
+	// Step 1: Add Divine buff to target player
+	addDivineAction := engineaction.NewAddBuffAction(target, constants.BuffTypeDivine, "TestDivine")
+	if err := actionCtx.ExecuteAction(addDivineAction); err != nil {
+		t.Fatalf("Add Divine buff failed: %v", err)
+	}
+
+	if !target.HasBuff(constants.BuffTypeDivine) {
+		t.Fatal("Target should have Divine buff")
+	}
+
+	// Step 2: StealBuffAction — BaiHu steals from QingLong
+	stealAction := engineaction.NewStealBuffAction(target, stealer, "Faction_BaiHu")
+	if err := actionCtx.ExecuteAction(stealAction); err != nil {
+		t.Fatalf("StealBuffAction failed: %v", err)
+	}
+
+	// Verify: Divine buff should be removed from target, added to stealer
+	if target.HasBuff(constants.BuffTypeDivine) {
+		t.Error("Target should NOT have Divine buff after steal")
+	}
+	if !stealer.HasBuff(constants.BuffTypeDivine) {
+		t.Error("Stealer should have Divine buff after steal")
+	}
+
+	// Verify: StolenBuff is set on the action
+	if stealAction.StolenBuff == nil {
+		t.Error("StolenBuff should be set after steal execution")
+	} else if stealAction.StolenBuff.Type != constants.BuffTypeDivine {
+		t.Errorf("StolenBuff type should be Divine, got %s", stealAction.StolenBuff.Type)
+	}
+}
