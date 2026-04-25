@@ -1069,9 +1069,20 @@ func (s *TurnBossBattleState) enterPlayerBranch(ctx *StateContext, player *core.
 		isCrit,
 		string(constants.SourceBossDamage),
 	)
+	// Execute BossDamageAction (player attacks Boss).
+	// PreTrigger publishes PhasePreDamage to BossPlayer (Thorns handler).
+	// Thorns handler pushes derived BossAttackAction for reflect damage.
+	// ExecuteAction internally calls ProcessQueue to handle derived actions.
 	if err := s.actionCtx.ExecuteAction(bossDamageAction); err != nil {
 		ctx.Error = errors.WrapHSMError(
 			err, "TurnBossBattle", 2, "Enter", "boss damage action failed")
+		return
+	}
+
+	// Additional ProcessQueue call for safety (queue should be empty after ExecuteAction)
+	if err := s.actionCtx.ProcessQueue(); err != nil {
+		ctx.Error = errors.WrapHSMError(
+			err, "TurnBossBattle", 2, "Enter", "boss damage derived action processing failed")
 		return
 	}
 
@@ -1104,8 +1115,8 @@ func (s *TurnBossBattleState) enterBossBranch(ctx *StateContext, bossPlayer *cor
 	// Calculate average LP of boss-cell alive players
 	avgLP := s.calcAvgLP(bossCellPlayers)
 
-	// Determine Boss attack type based on avgLP
-	attackResult := rng.CalcBossAttackType(game.RNG, avgLP, game.BossSkillPool)
+	// Determine Boss attack type based on avgLP and Boss HP
+	attackResult := rng.CalcBossAttackType(game.RNG, avgLP, bossPlayer.HP, bossPlayer.MaxHP, game.BossSkillPool)
 
 	switch attackResult.AttackType {
 	case "normal", "crit":
@@ -1297,9 +1308,19 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 		game.Draw,
 	)
 
-	// Boss player: skip AfterTurn effects, Buff ticking, faction charging
-	// Boss TurnEnd only broadcasts TurnSync and ends turn log
+	// Boss player: skip AfterTurn effects and faction charging, but tick Buffs
+	// Boss TurnEnd broadcasts TurnSync, ticks buffs, and ends turn log
 	if player.ID.IsBoss() {
+		// Tick Boss Buffs (duration countdown, remove expired)
+		expiredBuffs := player.TickBuffs()
+		for _, expired := range expiredBuffs {
+			removeAction := engineaction.NewRemoveBuffAction(player, expired.Type, "Buff_Expiry")
+			if err := s.actionCtx.ExecuteAction(removeAction); err != nil {
+				ctx.Error = errors.WrapHSMError(err, "TurnEnd", 2, "Enter", "boss expired buff removal failed")
+				return
+			}
+		}
+
 		// Broadcast TurnSync (Boss counter-attack animation)
 		s.broadcastTurnSync(ctx)
 
