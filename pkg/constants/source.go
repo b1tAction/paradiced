@@ -45,6 +45,8 @@ const (
 	SourceBossSkillCurse   ActionSource = "boss_skill_curse"  // Boss curse skill
 	SourceBossSkillLost    ActionSource = "boss_skill_lost"   // Boss lost skill
 	SourceBossSkillRest    ActionSource = "boss_skill_rest"   // Boss rest skill
+	SourceBossSkillThorns  ActionSource = "boss_skill_thorns" // Boss thorns skill
+	SourceThornsReflect    ActionSource = "thorns_reflect"    // Thorns reflect damage
 )
 
 // IsValid checks if ActionSource is valid.

@@ -185,9 +185,6 @@ func (p *Player) AddBuff(buffInstance *Buff) error {
 		return pkgerrors.NewInternalError("Player", "AddBuff", nil).
 		WithContext("reason", "buff instance is nil")
 	}
-	if p.HasBuff(constants.BuffTypeHidden) && !buffInstance.Type.IsPositive() {
-		return nil
-	}
 
 	// Check if player already has a buff of the same type
 	existing := p.GetBuff(buffInstance.Type)

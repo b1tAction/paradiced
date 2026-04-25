@@ -26,14 +26,15 @@ type BossSkillType string
 const (
 	BossSkillThunder BossSkillType = "thunder" // AOE damage 2 to all boss-cell players
 	BossSkillCurse   BossSkillType = "curse"   // Add curse buff to all boss-cell players
-	BossSkillLost    BossSkillType = "lost"     // Add lost buff to all boss-cell players
-	BossSkillRest    BossSkillType = "rest"     // Boss heals 5 HP
+	BossSkillLost    BossSkillType = "lost"    // Add lost buff to all boss-cell players
+	BossSkillRest    BossSkillType = "rest"    // Boss heals 5 HP
+	BossSkillThorns  BossSkillType = "thorns"  // Add thorns buff to all boss-cell players (reflect 30% damage)
 )
 
 // IsValid checks if BossSkillType is valid.
 func (bst BossSkillType) IsValid() bool {
 	switch bst {
-	case BossSkillThunder, BossSkillCurse, BossSkillLost, BossSkillRest:
+	case BossSkillThunder, BossSkillCurse, BossSkillLost, BossSkillRest, BossSkillThorns:
 		return true
 	default:
 		return false

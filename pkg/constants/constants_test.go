@@ -9,6 +9,7 @@ func TestBuffTypeIsValid(t *testing.T) {
 	validTypes := []BuffType{
 		BuffTypeCurse, BuffTypeLost, BuffTypeCorrupt, BuffTypePoison,
 		BuffTypeHidden, BuffTypeDivine, BuffTypeRain, BuffTypeExorcism, BuffTypeFire,
+		BuffTypeThorns, BuffTypeDeathMark,
 	}
 	for _, bt := range validTypes {
 		if !bt.IsValid() {
@@ -36,7 +37,7 @@ func TestBuffTypeIsPositive(t *testing.T) {
 
 	nonPositiveTypes := []BuffType{
 		BuffTypeCurse, BuffTypeLost, BuffTypeCorrupt, BuffTypePoison,
-		BuffTypeNone,
+		BuffTypeThorns, BuffTypeNone,
 	}
 	for _, bt := range nonPositiveTypes {
 		if bt.IsPositive() {
@@ -57,11 +58,71 @@ func TestBuffTypeIsNegative(t *testing.T) {
 
 	nonNegativeTypes := []BuffType{
 		BuffTypeDivine, BuffTypeHidden, BuffTypeRain, BuffTypeExorcism, BuffTypeFire,
-		BuffTypeNone,
+		BuffTypeThorns, BuffTypeNone,
 	}
 	for _, bt := range nonNegativeTypes {
 		if bt.IsNegative() {
 			t.Errorf("BuffType(%s).IsNegative() should be false", bt)
+		}
+	}
+}
+
+func TestBuffTypeIsBoss(t *testing.T) {
+	bossTypes := []BuffType{BuffTypeThorns, BuffTypeDeathMark}
+	for _, bt := range bossTypes {
+		if !bt.IsBoss() {
+			t.Errorf("BuffType(%s).IsBoss() should be true", bt)
+		}
+	}
+
+	nonBossTypes := []BuffType{
+		BuffTypeCurse, BuffTypeLost, BuffTypeCorrupt, BuffTypePoison,
+		BuffTypeHidden, BuffTypeDivine, BuffTypeRain, BuffTypeExorcism, BuffTypeFire,
+	}
+	for _, bt := range nonBossTypes {
+		if bt.IsBoss() {
+			t.Errorf("BuffType(%s).IsBoss() should be false", bt)
+		}
+	}
+}
+
+func TestBuffTypeIsHidden(t *testing.T) {
+	hiddenTypes := []BuffType{BuffTypeDeathMark}
+	for _, bt := range hiddenTypes {
+		if !bt.IsHidden() {
+			t.Errorf("BuffType(%s).IsHidden() should be true", bt)
+		}
+	}
+
+	visibleTypes := []BuffType{
+		BuffTypeCurse, BuffTypeLost, BuffTypeCorrupt, BuffTypePoison,
+		BuffTypeHidden, BuffTypeDivine, BuffTypeRain, BuffTypeExorcism, BuffTypeFire,
+		BuffTypeThorns,
+	}
+	for _, bt := range visibleTypes {
+		if bt.IsHidden() {
+			t.Errorf("BuffType(%s).IsHidden() should be false", bt)
+		}
+	}
+}
+
+func TestBuffTypeIsDraw(t *testing.T) {
+	// IsDraw = true means participates in lottery pool draws
+	drawTypes := []BuffType{
+		BuffTypeCurse, BuffTypeLost, BuffTypeCorrupt, BuffTypePoison,
+		BuffTypeHidden, BuffTypeDivine, BuffTypeRain, BuffTypeExorcism, BuffTypeFire,
+	}
+	for _, bt := range drawTypes {
+		if !bt.IsDraw() {
+			t.Errorf("BuffType(%s).IsDraw() should be true", bt)
+		}
+	}
+
+	// IsDraw = false means excluded from lottery pools (IsBoss or IsHidden)
+	noDrawTypes := []BuffType{BuffTypeThorns, BuffTypeDeathMark}
+	for _, bt := range noDrawTypes {
+		if bt.IsDraw() {
+			t.Errorf("BuffType(%s).IsDraw() should be false", bt)
 		}
 	}
 }
@@ -117,6 +178,7 @@ func TestPhaseIsValid(t *testing.T) {
 		PhasePreDamage, PhasePreEvent, PhasePreMove, PhasePreRespawn,
 		PhasePreBuffApplied, PhasePostBuffApplied,
 		PhasePreBuffRemoved, PhasePostBuffRemoved,
+		PhasePreAction,
 		PhaseAnyTime, PhaseItemUsed,
 	}
 	for _, p := range validPhases {
@@ -144,7 +206,8 @@ func TestPhaseNeedsSubscription(t *testing.T) {
 		PhaseBeforeTurn, PhaseOnLand, PhaseAfterTurn,
 		PhasePreDamage, PhasePreEvent, PhasePreMove, PhasePreRespawn,
 		PhasePreBuffApplied, PhasePostBuffApplied,
-		PhasePreBuffRemoved, PhasePostBuffRemoved, PhaseItemUsed,
+		PhasePreBuffRemoved, PhasePostBuffRemoved,
+		PhasePreAction, PhaseItemUsed,
 	}
 	for _, p := range needsSubscription {
 		if !p.NeedsSubscription() {
@@ -178,6 +241,7 @@ func TestPhaseIsActionPublished(t *testing.T) {
 		PhasePreDamage, PhasePreEvent, PhasePreMove, PhasePreRespawn,
 		PhasePreBuffApplied, PhasePostBuffApplied,
 		PhasePreBuffRemoved, PhasePostBuffRemoved,
+		PhasePreAction,
 	}
 	for _, p := range actionPhases {
 		if !p.IsActionPublished() {

@@ -17,6 +17,9 @@ const (
 	// Neutral Buff
 	BuffTypeHidden BuffType = "hidden" // Hidden隐匿: immunity
 
+	// Boss Buff (given by Boss skills, not drawn from lottery pool)
+	BuffTypeThorns BuffType = "thorns" // Thorns反刺: reflect 30% damage to attacking player
+
 	// Positive Buffs
 	BuffTypeDivine   BuffType = "divine"   // Divine神眷: LP+1 per turn
 	BuffTypeRain     BuffType = "rain"     // Rain甘霖: HP+1 every 2 turns
@@ -31,8 +34,8 @@ const (
 func (bt BuffType) IsValid() bool {
 	switch bt {
 	case BuffTypeCurse, BuffTypeLost, BuffTypeCorrupt, BuffTypePoison,
-		BuffTypeHidden, BuffTypeDivine, BuffTypeRain, BuffTypeExorcism,
-		BuffTypeFire, BuffTypeDeathMark:
+		BuffTypeHidden, BuffTypeThorns, BuffTypeDivine, BuffTypeRain,
+		BuffTypeExorcism, BuffTypeFire, BuffTypeDeathMark:
 		return true
 	default:
 		return false
@@ -55,6 +58,17 @@ func (bt BuffType) IsHidden() bool {
 	return bt == BuffTypeDeathMark
 }
 
+// IsBoss checks if the Buff is given by Boss skills or game mechanics (not drawn from lottery pool).
+func (bt BuffType) IsBoss() bool {
+	return bt == BuffTypeThorns || bt == BuffTypeDeathMark
+}
+
+// IsDraw checks if the Buff should participate in lottery pool draws.
+// Returns false for Boss buffs and hidden buffs (they are not drawn from pools).
+func (bt BuffType) IsDraw() bool {
+	return !bt.IsBoss() && !bt.IsHidden()
+}
+
 // ParseBuffType converts a string to BuffType.
 // Returns BuffTypeNone if the string is not a valid buff type.
 func ParseBuffType(s string) BuffType {
@@ -69,6 +83,8 @@ func ParseBuffType(s string) BuffType {
 		return BuffTypePoison
 	case "hidden":
 		return BuffTypeHidden
+	case "thorns":
+		return BuffTypeThorns
 	case "divine":
 		return BuffTypeDivine
 	case "rain":

@@ -16,23 +16,27 @@ type BossAttackResult struct {
 
 // Boss attack probability constants.
 // Lower average LP → higher Boss crit/skill probability.
+// Lower Boss HP → higher Boss skill probability (Boss fights harder when wounded).
 const (
-	bossCritSkillBaseRate = 0.1  // Base rate when avgLP = lpMax
+	bossCritSkillBaseRate = 0.25  // Base rate when avgLP = lpMax and bossHP = maxHP
 	bossCritSkillLpFactor = 0.05 // Additional rate per LP below lpMax
+	bossCritSkillHpFactor = 0.30 // Additional rate per HP ratio lost (0~0.30 based on bossHP/maxHP)
 )
 
 // CalcBossCritSkillProb calculates the probability of Boss using crit or skill.
-// Formula: baseRate + lpFactor * (lpMax - avgLP)
-// avgLP=0 → 50%, avgLP=4 → 30%, avgLP=8 → 10%
-func CalcBossCritSkillProb(avgLP float64) float64 {
-	return bossCritSkillBaseRate + bossCritSkillLpFactor*(float64(lpMax)-avgLP)
+// Formula: baseRate + lpFactor * (lpMax - avgLP) + hpFactor * (maxHP - currentHP) / maxHP
+// avgLP=8, bossHP=50 → 25%, avgLP=4, bossHP=25 → 60%, avgLP=0, bossHP=0 → 95%
+func CalcBossCritSkillProb(avgLP float64, bossCurrentHP int, bossMaxHP int) float64 {
+	return bossCritSkillBaseRate +
+		bossCritSkillLpFactor*(float64(lpMax)-avgLP) +
+		bossCritSkillHpFactor*float64(bossMaxHP-bossCurrentHP)/float64(bossMaxHP)
 }
 
-// CalcBossAttackType determines Boss attack type based on average LP.
+// CalcBossAttackType determines Boss attack type based on average LP and Boss HP.
 // Returns BossAttackResult with attack_type: "normal", "crit", or "skill".
-// When critOrSkill triggers, 50% chance is crit, 50% chance is skill.
-func CalcBossAttackType(r *rand.Rand, avgLP float64, skillPool []*EvaluatedItem) BossAttackResult {
-	prob := CalcBossCritSkillProb(avgLP)
+// When critOrSkill triggers, 30% chance is crit, 70% chance is skill.
+func CalcBossAttackType(r *rand.Rand, avgLP float64, bossCurrentHP int, bossMaxHP int, skillPool []*EvaluatedItem) BossAttackResult {
+	prob := CalcBossCritSkillProb(avgLP, bossCurrentHP, bossMaxHP)
 
 	// Normal attack is the default
 	if r.Float64() >= prob {
@@ -42,8 +46,8 @@ func CalcBossAttackType(r *rand.Rand, avgLP float64, skillPool []*EvaluatedItem)
 		}
 	}
 
-	// 50% chance crit, 50% chance skill
-	if r.Float64() < 0.5 || len(skillPool) == 0 {
+	// 30% chance crit, 70% chance skill
+	if r.Float64() < 0.3 || len(skillPool) == 0 {
 		return BossAttackResult{
 			AttackType: "crit",
 			Damage:     2,

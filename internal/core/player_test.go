@@ -308,18 +308,19 @@ func TestAddBuffNil(t *testing.T) {
 	}
 }
 
-func TestAddBuffHiddenImmune(t *testing.T) {
+func TestAddBuffNoHiddenImmunity(t *testing.T) {
+	// AddBuff no longer has hardcoded Hidden immunity.
+	// Hidden immunity is now managed by handleHiddenImmune handler (PhasePreBuffApplied).
 	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
 	player.AddBuff(NewBuff(constants.BuffTypeHidden, 3))
 
-	// Hidden immune to negative buff
+	// Negative buff should now be added (no hardcoded immunity in AddBuff)
 	err := player.AddBuff(NewBuff(constants.BuffTypeCurse, 3))
 	if err != nil {
 		t.Fatalf("AddBuff failed: %v", err)
 	}
-	// Curse buff should not be added
-	if player.HasBuff(constants.BuffTypeCurse) {
-		t.Error("player with Hidden buff should not receive negative buff")
+	if !player.HasBuff(constants.BuffTypeCurse) {
+		t.Error("Curse buff should be added (AddBuff no longer has Hidden immunity)")
 	}
 
 	// Positive buff should be added
@@ -328,7 +329,7 @@ func TestAddBuffHiddenImmune(t *testing.T) {
 		t.Fatalf("AddBuff failed: %v", err)
 	}
 	if !player.HasBuff(constants.BuffTypeDivine) {
-		t.Error("player with Hidden buff should receive positive buff")
+		t.Error("player should receive positive buff")
 	}
 }
 
