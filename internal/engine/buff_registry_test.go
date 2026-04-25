@@ -212,23 +212,35 @@ func TestRainBuffHandlerBehavior(t *testing.T) {
 	game.AddPlayer(player)
 	game.Log.StartTurn(1, 0, player.ID.UUID())
 
-	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
-	ctx := event.NewContext(player)
-	ctx.Set("action_context", actionCtx)
+	// Add Rain buff to player (required for counter persistence in Buff.Metadata)
+	rainBuff := core.NewBuff(constants.BuffTypeRain, 4)
+	player.ActiveBuffs = append(player.ActiveBuffs, rainBuff)
 
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	handler := GetBuffHandlerConfig(constants.BuffTypeRain).Handler
 
-	// First execution - counter 1, no HP change
-	handler(constants.PhaseAfterTurn, ctx)
-	if len(ctx.GetDerivedActions()) != 0 {
-		t.Errorf("Should have no derived actions on first turn, got %d", len(ctx.GetDerivedActions()))
+	// First execution with new context - counter 1 in Buff.Metadata, no HP change
+	ctx1 := event.NewContext(player)
+	ctx1.Set("action_context", actionCtx)
+	handler(constants.PhaseAfterTurn, ctx1)
+	if len(ctx1.GetDerivedActions()) != 0 {
+		t.Errorf("Should have no derived actions on first turn, got %d", len(ctx1.GetDerivedActions()))
+	}
+	if player.HP != 6 {
+		t.Errorf("HP should not change on first turn, got HP=%d", player.HP)
+	}
+	// Verify counter persisted in Buff.Metadata
+	if rainBuff.GetIntOrDefault("buff_turn_counter", 0) != 1 {
+		t.Errorf("buff_turn_counter should be 1 after first call, got %d", rainBuff.GetIntOrDefault("buff_turn_counter", 0))
 	}
 
-	// Second execution - counter reaches 2, HP+1
-	handler(constants.PhaseAfterTurn, ctx)
+	// Second execution with new context - counter reaches 2 in Buff.Metadata, HP+1
+	ctx2 := event.NewContext(player)
+	ctx2.Set("action_context", actionCtx)
+	handler(constants.PhaseAfterTurn, ctx2)
 
 	// Bridge derived actions and process
-	for _, da := range ctx.GetDerivedActions() {
+	for _, da := range ctx2.GetDerivedActions() {
 		if act, ok := da.(engineaction.Action); ok {
 			actionCtx.PushDerivedAction(act)
 		}
@@ -237,6 +249,10 @@ func TestRainBuffHandlerBehavior(t *testing.T) {
 
 	if player.HP != 7 {
 		t.Errorf("HP = %d, expected 7 (HP+1)", player.HP)
+	}
+	// Counter should be reset to 0 after trigger
+	if rainBuff.GetIntOrDefault("buff_turn_counter", 0) != 0 {
+		t.Errorf("buff_turn_counter should be 0 after reset, got %d", rainBuff.GetIntOrDefault("buff_turn_counter", 0))
 	}
 }
 
@@ -249,23 +265,31 @@ func TestCorruptBuffHandlerBehavior(t *testing.T) {
 	game.AddPlayer(player)
 	game.Log.StartTurn(1, 0, player.ID.UUID())
 
-	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
-	ctx := event.NewContext(player)
-	ctx.Set("action_context", actionCtx)
+	// Add Corrupt buff to player (required for counter persistence in Buff.Metadata)
+	corruptBuff := core.NewBuff(constants.BuffTypeCorrupt, 4)
+	player.ActiveBuffs = append(player.ActiveBuffs, corruptBuff)
 
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	handler := GetBuffHandlerConfig(constants.BuffTypeCorrupt).Handler
 
-	// First execution - counter 1, no HP change
-	handler(constants.PhaseAfterTurn, ctx)
-	if len(ctx.GetDerivedActions()) != 0 {
-		t.Errorf("Should have no derived actions on first turn, got %d", len(ctx.GetDerivedActions()))
+	// First execution with new context - counter 1 in Buff.Metadata, no HP change
+	ctx1 := event.NewContext(player)
+	ctx1.Set("action_context", actionCtx)
+	handler(constants.PhaseAfterTurn, ctx1)
+	if len(ctx1.GetDerivedActions()) != 0 {
+		t.Errorf("Should have no derived actions on first turn, got %d", len(ctx1.GetDerivedActions()))
+	}
+	if player.HP != 6 {
+		t.Errorf("HP should not change on first turn, got HP=%d", player.HP)
 	}
 
-	// Second execution - counter reaches 2, HP-1
-	handler(constants.PhaseAfterTurn, ctx)
+	// Second execution with new context - counter reaches 2 in Buff.Metadata, HP-1
+	ctx2 := event.NewContext(player)
+	ctx2.Set("action_context", actionCtx)
+	handler(constants.PhaseAfterTurn, ctx2)
 
 	// Bridge derived actions and process
-	for _, da := range ctx.GetDerivedActions() {
+	for _, da := range ctx2.GetDerivedActions() {
 		if act, ok := da.(engineaction.Action); ok {
 			actionCtx.PushDerivedAction(act)
 		}
@@ -274,6 +298,10 @@ func TestCorruptBuffHandlerBehavior(t *testing.T) {
 
 	if player.HP != 5 {
 		t.Errorf("HP = %d, expected 5 (HP-1)", player.HP)
+	}
+	// Counter should be reset to 0 after trigger
+	if corruptBuff.GetIntOrDefault("buff_turn_counter", 0) != 0 {
+		t.Errorf("buff_turn_counter should be 0 after reset, got %d", corruptBuff.GetIntOrDefault("buff_turn_counter", 0))
 	}
 }
 

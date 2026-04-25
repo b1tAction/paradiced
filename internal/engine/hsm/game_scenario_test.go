@@ -1446,10 +1446,8 @@ func TestScenarioBuff_Curse_LPRevertOnRemoval(t *testing.T) {
 
 // TestScenarioBuff_Rain_Every2TurnsHeal verifies that 甘霖 (Rain) buff
 // heals HP+1 every 2 turns via AfterTurn handler with everyNTurns counter.
-// The counter is stored in event.Context.Metadata, so it persists across
-// handler calls within the same event context.
-// First call: counter=1 (<2) → no heal
-// Second call: counter reaches 2 → heal, counter resets
+// The counter is now stored in Buff.Metadata, so it persists across turns
+// even when HSM creates a new event.Context each turn.
 func TestScenarioBuff_Rain_Every2TurnsHeal(t *testing.T) {
 	harness := NewGameTestHarness(&HarnessConfig{
 		Seed:        42,
@@ -1479,34 +1477,40 @@ func TestScenarioBuff_Rain_Every2TurnsHeal(t *testing.T) {
 
 	initialHP := player.HP
 
-	// Use the same event context for both handler calls (counter persists in context)
-	triggerCtx := event.NewContext(player)
-	triggerCtx.Set("action_context", actionCtx)
+	// Simulate first PhaseAfterTurn with NEW context (like real HSM flow)
+	triggerCtx1 := event.NewContext(player)
+	triggerCtx1.Set("action_context", actionCtx)
+	harness.Game.Bus.Publish(constants.PhaseAfterTurn, player.ID.UUID(), triggerCtx1)
 
-	// First AfterTurn trigger: counter increments to 1 (<2 → no heal)
-	handler := engine.GetBuffHandlerConfig(constants.BuffTypeRain).Handler
-	if err := handler(constants.PhaseAfterTurn, triggerCtx); err != nil {
-		t.Fatalf("Rain handler first call failed: %v", err)
+	// First trigger: counter=1 in Buff.Metadata, should NOT heal
+	if player.HP != initialHP {
+		t.Errorf("Rain should NOT heal on first AfterTurn (counter=1 <2), HP=%d expected %d", player.HP, initialHP)
 	}
 
-	// Should have no derived actions on first trigger
-	if len(triggerCtx.GetDerivedActions()) != 0 {
-		t.Errorf("Rain should NOT produce derived actions on first AfterTurn (counter=1 <2), got %d", len(triggerCtx.GetDerivedActions()))
-	}
-
-	// Counter should be 1 in context
-	counter1, _ := triggerCtx.GetInt("buff_turn_counter")
+	// Verify counter persisted in Buff.Metadata (not context)
+	rainBuff := player.GetBuff(constants.BuffTypeRain)
+	counter1 := rainBuff.GetIntOrDefault("buff_turn_counter", 0)
 	if counter1 != 1 {
-		t.Errorf("buff_turn_counter should be 1 after first AfterTurn, got %d", counter1)
+		t.Errorf("buff_turn_counter should be 1 in Buff.Metadata after first AfterTurn, got %d", counter1)
 	}
 
-	// Second AfterTurn trigger: counter reaches 2 → heal
-	if err := handler(constants.PhaseAfterTurn, triggerCtx); err != nil {
-		t.Fatalf("Rain handler second call failed: %v", err)
+	// Run derived actions from first trigger (should be empty)
+	for _, derived := range triggerCtx1.GetDerivedActions() {
+		if execAction, ok := derived.(engineaction.Action); ok {
+			actionCtx.PushDerivedAction(execAction)
+		}
+	}
+	if err := actionCtx.ProcessQueue(); err != nil {
+		t.Fatalf("ProcessQueue after first AfterTurn failed: %v", err)
 	}
 
-	// Should have derived HealAction on second trigger (counter reached 2)
-	derivedActions := triggerCtx.GetDerivedActions()
+	// Simulate second PhaseAfterTurn with NEW context (counter persists in Buff.Metadata)
+	triggerCtx2 := event.NewContext(player)
+	triggerCtx2.Set("action_context", actionCtx)
+	harness.Game.Bus.Publish(constants.PhaseAfterTurn, player.ID.UUID(), triggerCtx2)
+
+	// Second trigger: counter reaches 2, should produce HealAction derived action
+	derivedActions := triggerCtx2.GetDerivedActions()
 	if len(derivedActions) == 0 {
 		t.Fatal("Rain should produce derived HealAction on second AfterTurn (counter reaches 2)")
 	}
@@ -1525,14 +1529,18 @@ func TestScenarioBuff_Rain_Every2TurnsHeal(t *testing.T) {
 	if player.HP != initialHP+1 {
 		t.Errorf("Rain should heal HP+1 on second AfterTurn, got HP=%d (expected %d)", player.HP, initialHP+1)
 	}
+
+	// Counter should be reset to 0 after trigger
+	counter2 := rainBuff.GetIntOrDefault("buff_turn_counter", 0)
+	if counter2 != 0 {
+		t.Errorf("buff_turn_counter should be 0 after reset, got %d", counter2)
+	}
 }
 
 // TestScenarioBuff_Corrupt_Every2TurnsDamage verifies that 腐化 (Corrupt) buff
 // damages HP-1 every 2 turns via AfterTurn handler with everyNTurns counter.
-// The counter is stored in event.Context.Metadata, so it persists across
-// handler calls within the same event context.
-// First call: counter=1 (<2) → no damage
-// Second call: counter reaches 2 → HP-1, counter resets
+// The counter is now stored in Buff.Metadata, so it persists across turns
+// even when HSM creates a new event.Context each turn.
 func TestScenarioBuff_Corrupt_Every2TurnsDamage(t *testing.T) {
 	harness := NewGameTestHarness(&HarnessConfig{
 		Seed:        42,
@@ -1562,28 +1570,40 @@ func TestScenarioBuff_Corrupt_Every2TurnsDamage(t *testing.T) {
 
 	initialHP := player.HP
 
-	// Use the same event context for both handler calls (counter persists in context)
-	triggerCtx := event.NewContext(player)
-	triggerCtx.Set("action_context", actionCtx)
+	// Simulate first PhaseAfterTurn with NEW context (like real HSM flow)
+	triggerCtx1 := event.NewContext(player)
+	triggerCtx1.Set("action_context", actionCtx)
+	harness.Game.Bus.Publish(constants.PhaseAfterTurn, player.ID.UUID(), triggerCtx1)
 
-	// First AfterTurn trigger: counter=1, <2 → no damage
-	handler := engine.GetBuffHandlerConfig(constants.BuffTypeCorrupt).Handler
-	if err := handler(constants.PhaseAfterTurn, triggerCtx); err != nil {
-		t.Fatalf("Corrupt handler first call failed: %v", err)
+	// First trigger: counter=1 in Buff.Metadata, should NOT damage
+	if player.HP != initialHP {
+		t.Errorf("Corrupt should NOT damage on first AfterTurn (counter=1 <2), HP=%d expected %d", player.HP, initialHP)
 	}
 
-	// Should have no derived actions on first trigger
-	if len(triggerCtx.GetDerivedActions()) != 0 {
-		t.Errorf("Corrupt should NOT produce derived actions on first AfterTurn (counter=1 <2), got %d", len(triggerCtx.GetDerivedActions()))
+	// Verify counter persisted in Buff.Metadata
+	corruptBuff := player.GetBuff(constants.BuffTypeCorrupt)
+	counter1 := corruptBuff.GetIntOrDefault("buff_turn_counter", 0)
+	if counter1 != 1 {
+		t.Errorf("buff_turn_counter should be 1 in Buff.Metadata after first AfterTurn, got %d", counter1)
 	}
 
-	// Second AfterTurn trigger: counter reaches 2 → HP-1
-	if err := handler(constants.PhaseAfterTurn, triggerCtx); err != nil {
-		t.Fatalf("Corrupt handler second call failed: %v", err)
+	// Run derived actions from first trigger (should be empty)
+	for _, derived := range triggerCtx1.GetDerivedActions() {
+		if execAction, ok := derived.(engineaction.Action); ok {
+			actionCtx.PushDerivedAction(execAction)
+		}
+	}
+	if err := actionCtx.ProcessQueue(); err != nil {
+		t.Fatalf("ProcessQueue after first AfterTurn failed: %v", err)
 	}
 
-	// Should have derived DamageAction on second trigger (counter reached 2)
-	derivedActions := triggerCtx.GetDerivedActions()
+	// Simulate second PhaseAfterTurn with NEW context (counter persists in Buff.Metadata)
+	triggerCtx2 := event.NewContext(player)
+	triggerCtx2.Set("action_context", actionCtx)
+	harness.Game.Bus.Publish(constants.PhaseAfterTurn, player.ID.UUID(), triggerCtx2)
+
+	// Second trigger: counter reaches 2, should produce DamageAction derived action
+	derivedActions := triggerCtx2.GetDerivedActions()
 	if len(derivedActions) == 0 {
 		t.Fatal("Corrupt should produce derived DamageAction on second AfterTurn (counter reaches 2)")
 	}
@@ -1601,6 +1621,12 @@ func TestScenarioBuff_Corrupt_Every2TurnsDamage(t *testing.T) {
 	// HP should decrease by 1 after second AfterTurn
 	if player.HP != initialHP-1 {
 		t.Errorf("Corrupt should damage HP-1 on second AfterTurn, got HP=%d (expected %d)", player.HP, initialHP-1)
+	}
+
+	// Counter should be reset to 0 after trigger
+	counter2 := corruptBuff.GetIntOrDefault("buff_turn_counter", 0)
+	if counter2 != 0 {
+		t.Errorf("buff_turn_counter should be 0 after reset, got %d", counter2)
 	}
 }
 
