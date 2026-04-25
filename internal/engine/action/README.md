@@ -210,7 +210,8 @@ type BossDamageAction struct {
 ```
 
 - `CanModify() = false` - Boss damage cannot be intercepted
-- `PreTriggerPhase() = PhaseAnyTime` - Player attacking Boss cannot be intercepted
+- `PreTriggerPhase() = PhasePreDamage` - Thorns handler intercepts at PreDamage on BossPlayer (publishes PhasePreDamage to Boss, Thorns Buff handler pushes derived BossAttackAction for reflect)
+- `PostTriggerPhase() = PhaseAnyTime` - No post-trigger for boss damage
 - `TargetPlayer()` returns `targetPlayer` (Boss player)
 - Used when player is on Boss cell and rolls dice
 
@@ -301,6 +302,10 @@ func (a *DamageAction) PreTriggerPhase() constants.Phase {
     return constants.PhasePreDamage
 }
 func (a *DamageAction) PostTriggerPhase() constants.Phase { return constants.PhaseAnyTime }
+
+// BossDamageAction - 玩家攻击Boss，PreDamage发布到BossPlayer（Thorns handler可响应）
+func (a *BossDamageAction) PreTriggerPhase() constants.Phase { return constants.PhasePreDamage }
+func (a *BossDamageAction) PostTriggerPhase() constants.Phase { return constants.PhaseAnyTime }
 
 // MoveAction - 移动前可被篡改
 func (a *MoveAction) PreTriggerPhase() constants.Phase { return constants.PhasePreMove }

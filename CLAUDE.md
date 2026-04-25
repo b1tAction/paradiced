@@ -323,13 +323,14 @@ Git Commit信息必须使用英文提交
 | 神眷 (Divine) | BeforeTurn | LP+1 per turn |
 | 诅咒 (Curse) | BeforeTurn | LP-1 per turn |
 | 迷途 (Lost) | PreMove (HSM发布) | Reverse movement direction (Steps → -Steps, anti double-flip) |
-| 隐匿 (Hidden) | PreDamage | Immunity to damage/events |
+| 隐匿 (Hidden) | PreDamage, PreBuffApplied | Immunity to damage/events; blocks non-positive, non-Boss buffs (IsBoss/IsPositive bypass) |
 | 甘霖 (Rain) | AfterTurn | HP+1 every 2 turns |
 | 腐化 (Corrupt) | AfterTurn | HP-1 every 2 turns |
 | 辟邪 (Exorcism) | PreEvent | Immune to poison |
 | 毒瘴 (Poison) | BeforeTurn | Bad event each turn |
 | 离火 (Fire) | BeforeTurn | ZhuQue passive, LP+1 every 4 turns |
 | 死亡标记 (DeathMark) | PreAction (Hidden) | Block all actions for dead players (exempt: RespawnAction, RemoveBuffAction(DeathMark)) |
+| 反刺 (Thorns) | PreDamage (Boss self) | Boss reflect: 30% damage back as BossAttackAction (Hidden can block reflect) |
 
 ## Boss System
 
@@ -348,11 +349,12 @@ Git Commit信息必须使用英文提交
 | Thunder (天雷) | AOE damage | All Boss-cell players take 2 damage |
 | Curse (诅咒) | Debuff | All Boss-cell players get Curse buff |
 | Lost (迷雾) | Debuff | All Boss-cell players get Lost buff |
+| Thorns (反刺) | Self-buff | Boss gains Thorns buff (2 turns): reflect 30% damage back |
 | Rest (息) | Heal | Boss heals 5 HP |
 
 ### Boss Attack Mechanics
 
-- Boss crit/skill probability: `0.1 + 0.05 × (8 - avgLP)`
+- Boss crit/skill probability: `0.25 + 0.30 × bossHPRatio` (30/70 crit/skill split)
 - Boss target selection: LP-weighted, lower LP = higher chance of being targeted
 - Player crit rate: based on dice quality (Gold:30%, Silver:20%, Copper:10%, Wood:5%)
 

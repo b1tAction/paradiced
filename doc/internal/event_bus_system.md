@@ -69,17 +69,21 @@ type Phase string  // snake_case values for JSON compatibility
 const (
     // ========== HSM发布的Phase（状态时机） ==========
     // 这些Phase由HSM状态机Enter()方法发布
-    PhaseBeforeTurn  Phase = "before_turn"  // TurnUpkeep.Enter() - 回合开始前（神眷/诅咒 LP±1, 离火每4回合）
-    PhaseOnLand      Phase = "on_land"      // TurnLanded.Enter() - 落地后（落地事件、格子效果）
-    PhaseAfterTurn   Phase = "after_turn"   // TurnEnd.Enter() - 回合结束后（甘霖/腐化 HP±1, TickDuration）
+    PhaseBeforeTurn      Phase = "before_turn"      // TurnUpkeep.Enter() - 回合开始前（神眷/诅咒 LP±1, 离火每4回合）
+    PhaseOnLand          Phase = "on_land"          // TurnLanded.Enter() - 落地后（落地事件、格子效果）
+    PhaseAfterTurn       Phase = "after_turn"       // TurnEnd.Enter() - 回合结束后（甘霖/腐化 HP±1, TickDuration）
 
     // ========== Action发布的Phase（动作时机） ==========
     // 这些Phase由ActionContext.ExecuteAction()发布
-    PhasePreDamage     Phase = "pre_damage"     // DamageAction.Execute() - 伤害应用前（隐匿、护盾拦截）
-    PhasePreEvent      Phase = "pre_event"      // DrawEventAction.Execute() - 事件触发前（辟邪、玄武）
-    PhasePreMove       Phase = "pre_move"       // MoveAction.Execute() - 移动前（迷途反向）
-    PhaseOnBuffApplied Phase = "on_buff_applied" // AddBuffAction.Execute() - Buff添加后（入场效果、连锁反应）
-    PhaseOnBuffRemoved Phase = "on_buff_removed" // RemoveBuffAction.Execute() - Buff移除前（亡语）
+    PhasePreDamage       Phase = "pre_damage"       // DamageAction/BossDamageAction/BossAttackAction - 伤害应用前（隐匿拦截、反刺反伤）
+    PhasePreEvent        Phase = "pre_event"        // DrawEventAction.Execute() - 事件触发前（辟邪、玄武）
+    PhasePreMove         Phase = "pre_move"         // MoveAction.Execute() - 移动前（迷途反向）
+    PhasePreRespawn      Phase = "pre_respawn"      // RespawnAction - 重生前（可拦截）
+    PhasePreBuffApplied  Phase = "pre_buff_applied" // AddBuffAction.PreTrigger() - Buff添加前（隐匿拦截）
+    PhasePostBuffApplied Phase = "post_buff_applied" // AddBuffAction.PostTrigger() - Buff添加后（入场效果、连锁反应）
+    PhasePreBuffRemoved  Phase = "pre_buff_removed" // RemoveBuffAction.PreTrigger() - Buff移除前（亡语）
+    PhasePostBuffRemoved Phase = "post_buff_removed" // RemoveBuffAction.PostTrigger() - Buff移除后
+    PhasePreAction       Phase = "pre_action"       // ActionContext.ExecuteAction() - 任何Action执行前（死亡标记拦截）
 
     // ========== 特殊Phase ==========
     PhaseAnyTime  Phase = "any_time"  // 任何时候可用（道具主动使用）- 玩家手动触发
@@ -92,11 +96,15 @@ const (
 | BeforeTurn | HSM | 回合开始前 | ✓ |
 | OnLand | HSM | 落地后 | ✓ |
 | AfterTurn | HSM | 回合结束后 | ✓ |
-| PreDamage | Action | 受伤前 | ✓ |
+| PreDamage | Action | 伤害应用前（隐匿拦截、反刺反伤） | ✓ |
 | PreEvent | Action | 事件触发前 | ✓ |
 | PreMove | Action | 移动前 | ✓ |
-| OnBuffApplied | Action | Buff添加后 | ✓ |
-| OnBuffRemoved | Action | Buff移除前 | ✓ |
+| PreRespawn | Action | 重生前（可拦截） | ✓ |
+| PreBuffApplied | Action | Buff添加前（隐匿拦截） | ✓ |
+| PostBuffApplied | Action | Buff添加后 | ✓ |
+| PreBuffRemoved | Action | Buff移除前 | ✓ |
+| PostBuffRemoved | Action | Buff移除后 | ✓ |
+| PreAction | Action | 任何Action执行前（死亡标记拦截） | ✓ |
 | AnyTime | - | 任何时候可用 | ❌（主动触发） |
 | ItemUsed | Game | 道具使用时 | ✓ |
 
@@ -211,14 +219,25 @@ func handleLostReverse(phase constants.Phase, ctx *event.Context) {
     ctx.SetBool("reverse_movement", true)
 }
 
-// 隐匿Buff：免疫伤害（在PreDamage时拦截）
+// 隐匿Buff：条件性免疫（PreDamage拦截伤害，PreBuffApplied拦截非positive/non-Boss buff）
 func handleHiddenImmune(phase constants.Phase, ctx *event.Context) {
-    if phase != constants.PhasePreDamage {
-        return
+    if phase == constants.PhasePreDamage {
+        // 阻断伤害 Action
+        ctx.SetBool("action_blocked", true)
+        ctx.SetString("blocked_by", "Buff_Hidden")
+    } else if phase == constants.PhasePreBuffApplied {
+        // 只阻挡非Positive且非Boss的buff
+        // IsBoss buffs (Thorns, DeathMark) 绕过隐匿（游戏机制强制）
+        // Positive buffs (Divine, Rain) 也绕过
+        if raw, ok := ctx.Get("applied_buff_type"); ok {
+            buffType := constants.BuffType(raw.(string))
+            if buffType.IsPositive() || buffType.IsBoss() {
+                return // 允许通过
+            }
+        }
+        ctx.SetBool("action_blocked", true)
+        ctx.SetString("blocked_by", "Buff_Hidden")
     }
-    // 阻断伤害 Action
-    ctx.SetBool("action_blocked", true)
-    ctx.SetString("blocked_by", "Buff_Hidden")
 }
 
 // 神眷Buff：每回合LP+1
@@ -260,13 +279,14 @@ func handleZhuQueFire(phase constants.Phase, ctx *event.Context) {
 | 神眷 | [BeforeTurn] | 50 | false | 自动LP+1 |
 | 诅咒 | [BeforeTurn] | 50 | false | 自动LP-1 |
 | 迷途 | [PreMove] | 100 | false | 自动反向 |
-| 隐匿 | [PreDamage] | 100 | false | 自动免疫（高优先级） |
+| 隐匿 | [PreDamage, PreBuffApplied] | 100 | false | 免疫伤害/事件；PreBuffApplied只阻挡非Positive且非Boss的buff |
 | 辟邪 | [PreEvent] | 80 | false | 自动免疫毒瘴 |
 | 甘霖 | [AfterTurn] | 50 | false | 每2回合HP+1 |
 | 腐化 | [AfterTurn] | 50 | false | 每2回合HP-1 |
 | 毒瘴 | [BeforeTurn] | 30 | false | 每回合恶性事件 |
 | 离火 | [BeforeTurn] | 10 | false | 每4回合LP+1（定制处理器） |
 | 死亡标记 | [PreAction] | 999 | false | 死亡后阻拦后续Action（豁免Respawn/移除自身） |
+| 反刺 | [PreDamage] | 50 | false | Boss自身反刺：30%反伤为衍生BossAttackAction（隐匿可拦截反伤） |
 
 | Item | Phase | Priority | NeedConfirm | 说明 |
 |------|-------|----------|-------------|------|

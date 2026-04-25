@@ -52,8 +52,14 @@ func ExecuteHPChange(ctx *ActionContext, target *Player) {
 | `current_state` | StepsModifier | HSM (TurnMoving) | 当前移动状态实例（迷途修改Steps） | 迷途handler |
 | `draw_bad_event` | bool | Buff_Poison（毒瘴） | 抽取坏事件标志 | DrawEventAction |
 | `block_poison_effect` | bool | Buff_Exorcism（辟邪） | 阻挡毒效果标志 | Event Handler |
-| `applied_buff_type` | string | ActionContext (PostTrigger) | 被添加的Buff类型标识 | Divine/Curse Handler |
+| `applied_buff_type` | string | ActionContext (PreTrigger) | 被添加的Buff类型标识（用于隐匿Handler判断IsPositive/IsBoss） | Hidden Handler |
 | `removed_buff_type` | string | ActionContext (PreTrigger) / HSM (TurnEnd expiry) | 被移除的Buff类型标识 | Divine/Curse Handler |
+
+**反刺(Thorns)反伤机制**：
+- Thorns Handler 在 PhasePreDamage（BossPlayer上）触发
+- 从 `current_action` 获取 BossDamageAction，计算30%反伤（math.Round）
+- 推送衍生 BossAttackAction（Boss→攻击玩家，SourceThornsReflect）
+- 衍生 BossAttackAction 走 PhasePreDamage → 隐匿可拦截反伤
 
 ### Event 效果信号
 

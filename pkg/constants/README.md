@@ -36,19 +36,21 @@ pkg/constants/
 
 ### BuffType - Buff 类型标识
 
-提供 `IsValid()`、`IsPositive()`、`IsNegative()` 方法。
+提供 `IsValid()`、`IsPositive()`、`IsNegative()`、`IsBoss()`、`IsHidden()`、`IsDraw()` 方法。
 
 | 常量 | 值 | 分类 | 说明 |
 |------|-----|------|------|
 | `BuffTypeDivine` | `divine` | Positive | 神眷：LP+1/回合 |
 | `BuffTypeRain` | `rain` | Positive | 甘霖：HP+1/2回合 |
 | `BuffTypeExorcism` | `exorcism` | Positive | 辟邪：免疫毒瘴 |
-| `BuffTypeHidden` | `hidden` | Neutral | 隐匿：免疫伤害/事件 |
+| `BuffTypeHidden` | `hidden` | Neutral | 隐匿：免疫伤害/事件；PreBuffApplied阻挡非Positive且非Boss buff |
 | `BuffTypeFire` | `fire` | Positive | 离火：朱雀被动 |
 | `BuffTypeCurse` | `curse` | Negative | 诅咒：LP-1/回合 |
 | `BuffTypeLost` | `lost` | Negative | 迷途：反向移动 |
 | `BuffTypeCorrupt` | `corrupt` | Negative | 腐化：HP-1/2回合 |
 | `BuffTypePoison` | `poison` | Negative | 毒瘴：每回合恶性事件 |
+| `BuffTypeDeathMark` | `death_mark` | Boss | 死亡标记：阻断死亡玩家所有Action（IsBoss=true，不进入抽签池） |
+| `BuffTypeThorns` | `thorns` | Boss | 反刺：Boss自身30%反伤（IsBoss=true，不进入抽签池） |
 
 ### EventType - Event 类型标识
 
@@ -93,12 +95,15 @@ pkg/constants/
 | HSM | `PhaseBeforeTurn` | `before_turn` | 回合开始前 |
 | HSM | `PhaseOnLand` | `on_land` | 落地后 |
 | HSM | `PhaseAfterTurn` | `after_turn` | 回合结束后 |
-| Action | `PhasePreDamage` | `pre_damage` | 伤害应用前 |
+| Action | `PhasePreDamage` | `pre_damage` | 伤害应用前（隐匿拦截、反刺反伤） |
 | Action | `PhasePreEvent` | `pre_event` | 事件触发前 |
 | Action | `PhasePreMove` | `pre_move` | 移动前 |
 | Action | `PhasePreRespawn` | `pre_respawn` | 重生前（可拦截） |
-| Action | `PhaseOnBuffApplied` | `on_buff_applied` | Buff应用后 |
-| Action | `PhaseOnBuffRemoved` | `on_buff_removed` | Buff移除前 |
+| Action | `PhasePreBuffApplied` | `pre_buff_applied` | Buff添加前（隐匿拦截） |
+| Action | `PhasePostBuffApplied` | `post_buff_applied` | Buff添加后 |
+| Action | `PhasePreBuffRemoved` | `pre_buff_removed` | Buff移除前 |
+| Action | `PhasePostBuffRemoved` | `post_buff_removed` | Buff移除后 |
+| Action | `PhasePreAction` | `pre_action` | 任何Action执行前（死亡标记拦截） |
 | Special | `PhaseAnyTime` | `any_time` | 任意时刻（手动触发，不订阅） |
 | Special | `PhaseItemUsed` | `item_used` | 道具主动使用 |
 
@@ -142,6 +147,7 @@ pkg/constants/
 | `BossSkillThunder` | `thunder` | 天雷：AOE伤害2点 |
 | `BossSkillCurse` | `curse` | 诅咒：所有Boss格玩家获得诅咒Buff |
 | `BossSkillLost` | `lost` | 迷雾：所有Boss格玩家获得迷途Buff |
+| `BossSkillThorns` | `thorns` | 反刺：Boss自身获得反刺Buff（2回合，30%反伤） |
 | `BossSkillRest` | `rest` | 息：Boss恢复5HP |
 
 ### BossAttackType - Boss 攻击类型标识
@@ -201,7 +207,7 @@ pkg/constants/
 - `item_*` - Item 来源
 - `event_*` - Event 来源
 - `faction_*` - Faction 来源
-- `boss_*` - Boss 来源
+- `boss_*` - Boss 来源（包括 `boss_skill_thorns`、`thorns_reflect`）
 - `system_*` + 特殊值 - System 来源
 
 ### Evaluation - 评分系统

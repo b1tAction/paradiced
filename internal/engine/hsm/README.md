@@ -113,7 +113,7 @@ ctx.GetDiceSteps() // 返回 5
 | TurnLanded | 落地处理：CellType 行为矩阵、触发 OnLand、捕获 DrawType 配置 | PhaseOnLand |
 | TurnDraw | 概率抽取：根据 cell 的 DrawType 和 prob 配置进行事件/道具抽取 | PhasePreEvent (DrawEventAction) |
 | TurnBossBattle | Boss 战斗：玩家攻击Boss/Boss反击（Boss格玩家或Boss回合） | - |
-| TurnEnd | 回合结束：触发 AfterTurn、TickBuffs（Boss跳过AfterTurn） | PhaseAfterTurn |
+| TurnEnd | 回合结束：触发 AfterTurn、TickBuffs（Boss只TickBuffs不触发AfterTurn） | PhaseAfterTurn |
 
 ### TurnDrawState 详解
 
@@ -193,7 +193,7 @@ TurnEnd
 | AfterTurn | HSM | TurnEnd.Enter() |
 | PreMove | HSM | TurnMoving.Enter() |
 | PreEvent | Action | DrawEventAction.Execute() |
-| PreDamage | Action | DamageAction.Execute() |
+| PreDamage | Action | DamageAction / BossDamageAction / BossAttackAction |
 | ItemUsed | Game | Game.UseItem() |
 
 ## 与 Action 系统集成

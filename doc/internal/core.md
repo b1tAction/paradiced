@@ -90,9 +90,10 @@ type BuffDefinition struct {
     Name        string               `json:"name"`
     Desc        string               `json:"desc"`
     Duration    int                  `json:"duration"`      // -1 表示永久
-    Hidden      bool                 `json:"hidden"`        // 隐藏Buff：无抽签，不发送给客户端
 }
 ```
+
+**注意**：`Hidden` 字段已移除。BuffType 分类方法（`IsBoss()`、`IsHidden()`、`IsDraw()`）替代了原有的 `Hidden` 字段功能。Boss Buff（Thorns、DeathMark）通过 `IsBoss()` 判断是否为游戏机制强制 Buff，不进入抽签池且不发送给客户端。
 
 ### EventDefinition
 
@@ -194,7 +195,7 @@ func NewPlayer(config PlayerConfig) *Player
 ### 1. 数值逻辑
 
 ```go
-// 扣血（隐匿免疫）
+// 扣血
 player.ApplyDamage(amount) error
 
 // 回血
@@ -207,7 +208,7 @@ player.ModifyLP(amount)
 ### 2. Buff 管理
 
 ```go
-player.AddBuff(buff)                    // 添加 Buff
+player.AddBuff(buff)                    // 添加 Buff（无硬编码隐匿免疫，由Handler管理）
 player.RemoveBuff(buffType)             // 移除指定类型 Buff
 player.HasBuff(constants.BuffTypeFire)  // 检查是否有 Buff
 player.GetBuff(constants.BuffTypeFire)  // 获取 Buff 实例
