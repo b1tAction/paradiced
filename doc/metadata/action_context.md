@@ -76,6 +76,10 @@ func (ctx *ActionContext) ExecuteAction(action Action) error {
         preCtx.Set("current_action", action)
         preCtx.Set("action_context", ctx)
         ctx.EventBus.Publish(constants.PhasePreAction, targetPlayer.ID.UUID(), preCtx)
+        // 检查 PhasePreAction handler 错误
+        if preCtx.HasError() {
+            return preCtx.FirstError()
+        }
         if preCtx.GetBoolOrDefault("action_blocked", false) {
             // 阻拦时仍收集衍生Action
             return nil
