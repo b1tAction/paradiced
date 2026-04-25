@@ -658,3 +658,116 @@ func TestDivineHandlerWrongPhase(t *testing.T) {
 		t.Error("Divine handler should not produce actions on wrong phase")
 	}
 }
+
+// ========== DeathMark Handler Tests ==========
+
+func TestDeathMarkBlockRespawnAction(t *testing.T) {
+	// RespawnAction must NOT be blocked by DeathMark
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.IsDead = true
+	ctx := event.NewContext(player)
+	ctx.Set("current_action", engineaction.NewRespawnAction(player, 30, "BossAttackRespawn"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeDeathMark).Handler
+	err := handler(constants.PhasePreAction, ctx)
+	if err != nil {
+		t.Fatalf("DeathMark handler should not return error for RespawnAction: %v", err)
+	}
+
+	// RespawnAction should NOT be blocked
+	if ctx.GetBoolOrDefault("action_blocked", false) {
+		t.Error("RespawnAction should not be blocked by DeathMark")
+	}
+}
+
+func TestDeathMarkBlockRemoveDeathMarkAction(t *testing.T) {
+	// RemoveBuffAction(DeathMark) must NOT be blocked (removing self should not block itself)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.IsDead = true
+	ctx := event.NewContext(player)
+	ctx.Set("current_action", engineaction.NewRemoveBuffAction(player, constants.BuffTypeDeathMark, "DeathMarkCleanup"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeDeathMark).Handler
+	err := handler(constants.PhasePreAction, ctx)
+	if err != nil {
+		t.Fatalf("DeathMark handler should not return error for RemoveBuffAction(DeathMark): %v", err)
+	}
+
+	// RemoveBuffAction(DeathMark) should NOT be blocked
+	if ctx.GetBoolOrDefault("action_blocked", false) {
+		t.Error("RemoveBuffAction(DeathMark) should not be blocked by DeathMark")
+	}
+}
+
+func TestDeathMarkBlockRemoveOtherBuffAction(t *testing.T) {
+	// RemoveBuffAction for OTHER buffs should still be blocked
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.IsDead = true
+	ctx := event.NewContext(player)
+	ctx.Set("current_action", engineaction.NewRemoveBuffAction(player, constants.BuffTypeDivine, "Buff_Expiry"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeDeathMark).Handler
+	err := handler(constants.PhasePreAction, ctx)
+	if err != nil {
+		t.Fatalf("DeathMark handler should not return error: %v", err)
+	}
+
+	// RemoveBuffAction(Divine) should be blocked
+	if !ctx.GetBoolOrDefault("action_blocked", false) {
+		t.Error("RemoveBuffAction(Divine) should be blocked by DeathMark")
+	}
+}
+
+func TestDeathMarkBlockDamageAction(t *testing.T) {
+	// DamageAction should be blocked by DeathMark
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.IsDead = true
+	ctx := event.NewContext(player)
+	ctx.Set("current_action", engineaction.NewDamageAction(player, 3, "TestKill"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeDeathMark).Handler
+	err := handler(constants.PhasePreAction, ctx)
+	if err != nil {
+		t.Fatalf("DeathMark handler should not return error: %v", err)
+	}
+
+	if !ctx.GetBoolOrDefault("action_blocked", false) {
+		t.Error("DamageAction should be blocked by DeathMark")
+	}
+}
+
+func TestDeathMarkBlockNilActionContext(t *testing.T) {
+	// When current_action is missing, block by default
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.IsDead = true
+	ctx := event.NewContext(player)
+	// No current_action set
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeDeathMark).Handler
+	err := handler(constants.PhasePreAction, ctx)
+	if err != nil {
+		t.Fatalf("DeathMark handler should not return error: %v", err)
+	}
+
+	if !ctx.GetBoolOrDefault("action_blocked", false) {
+		t.Error("Missing current_action should default to blocking")
+	}
+}
+
+func TestDeathMarkBlockNonPreActionPhase(t *testing.T) {
+	// DeathMark handler should not act on phases other than PhasePreAction
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+	ctx.Set("current_action", engineaction.NewDamageAction(player, 3, "Test"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeDeathMark).Handler
+	err := handler(constants.PhaseBeforeTurn, ctx)
+	if err != nil {
+		t.Fatalf("DeathMark handler should not return error on wrong phase: %v", err)
+	}
+
+	// Should NOT block on wrong phase
+	if ctx.GetBoolOrDefault("action_blocked", false) {
+		t.Error("DeathMark should not block actions on non-PhasePreAction phases")
+	}
+}
