@@ -133,7 +133,9 @@ func (a *HealAction) Execute(ctx *ActionContext) error {
 	if a.targetPlayer == nil {
 		return errors.NewActionExecutionError("heal", "", "target player is nil", nil)
 	}
-	a.targetPlayer.Heal(a.Amount)
+	if err := a.targetPlayer.Heal(a.Amount); err != nil {
+		return errors.NewActionExecutionError("heal", a.targetPlayer.ID.UUID(), "failed to heal", err)
+	}
 	return nil
 }
 
@@ -531,7 +533,9 @@ func (a *StealBuffAction) Execute(ctx *ActionContext) error {
 	// Take first buff (in real implementation, would be random selection)
 	stolen := a.targetPlayer.ActiveBuffs[0]
 	a.targetPlayer.RemoveBuff(stolen.Type)
-	a.SourcePlayer.AddBuff(stolen)
+	if err := a.SourcePlayer.AddBuff(stolen); err != nil {
+		return errors.NewActionExecutionError("steal_buff", a.SourcePlayer.ID.UUID(), "failed to add stolen buff to source player", err)
+	}
 	a.StolenBuff = stolen
 
 	return nil
@@ -706,7 +710,9 @@ func (a *DrawItemAction) Execute(ctx *ActionContext) error {
 	// Add drawn item to player's inventory
 	if a.DrawnType != constants.ItemTypeNone && a.DrawnType.IsValid() {
 		newItem := core.NewItem(a.DrawnType)
-		a.targetPlayer.AddItem(newItem)
+		if err := a.targetPlayer.AddItem(newItem); err != nil {
+			return errors.NewActionExecutionError("draw_item", a.targetPlayer.ID.UUID(), "failed to add drawn item to inventory", err)
+		}
 	}
 
 	return nil
@@ -763,7 +769,9 @@ func (a *RespawnAction) Execute(ctx *ActionContext) error {
 	if a.targetPlayer == nil {
 		return errors.NewActionExecutionError("respawn", "", "target player is nil", nil)
 	}
-	a.targetPlayer.Respawn(a.CheckpointPos)
+	if err := a.targetPlayer.Respawn(a.CheckpointPos); err != nil {
+		return errors.NewActionExecutionError("respawn", a.targetPlayer.ID.UUID(), "failed to respawn", err)
+	}
 	return nil
 }
 
@@ -885,6 +893,9 @@ func (a *DeathAction) PostTriggerPhase() constants.Phase {
 func (a *DeathAction) Execute(ctx *ActionContext) error {
 	// Add DeathMark buff via OnAddBuff callback (like AddBuffAction)
 	// DeathMark blocks all subsequent Actions via PhasePreAction on EventBus.
+	if a.targetPlayer == nil {
+		return errors.NewActionExecutionError("death", "", "target player is nil", nil)
+	}
 	if ctx.OnAddBuff == nil {
 		return errors.NewActionExecutionError("death", a.targetPlayer.ID.UUID(), "OnAddBuff callback is nil", nil)
 	}
