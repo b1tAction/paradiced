@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/b1tAction/paradiced/internal/core"
@@ -54,6 +55,7 @@ func TestBuffHandlerConfigPhases(t *testing.T) {
 		{constants.BuffTypeExorcism, constants.PhasePreEvent, true, 80, false},
 		{constants.BuffTypePoison, constants.PhaseBeforeTurn, true, 30, false},
 		{constants.BuffTypeDeathMark, constants.PhasePreAction, true, 999, false},
+		{constants.BuffTypeThorns, constants.PhasePreDamage, true, 50, false},
 	}
 
 	for _, tt := range tests {
@@ -540,7 +542,7 @@ func (m *mockStepsModifier) SetSteps(steps int) {
 // ========== Edge Case Tests: nil player/context ==========
 
 func TestHandlerWithNilContext(t *testing.T) {
-	// All handlers should gracefully handle nil context
+	// All handlers should gracefully handle nil context (no panic)
 	buffTypes := GetAllBuffTypes()
 	for _, bt := range buffTypes {
 		handler := GetBuffHandlerConfig(bt).Handler
@@ -553,7 +555,7 @@ func TestHandlerWithNilContext(t *testing.T) {
 }
 
 func TestHandlerWithNilPlayer(t *testing.T) {
-	// All handlers should gracefully handle nil player in context
+	// All handlers should gracefully handle nil player in context (no panic, no derived actions)
 	buffTypes := GetAllBuffTypes()
 	for _, bt := range buffTypes {
 		handler := GetBuffHandlerConfig(bt).Handler
@@ -797,5 +799,247 @@ func TestDeathMarkBlockNonPreActionPhase(t *testing.T) {
 	// Should NOT block on wrong phase
 	if ctx.GetBoolOrDefault("action_blocked", false) {
 		t.Error("DeathMark should not block actions on non-PhasePreAction phases")
+	}
+}
+
+// ========== Thorns Buff Handler Tests ==========
+
+func TestThornsReflectHandler(t *testing.T) {
+	// Thorns handler should push derived BossAttackAction for reflect damage
+	// Thorns buff is on BossPlayer, ctx.Player = BossPlayer (PreDamage publishes to BossPlayer)
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	bossPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 50})
+	bossPlayer.HP = 50
+
+	game.AddPlayer(player)
+	game.AddPlayer(bossPlayer)
+
+	// Apply Thorns buff to BossPlayer (Boss gives itself Thorns)
+	thornsBuff := core.NewBuff(constants.BuffTypeThorns, 2)
+	game.ApplyBuffToPlayer(bossPlayer, thornsBuff)
+
+	// Create BossDamageAction (player attacks Boss)
+	bossDamageAction := engineaction.NewBossDamageAction(
+		player, bossPlayer, 4, false, string(constants.SourceBossDamage),
+	)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(bossPlayer) // ctx.Player = BossPlayer (PreDamage published to BossPlayer)
+	ctx.Set("current_action", bossDamageAction)
+	ctx.Set("action_context", actionCtx)
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeThorns).Handler
+	handler(constants.PhasePreDamage, ctx)
+
+	// Should produce one derived BossAttackAction (reflect 4*30%=1.2→rounded=1)
+	derivedActions := ctx.GetDerivedActions()
+	if len(derivedActions) != 1 {
+		t.Fatalf("Expected 1 derived action, got %d", len(derivedActions))
+	}
+
+	reflectAction, ok := derivedActions[0].(*engineaction.BossAttackAction)
+	if !ok {
+		t.Fatalf("Derived action should be BossAttackAction, got %T", derivedActions[0])
+	}
+
+	if reflectAction.Damage != 1 {
+		t.Errorf("Reflect damage = %d, expected 1 (4*0.3 rounded)", reflectAction.Damage)
+	}
+
+	if reflectAction.SourceID != string(constants.SourceThornsReflect) {
+		t.Errorf("Reflect source = %s, expected %s", reflectAction.SourceID, string(constants.SourceThornsReflect))
+	}
+}
+
+func TestThornsReflectDamageCalculation(t *testing.T) {
+	// Test reflect damage rounding: 30% with math.Round
+	// Thorns buff is on BossPlayer, ctx.Player = BossPlayer
+	tests := []struct {
+		damage        int
+		expectedReflect int
+	}{
+		{1, 0},  // 1*0.3=0.3 → rounded=0 → no reflect
+		{2, 1},  // 2*0.3=0.6 → rounded=1
+		{4, 1},  // 4*0.3=1.2 → rounded=1
+		{6, 2},  // 6*0.3=1.8 → rounded=2
+		{10, 3}, // 10*0.3=3.0 → rounded=3
+	}
+
+	game := NewGame(id.NewGameID(), 0)
+	bossPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 50})
+	game.AddPlayer(bossPlayer)
+
+	// Apply Thorns buff to BossPlayer
+	thornsBuff := core.NewBuff(constants.BuffTypeThorns, 2)
+	game.ApplyBuffToPlayer(bossPlayer, thornsBuff)
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeThorns).Handler
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("damage_%d", tt.damage), func(t *testing.T) {
+			player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+			game.AddPlayer(player)
+
+			bossDamageAction := engineaction.NewBossDamageAction(
+				player, bossPlayer, tt.damage, false, string(constants.SourceBossDamage),
+			)
+
+			ctx := event.NewContext(bossPlayer) // ctx.Player = BossPlayer
+			ctx.Set("current_action", bossDamageAction)
+
+			handler(constants.PhasePreDamage, ctx)
+
+			derivedActions := ctx.GetDerivedActions()
+			if tt.expectedReflect == 0 {
+				if len(derivedActions) != 0 {
+					t.Errorf("damage=%d: expected 0 derived actions, got %d", tt.damage, len(derivedActions))
+				}
+			} else {
+				if len(derivedActions) != 1 {
+					t.Fatalf("damage=%d: expected 1 derived action, got %d", tt.damage, len(derivedActions))
+				}
+				reflectAction, ok := derivedActions[0].(*engineaction.BossAttackAction)
+				if !ok {
+					t.Fatalf("damage=%d: derived action should be BossAttackAction", tt.damage)
+				}
+				if reflectAction.Damage != tt.expectedReflect {
+					t.Errorf("damage=%d: reflect damage = %d, expected %d", tt.damage, reflectAction.Damage, tt.expectedReflect)
+				}
+			}
+
+			// Clean up player for next iteration
+			game.RemovePlayer(player.ID)
+		})
+	}
+}
+
+func TestThornsReflectWrongPhase(t *testing.T) {
+	// Thorns handler should only work on PhasePreDamage
+	game := NewGame(id.NewGameID(), 0)
+	bossPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 50})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	game.AddPlayer(bossPlayer)
+	game.AddPlayer(player)
+
+	thornsBuff := core.NewBuff(constants.BuffTypeThorns, 2)
+	game.ApplyBuffToPlayer(bossPlayer, thornsBuff)
+
+	bossDamageAction := engineaction.NewBossDamageAction(
+		player, bossPlayer, 4, false, string(constants.SourceBossDamage),
+	)
+
+	ctx := event.NewContext(bossPlayer)
+	ctx.Set("current_action", bossDamageAction)
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeThorns).Handler
+	handler(constants.PhaseBeforeTurn, ctx) // Wrong phase
+
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Thorns handler should not produce actions on wrong phase")
+	}
+}
+
+func TestThornsReflectNoBossDamageAction(t *testing.T) {
+	// Thorns handler should not produce actions without BossDamageAction in context
+	bossPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 50})
+	thornsBuff := core.NewBuff(constants.BuffTypeThorns, 2)
+
+	game := NewGame(id.NewGameID(), 0)
+	game.AddPlayer(bossPlayer)
+	game.ApplyBuffToPlayer(bossPlayer, thornsBuff)
+
+	ctx := event.NewContext(bossPlayer)
+	// No current_action set
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeThorns).Handler
+	handler(constants.PhasePreDamage, ctx)
+
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Thorns handler should not produce actions without BossDamageAction")
+	}
+}
+
+func TestThornsReflectNoThornsBuff(t *testing.T) {
+	// Thorns handler should not produce reflect if BossPlayer doesn't have Thorns buff
+	bossPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 50})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+
+	game := NewGame(id.NewGameID(), 0)
+	game.AddPlayer(bossPlayer)
+	game.AddPlayer(player)
+
+	// BossPlayer does NOT have Thorns buff
+	bossDamageAction := engineaction.NewBossDamageAction(
+		player, bossPlayer, 4, false, string(constants.SourceBossDamage),
+	)
+
+	ctx := event.NewContext(bossPlayer) // ctx.Player = BossPlayer
+	ctx.Set("current_action", bossDamageAction)
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeThorns).Handler
+	handler(constants.PhasePreDamage, ctx)
+
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Thorns handler should not produce reflect if BossPlayer doesn't have Thorns buff")
+	}
+}
+
+func TestThornsReflectNotBossDamageAction(t *testing.T) {
+	// Thorns handler should not produce actions when current_action is not BossDamageAction
+	bossPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 50})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+
+	game := NewGame(id.NewGameID(), 0)
+	game.AddPlayer(bossPlayer)
+	game.AddPlayer(player)
+
+	thornsBuff := core.NewBuff(constants.BuffTypeThorns, 2)
+	game.ApplyBuffToPlayer(bossPlayer, thornsBuff)
+
+	// Use DamageAction instead of BossDamageAction
+	damageAction := engineaction.NewDamageAction(player, 4, "TestDamage")
+
+	ctx := event.NewContext(bossPlayer)
+	ctx.Set("current_action", damageAction) // Not a BossDamageAction
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeThorns).Handler
+	handler(constants.PhasePreDamage, ctx)
+
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Thorns handler should not produce actions when current_action is not BossDamageAction")
+	}
+}
+
+// ========== Hidden Immune IsBoss Bypass Tests ==========
+
+func TestHiddenImmuneIsBossBypass(t *testing.T) {
+	// IsBoss buffs (Thorns, DeathMark) should bypass Hidden immunity
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+
+	tests := []struct {
+		buffType    constants.BuffType
+		shouldBlock bool
+	}{
+		{constants.BuffTypeThorns, false},    // IsBoss → bypass Hidden
+		{constants.BuffTypeDeathMark, false},  // IsBoss → bypass Hidden
+		{constants.BuffTypeCurse, true},       // Negative → blocked by Hidden
+		{constants.BuffTypeDivine, false},     // Positive → bypass Hidden
+	}
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeHidden).Handler
+
+	for _, tt := range tests {
+		t.Run(string(tt.buffType), func(t *testing.T) {
+			ctx := event.NewContext(player)
+			ctx.Set("applied_buff_type", string(tt.buffType))
+
+			handler(constants.PhasePreBuffApplied, ctx)
+
+			blocked := ctx.GetBoolOrDefault("action_blocked", false)
+			if blocked != tt.shouldBlock {
+				t.Errorf("BuffType(%s): action_blocked = %v, expected %v", tt.buffType, blocked, tt.shouldBlock)
+			}
+		})
 	}
 }
