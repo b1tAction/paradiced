@@ -50,34 +50,30 @@ NakamaMatchHandler.MatchInit()
 
 | OpCode | Handler | HSM Method | 状态 |
 |--------|---------|------------|------|
-| OpRollDice | handleRollDice | hsm.OnRollDice | StateMainAction |
-| OpUseItem | handleUseItem | hsm.OnUseItem | StateMainAction |
-| OpMiniGameResult | handleMiniGameResult | hsm.OnMiniGameResult | StateRoundMiniGame |
-| OpUserChoice | handleUserChoice | hsm.OnUserChoice | StateWaitDecision |
+| OpRollDice (100) | handleRollDice | hsm.OnRollDice(ctx) | StateMainAction |
+| OpUseItem (101) | handleUseItem | hsm.OnUseItem(ctx) | StateMainAction |
+| OpUseSkill (102) | handleUseSkill | hsm.OnUseSkill(ctx) | StateMainAction |
+| OpUserChoice (103) | handleUserChoice | hsm.OnUserChoice | StateWaitDecision |
+| OpStartGame (105) | handleStartGame | hsm.Start | StateWaitingForHost |
+| OpRoundReady (106) | handleRoundReady | hsm.OnRoundReady | StateRoundEndWait |
+| OpMiniGameDataSubmit (107) | handleMiniGameDataSubmit | hsm.OnMiniGameDataSubmit | StateRoundMiniGame |
 
 ```go
-// handleRollDice 示例
+// handleRollDice 示例 - Steps 由 RollDiceAction 内部计算
 func (h *NakamaMatchHandler) handleRollDice(sender string) error {
     player := h.GetPlayer(sender)
-    
+
     // 检查状态
-    if h.hsm.GetCurrentStateID() != hsm.StateMainAction {
+    if h.hsm.GetTurnStateID() != hsm.StateMainAction {
         return nil
     }
-    
-    // 掷骰子
-    steps := h.diceMgr.RollSpecialDice(sender)
-    
-    // 创建完整的 ctx
-    builder := net.NewBuilder(h.hsm)
-    ctx := hsm.NewStateContext()
-        .WithHSM(h.hsm)
+
+    // 创建 StateContext（Steps 由 HSM 内部 RollDiceAction 计算）
+    ctx := h.hsm.NewStateContext()
         .WithPlayer(player)
-        .WithBroadcast(NewNakamaBroadcastAdapter(h))
-        .WithBuilder(builder)  // ⭐
-    
-    // 调用 HSM
-    return h.hsm.OnRollDice(steps, ctx)
+
+    // 调用 HSM（无 steps 参数）
+    return h.hsm.OnRollDice(ctx)
 }
 ```
 
@@ -170,13 +166,17 @@ TurnEndState.Enter(ctx)
 
 | 阶段 | State.Enter | Builder 方法 | Broadcast 方法 | OpCode |
 |------|-------------|--------------|----------------|--------|
-| MatchInit | MatchInitState.Enter | BuildStateSync | BroadcastStateSync | OpStateSync |
-| MiniGame | RoundMiniGameState.Enter | BuildStateSync | BroadcastMiniGameStart | OpMiniGameStart |
-| TurnUpkeep | TurnUpkeepState.Enter | BuildStateSync | BroadcastStateSync | OpStateSync |
-| MainAction | MainActionState.Enter | BuildAvailable | SendAvailable | OpAvailable |
+| MatchInit | MatchInitState.Enter | BuildStateSync | BroadcastStateSync | OpStateSync (1) |
+| WaitingForHost | WaitingForHostState.Enter | BuildStateSync | BroadcastWaitingSync | OpWaitingSync (10) |
+| MiniGame | RoundMiniGameState.Enter | BuildStateSync | BroadcastMiniGameStart | OpMiniGameStart (5) |
+| RoundPrep | RoundPrepState.Enter | BuildStateSync | BroadcastStateSync | OpStateSync (1) |
+| TurnUpkeep | TurnUpkeepState.Enter | BuildStateSync | BroadcastStateSync | OpStateSync (1) |
+| MainAction | MainActionState.Enter | BuildAvailable | SendAvailable | OpAvailable (4) |
 | TurnMoving | TurnMovingState.Enter (PhasePreMove) | - | - | - (纯移动，不单独广播) |
-| TurnLanded | TurnLandedState.Enter (PhaseOnLand) | BuildStateSync | BroadcastStateSync | OpStateSync |
-| TurnDraw | TurnDrawState.Enter (DrawEvent/DrawItem) | BuildStateSync | BroadcastStateSync | OpStateSync |
-| TurnBossBattle | TurnBossBattleState.Enter | BuildStateSync | BroadcastStateSync | OpStateSync |
-| TurnEnd | TurnEndState.Enter | BuildStateSync | BroadcastStateSync | OpStateSync |
-| GameOver | GameOverState.Enter | BuildStateSync | BroadcastGameOver | OpGameOver |
+| TurnLanded | TurnLandedState.Enter (PhaseOnLand) | BuildStateSync | BroadcastStateSync | OpStateSync (1) |
+| TurnDraw | TurnDrawState.Enter (DrawEvent/DrawItem) | BuildStateSync | BroadcastStateSync | OpStateSync (1) |
+| TurnBossBattle | TurnBossBattleState.Enter | BuildStateSync | BroadcastStateSync | OpStateSync (1) |
+| TurnEnd | TurnEndState.Enter | BuildStateSync | BroadcastStateSync | OpStateSync (1) |
+| GameOver | GameOverState.Enter | BuildStateSync | BroadcastGameOver | OpGameOver (7) |
+| ActionRejected | - | - | SendActionRejected | OpActionRejected (9) |
+| StartGameAck | - | BuildFullSyncStateSync + BuildMapInfo | BroadcastStartGameAck | OpStartGameAck (11) |

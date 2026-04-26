@@ -113,25 +113,31 @@ Match Handler 核心结构，管理游戏生命周期：
 ```go
 type NakamaMatchHandler struct {
     // 核心组件
-    game      *engine.Game       // 游戏实例
-    hsm       *hsm.HSM           // 分层状态机
+    hsm       *hsm.HSM           // 分层状态机（Game通过hsm.GetGame()访问）
     mapEngine *gamemap.MapEngine // 地图引擎
-    diceMgr   *rng.DiceManager   // 骰子管理器
 
     // 消息分发器
     dispatcher DispatcherAdapter // SDK 隔离接口
 
     // Match 标识
     matchID string // Nakama Match ID
+    logger  runtime.Logger // Nakama日志
 
     // 玩家管理
     players    map[string]*core.Player // userID -> Player
     playerList []string                // 按加入顺序的玩家列表
+    disconnected map[string]bool       // userID -> 是否断线
 
-    // 配置
-    maxPlayers  int    // 最大玩家数（默认 4）
-    mapLength   int    // 地图长度（默认 100）
-    randomSeed  int64  // 随机种子
+    // 房主和启动控制
+    hostUserID    string // 房主用户ID
+    startRequested bool  // 是否已请求启动
+
+    // 配置和数据
+    maxPlayers  int              // 最大玩家数（默认 4）
+    mapLength   int              // 地图长度（默认 100）
+    randomSeed  int64            // 随机种子
+    mapConfig   *net.MapConfig   // 地图配置（用于StartGameAck）
+    lastDecisionID string        // 最近DecisionID（避免重复发送）
 }
 ```
 
@@ -211,6 +217,8 @@ func (h *NakamaMatchHandler) HandleMessage(sender string, data []byte) error {
         return h.handleUserChoice(sender, data)
     case strconv.FormatInt(int64(net.OpMiniGameDataSubmit), 10):
         return h.handleMiniGameDataSubmit(sender, data)
+    case strconv.FormatInt(int64(net.OpStartGame), 10):
+        return h.handleStartGame(sender)
     case strconv.FormatInt(int64(net.OpRoundReady), 10):
         return h.handleRoundReady(sender)
     default:
@@ -234,18 +242,15 @@ func (h *NakamaMatchHandler) handleRollDice(sender string) error {
     }
 
     // 检查是否在 MainAction 状态
-    if h.hsm.GetCurrentStateID() != hsm.StateMainAction {
+    if h.hsm.GetTurnStateID() != hsm.StateMainAction {
         return nil
     }
 
-    // 使用 DiceManager 计算骰子结果
-    steps := h.diceMgr.RollSpecialDice(sender)
+    // 创建 StateContext（Steps 由 HSM 内部 RollDiceAction 计算）
+    ctx := h.hsm.NewStateContext().WithPlayer(player)
 
-    // 通知 HSM（实际实现）
-    // ctx := hsm.NewStateContext().WithPlayer(player)
-    // h.hsm.OnRollDice(steps, ctx)
-
-    return nil
+    // 通知 HSM（无 steps 参数）
+    return h.hsm.OnRollDice(ctx)
 }
 ```
 

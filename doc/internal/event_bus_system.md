@@ -19,6 +19,7 @@ EventBus + Decision 系统是《派乐代》游戏的统一触发机制框架，
 ```
 pkg/constants/
 ├── phase.go          # Phase枚举定义（触发时机）
+├── action.go         # ActionType枚举定义
 
 internal/event/
 ├── bus.go            # EventBus结构和方法
@@ -32,8 +33,10 @@ pkg/gamelog/
 ├── log.go            # GameLog全局日志管理器
 ├── log_test.go       # 单元测试
 
-pkg/action/
-├── action.go         # ActionType（string类型，snake_case命名）、Action接口
+internal/engine/action/
+├── types.go          # ActionType（string类型，snake_case命名）、Action接口、具体Action类型
+├── context.go        # ActionContext（与全局GameLog集成）
+├── queue.go          # 衍生动作队列
 
 internal/core/
 ├── buff.go           # Buff结构 + BuffDefinition（静态元数据）
@@ -84,6 +87,7 @@ const (
     PhasePreBuffRemoved  Phase = "pre_buff_removed" // RemoveBuffAction.PreTrigger() - Buff移除前（亡语）
     PhasePostBuffRemoved Phase = "post_buff_removed" // RemoveBuffAction.PostTrigger() - Buff移除后
     PhasePreAction       Phase = "pre_action"       // ActionContext.ExecuteAction() - 任何Action执行前（死亡标记拦截）
+    PhasePreDiceRoll     Phase = "pre_dice_roll"     // RollDiceAction.PreTrigger() - 骰子结果前（可拦截修改Steps）
 
     // ========== 特殊Phase ==========
     PhaseAnyTime  Phase = "any_time"  // 任何时候可用（道具主动使用）- 玩家手动触发
@@ -98,13 +102,14 @@ const (
 | AfterTurn | HSM | 回合结束后 | ✓ |
 | PreDamage | Action | 伤害应用前（隐匿拦截、反刺反伤） | ✓ |
 | PreEvent | Action | 事件触发前 | ✓ |
-| PreMove | Action | 移动前 | ✓ |
+| PreMove | Action | 移动前（迷途反向） | ✓ |
 | PreRespawn | Action | 重生前（可拦截） | ✓ |
 | PreBuffApplied | Action | Buff添加前（隐匿拦截） | ✓ |
 | PostBuffApplied | Action | Buff添加后 | ✓ |
 | PreBuffRemoved | Action | Buff移除前 | ✓ |
 | PostBuffRemoved | Action | Buff移除后 | ✓ |
 | PreAction | Action | 任何Action执行前（死亡标记拦截） | ✓ |
+| PreDiceRoll | Action | 骰子结果前（可拦截修改Steps） | ✓ |
 | AnyTime | - | 任何时候可用 | ❌（主动触发） |
 | ItemUsed | Game | 道具使用时 | ✓ |
 
@@ -149,12 +154,13 @@ GlobalBuffRegistry.RegisterBuff(&BuffDefinition{
 })
 ```
 
-Buff 实例存储多个订阅ID：
+Buff 实例使用 `*util.Metadata` 存储动态属性（如 everyNTurns 计数器）：
 ```go
 type Buff struct {
-    Type            BuffType
-    SubscriptionIDs []string  // 多订阅ID（UUID字符串）
-    // ...
+    Type         constants.BuffType `json:"type"`
+    ID           id.BuffID          `json:"id"`            // Buff instance ID (UUID v7)
+    Duration     int                `json:"duration"`      // Remaining duration (-1 for permanent)
+    *util.Metadata                  // Per-buff state storage (e.g. everyNTurns counter)
 }
 ```
 
@@ -254,13 +260,9 @@ func handleLostReverse(phase constants.Phase, ctx *event.Context) {
     ctx.SetBool("reverse_movement", true)
 }
 
-// 隐匿Buff：条件性免疫（PreDamage拦截伤害，PreBuffApplied拦截非positive/non-Boss buff）
+// 隐匿Buff：条件性免疫（PreBuffApplied拦截非positive/non-Boss buff）
 func handleHiddenImmune(phase constants.Phase, ctx *event.Context) {
-    if phase == constants.PhasePreDamage {
-        // 阻断伤害 Action
-        ctx.SetBool("action_blocked", true)
-        ctx.SetString("blocked_by", "Buff_Hidden")
-    } else if phase == constants.PhasePreBuffApplied {
+    if phase == constants.PhasePreBuffApplied {
         // 只阻挡非Positive且非Boss的buff
         // IsBoss buffs (Thorns, DeathMark) 绕过隐匿（游戏机制强制）
         // Positive buffs (Divine, Rain) 也绕过
@@ -275,15 +277,28 @@ func handleHiddenImmune(phase constants.Phase, ctx *event.Context) {
     }
 }
 
-// 神眷Buff：每回合LP+1
-func handleDivineBuff(phase constants.Phase, ctx *event.Context) {
-    if phase != constants.PhaseBeforeTurn {
-        return
+// 神眷Buff：入场LP+1, 亡语LP-1（通过Action系统）
+func handleDivineEffect(phase constants.Phase, ctx *event.Context) error {
+    if phase == constants.PhasePostBuffApplied {
+        // 入场效果：LP+1
+        ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, "Buff_Divine"))
+    } else if phase == constants.PhasePreBuffRemoved {
+        // 亡语效果：LP-1
+        ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, -1, "Buff_Divine"))
     }
-    // 直接修改 LP（无需 Action）
-    if ctx.Player != nil {
-        ctx.Player.ModifyLP(1)
+    return nil
+}
+
+// 诅咒Buff：入场LP-1, 亡语LP+1（通过Action系统）
+func handleCurseEffect(phase constants.Phase, ctx *event.Context) error {
+    if phase == constants.PhasePostBuffApplied {
+        // 入场效果：LP-1
+        ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, -1, "Buff_Curse"))
+    } else if phase == constants.PhasePreBuffRemoved {
+        // 亡语效果：LP+1
+        ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, "Buff_Curse"))
     }
+    return nil
 }
 
 // 离火Buff：朱雀被动，每4回合LP+1
@@ -311,10 +326,10 @@ func handleZhuQueFire(phase constants.Phase, ctx *event.Context) {
 
 | Buff | Phases | Priority | NeedConfirm | 说明 |
 |------|--------|----------|-------------|------|
-| 神眷 | [BeforeTurn] | 50 | false | 自动LP+1 |
-| 诅咒 | [BeforeTurn] | 50 | false | 自动LP-1 |
+| 神眷 | [PostBuffApplied, PreBuffRemoved] | 50 | false | 入场LP+1/亡语LP-1 |
+| 诅咒 | [PostBuffApplied, PreBuffRemoved] | 50 | false | 入场LP-1/亡语LP+1 |
 | 迷途 | [PreMove] | 100 | false | 自动反向 |
-| 隐匿 | [PreDamage, PreBuffApplied] | 100 | false | 免疫伤害/事件；PreBuffApplied只阻挡非Positive且非Boss的buff |
+| 隐匿 | [PreBuffApplied] | 100 | false | 只阻挡非Positive且非Boss的buff |
 | 辟邪 | [PreEvent] | 80 | false | 自动免疫毒瘴 |
 | 甘霖 | [AfterTurn] | 50 | false | 每2回合HP+1 |
 | 腐化 | [AfterTurn] | 50 | false | 每2回合HP-1 |
@@ -333,9 +348,9 @@ func handleZhuQueFire(phase constants.Phase, ctx *event.Context) {
 
 ### 测试覆盖率统计
 ```
-internal/event:    91.9% statements
-internal/core:     93.4% statements
-internal/engine:   91.8% statements
+internal/event:    95.5% statements
+internal/core:     98.6% statements
+internal/engine:   84.9% statements
 ```
 
 ## 后续扩展

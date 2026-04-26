@@ -88,7 +88,7 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **OpCode**: Message operation codes (Server→Client: 1-99, Client→Server: 100+)
   - Server→Client: OpStateSync(1), OpDecisionRequest(3), OpAvailable(4), OpMiniGameStart(5), OpMiniGameResult(6), OpGameOver(7), OpFullSync(8), OpActionRejected(9), OpWaitingSync(10), OpStartGameAck(11)
   - Client→Server: OpRollDice(100), OpUseItem(101), OpUseSkill(102), OpUserChoice(103), OpStartGame(105), OpRoundReady(106), OpMiniGameDataSubmit(107)
-- **StateSync/TurnSync**: Complete state and turn synchronization structures
+- **StateSync**: Complete state synchronization structure
 - **Decision**: User confirmation request structure
 - **ActionRejected**: Action rejection notification with ErrorCode for client-side error handling
 
@@ -304,10 +304,12 @@ Git Commit信息必须使用英文提交
 | [doc/metadata/event_context.md](doc/metadata/event_context.md) | `event.Context.Metadata` | 内部 | EventBus Handler 通信 |
 | [doc/metadata/hsm_context.md](doc/metadata/hsm_context.md) | `hsm.StateContext.Metadata` | 内部 | HSM 状态机通信 |
 | [doc/metadata/action_context.md](doc/metadata/action_context.md) | `action.ActionContext.Metadata` | 内部 | Action 执行上下文 |
+| [doc/metadata/buff.md](doc/metadata/buff.md) | `core.Buff.Metadata` | 内部 | Buff 实例动态属性 |
+| [doc/metadata/round_data.md](doc/metadata/round_data.md) | `hsm.StateContext.RoundData` | 内部 | 回合周期性数据 |
 
 ### 新增 Metadata 字段时
 
-1. 确定字段归属（LogEntry/Player/Context/StateContext/ActionContext）
+1. 确定字段归属（LogEntry/Player/Context/StateContext/ActionContext/Buff/RoundData）
 2. 在对应契约文档更新表格
 3. 若客户端可见，同步更新 TypeScript 类型定义
 

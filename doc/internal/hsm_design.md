@@ -89,11 +89,13 @@ internal/engine/hsm/
 
 | StateID | 结构体名称 | 行为 | Phase触发 | 转移条件 |
 |---------|------------|------|-----------|----------|
-| `StateMatchInit` (100) | `MatchInitState` | 初始化标记、设置metadata | - | Update自动返回StateRoundMiniGame |
-| `StateRoundMiniGame` (101) | `RoundMiniGameState` | 等待小游戏排名 | - | 收到所有排名后返回StateRoundPrep |
-| `StateRoundPrep` (102) | `RoundPrepState` | 根据排名分配骰子、增加Round计数 | - | Update自动返回StateTurnLoop |
-| `StateTurnLoop` (103) | `TurnLoopState` | 管理回合队列、检查Boss击败 | - | StartPlayerTurn→StateTurnUpkeep；BossDefeated→StateGameOver |
-| `StateGameOver` (104) | `GameOverState` | 终态，记录winner | - | 无转移（终态） |
+| `StateMatchInit` (100) | `MatchInitState` | 初始化标记、设置metadata | - | Update自动返回StateWaitingForHost |
+| `StateWaitingForHost` (101) | `WaitingForHostState` | 等待房主手动启动游戏 | - | 收到StartGame后返回StateRoundMiniGame |
+| `StateRoundMiniGame` (102) | `RoundMiniGameState` | 等待小游戏排名 | - | 收到所有排名后返回StateRoundPrep |
+| `StateRoundPrep` (103) | `RoundPrepState` | 根据排名分配骰子、增加Round计数 | - | Update自动返回StateTurnLoop |
+| `StateTurnLoop` (104) | `TurnLoopState` | 管理回合队列、检查Boss击败 | - | StartPlayerTurn→StateTurnUpkeep；BossDefeated→StateGameOver |
+| `StateRoundEndWait` (105) | `RoundEndWaitState` | 等待所有客户端信号RoundReady | - | 收到所有后返回StateRoundMiniGame |
+| `StateGameOver` (106) | `GameOverState` | 终态，记录winner | - | 无转移（终态） |
 
 ### 🔄 第二层：玩家回合子层 (PlayerTurnState)
 
@@ -156,10 +158,15 @@ PhasePreMove       → S_TURN_MOVING.Enter()    // 移动前（迷途handler修�
 
 // ========== Action发布的Phase（动作时机） ==========
 // 这些Phase由ActionContext.ExecuteAction()发布
-PhasePreDamage     → DamageAction.PreTriggerPhase()    // 伤害应用前
-PhasePreEvent      → DrawEventAction.PreTriggerPhase() // 事件触发前
-PhaseOnBuffApplied → AddBuffAction.PostTriggerPhase()  // Buff添加后
-PhaseOnBuffRemoved → RemoveBuffAction.PreTriggerPhase() // Buff移除前
+PhasePreDamage       → DamageAction/BossDamageAction.PreTriggerPhase()    // 伤害应用前
+PhasePreEvent        → DrawEventAction.PreTriggerPhase()                  // 事件触发前
+PhasePreRespawn      → RespawnAction.PreTriggerPhase()                    // 重生前
+PhasePreBuffApplied  → AddBuffAction.PreTriggerPhase()                   // Buff添加前
+PhasePostBuffApplied → AddBuffAction.PostTriggerPhase()                  // Buff添加后（入场效果）
+PhasePreBuffRemoved  → RemoveBuffAction.PreTriggerPhase()               // Buff移除前（亡语）
+PhasePostBuffRemoved → RemoveBuffAction.PostTriggerPhase()              // Buff移除后
+PhasePreAction       → ActionContext.ExecuteAction()                     // 任何Action前（死亡标记）
+PhasePreDiceRoll     → RollDiceAction.PreTriggerPhase()                 // 骰子结果前（可拦截）
 
 // ========== 特殊Phase ==========
 PhaseAnyTime   → 全局可用，由客户端主动触发
@@ -219,13 +226,14 @@ type StateID int
 
 // StateContext 状态上下文
 type StateContext struct {
-    Game        *Game
-    Player      *core.Player      // 当前玩家（回合层使用）
-    Phase       event.Phase       // 当前Phase
-    Data        interface{}       // 附加数据（如骰子点数、伤害值）
-    Stack       *StateStack       // 状态栈（中断层使用）
-    Decision    *event.Decision   // 待处理决策
-    Timeout     time.Duration     // 超时时间
+    *util.Metadata                    // 元数据存储（嵌入）
+    HSM           *HSM                // HSM引用
+    Player        *core.Player        // 当前玩家（回合层使用）
+    Builder       pkgnet.Builder      // 协议构建器
+    Broadcast     pkgnet.BroadcastAdapter // 广播适配器
+    Decisions     []*event.Decision   // 待处理决策列表
+    StartTime     time.Time           // 状态进入时间
+    RoundData     *util.Metadata      // 回合周期性数据（charge_counter/fire_counter等）
 }
 ```
 
@@ -235,28 +243,39 @@ type StateContext struct {
 // HSM 分层状态机
 type HSM struct {
     // 全局层
-    GlobalState    State
-    GlobalStateID  StateID
+    globalState    State
+    globalStateID  StateID
 
     // 回合层（子状态机）
-    TurnState      State
-    TurnStateID    StateID
-    TurnPlayer     *core.Player
+    turnState      State
+    turnStateID    StateID
 
     // 中断栈
-    InterruptStack *StateStack
+    interruptStack *StateStack
 
     // 状态注册表
-    States         map[StateID]State
+    states         map[StateID]State
+    factory        StateFactory
 
-    // 游戏引用
-    Game           *Game
+    // 游戏引用（通过getter访问）
+    game           *engine.Game
+    bus            *event.EventBus
+
+    // Builder和Broadcast
+    builder        pkgnet.Builder
+    broadcast      pkgnet.BroadcastAdapter
+
+    // 运行状态
+    running        bool
+    paused         bool
+    round          int
+    turn           int
 }
 
 // StateStack 状态栈
 type StateStack struct {
-    Stack        []State
-    ContextStack []*StateContext
+    stack        []State
+    contextStack []*StateContext
 }
 ```
 
