@@ -324,10 +324,10 @@ Git Commit信息必须使用英文提交
 
 | Buff | Phases | Effect |
 |------|--------|--------|
-| 神眷 (Divine) | BeforeTurn | LP+1 per turn |
-| 诅咒 (Curse) | BeforeTurn | LP-1 per turn |
+| 神眷 (Divine) | PostBuffApplied, PreBuffRemoved | LP+1 on application, LP-1 on removal |
+| 诅咒 (Curse) | PostBuffApplied, PreBuffRemoved | LP-1 on application, LP+1 on removal |
 | 迷途 (Lost) | PreMove (HSM发布) | Reverse movement direction (Steps → -Steps, anti double-flip) |
-| 隐匿 (Hidden) | PreDamage, PreBuffApplied | Immunity to damage/events; blocks non-positive, non-Boss buffs (IsBoss/IsPositive bypass) |
+| 隐匿 (Hidden) | PreBuffApplied | Immunity to damage/events; blocks non-positive, non-Boss buffs (IsBoss/IsPositive bypass) |
 | 甘霖 (Rain) | AfterTurn | HP+1 every 2 turns |
 | 腐化 (Corrupt) | AfterTurn | HP-1 every 2 turns |
 | 辟邪 (Exorcism) | PreEvent | Immune to poison |
@@ -365,15 +365,14 @@ Git Commit信息必须使用英文提交
 
 | Skill | Type | Effect |
 |-------|------|--------|
-| Thunder (天雷) | AOE damage | All Boss-cell players take 2 damage |
+| Thunder (天雷) | AOE damage | All Boss-cell players take 3 damage |
 | Curse (诅咒) | Debuff | All Boss-cell players get Curse buff |
-| Lost (迷雾) | Debuff | All Boss-cell players get Lost buff |
 | Thorns (反刺) | Self-buff | Boss gains Thorns buff (2 turns): reflect 30% damage back |
-| Rest (息) | Heal | Boss heals 5 HP |
+| Rest (息) | Heal | Boss heals 20 HP |
 
 ### Boss Attack Mechanics
 
-- Boss crit/skill probability: `0.25 + 0.30 × bossHPRatio` (30/70 crit/skill split)
+- Boss crit/skill probability: `0.25 + 0.05 × (8 - avgLP) + 0.30 × (maxHP - currentHP) / maxHP` (30/70 crit/skill split)
 - Boss target selection: LP-weighted, lower LP = higher chance of being targeted
 - Player crit rate: based on dice quality (Gold:30%, Silver:20%, Copper:10%, Wood:5%)
 

@@ -191,19 +191,19 @@ BUFF
 **Boss反击**：Boss回合（排在所有玩家回合之后）：
 - TurnUpkeep(空) → TurnBossBattle(Boss反击) → TurnEnd
 - Boss反击前，如果没有玩家在Boss格，Boss回合空转（TurnUpkeep→TurnBossBattle→TurnEnd）
-- Boss攻击类型基于Boss格存活玩家的平均LP：
-  - 暴击/技能概率 = `0.1 + 0.05 × (8 - avgLP)`（avgLP=0→50%, avgLP=4→30%, avgLP=8→10%）
-  - 50%概率暴击，50%概率技能（当暴击/技能触发时）
+- Boss攻击类型基于Boss格存活玩家的平均LP和Boss当前HP：
+  - 暴击/技能概率 = `0.25 + 0.05 × (8 - avgLP) + 0.30 × (maxHP - currentHP) / maxHP`（avgLP=8, bossHP=50→25%, avgLP=4, bossHP=25→60%, avgLP=0, bossHP=0→95%）
+  - 30%概率暴击，70%概率技能（当暴击/技能触发时）
 - Boss攻击目标：LP加权选择，LP越低越容易被攻击
 - Boss攻击（普通1点/暴击2点）可被隐匿Buff拦截（PhasePreDamage）
 
 **Boss技能池**（随机抽取，等权重）：
 | 技能 | 类型 | 效果 |
 |------|------|------|
-| 天雷(Thunder) | AOE伤害 | 所有Boss格玩家受到2点伤害 |
+| 天雷(Thunder) | AOE伤害 | 所有Boss格玩家受到3点伤害 |
 | 诅咒(Curse) | Debuff | 所有Boss格玩家获得诅咒Buff |
-| 迷雾(Lost) | Debuff | 所有Boss格玩家获得迷途Buff |
-| 息(Rest) | 治疗 | Boss恢复5HP |
+| 反刺(Thorns) | 自身Buff | Boss获得反刺Buff（2回合）：反射30%伤害 |
+| 息(Rest) | 治疗 | Boss恢复20HP |
 
 **胜负规则**：
 - 击败Boss的玩家获胜 → GameOver
