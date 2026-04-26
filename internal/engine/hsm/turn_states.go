@@ -868,6 +868,21 @@ func (s *TurnLandedState) Enter(ctx *StateContext) {
 		// Random DrawEvent will be handled in TurnDraw state
 		// No special action needed here
 	}
+
+	// Broadcast StateSync after all landing effects (PhaseOnLand + cell-type actions)
+	s.broadcastStateSync(ctx)
+}
+
+// broadcastStateSync broadcasts current game state after landing effects.
+func (s *TurnLandedState) broadcastStateSync(ctx *StateContext) {
+	game := ctx.GetGame()
+	if ctx.Broadcast == nil || game == nil {
+		return
+	}
+	if ctx.Builder != nil {
+		stateSync := ctx.Builder.BuildStateSync()
+		ctx.Broadcast.BroadcastStateSync(stateSync)
+	}
 }
 
 func (s *TurnLandedState) Update(ctx *StateContext) StateID {
@@ -980,6 +995,21 @@ func (s *TurnDrawState) Enter(ctx *StateContext) {
 				err, "TurnDraw", 2, "Enter", "draw item action failed")
 			return
 		}
+	}
+
+	// Broadcast StateSync after draw effects (event or item)
+	s.broadcastStateSync(ctx)
+}
+
+// broadcastStateSync broadcasts current game state after draw effects.
+func (s *TurnDrawState) broadcastStateSync(ctx *StateContext) {
+	game := ctx.GetGame()
+	if ctx.Broadcast == nil || game == nil {
+		return
+	}
+	if ctx.Builder != nil {
+		stateSync := ctx.Builder.BuildStateSync()
+		ctx.Broadcast.BroadcastStateSync(stateSync)
 	}
 }
 
@@ -1333,27 +1363,27 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 			}
 		}
 
-		// Broadcast TurnSync (Boss counter-attack animation)
-		s.broadcastTurnSync(ctx)
+		// Broadcast StateSync (final state with Boss counter-attack entries)
+		// Must be called BEFORE EndTurn because EndTurn sets GameLog.current to nil.
+		s.broadcastStateSync(ctx)
 
 		// End turn log segment
 		if game != nil && game.Log != nil {
 			game.Log.EndTurn()
 		}
 
-		// Broadcast StateSync (final state after Boss turn)
-		s.broadcastStateSync(ctx)
 		return
 	}
 
 	// Boss defeated during this turn: skip AfterTurn effects
 	// Game will end immediately after this TurnEnd
 	if game != nil && game.RoundData != nil && game.RoundData.GetBoolOrDefault(KeyBossDefeated, false) {
-		s.broadcastTurnSync(ctx)
+		// Broadcast StateSync (final state with all entries before Boss game-over)
+		// Must be called BEFORE EndTurn.
+		s.broadcastStateSync(ctx)
 		if game.Log != nil {
 			game.Log.EndTurn()
 		}
-		s.broadcastStateSync(ctx)
 		return
 	}
 
@@ -1423,29 +1453,14 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 		ctx.Set(KeyPendingCtx, triggerCtx)
 	}
 
-	// Broadcast TurnSync (all actions from this turn) BEFORE EndTurn,
-	// because EndTurn sets GameLog.current to nil, making GetCurrentTurnEntries return nil.
-	s.broadcastTurnSync(ctx)
+	// Broadcast StateSync (final state after turn, with all remaining entries)
+	// Must be called BEFORE EndTurn because EndTurn sets GameLog.current to nil,
+	// making GetNewEntries return nil.
+	s.broadcastStateSync(ctx)
 
 	// End turn log segment
 	if game != nil && game.Log != nil {
 		game.Log.EndTurn()
-	}
-
-	// Broadcast StateSync (final state after turn)
-	s.broadcastStateSync(ctx)
-}
-
-// broadcastTurnSync broadcasts all actions from current turn.
-func (s *TurnEndState) broadcastTurnSync(ctx *StateContext) {
-	game := ctx.GetGame()
-	if ctx.Broadcast == nil || game == nil {
-		return
-	}
-	// Use Builder if available
-	if ctx.Builder != nil {
-		turnSync := ctx.Builder.BuildTurnSync()
-		ctx.Broadcast.BroadcastTurnSync(turnSync)
 	}
 }
 

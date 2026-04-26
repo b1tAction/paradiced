@@ -553,10 +553,14 @@ func (b *builderAdapter) BuildStateSync() *pkgnet.StateSync {
 	}
 }
 
-func (b *builderAdapter) BuildTurnSync() *pkgnet.TurnSync {
-	return &pkgnet.TurnSync{
-		Round: b.hsmInst.GetRound(),
-		Turn:  b.hsmInst.GetTurn(),
+func (b *builderAdapter) BuildFullSyncStateSync() *pkgnet.StateSync {
+	return &pkgnet.StateSync{
+		GlobalState:     b.hsmInst.GetGlobalStateID().String(),
+		TurnState:       b.hsmInst.GetTurnStateID().String(),
+		CurrentPlayerID: "",
+		Round:           b.hsmInst.GetRound(),
+		Turn:            b.hsmInst.GetTurn(),
+		Paused:          b.hsmInst.IsPaused(),
 	}
 }
 
