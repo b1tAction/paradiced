@@ -273,7 +273,7 @@ func (h *GameTestHarness) RunPlayerTurn(playerIndex int, diceSteps int) error {
 
 	if currentTurnState == StateMainAction {
 		// Roll dice to trigger movement
-		err = h.HSM.OnRollDice(diceSteps, ctx)
+		err = h.HSM.OnRollDice(ctx)
 		if err != nil {
 			return err
 		}
@@ -382,7 +382,7 @@ func (h *GameTestHarness) RunFullRound(miniGameRanks map[int]int) error {
 			// First player's TurnUpkeep may already be done.
 			// Check if we're in MainAction state.
 			if h.HSM.GetTurnStateID() == StateMainAction {
-				err = h.HSM.OnRollDice(3, h.newCtx(h.Players[0]))
+				err = h.HSM.OnRollDice(h.newCtx(h.Players[0]))
 				if err != nil {
 					return err
 				}
@@ -442,7 +442,7 @@ func (h *GameTestHarness) RunSingleTurnInLoop(playerIndex int, diceSteps int) er
 	currentTurnState := h.HSM.GetTurnStateID()
 
 	if currentTurnState == StateMainAction {
-		err = h.HSM.OnRollDice(diceSteps, ctx)
+		err = h.HSM.OnRollDice(ctx)
 		if err != nil {
 			return err
 		}

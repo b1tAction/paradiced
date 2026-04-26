@@ -6,6 +6,7 @@ import (
 
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/engine"
+	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
@@ -211,13 +212,23 @@ func TestMainActionState_Enter(t *testing.T) {
 }
 
 func TestMainActionState_OnRollDice(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 42) // Fixed seed for deterministic dice roll
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	hsmInst := NewHSM(game)
+	ctx := NewStateContext().WithHSM(hsmInst).WithPlayer(player)
+
 	state := NewMainActionState(45 * time.Second)
-	ctx := NewStateContext()
+	state.Enter(ctx)
 
-	state.OnRollDice(ctx, 6)
+	// Set dice type for deterministic roll
+	ctx.SetDiceType(player.ID.UUID(), rng.DiceTypeWood)
 
-	if state.diceSteps != 6 {
-		t.Errorf("diceSteps should be 6, got %d", state.diceSteps)
+	state.OnRollDice(ctx)
+
+	if state.diceSteps == 0 {
+		t.Error("diceSteps should be non-zero after OnRollDice (computed by RollDiceAction)")
 	}
 	if state.diceRolled != true {
 		t.Error("diceRolled should be true after OnRollDice")
@@ -262,29 +273,17 @@ func TestMainActionState_Update_Waiting(t *testing.T) {
 	}
 }
 
-func TestMainActionState_defaultDiceRoll(t *testing.T) {
-	state := NewMainActionState(45 * time.Second)
-	game := engine.NewGame(id.NewGameID(), 0)
+func TestMainActionState_RollDiceAction_StepsRange(t *testing.T) {
+	// Verify RollDiceAction produces valid steps (1-6) for each dice type
+	game := engine.NewGame(id.NewGameID(), 42)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
-	hsmInst := NewHSM(game)
-	ctx := NewStateContext().WithHSM(hsmInst).WithPlayer(player)
+	game.AddPlayer(player)
 
-	tests := []struct {
-		diceType rng.DiceType
-		expected int
-	}{
-		{rng.DiceTypeGold, 6},
-		{rng.DiceTypeSilver, 4},
-		{rng.DiceTypeCopper, 3},
-		{rng.DiceTypeWood, 2},
-		{rng.DiceTypeNone, 2},
-	}
-
-	for _, tt := range tests {
-		ctx.SetDiceType(player.ID.UUID(), tt.diceType)
-		result := state.defaultDiceRoll(ctx)
-		if result != tt.expected {
-			t.Errorf("defaultDiceRoll for %s should return %d, got %d", tt.diceType.String(), tt.expected, result)
+	diceTypes := []rng.DiceType{rng.DiceTypeGold, rng.DiceTypeSilver, rng.DiceTypeCopper, rng.DiceTypeWood, rng.DiceTypeNormal}
+	for _, diceType := range diceTypes {
+		action := engineaction.NewRollDiceAction(player, diceType, game.RNG, "DiceRoll")
+		if action.Steps < 1 || action.Steps > 6 {
+			t.Errorf("RollDiceAction Steps for %s should be 1-6, got %d", diceType.String(), action.Steps)
 		}
 	}
 }

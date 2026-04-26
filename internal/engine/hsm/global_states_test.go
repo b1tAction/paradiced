@@ -240,8 +240,8 @@ func TestStateTurnLoop(t *testing.T) {
 	if !state.CanTransitionTo(StateGameOver) {
 		t.Error("TurnLoop should transition to GameOver")
 	}
-	if !state.CanTransitionTo(StateRoundMiniGame) {
-		t.Error("TurnLoop should transition to RoundMiniGame")
+	if !state.CanTransitionTo(StateRoundEndWait) {
+		t.Error("TurnLoop should transition to RoundEndWait")
 	}
 	if !state.CanTransitionTo(StateTurnUpkeep) {
 		t.Error("TurnLoop should transition to TurnUpkeep")
@@ -388,9 +388,106 @@ func TestTurnLoopAllPlayersComplete(t *testing.T) {
 	state.StartPlayerTurn(ctx)
 	state.OnTurnComplete(ctx)
 
-	// After all players complete, next round
+	// After all players complete, wait for clients before next round
 	nextID := state.StartPlayerTurn(ctx)
+	if nextID != StateRoundEndWait {
+		t.Errorf("After all players, should return RoundEndWait, got %s", nextID.String())
+	}
+}
+
+// ========== RoundEndWaitState Tests ==========
+
+func TestRoundEndWaitState_Enter(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 0)
+	p1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	p2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(p1)
+	game.AddPlayer(p2)
+
+	hsmInst := NewHSM(game)
+	ctx := NewStateContext().WithHSM(hsmInst)
+
+	state := NewRoundEndWaitState()
+	state.Enter(ctx)
+
+	if state.totalPlayers != 2 {
+		t.Errorf("totalPlayers should be 2 (non-Boss), got %d", state.totalPlayers)
+	}
+	if state.readyReceived != 0 {
+		t.Errorf("readyReceived should be 0 initially, got %d", state.readyReceived)
+	}
+	if !ctx.GetBoolOrDefault(KeyRoundEndWaiting, false) {
+		t.Error("KeyRoundEndWaiting should be set after Enter")
+	}
+}
+
+func TestRoundEndWaitState_Update_NoReady(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 0)
+	p1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(p1)
+
+	hsmInst := NewHSM(game)
+	ctx := NewStateContext().WithHSM(hsmInst)
+
+	state := NewRoundEndWaitState()
+	state.Enter(ctx)
+
+	nextID := state.Update(ctx)
+	if nextID != StateNone {
+		t.Errorf("Update should return StateNone when no clients ready, got %s", nextID.String())
+	}
+}
+
+func TestRoundEndWaitState_Update_AllReady(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 0)
+	p1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	p2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(p1)
+	game.AddPlayer(p2)
+
+	hsmInst := NewHSM(game)
+	ctx := NewStateContext().WithHSM(hsmInst)
+
+	state := NewRoundEndWaitState()
+	state.Enter(ctx)
+
+	// Signal all players ready
+	state.OnRoundReady(ctx, p1.ID.UUID())
+	state.OnRoundReady(ctx, p2.ID.UUID())
+
+	nextID := state.Update(ctx)
 	if nextID != StateRoundMiniGame {
-		t.Errorf("After all players, should return RoundMiniGame, got %s", nextID.String())
+		t.Errorf("Update should return StateRoundMiniGame when all ready, got %s", nextID.String())
+	}
+}
+
+func TestRoundEndWaitState_Exit(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 0)
+	p1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(p1)
+
+	hsmInst := NewHSM(game)
+	ctx := NewStateContext().WithHSM(hsmInst)
+
+	state := NewRoundEndWaitState()
+	state.Enter(ctx)
+	state.Exit(ctx)
+
+	if ctx.GetBoolOrDefault(KeyRoundEndWaiting, false) {
+		t.Error("KeyRoundEndWaiting should be cleared after Exit")
+	}
+}
+
+func TestRoundEndWaitState_CanTransitionTo(t *testing.T) {
+	state := NewRoundEndWaitState()
+
+	if !state.CanTransitionTo(StateRoundMiniGame) {
+		t.Error("RoundEndWait should transition to RoundMiniGame")
+	}
+	if !state.CanTransitionTo(StateGameOver) {
+		t.Error("RoundEndWait should transition to GameOver")
+	}
+	if state.CanTransitionTo(StateTurnUpkeep) {
+		t.Error("RoundEndWait should NOT transition to TurnUpkeep")
 	}
 }
