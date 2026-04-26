@@ -284,6 +284,23 @@ func (h *NakamaMatchHandler) getCurrentPlayer() *core.Player {
 	return nil
 }
 
+// getCurrentMiniGameType returns the current mini-game type from RoundMiniGameState.
+// Returns "dice_race" as fallback when not in RoundMiniGame state.
+func (h *NakamaMatchHandler) getCurrentMiniGameType() string {
+	if h.hsm == nil {
+		return string(constants.MiniGameTypeDiceRace)
+	}
+	globalState := h.hsm.GetGlobalState()
+	if globalState == nil {
+		return string(constants.MiniGameTypeDiceRace)
+	}
+	miniGameState, ok := globalState.(*hsm.RoundMiniGameState)
+	if !ok {
+		return string(constants.MiniGameTypeDiceRace)
+	}
+	return string(miniGameState.GetGameType())
+}
+
 // addPlayer adds a new player to the match.
 // Called during MatchInit or when players join.
 // displayName is stored in Player.Metadata for protocol synchronization.

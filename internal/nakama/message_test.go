@@ -158,10 +158,11 @@ func TestHandleMiniGameResult(t *testing.T) {
 	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 	handler.MatchInit()
 
-	// Send mini-game result
-	data, _ := json.Marshal(MiniGameResultSubmit{
-		OpCode: "5", // OpCode for MiniGameResultSubmit
-		Rank:   1,
+	// Send mini-game data submit
+	data, _ := json.Marshal(MiniGameDataSubmitRequest{
+		OpCode:   "5",
+		GameType: "dice_race",
+		GameData: map[string]interface{}{"score": 100, "time": 3.5},
 	})
 
 	err := handler.HandleMessage(id.TestUUID(1), data)

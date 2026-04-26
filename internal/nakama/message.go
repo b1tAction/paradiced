@@ -25,8 +25,8 @@ func (h *NakamaMatchHandler) HandleMessageWithOp(sender string, opCode int64, da
 		return h.handleUseSkill(sender)
 	case int64(pkgnet.OpUserChoice):
 		return h.handleUserChoice(sender, data)
-	case int64(pkgnet.OpMiniGameResultSubmit):
-		return h.handleMiniGameResult(sender, data)
+	case int64(pkgnet.OpMiniGameDataSubmit):
+		return h.handleMiniGameDataSubmit(sender, data)
 	case int64(pkgnet.OpStartGame):
 		return h.handleStartGame(sender)
 	case int64(pkgnet.OpRoundReady):
@@ -68,10 +68,12 @@ type UserChoiceResponse struct {
 	Choice     int    `json:"choice"`
 }
 
-// MiniGameResultSubmit represents mini-game result submission.
-type MiniGameResultSubmit struct {
-	OpCode string `json:"op_code"`
-	Rank   int    `json:"rank"`
+// MiniGameDataSubmitRequest represents mini-game data submission from client.
+// Client submits game_data (not rank); server calculates ranking using RankCalculator.
+type MiniGameDataSubmitRequest struct {
+	OpCode   string                 `json:"op_code"`
+	GameType string                 `json:"game_type"`
+	GameData map[string]interface{} `json:"game_data"`
 }
 
 // HandleMessage processes incoming messages from clients.
@@ -100,8 +102,8 @@ func (h *NakamaMatchHandler) HandleMessage(sender string, data []byte) error {
 		return h.handleUseSkill(sender)
 	case strconv.FormatInt(int64(pkgnet.OpUserChoice), 10):
 		return h.handleUserChoice(sender, data)
-	case strconv.FormatInt(int64(pkgnet.OpMiniGameResultSubmit), 10):
-		return h.handleMiniGameResult(sender, data)
+	case strconv.FormatInt(int64(pkgnet.OpMiniGameDataSubmit), 10):
+		return h.handleMiniGameDataSubmit(sender, data)
 	case strconv.FormatInt(int64(pkgnet.OpRoundReady), 10):
 		return h.handleRoundReady(sender)
 	default:
@@ -385,27 +387,28 @@ func (h *NakamaMatchHandler) handleUserChoice(sender string, data []byte) error 
 	return nil
 }
 
-// handleMiniGameResult handles mini-game result submission.
-func (h *NakamaMatchHandler) handleMiniGameResult(sender string, data []byte) error {
+// handleMiniGameDataSubmit handles mini-game data submission from client.
+// Client submits game_data (score/time etc), server calculates ranking via RankCalculator.
+func (h *NakamaMatchHandler) handleMiniGameDataSubmit(sender string, data []byte) error {
 	logger := NewLogger(h)
-	logger.logRequest("handleMiniGameResult", sender, data)
+	logger.logRequest("handleMiniGameDataSubmit", sender, data)
 
-	// Parse mini-game result
-	var req MiniGameResultSubmit
+	// Parse mini-game data submission
+	var req MiniGameDataSubmitRequest
 	if err := json.Unmarshal(data, &req); err != nil {
-		h.logError("handleMiniGameResult: failed to parse request", "sender", sender, "error", err)
-		logger.logError("OpMiniGameResultSubmit", sender, err)
+		h.logError("handleMiniGameDataSubmit: failed to parse request", "sender", sender, "error", err)
+		logger.logError("OpMiniGameDataSubmit", sender, err)
 		return err
 	}
 
-	h.logDebug("handleMiniGameResult: parsed request", "sender", sender, "rank", req.Rank)
+	h.logDebug("handleMiniGameDataSubmit: parsed request", "sender", sender, "game_type", req.GameType, "game_data_keys", len(req.GameData))
 
 	// Get player
 	player := h.GetPlayer(sender)
 	if player == nil {
 		logger.logValidation(sender, "player_exists", false, "sender", sender)
-		logger.logReject("OpMiniGameResultSubmit", sender, constants.ErrPlayerNotFound, "player_not_found", "Unknown player")
-		return h.sendActionRejectedWithCode(sender, pkgnet.OpMiniGameResultSubmit, constants.ErrPlayerNotFound, "Unknown player")
+		logger.logReject("OpMiniGameDataSubmit", sender, constants.ErrPlayerNotFound, "player_not_found", "Unknown player")
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpMiniGameDataSubmit, constants.ErrPlayerNotFound, "Unknown player")
 	}
 
 	logger.logValidation(sender, "player_exists", true, "player_id", player.ID.UUID())
@@ -416,8 +419,8 @@ func (h *NakamaMatchHandler) handleMiniGameResult(sender string, data []byte) er
 
 	if globalState != hsm.StateRoundMiniGame {
 		logger.logValidation(sender, "state_check", false, "global_state", globalState.String())
-		logger.logReject("OpMiniGameResultSubmit", sender, constants.ErrInvalidState, "invalid_state", "Not in mini-game state")
-		return h.sendActionRejectedWithCode(sender, pkgnet.OpMiniGameResultSubmit, constants.ErrInvalidState, "Not in mini-game state")
+		logger.logReject("OpMiniGameDataSubmit", sender, constants.ErrInvalidState, "invalid_state", "Not in mini-game state")
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpMiniGameDataSubmit, constants.ErrInvalidState, "Not in mini-game state")
 	}
 
 	// Create builder for context
@@ -430,27 +433,31 @@ func (h *NakamaMatchHandler) handleMiniGameResult(sender string, data []byte) er
 		WithBroadcast(NewNakamaBroadcastAdapter(h)).
 		WithBuilder(builder)
 
-	// Call HSM's OnMiniGameResult method
-	h.logDebug("handleMiniGameResult: calling OnMiniGameResult", "sender", sender, "rank", req.Rank)
-	err := h.hsm.OnMiniGameResult(player.ID.UUID(), req.Rank, ctx)
+	// Call HSM's OnMiniGameDataSubmit method
+	h.logDebug("handleMiniGameDataSubmit: calling OnMiniGameDataSubmit", "sender", sender, "game_type", req.GameType)
+	err := h.hsm.OnMiniGameDataSubmit(player.ID.UUID(), req.GameType, req.GameData, ctx)
 	if err != nil {
-		logger.logError("OpMiniGameResultSubmit", sender, err)
-		h.logError("handleMiniGameResult: OnMiniGameResult failed", "sender", sender, "error", err)
-		return h.sendActionRejectedWithCode(sender, pkgnet.OpMiniGameResultSubmit, constants.ErrInternal, err.Error())
+		logger.logError("OpMiniGameDataSubmit", sender, err)
+		h.logError("handleMiniGameDataSubmit: OnMiniGameDataSubmit failed", "sender", sender, "error", err)
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpMiniGameDataSubmit, constants.ErrInternal, err.Error())
 	}
 
 	// Check if state execution produced an error
 	if ctx.Error != nil {
-		logger.logError("OpMiniGameResultSubmit", sender, ctx.Error)
-		h.logError("handleMiniGameResult: state execution failed", "sender", sender, "error", ctx.Error)
-		return h.sendActionRejectedWithCode(sender, pkgnet.OpMiniGameResultSubmit, constants.ErrInternal, ctx.Error.Error())
+		logger.logError("OpMiniGameDataSubmit", sender, ctx.Error)
+		h.logError("handleMiniGameDataSubmit: state execution failed", "sender", sender, "error", ctx.Error)
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpMiniGameDataSubmit, constants.ErrInternal, ctx.Error.Error())
 	}
 
-	// Keep dice manager assignment in sync with submitted mini-game rank.
-	// RollDice currently uses sender(userID) as dice key.
-	h.diceMgr.AssignDice(sender, req.Rank)
+	// If all players submitted and rankings calculated, assign dice types.
+	// Check if state transitioned to RoundPrep (all data received).
+	if h.hsm.GetGlobalStateID() == hsm.StateRoundPrep {
+		// Get player rank from context and assign dice
+		rank := ctx.GetMiniGameRank(player.ID.UUID())
+		h.diceMgr.AssignDice(sender, rank)
+	}
 
-	logger.logResponse("OpMiniGameResultSubmit", sender, "result submitted")
+	logger.logResponse("OpMiniGameDataSubmit", sender, "data submitted")
 	return nil
 }
 

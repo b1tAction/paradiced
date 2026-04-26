@@ -219,6 +219,32 @@ type MiniGameStart struct {
 
 	// Players contains all participating player IDs.
 	Players []string `json:"players"`
+
+	// Connection contains MiniGame Service connection info (nil for frontend-driven mode).
+	Connection *MiniGameConn `json:"connection,omitempty"`
+}
+
+// MiniGameConn represents connection info for real-time competitive mini-game service.
+// Only present when MiniGame Service (Colyseus) is used; nil for frontend-driven mode.
+type MiniGameConn struct {
+	// URL is the MiniGame Service WebSocket URL.
+	URL string `json:"url"`
+
+	// RoomID is the Colyseus room ID.
+	RoomID string `json:"room_id"`
+
+	// Token is the authentication token for MiniGame Service.
+	Token string `json:"token"`
+}
+
+// MiniGameDataSubmit represents client mini-game data submission.
+// Client submits game_data (not rank); server calculates ranking using RankCalculator.
+type MiniGameDataSubmit struct {
+	// GameType identifies the mini-game type (must match MiniGameStart.GameType).
+	GameType string `json:"game_type"`
+
+	// GameData contains raw mini-game performance data (score, time, etc).
+	GameData map[string]interface{} `json:"game_data"`
 }
 
 // MiniGameResult represents mini-game ranking result notification.

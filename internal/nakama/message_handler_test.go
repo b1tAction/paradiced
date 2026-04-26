@@ -153,18 +153,18 @@ func TestHandleMessageWithOp_UserChoice(t *testing.T) {
 	verifyActionRejected(t, mock, id.TestUUID(999), pkgnet.OpUserChoice, constants.ErrPlayerNotFound)
 }
 
-func TestHandleMessageWithOp_MiniGameResult(t *testing.T) {
+func TestHandleMessageWithOp_MiniGameDataSubmit(t *testing.T) {
 	handler := setupHandlerWithPlayers(t, 2)
 	mock := getMockDispatcher(handler)
 	mock.Clear()
 
-	data := []byte(`{"op_code": "104", "rank": 1}`)
-	err := handler.HandleMessageWithOp(id.TestUUID(999), int64(pkgnet.OpMiniGameResultSubmit), data)
+	data := []byte(`{"op_code": "107", "game_type": "dice_race", "game_data": {"score": 100, "time": 3.5}}`)
+	err := handler.HandleMessageWithOp(id.TestUUID(999), int64(pkgnet.OpMiniGameDataSubmit), data)
 	if err != nil {
-	 // Expected
+		// Expected
 	}
 
-	verifyActionRejected(t, mock, id.TestUUID(999), pkgnet.OpMiniGameResultSubmit, constants.ErrPlayerNotFound)
+	verifyActionRejected(t, mock, id.TestUUID(999), pkgnet.OpMiniGameDataSubmit, constants.ErrPlayerNotFound)
 }
 
 func TestHandleMessageWithOp_UnknownOpCode(t *testing.T) {
@@ -498,50 +498,50 @@ func TestHandleUserChoice_InvalidJSON(t *testing.T) {
 	}
 }
 
-// ========== handleMiniGameResult Tests ==========
+// ========== handleMiniGameDataSubmit Tests ==========
 
-func TestHandleMiniGameResult_PlayerNotFound(t *testing.T) {
+func TestHandleMiniGameDataSubmit_PlayerNotFound(t *testing.T) {
 	handler := setupHandlerWithPlayers(t, 2)
 	mock := getMockDispatcher(handler)
 	mock.Clear()
 
-	data := []byte(`{"op_code": "104", "rank": 1}`)
-	err := handler.handleMiniGameResult(id.TestUUID(999), data)
+	data := []byte(`{"op_code": "107", "game_type": "dice_race", "game_data": {"score": 100, "time": 3.5}}`)
+	err := handler.handleMiniGameDataSubmit(id.TestUUID(999), data)
 	if err != nil {
-	 // Expected
+		// Expected
 	}
 
-	verifyActionRejected(t, mock, id.TestUUID(999), pkgnet.OpMiniGameResultSubmit, constants.ErrPlayerNotFound)
+	verifyActionRejected(t, mock, id.TestUUID(999), pkgnet.OpMiniGameDataSubmit, constants.ErrPlayerNotFound)
 }
 
-func TestHandleMiniGameResult_InvalidJSON(t *testing.T) {
+func TestHandleMiniGameDataSubmit_InvalidJSON(t *testing.T) {
 	handler := setupHandlerWithPlayers(t, 2)
 
-	err := handler.handleMiniGameResult(id.TestUUID(1), []byte("invalid json"))
+	err := handler.handleMiniGameDataSubmit(id.TestUUID(1), []byte("invalid json"))
 	if err == nil {
-	 t.Error("handleMiniGameResult should return error for invalid JSON")
+		t.Error("handleMiniGameDataSubmit should return error for invalid JSON")
 	}
 }
 
-func TestHandleMiniGameResult_InvalidState(t *testing.T) {
+func TestHandleMiniGameDataSubmit_InvalidState(t *testing.T) {
 	handler := setupHandlerWithPlayers(t, 2)
 	mock := getMockDispatcher(handler)
 
 	// Check if not in RoundMiniGame state
 	globalState := handler.hsm.GetGlobalStateID()
 	if globalState == hsm.StateRoundMiniGame {
-	 t.Skip("Already in RoundMiniGame state")
+		t.Skip("Already in RoundMiniGame state")
 	}
 
 	mock.Clear()
 
-	data := []byte(`{"op_code": "104", "rank": 1}`)
-	err := handler.handleMiniGameResult(id.TestUUID(1), data)
+	data := []byte(`{"op_code": "107", "game_type": "dice_race", "game_data": {"score": 100}}`)
+	err := handler.handleMiniGameDataSubmit(id.TestUUID(1), data)
 	if err != nil {
-	 // Expected
+		// Expected
 	}
 
-	verifyActionRejected(t, mock, id.TestUUID(1), pkgnet.OpMiniGameResultSubmit, constants.ErrInvalidState)
+	verifyActionRejected(t, mock, id.TestUUID(1), pkgnet.OpMiniGameDataSubmit, constants.ErrInvalidState)
 }
 
 // ========== Request Types Tests ==========
@@ -638,28 +638,29 @@ func TestUserChoiceResponse_JSON(t *testing.T) {
 	}
 }
 
-func TestMiniGameResultSubmit_JSON(t *testing.T) {
-	req := MiniGameResultSubmit{
-	 OpCode: "104",
-	 Rank:	 2,
+func TestMiniGameDataSubmitRequest_JSON(t *testing.T) {
+	req := MiniGameDataSubmitRequest{
+		OpCode:   "107",
+		GameType: "dice_race",
+		GameData: map[string]interface{}{"score": 100, "time": 3.5},
 	}
 
 	data, err := json.Marshal(req)
 	if err != nil {
-	 t.Fatalf("Marshal failed: %v", err)
+		t.Fatalf("Marshal failed: %v", err)
 	}
 
-	var parsed MiniGameResultSubmit
+	var parsed MiniGameDataSubmitRequest
 	err = json.Unmarshal(data, &parsed)
 	if err != nil {
-	 t.Fatalf("Unmarshal failed: %v", err)
+		t.Fatalf("Unmarshal failed: %v", err)
 	}
 
-	if parsed.OpCode != "104" {
-	 t.Errorf("OpCode = %s, expected 104", parsed.OpCode)
+	if parsed.OpCode != "107" {
+		t.Errorf("OpCode = %s, expected 107", parsed.OpCode)
 	}
-	if parsed.Rank != 2 {
-	 t.Errorf("Rank = %d, expected 2", parsed.Rank)
+	if parsed.GameType != "dice_race" {
+		t.Errorf("GameType = %s, expected dice_race", parsed.GameType)
 	}
 }
 

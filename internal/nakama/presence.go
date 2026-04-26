@@ -158,7 +158,7 @@ func (h *NakamaMatchHandler) handlePlayerRejoin(userID string) error {
 			copy(players, h.playerList)
 
 			miniGameStart := &pkgnet.MiniGameStart{
-				GameType: "dice_race",
+				GameType: h.getCurrentMiniGameType(),
 				Players:  players,
 			}
 

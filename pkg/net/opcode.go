@@ -74,9 +74,9 @@ const (
 	// Data: UserChoice
 	OpUserChoice OpCode = 103
 
-	// OpMiniGameResultSubmit submits mini-game ranking result (deprecated - server calculates).
-	// Data: MiniGameResultSubmit
-	OpMiniGameResultSubmit OpCode = 104
+	// OpMiniGameDataSubmit submits mini-game data for server-side rank calculation.
+	// Data: MiniGameDataSubmit (includes game_type and game_data)
+	OpMiniGameDataSubmit OpCode = 107
 
 	// OpStartGame requests host to start the game manually.
 	// Data: StartGame (empty, server validates host and minimum players)
@@ -105,7 +105,7 @@ func (op OpCode) String() string {
 		OpUseItem:              "use_item",
 		OpUseSkill:             "use_skill",
 		OpUserChoice:           "user_choice",
-		OpMiniGameResultSubmit: "mini_game_result_submit",
+		OpMiniGameDataSubmit:  "mini_game_data_submit",
 		OpStartGame:            "start_game",
 		OpRoundReady:           "round_ready",
 	}
