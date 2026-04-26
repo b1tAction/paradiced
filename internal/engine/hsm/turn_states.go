@@ -1,6 +1,7 @@
 package hsm
 
 import (
+	"math/rand"
 	"time"
 
 	"github.com/b1tAction/paradiced/internal/core"
@@ -283,10 +284,9 @@ func (s *MainActionState) Update(ctx *StateContext) StateID {
 
 	// Check timeout
 	if time.Since(s.startTime) > s.timeout {
-		// Auto roll dice (default action)
-		steps := s.defaultDiceRoll(ctx)
-		s.OnRollDice(ctx, steps)
-		ctx.SetInt(KeyDiceSteps, steps)
+		// Auto roll dice (timeout), uses RollDiceAction internally
+		s.onRollDiceInternal(ctx, "DiceRollTimeout")
+		// steps are already set in ctx by onRollDiceInternal
 
 		// Check if player is on Boss cell -> TurnBossBattle
 		player := ctx.Player
@@ -310,10 +310,51 @@ func (s *MainActionState) Exit(ctx *StateContext) {
 }
 
 // OnRollDice handles dice roll input.
-func (s *MainActionState) OnRollDice(ctx *StateContext, steps int) {
+// Creates and executes a RollDiceAction which calculates steps via RNG.
+// After execution, reads the result from ActionContext metadata.
+func (s *MainActionState) OnRollDice(ctx *StateContext) {
+	s.onRollDiceInternal(ctx, "DiceRoll")
+}
+
+// onRollDiceInternal is the shared implementation for player-initiated and timeout auto-roll.
+func (s *MainActionState) onRollDiceInternal(ctx *StateContext, sourceID string) {
+	player := ctx.Player
+	if player == nil || s.actionCtx == nil {
+		// Fallback: no player or action context available
+		s.diceSteps = 2 // Default wood dice steps
+		s.diceRolled = true
+		s.waitingForAction = false
+		ctx.SetInt(KeyDiceSteps, s.diceSteps)
+		return
+	}
+
+	// Get dice type and RNG from context
+	diceType := ctx.GetDiceType(player.ID.UUID())
+	game := ctx.GetGame()
+	var rngInst *rand.Rand
+	if game != nil {
+		rngInst = game.RNG
+	}
+
+	// Create and execute RollDiceAction (Steps calculated at construction)
+	rollAction := engineaction.NewRollDiceAction(player, diceType, rngInst, sourceID)
+	if err := s.actionCtx.ExecuteAction(rollAction); err != nil {
+		ctx.Error = errors.WrapHSMError(err, "MainAction", 2, "OnRollDice", "dice roll action failed")
+		// Fallback to action's computed steps (still available even if execute partially failed)
+		s.diceSteps = rollAction.Steps
+		s.diceRolled = true
+		s.waitingForAction = false
+		ctx.SetInt(KeyDiceSteps, s.diceSteps)
+		return
+	}
+
+	// Read final Steps from ActionContext metadata (may have been modified by PhasePreDiceRoll interception)
+	steps := s.actionCtx.GetIntOrDefault("dice_steps_result", rollAction.Steps)
+
 	s.diceSteps = steps
 	s.diceRolled = true
 	s.waitingForAction = false
+	ctx.SetInt(KeyDiceSteps, steps)
 }
 
 // OnUseItem handles item usage input.
@@ -338,35 +379,6 @@ func (s *MainActionState) OnUseItem(ctx *StateContext, itemID string) {
 		ctx.Error = errors.WrapHSMError(
 			err, "MainAction", 2, "OnUseItem", "derived action execution failed")
 		return
-	}
-}
-
-// defaultDiceRoll returns default dice steps based on dice type.
-// Default values for timeout auto-roll scenarios.
-func (s *MainActionState) defaultDiceRoll(ctx *StateContext) int {
-	// Prefer current turn player from HSM; fallback to context player.
-	var turnPlayer *core.Player
-	if ctx.HSM != nil {
-		turnPlayer = ctx.HSM.GetTurnPlayer()
-	}
-	if turnPlayer == nil {
-		turnPlayer = ctx.Player
-	}
-	if turnPlayer == nil {
-		return 2 // Default to wood dice steps
-	}
-
-	// Get dice type from context (assigned in RoundPrep)
-	diceType := ctx.GetDiceType(turnPlayer.ID.UUID())
-	switch diceType {
-	case rng.DiceTypeGold:
-		return 6 // Gold dice: weighted toward high numbers
-	case rng.DiceTypeSilver:
-		return 4 // Silver dice: moderate weights
-	case rng.DiceTypeCopper:
-		return 3 // Copper dice: slight high bias
-	default:
-		return 2 // Wood dice: uniform distribution
 	}
 }
 

@@ -634,7 +634,8 @@ func (hsm *HSM) IsInTurn() bool {
 // ========== Turn State Input Handling ==========
 
 // OnRollDice handles dice roll input during MainActionState.
-func (hsm *HSM) OnRollDice(steps int, ctx *StateContext) error {
+// Steps is calculated internally by RollDiceAction (no steps parameter needed).
+func (hsm *HSM) OnRollDice(ctx *StateContext) error {
 	// Must be in MainAction state
 	if hsm.turnStateID != StateMainAction {
 		return errors.New("OnRollDice requires MainAction state")
@@ -647,7 +648,7 @@ func (hsm *HSM) OnRollDice(steps int, ctx *StateContext) error {
 
 	// Call OnRollDice on the turn state if it implements RollDiceHandler
 	if handler, ok := hsm.turnState.(RollDiceHandler); ok {
-		handler.OnRollDice(ctx, steps)
+		handler.OnRollDice(ctx)
 	} else {
 		return errors.New("current turn state does not handle RollDice")
 	}
@@ -691,7 +692,7 @@ func (hsm *HSM) OnUseItem(itemID string, ctx *StateContext) error {
 
 // RollDiceHandler is an interface for states that handle dice roll input.
 type RollDiceHandler interface {
-	OnRollDice(ctx *StateContext, steps int)
+	OnRollDice(ctx *StateContext)
 }
 
 // UseItemHandler is an interface for states that handle item usage input.
@@ -728,6 +729,45 @@ func (hsm *HSM) OnMiniGameResult(playerID string, rank int, ctx *StateContext) e
 
 	// Call the state's OnMiniGameResult method
 	miniGameState.OnMiniGameResult(ctx, playerID, rank)
+
+	// Trigger update to check for state transition
+	nextID := globalState.Update(ctx)
+	if nextID != StateNone && nextID != hsm.globalStateID {
+		return hsm.TransitionTo(nextID, ctx)
+	}
+
+	return nil
+}
+
+// ========== Round Ready Handler ==========
+
+// OnRoundReady handles client's round-ready signal.
+// Must be called when in RoundEndWait state.
+func (hsm *HSM) OnRoundReady(playerID string, ctx *StateContext) error {
+	// Must be in RoundEndWait state
+	if hsm.globalStateID != StateRoundEndWait {
+		return errors.New("OnRoundReady requires RoundEndWait state")
+	}
+
+	// Get the global state
+	globalState := hsm.GetGlobalState()
+	if globalState == nil {
+		return errors.New("no global state active")
+	}
+
+	// Type assertion to RoundEndWaitState
+	roundEndWaitState, ok := globalState.(*RoundEndWaitState)
+	if !ok {
+		return errors.New("current global state is not RoundEndWaitState")
+	}
+
+	// Create context if not provided
+	if ctx == nil {
+		ctx = NewStateContext().WithHSM(hsm)
+	}
+
+	// Call the state's OnRoundReady method
+	roundEndWaitState.OnRoundReady(ctx, playerID)
 
 	// Trigger update to check for state transition
 	nextID := globalState.Update(ctx)

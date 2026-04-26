@@ -29,6 +29,8 @@ func (h *NakamaMatchHandler) HandleMessageWithOp(sender string, opCode int64, da
 		return h.handleMiniGameResult(sender, data)
 	case int64(pkgnet.OpStartGame):
 		return h.handleStartGame(sender)
+	case int64(pkgnet.OpRoundReady):
+		return h.handleRoundReady(sender)
 	default:
 		h.logWarn("Unknown opcode received", "sender", sender, "op_code", opCode)
 	}
@@ -100,6 +102,8 @@ func (h *NakamaMatchHandler) HandleMessage(sender string, data []byte) error {
 		return h.handleUserChoice(sender, data)
 	case strconv.FormatInt(int64(pkgnet.OpMiniGameResultSubmit), 10):
 		return h.handleMiniGameResult(sender, data)
+	case strconv.FormatInt(int64(pkgnet.OpRoundReady), 10):
+		return h.handleRoundReady(sender)
 	default:
 		h.logWarn("Unknown opcode in payload", "sender", sender, "op_code", opCode)
 		// Unknown opcode, ignore
@@ -108,6 +112,7 @@ func (h *NakamaMatchHandler) HandleMessage(sender string, data []byte) error {
 }
 
 // handleRollDice handles dice roll request.
+// Steps are now calculated by RollDiceAction inside HSM, not by DiceManager.
 func (h *NakamaMatchHandler) handleRollDice(sender string) error {
 	logger := NewLogger(h)
 	logger.logRequest("handleRollDice", sender, nil)
@@ -142,10 +147,6 @@ func (h *NakamaMatchHandler) handleRollDice(sender string) error {
 		return h.sendActionRejectedWithCode(sender, pkgnet.OpRollDice, constants.ErrInvalidState, "Cannot roll dice in current state")
 	}
 
-	// Roll dice using dice manager
-	steps := h.diceMgr.RollSpecialDice(sender)
-	h.logInfo("handleRollDice: dice rolled", "steps", steps)
-
 	// Create builder for context
 	builder := net.NewBuilder(h.hsm)
 
@@ -156,9 +157,9 @@ func (h *NakamaMatchHandler) handleRollDice(sender string) error {
 		WithBroadcast(NewNakamaBroadcastAdapter(h)).
 		WithBuilder(builder)
 
-	// Call HSM's OnRollDice method
+	// Call HSM's OnRollDice method (no steps parameter - calculated internally by RollDiceAction)
 	h.logDebug("handleRollDice: calling OnRollDice")
-	err := h.hsm.OnRollDice(steps, ctx)
+	err := h.hsm.OnRollDice(ctx)
 	if err != nil {
 		logger.logError("OpRollDice", sender, err)
 		return err
@@ -450,6 +451,55 @@ func (h *NakamaMatchHandler) handleMiniGameResult(sender string, data []byte) er
 	h.diceMgr.AssignDice(sender, req.Rank)
 
 	logger.logResponse("OpMiniGameResultSubmit", sender, "result submitted")
+	return nil
+}
+
+// handleRoundReady handles client's round-ready signal.
+// Called when client finishes rendering current round and is ready for next.
+func (h *NakamaMatchHandler) handleRoundReady(sender string) error {
+	logger := NewLogger(h)
+	logger.logRequest("handleRoundReady", sender, nil)
+
+	// Get player
+	player := h.GetPlayer(sender)
+	if player == nil {
+		logger.logReject("OpRoundReady", sender, constants.ErrPlayerNotFound, "player_not_found", "Unknown player")
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpRoundReady, constants.ErrPlayerNotFound, "Unknown player")
+	}
+
+	// Check if in RoundEndWait state
+	globalState := h.hsm.GetGlobalStateID()
+	logger.logState(sender, globalState.String(), hsm.StateRoundEndWait.String())
+
+	if globalState != hsm.StateRoundEndWait {
+		logger.logReject("OpRoundReady", sender, constants.ErrInvalidState, "invalid_state", "Not in round-end wait state")
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpRoundReady, constants.ErrInvalidState, "Not in round-end wait state")
+	}
+
+	// Create builder for context
+	builder := net.NewBuilder(h.hsm)
+
+	// Create state context for HSM
+	ctx := hsm.NewStateContext().
+		WithHSM(h.hsm).
+		WithPlayer(player).
+		WithBroadcast(NewNakamaBroadcastAdapter(h)).
+		WithBuilder(builder)
+
+	// Call HSM's OnRoundReady method
+	err := h.hsm.OnRoundReady(player.ID.UUID(), ctx)
+	if err != nil {
+		logger.logError("OpRoundReady", sender, err)
+		return err
+	}
+
+	// Check if state execution produced an error
+	if ctx.Error != nil {
+		logger.logError("OpRoundReady", sender, ctx.Error)
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpRoundReady, ErrorCodeForError(ctx.Error), ctx.Error.Error())
+	}
+
+	logger.logResponse("OpRoundReady", sender, "round ready signal received")
 	return nil
 }
 
