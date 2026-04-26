@@ -41,7 +41,7 @@ func (b *Builder) SetDiceTypeFromRng(diceType rng.DiceType) {
 	b.turnDiceType = diceType
 }
 
-// BuildStateSync builds a complete state sync message.
+// BuildStateSync builds a complete state sync message with incremental entries.
 func (b *Builder) BuildStateSync() *pkgnet.StateSync {
 	globalState := b.hsm.GetGlobalStateID()
 	turnState := b.hsm.GetTurnStateID()
@@ -52,6 +52,9 @@ func (b *Builder) BuildStateSync() *pkgnet.StateSync {
 		currentPlayerID = turnPlayer.ID.UUID()
 	}
 
+	// Get incremental entries since last broadcast
+	entries := b.getNewEntries()
+
 	return &pkgnet.StateSync{
 		GlobalState:     globalState.String(),
 		TurnState:       turnState.String(),
@@ -61,23 +64,34 @@ func (b *Builder) BuildStateSync() *pkgnet.StateSync {
 		Paused:          b.hsm.IsPaused(),
 		Players:         b.BuildPlayers(),
 		Map:             *b.BuildMapInfo(),
+		Entries:         entries,
 	}
 }
 
-// BuildTurnSync builds a turn sync message with all log entries.
-func (b *Builder) BuildTurnSync() *pkgnet.TurnSync {
-	entries := b.GetCurrentTurnEntries()
+// BuildFullSyncStateSync builds a state sync for reconnecting players
+// with all current turn entries (not incremental).
+func (b *Builder) BuildFullSyncStateSync() *pkgnet.StateSync {
+	globalState := b.hsm.GetGlobalStateID()
+	turnState := b.hsm.GetTurnStateID()
+	turnPlayer := b.hsm.GetTurnPlayer()
 
-	player := b.hsm.GetTurnPlayer()
-	currentPlayerID := ""
-	if player != nil {
-		currentPlayerID = player.ID.UUID()
+	var currentPlayerID string
+	if turnPlayer != nil {
+		currentPlayerID = turnPlayer.ID.UUID()
 	}
 
-	return &pkgnet.TurnSync{
+	// Get all current turn entries for full sync (reconnecting players need complete data)
+	entries := b.getAllCurrentEntries()
+
+	return &pkgnet.StateSync{
+		GlobalState:     globalState.String(),
+		TurnState:       turnState.String(),
+		CurrentPlayerID: currentPlayerID,
 		Round:           b.hsm.GetRound(),
 		Turn:            b.hsm.GetTurn(),
-		CurrentPlayerID: currentPlayerID,
+		Paused:          b.hsm.IsPaused(),
+		Players:         b.BuildPlayers(),
+		Map:             *b.BuildMapInfo(),
 		Entries:         entries,
 	}
 }
@@ -229,11 +243,6 @@ func (b *Builder) BuildDecisionFromEvent(decision *event.Decision) *pkgnet.Decis
 	}
 }
 
-// BuildFullSync builds complete sync data for reconnecting players.
-func (b *Builder) BuildFullSync() (*pkgnet.StateSync, *pkgnet.TurnSync) {
-	return b.BuildStateSync(), b.BuildTurnSync()
-}
-
 // BuildMapInfo builds map information from MapEngine data.
 // Implements pkg/net.Builder interface.
 func (b *Builder) BuildMapInfo() *pkgnet.MapInfo {
@@ -263,11 +272,23 @@ func (b *Builder) BuildMapInfo() *pkgnet.MapInfo {
 	}
 }
 
-// GetCurrentTurnEntries returns current turn's log entries.
-func (b *Builder) GetCurrentTurnEntries() []gamelog.LogEntry {
+// getNewEntries returns incremental entries since last broadcast and marks them as broadcasted.
+func (b *Builder) getNewEntries() []gamelog.LogEntry {
 	game := b.hsm.GetGame()
 	if game == nil || game.Log == nil {
 		return nil
 	}
-	return game.Log.GetCurrentTurnEntries()
+	entries := game.Log.GetNewEntries()
+	game.Log.MarkBroadcasted()
+	return entries
+}
+
+// getAllCurrentEntries returns all current turn entries for FullSync.
+// Does not call MarkBroadcasted - reconnecting players need full data without affecting incremental tracking.
+func (b *Builder) getAllCurrentEntries() []gamelog.LogEntry {
+	game := b.hsm.GetGame()
+	if game == nil || game.Log == nil {
+		return nil
+	}
+	return game.Log.GetAllCurrentEntries()
 }

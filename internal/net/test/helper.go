@@ -100,9 +100,9 @@ func (h *TestHelper) BuildStateSync() *pkgnet.StateSync {
 	return h.builder.BuildStateSync()
 }
 
-// BuildTurnSync builds turn sync with current turn actions.
-func (h *TestHelper) BuildTurnSync() *pkgnet.TurnSync {
-	return h.builder.BuildTurnSync()
+// BuildFullSyncStateSync builds a full sync state for reconnecting players.
+func (h *TestHelper) BuildFullSyncStateSync() *pkgnet.StateSync {
+	return h.builder.BuildFullSyncStateSync()
 }
 
 // BuildAvailable builds available actions for a player.
@@ -149,10 +149,10 @@ func (h *TestHelper) SimulateStateTransition(globalState, turnState string) erro
 	return h.CaptureBroadcast(pkgnet.OpStateSync, stateSync)
 }
 
-// SimulateTurnSync simulates broadcasting turn actions.
-func (h *TestHelper) SimulateTurnSync() error {
-	turnSync := h.builder.BuildTurnSync()
-	return h.CaptureBroadcast(pkgnet.OpTurnSync, turnSync)
+// SimulateStateSyncBroadcast simulates broadcasting state sync.
+func (h *TestHelper) SimulateStateSyncBroadcast() error {
+	stateSync := h.builder.BuildStateSync()
+	return h.CaptureBroadcast(pkgnet.OpStateSync, stateSync)
 }
 
 // WaitForDecision simulates sending a decision request to a player.

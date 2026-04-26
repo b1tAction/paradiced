@@ -5,8 +5,10 @@
 ## 设计目标
 
 1. **数据转换**：将 `core.Player`、`gamelog.LogEntry` 转换为协议数据结构
-2. **测试支持**：提供测试辅助函数模拟游戏流程
-3. **复用现有组件**：使用 `pkg/rng.DiceManager` 进行骰子计算
+2. **增量广播**：`BuildStateSync()` 自动获取增量 LogEntry 并标记已广播
+3. **断线重连**：`BuildFullSyncStateSync()` 提供包含当前回合全部 LogEntry 的 StateSync
+4. **测试支持**：提供测试辅助函数模拟游戏流程
+5. **复用现有组件**：使用 `pkg/rng.DiceManager` 进行骰子计算
 
 ## 文件说明
 
@@ -28,13 +30,13 @@ import (
 )
 
 // 创建构建器
-builder := internalnet.NewBuilder(hsm, game)
+builder := internalnet.NewBuilder(hsm)
 
-// 构建状态同步
+// 构建状态同步（含增量 LogEntry，自动 MarkBroadcasted）
 stateSync := builder.BuildStateSync()
 
-// 构建回合同步（从GameLog提取所有Action）
-turnSync := builder.BuildTurnSync()
+// 构建断线重连状态同步（含当前回合全部 LogEntry，不 MarkBroadcasted）
+fullSyncState := builder.BuildFullSyncStateSync()
 
 // 构建玩家快照
 players := builder.BuildPlayers()
@@ -42,23 +44,40 @@ players := builder.BuildPlayers()
 // 构建可用操作列表
 builder.SetDiceType(rng.DiceTypeGold) // 设置骰子类型（使用 pkg/rng.DiceType 枚举）
 available := builder.BuildAvailable(player)
+````
 
-// 构建完整同步（断线重连）
-stateSync, turnSync := builder.BuildFullSync()
-```
+## StateSync 增量 Entries 构建
 
-## TurnSync 构建
-
-`BuildTurnSync()` 从当前回合的 GameLog 提取所有 LogEntry，直接用于协议同步：
+`BuildStateSync()` 通过 `GameLog.GetNewEntries()` 获取自上次广播以来的新 LogEntry，并自动调用 `MarkBroadcasted()` 标记已广播索引：
 
 ```go
-func (b *Builder) BuildTurnSync() *pkgnet.TurnSync {
-    entries := b.GetCurrentTurnEntries()
-    return &pkgnet.TurnSync{
-        Round:           b.game.State.Round,
-        Turn:            b.game.State.Turn,
+func (b *Builder) BuildStateSync() *pkgnet.StateSync {
+    // Get incremental entries since last broadcast
+    entries := b.getNewEntries()  // calls GetNewEntries() + MarkBroadcasted()
+
+    return &pkgnet.StateSync{
+        GlobalState:     globalState,
+        TurnState:       turnState,
         CurrentPlayerID: playerID,
+        Round:           b.hsm.GetRound(),
+        Turn:            b.hsm.GetTurn(),
+        Paused:          b.hsm.IsPaused(),
+        Players:         b.BuildPlayers(),
+        Map:             *b.BuildMapInfo(),
         Entries:         entries,
+    }
+}
+```
+
+**断线重连**使用 `BuildFullSyncStateSync()` 获取当前回合全部 LogEntry，不调用 `MarkBroadcasted()`：
+
+```go
+func (b *Builder) BuildFullSyncStateSync() *pkgnet.StateSync {
+    entries := b.getAllCurrentEntries()  // calls GetAllCurrentEntries() only
+
+    return &pkgnet.StateSync{
+        // ... same fields as BuildStateSync ...
+        Entries: entries,  // contains ALL current turn LogEntry
     }
 }
 ```
@@ -206,24 +225,20 @@ helper.SimulateActionExecution("damage", "player_001", -1, "Buff_Curse")
 broadcasts := helper.GetBroadcasts()
 
 // 构建完整同步数据
-fullSync := helper.BuildStateSync()
-turnSync := helper.BuildTurnSync()
+stateSync := helper.BuildStateSync()
+fullSyncState := helper.BuildFullSyncStateSync()
 ```
 
 ## 与 BroadcastAdapter 集成
 
-Builder 生成的数据通过 BroadcastAdapter 发送：
+Builder 生成的数据通过 BroadcastAdapter 发送。`TurnSync` 已移除，LogEntry 数据通过 `StateSync.Entries` 增量携带：
 
 ```go
 func (h *NakamaMatchHandler) broadcastTurnEnd() {
-    // 构建回合同步
-    turnSync := h.builder.BuildTurnSync()
-    
-    // 广播给所有玩家
-    h.adapter.BroadcastTurnSync(turnSync)
-    
-    // 构建状态同步
+    // 构建状态同步（含增量 Entries）
     stateSync := h.builder.BuildStateSync()
+
+    // 广播给所有玩家
     h.adapter.BroadcastStateSync(stateSync)
 }
 ```

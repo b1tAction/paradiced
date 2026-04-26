@@ -53,7 +53,7 @@ func TestBuildStateSync(t *testing.T) {
 	}
 }
 
-func TestBuildTurnSync(t *testing.T) {
+func TestBuildStateSyncWithEntries(t *testing.T) {
 	builder, game, hsmInstance := newTestBuilder()
 
 	player := newTestPlayer(constants.FactionZhuQue)
@@ -74,26 +74,69 @@ func TestBuildTurnSync(t *testing.T) {
 	entry2 := gamelog.NewActionEntryWithMetadata("move", player.ID.UUID(), "DiceRoll", meta)
 	game.Log.AddEntry(entry2)
 
-	turnSync := builder.BuildTurnSync()
+	stateSync := builder.BuildStateSync()
 
-	if turnSync.Round != 1 {
-		t.Errorf("turnSync.Round = %d, want 1", turnSync.Round)
+	if stateSync.Round != 1 {
+		t.Errorf("stateSync.Round = %d, want 1", stateSync.Round)
 	}
-	if len(turnSync.Entries) != 2 {
-		t.Errorf("len(turnSync.Entries) = %d, want 2", len(turnSync.Entries))
+	if len(stateSync.Entries) != 2 {
+		t.Errorf("len(stateSync.Entries) = %d, want 2", len(stateSync.Entries))
 	}
-	if turnSync.Entries[0].ActionType != "modify_lp" {
-		t.Errorf("turnSync.Entries[0].ActionType = %s, want modify_lp", turnSync.Entries[0].ActionType)
+	if stateSync.Entries[0].ActionType != "modify_lp" {
+		t.Errorf("stateSync.Entries[0].ActionType = %s, want modify_lp", stateSync.Entries[0].ActionType)
 	}
-	if turnSync.Entries[0].Metadata.GetIntOrDefault("lp_change", 0) != 1 {
-		t.Errorf("turnSync.Entries[0].lp_change = %d, want 1", turnSync.Entries[0].Metadata.GetIntOrDefault("lp_change", 0))
+	if stateSync.Entries[0].Metadata.GetIntOrDefault("lp_change", 0) != 1 {
+		t.Errorf("stateSync.Entries[0].lp_change = %d, want 1", stateSync.Entries[0].Metadata.GetIntOrDefault("lp_change", 0))
 	}
-	if turnSync.Entries[1].ActionType != "move" {
-		t.Errorf("turnSync.Entries[1].ActionType = %s, want move", turnSync.Entries[1].ActionType)
+	if stateSync.Entries[1].ActionType != "move" {
+		t.Errorf("stateSync.Entries[1].ActionType = %s, want move", stateSync.Entries[1].ActionType)
+	}
+
+	// Second BuildStateSync should return 0 new entries (already broadcasted)
+	stateSync2 := builder.BuildStateSync()
+	if len(stateSync2.Entries) != 0 {
+		t.Errorf("len(stateSync2.Entries) = %d, want 0 (no new entries after MarkBroadcasted)", len(stateSync2.Entries))
 	}
 }
 
-func TestBuildTurnSyncWithMetadata(t *testing.T) {
+func TestBuildStateSyncIncrementalEntries(t *testing.T) {
+	builder, game, hsmInstance := newTestBuilder()
+
+	player := newTestPlayer(constants.FactionQingLong)
+	game.AddPlayer(player)
+	hsmInstance.SetTurnPlayer(player)
+
+	game.Log.StartTurn(1, 0, player.ID.UUID())
+
+	// First broadcast: 1 entry
+	game.Log.AddEntry(gamelog.NewActionEntry("damage", player.ID.UUID(), "Test1"))
+	stateSync1 := builder.BuildStateSync()
+	if len(stateSync1.Entries) != 1 {
+		t.Errorf("len(stateSync1.Entries) = %d, want 1", len(stateSync1.Entries))
+	}
+
+	// Add 2 more entries, second broadcast should only return the new 2
+	game.Log.AddEntry(gamelog.NewActionEntry("heal", player.ID.UUID(), "Test2"))
+	game.Log.AddEntry(gamelog.NewActionEntry("move", player.ID.UUID(), "Test3"))
+	stateSync2 := builder.BuildStateSync()
+	if len(stateSync2.Entries) != 2 {
+		t.Errorf("len(stateSync2.Entries) = %d, want 2 (incremental)", len(stateSync2.Entries))
+	}
+	if stateSync2.Entries[0].ActionType != "heal" {
+		t.Errorf("stateSync2.Entries[0].ActionType = %s, want heal", stateSync2.Entries[0].ActionType)
+	}
+	if stateSync2.Entries[1].ActionType != "move" {
+		t.Errorf("stateSync2.Entries[1].ActionType = %s, want move", stateSync2.Entries[1].ActionType)
+	}
+
+	// Third broadcast: no new entries
+	stateSync3 := builder.BuildStateSync()
+	if len(stateSync3.Entries) != 0 {
+		t.Errorf("len(stateSync3.Entries) = %d, want 0", len(stateSync3.Entries))
+	}
+}
+
+func TestBuildStateSyncEntriesWithMetadata(t *testing.T) {
 	builder, game, hsmInstance := newTestBuilder()
 
 	player := newTestPlayer(constants.FactionQingLong)
@@ -111,24 +154,24 @@ func TestBuildTurnSyncWithMetadata(t *testing.T) {
 	entry := gamelog.NewActionEntryWithMetadata("move", player.ID.UUID(), "DiceRoll", meta)
 	game.Log.AddEntry(entry)
 
-	turnSync := builder.BuildTurnSync()
+	stateSync := builder.BuildStateSync()
 
-	if len(turnSync.Entries) != 1 {
-		t.Fatalf("len(turnSync.Entries) = %d, want 1", len(turnSync.Entries))
+	if len(stateSync.Entries) != 1 {
+		t.Fatalf("len(stateSync.Entries) = %d, want 1", len(stateSync.Entries))
 	}
 
 	// Verify entry has metadata
-	if turnSync.Entries[0].Metadata == nil {
-		t.Fatal("turnSync.Entries[0].Metadata should not be nil")
+	if stateSync.Entries[0].Metadata == nil {
+		t.Fatal("stateSync.Entries[0].Metadata should not be nil")
 	}
 
 	// Verify metadata fields preserved
-	path := turnSync.Entries[0].Metadata.GetIntOrDefault("dice_steps", 0)
-	if path != 3 {
-		t.Errorf("dice_steps = %d, want 3", path)
+	diceSteps := stateSync.Entries[0].Metadata.GetIntOrDefault("dice_steps", 0)
+	if diceSteps != 3 {
+		t.Errorf("dice_steps = %d, want 3", diceSteps)
 	}
 
-	diceType := turnSync.Entries[0].Metadata.GetStringOrDefault("dice_type", "")
+	diceType := stateSync.Entries[0].Metadata.GetStringOrDefault("dice_type", "")
 	if diceType != "silver" {
 		t.Errorf("dice_type = %s, want silver", diceType)
 	}
@@ -242,7 +285,7 @@ func TestBuildAvailableWithCharge(t *testing.T) {
 	}
 }
 
-func TestBuildFullSync(t *testing.T) {
+func TestBuildFullSyncStateSync(t *testing.T) {
 	builder, game, hsmInstance := newTestBuilder()
 
 	player := newTestPlayer(constants.FactionQingLong)
@@ -252,16 +295,19 @@ func TestBuildFullSync(t *testing.T) {
 	game.Log.StartTurn(1, 0, player.ID.UUID())
 	game.Log.AddEntry(gamelog.NewActionEntry("heal", player.ID.UUID(), "Test"))
 
-	stateSync, turnSync := builder.BuildFullSync()
+	// MarkBroadcasted so incremental won't return entries
+	stateSync := builder.BuildStateSync()
+	if len(stateSync.Entries) != 1 {
+		t.Errorf("first BuildStateSync.Entries = %d, want 1", len(stateSync.Entries))
+	}
 
-	if stateSync == nil {
-		t.Fatal("stateSync should not be nil")
+	// BuildFullSyncStateSync returns all current entries (not incremental)
+	fullSyncState := builder.BuildFullSyncStateSync()
+	if fullSyncState == nil {
+		t.Fatal("BuildFullSyncStateSync should not return nil")
 	}
-	if turnSync == nil {
-		t.Fatal("turnSync should not be nil")
-	}
-	if len(turnSync.Entries) != 1 {
-		t.Errorf("len(turnSync.Entries) = %d, want 1", len(turnSync.Entries))
+	if len(fullSyncState.Entries) != 1 {
+		t.Errorf("len(fullSyncState.Entries) = %d, want 1 (all current entries)", len(fullSyncState.Entries))
 	}
 }
 
@@ -289,25 +335,25 @@ func TestBuildDecision(t *testing.T) {
 	}
 }
 
-func TestGetCurrentTurnEntries(t *testing.T) {
+func TestGetNewEntriesAfterStartTurn(t *testing.T) {
 	builder, game, hsmInstance := newTestBuilder()
 
 	player := newTestPlayer(constants.FactionQingLong)
 	game.AddPlayer(player)
 	hsmInstance.SetTurnPlayer(player)
 
-	// Without starting turn, should return nil
-	entries := builder.GetCurrentTurnEntries()
-	if entries != nil {
-		t.Errorf("GetCurrentTurnEntries() = %v, want nil before StartTurn", entries)
+	// Without starting turn, BuildStateSync should have nil Entries
+	stateSync := builder.BuildStateSync()
+	if stateSync.Entries != nil {
+		t.Errorf("stateSync.Entries = %v, want nil before StartTurn", stateSync.Entries)
 	}
 
 	// Start turn and add entries
 	game.Log.StartTurn(1, 0, player.ID.UUID())
 	game.Log.AddEntry(gamelog.NewActionEntry("damage", player.ID.UUID(), "Test"))
 
-	entries = builder.GetCurrentTurnEntries()
-	if len(entries) != 1 {
-		t.Errorf("len(GetCurrentTurnEntries()) = %d, want 1", len(entries))
+	stateSync = builder.BuildStateSync()
+	if len(stateSync.Entries) != 1 {
+		t.Errorf("len(stateSync.Entries) = %d, want 1", len(stateSync.Entries))
 	}
 }
