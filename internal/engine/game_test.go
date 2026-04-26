@@ -521,3 +521,96 @@ func TestGameGetActiveBuffCount(t *testing.T) {
 		t.Error("Unknown player buff count should be 0")
 	}
 }
+
+// ========== Item Lifecycle Tests ==========
+
+func TestApplyItemToPlayer(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	item := core.NewItem(constants.ItemTypeReverseClock)
+	err := game.ApplyItemToPlayer(player, item)
+
+	if err != nil {
+		t.Errorf("ApplyItemToPlayer failed: %v", err)
+	}
+
+	// Item should be in player's inventory
+	if len(player.Inventory) != 1 {
+		t.Errorf("Player should have 1 item, got %d", len(player.Inventory))
+	}
+	if player.Inventory[0].Type != constants.ItemTypeReverseClock {
+		t.Errorf("Item type = %s, expected reverse_clock", player.Inventory[0].Type)
+	}
+
+	// ReverseClock subscribes to PhaseAnyTime which doesn't need subscription,
+	// so verify through UnsubscribeBySource that item.ID.UUID() is tracked
+	// (PhaseAnyTime.NeedsSubscription() returns false, so no EventBus subscription)
+	// This is expected behavior - item handlers are invoked via PhaseItemUsed publish
+}
+
+func TestRemoveItemFromPlayer(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	item := core.NewItem(constants.ItemTypeReverseClock)
+	game.ApplyItemToPlayer(player, item)
+
+	if len(player.Inventory) != 1 {
+		t.Fatalf("Player should have 1 item before removal, got %d", len(player.Inventory))
+	}
+
+	removed := game.RemoveItemFromPlayer(player, item)
+
+	if !removed {
+		t.Error("RemoveItemFromPlayer should return true for existing item")
+	}
+
+	// Item should be removed from player's inventory
+	if len(player.Inventory) != 0 {
+		t.Errorf("Player should have 0 items after removal, got %d", len(player.Inventory))
+	}
+}
+
+func TestApplyItemToPlayerWithSubscription(t *testing.T) {
+	// AnyDoor subscribes to PhaseOnLand which needs subscription
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	item := core.NewItem(constants.ItemTypeAnyDoor)
+	err := game.ApplyItemToPlayer(player, item)
+
+	if err != nil {
+		t.Errorf("ApplyItemToPlayer failed: %v", err)
+	}
+
+	// Item should be in player's inventory
+	if len(player.Inventory) != 1 {
+		t.Errorf("Player should have 1 item, got %d", len(player.Inventory))
+	}
+
+	// AnyDoor subscribes to PhaseOnLand
+	subscriptions := game.Bus.GetSubscriptions(constants.PhaseOnLand)
+	hasItemSub := false
+	for _, sub := range subscriptions {
+		if sub.SourceID == item.ID.UUID() {
+			hasItemSub = true
+			break
+		}
+	}
+	if !hasItemSub {
+		t.Error("AnyDoor item should be subscribed to PhaseOnLand after ApplyItemToPlayer")
+	}
+
+	// Remove item and verify subscription removed
+	game.RemoveItemFromPlayer(player, item)
+	subscriptions = game.Bus.GetSubscriptions(constants.PhaseOnLand)
+	for _, sub := range subscriptions {
+		if sub.SourceID == item.ID.UUID() {
+			t.Error("AnyDoor subscription should be removed after RemoveItemFromPlayer")
+		}
+	}
+}

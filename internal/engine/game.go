@@ -28,6 +28,7 @@ type Game struct {
 	RoundData    *util.Metadata       `json:"-"`   // Round-level persistent data (cleared each round)
 	EventPool    []*rng.EvaluatedItem `json:"-"`   // Event pool for DrawEventAction (all events)
 	ItemPool     []*rng.EvaluatedItem `json:"-"`   // Item pool for DrawItemAction (all items)
+	BuffPool     []*rng.EvaluatedItem `json:"-"`   // Buff pool for DrawBuffAction (drawable buffs)
 	BossSkillPool []*rng.EvaluatedItem `json:"-"` // Boss skill pool for random draw
 	mutex        sync.RWMutex
 }
@@ -245,6 +246,44 @@ func (g *Game) createItemDecisionWithAction(item *core.Item, def *core.ItemDefin
 // Uses UnsubscribeBySource with item.ID.UUID() to remove subscription.
 func (g *Game) UnsubscribeItem(item *core.Item) {
 	g.Bus.UnsubscribeBySource(item.ID.UUID())
+}
+
+// ========== Item Lifecycle Management ==========
+
+// ApplyItemToPlayer adds Item to player and handles complete lifecycle.
+// Process order:
+//  1. Underlying data add (player.AddItem)
+//  2. Subscribe to EventBus (SubscribeItem)
+//
+// Note: Called by AddItemAction.Execute via OnAddItem callback.
+func (g *Game) ApplyItemToPlayer(player *core.Player, item *core.Item) error {
+	// 1. Underlying data add
+	if err := player.AddItem(item); err != nil {
+		return err
+	}
+
+	// 2. Subscribe to EventBus
+	g.SubscribeItem(player, item)
+
+	return nil
+}
+
+// RemoveItemFromPlayer removes Item from player and handles complete lifecycle.
+// Process order:
+//  1. Unsubscribe (UnsubscribeItem)
+//  2. Underlying data remove (player.RemoveItem)
+//
+// Note: Called by RemoveItemAction.Execute via OnRemoveItem callback.
+func (g *Game) RemoveItemFromPlayer(player *core.Player, item *core.Item) bool {
+	// 1. Unsubscribe
+	g.UnsubscribeItem(item)
+
+	// 2. Underlying data remove
+	removed, err := player.RemoveItem(item.ID)
+	if err != nil {
+		return false
+	}
+	return removed != nil
 }
 
 // ========== Faction Initialization ==========
