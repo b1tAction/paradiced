@@ -414,3 +414,98 @@ func TestGameLogConcurrentAccess(t *testing.T) {
 		t.Errorf("Should have 10 segments, got %d", len(segments))
 	}
 }
+
+// ========== Broadcast Incremental Tests ==========
+
+func TestGetNewEntriesNoActiveTurn(t *testing.T) {
+	log := NewGameLog()
+	entries := log.GetNewEntries()
+	if entries != nil {
+		t.Errorf("GetNewEntries without active turn should return nil, got %d entries", len(entries))
+	}
+}
+
+func TestGetNewEntriesAndMarkBroadcasted(t *testing.T) {
+	log := NewGameLog()
+
+	// Start turn and add entries
+	log.StartTurn(1, 0, "player1")
+	log.AddEntry(NewActionEntry("Damage", "player1", "Event_Trap"))
+	log.AddEntry(NewActionEntry("Heal", "player1", "Buff_Rain"))
+
+	// Get new entries - should return all 2
+	entries := log.GetNewEntries()
+	if len(entries) != 2 {
+		t.Errorf("GetNewEntries should return 2 entries, got %d", len(entries))
+	}
+
+	// Mark as broadcasted
+	log.MarkBroadcasted()
+
+	// Add more entries
+	log.AddEntry(NewActionEntry("Move", "player1", "DiceRoll"))
+
+	// Get new entries - should only return 1 new entry
+	entries = log.GetNewEntries()
+	if len(entries) != 1 {
+		t.Errorf("GetNewEntries after MarkBroadcasted should return 1 new entry, got %d", len(entries))
+	}
+	if entries[0].ActionType != "Move" {
+		t.Errorf("New entry should be Move, got %s", entries[0].ActionType)
+	}
+
+	// Mark again
+	log.MarkBroadcasted()
+
+	// Get new entries - should return nil (no new entries)
+	entries = log.GetNewEntries()
+	if entries != nil {
+		t.Errorf("GetNewEntries after second MarkBroadcasted should return nil, got %d entries", len(entries))
+	}
+}
+
+func TestMarkBroadcastedNoActiveTurn(t *testing.T) {
+	log := NewGameLog()
+	// Should not panic when no active turn
+	log.MarkBroadcasted()
+}
+
+func TestGetAllCurrentEntriesNoActiveTurn(t *testing.T) {
+	log := NewGameLog()
+	entries := log.GetAllCurrentEntries()
+	if entries != nil {
+		t.Errorf("GetAllCurrentEntries without active turn should return nil, got %d entries", len(entries))
+	}
+}
+
+func TestGetAllCurrentEntries(t *testing.T) {
+	log := NewGameLog()
+
+	// Start turn and add entries
+	log.StartTurn(1, 0, "player1")
+	log.AddEntry(NewActionEntry("Damage", "player1", "Event_Trap"))
+	log.AddEntry(NewActionEntry("Heal", "player1", "Buff_Rain"))
+
+	// Mark some as broadcasted
+	log.MarkBroadcasted()
+
+	// Add more entries
+	log.AddEntry(NewActionEntry("Move", "player1", "DiceRoll"))
+
+	// GetAllCurrentEntries should return ALL entries (including broadcasted ones)
+	allEntries := log.GetAllCurrentEntries()
+	if len(allEntries) != 3 {
+		t.Errorf("GetAllCurrentEntries should return 3 entries (all), got %d", len(allEntries))
+	}
+
+	// Verify entries are in order
+	if allEntries[0].ActionType != "Damage" {
+		t.Errorf("First entry should be Damage, got %s", allEntries[0].ActionType)
+	}
+	if allEntries[1].ActionType != "Heal" {
+		t.Errorf("Second entry should be Heal, got %s", allEntries[1].ActionType)
+	}
+	if allEntries[2].ActionType != "Move" {
+		t.Errorf("Third entry should be Move, got %s", allEntries[2].ActionType)
+	}
+}
