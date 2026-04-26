@@ -4,6 +4,8 @@ import (
 	"sort"
 
 	"github.com/b1tAction/paradiced/internal/core"
+	"github.com/b1tAction/paradiced/internal/engine/minigame"
+	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/errors"
 	"github.com/b1tAction/paradiced/pkg/id"
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
@@ -126,21 +128,46 @@ func (s *WaitingForHostState) Exit(ctx *StateContext) {
 }
 
 // RoundMiniGameState - Mini-Game Phase State
-// Waits for all players to submit mini-game rankings.
+// Waits for all players to submit mini-game data (game_data), then calculates rankings.
 
 type RoundMiniGameState struct {
 	BaseGlobalState
 	resultsReceived int
 	totalPlayers    int
+	gameType        constants.MiniGameType                      // Current round mini-game type (server-selected)
+	mode            constants.MiniGameMode                      // Frontend-driven or RPC-driven
+	gameData        map[string]map[string]interface{}           // playerID -> game_data (frontend mode storage)
+	rankCalculator  minigame.RankCalculator
 }
 
-// NewRoundMiniGameState creates a new RoundMiniGame state.
+// NewRoundMiniGameState creates a new RoundMiniGame state with default frontend-driven mode.
 func NewRoundMiniGameState() *RoundMiniGameState {
 	return &RoundMiniGameState{
 		BaseGlobalState: BaseGlobalState{id: StateRoundMiniGame},
 		resultsReceived: 0,
 		totalPlayers:    0,
+		gameType:        constants.MiniGameTypeDiceRace,
+		mode:            constants.MiniGameModeFrontend,
+		gameData:        make(map[string]map[string]interface{}),
+		rankCalculator:  minigame.NewDefaultRankCalculator(),
 	}
+}
+
+// WithMode sets the mini-game mode (frontend-driven or RPC-driven).
+func (s *RoundMiniGameState) WithMode(mode constants.MiniGameMode) *RoundMiniGameState {
+	s.mode = mode
+	return s
+}
+
+// WithRankCalculator sets a custom rank calculator.
+func (s *RoundMiniGameState) WithRankCalculator(calc minigame.RankCalculator) *RoundMiniGameState {
+	s.rankCalculator = calc
+	return s
+}
+
+// GetGameType returns the current round's mini-game type.
+func (s *RoundMiniGameState) GetGameType() constants.MiniGameType {
+	return s.gameType
 }
 
 func (s *RoundMiniGameState) Enter(ctx *StateContext) {
@@ -160,6 +187,10 @@ func (s *RoundMiniGameState) Enter(ctx *StateContext) {
 	}
 	s.totalPlayers = nonBossPlayers
 	s.resultsReceived = 0
+	s.gameData = make(map[string]map[string]interface{}, nonBossPlayers)
+
+	// Select mini-game type using game RNG for deterministic replay
+	s.gameType = minigame.SelectMiniGameType(game.RNG)
 
 	ctx.SetBool(KeyMiniGameStarted, true)
 	ctx.SetBool(KeyWaitingForResults, true)
@@ -173,7 +204,7 @@ func (s *RoundMiniGameState) Enter(ctx *StateContext) {
 			}
 		}
 		start := &pkgnet.MiniGameStart{
-			GameType: "dice_race",
+			GameType: string(s.gameType),
 			Players:  playerIDs,
 		}
 		ctx.Broadcast.BroadcastMiniGameStart(start)
@@ -227,7 +258,35 @@ func (s *RoundMiniGameState) Exit(ctx *StateContext) {
 	ctx.SetBool(KeyWaitingForResults, false)
 }
 
-// OnMiniGameResult handles mini-game result submission.
+// OnMiniGameDataSubmit handles client mini-game data submission (frontend-driven mode).
+// Stores game_data, verifies game_type match, and calculates rankings when all submissions received.
+// Returns true if all players have submitted and rankings were calculated.
+func (s *RoundMiniGameState) OnMiniGameDataSubmit(ctx *StateContext, playerID string, gameType constants.MiniGameType, gameData map[string]interface{}) bool {
+	if s.mode != constants.MiniGameModeFrontend {
+		return false // Not applicable for RPC mode
+	}
+
+	// Verify game_type matches current round's selection
+	if gameType != s.gameType {
+		return false // Game type mismatch, will be rejected by handler
+	}
+
+	s.gameData[playerID] = gameData
+	s.resultsReceived++
+
+	// When all submissions received, calculate rankings
+	if s.resultsReceived >= s.totalPlayers {
+		ranks := s.rankCalculator.Calculate(s.gameType, s.gameData)
+		for pid, rank := range ranks {
+			ctx.SetMiniGameRank(pid, rank)
+		}
+		return true
+	}
+	return false
+}
+
+// OnMiniGameResult handles direct rank assignment (internal/RPC mode).
+// Used by RPC report handler to directly set pre-calculated rankings.
 func (s *RoundMiniGameState) OnMiniGameResult(ctx *StateContext, playerID string, rank int) {
 	s.resultsReceived++
 	ctx.SetMiniGameRank(playerID, rank)

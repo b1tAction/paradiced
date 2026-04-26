@@ -630,3 +630,126 @@ func TestActionRejectedDifferentErrorCodes(t *testing.T) {
 		})
 	}
 }
+
+func TestMiniGameStartWithConnection(t *testing.T) {
+	conn := &MiniGameConn{
+		URL:    "ws://minigame.example.com",
+		RoomID: "room-abc123",
+		Token:  "token-xyz789",
+	}
+	start := MiniGameStart{
+		GameType:   "coin_flip",
+		Players:    []string{"p1", "p2"},
+		Connection: conn,
+	}
+
+	jsonBytes, err := json.Marshal(start)
+	if err != nil {
+		t.Fatalf("json.Marshal() error: %v", err)
+	}
+
+	var parsed MiniGameStart
+	err = json.Unmarshal(jsonBytes, &parsed)
+	if err != nil {
+		t.Fatalf("json.Unmarshal() error: %v", err)
+	}
+	if parsed.GameType != "coin_flip" {
+		t.Errorf("parsed.GameType = %s, want coin_flip", parsed.GameType)
+	}
+	if parsed.Connection == nil {
+		t.Fatal("parsed.Connection should not be nil")
+	}
+	if parsed.Connection.URL != "ws://minigame.example.com" {
+		t.Errorf("parsed.Connection.URL = %s, want ws://minigame.example.com", parsed.Connection.URL)
+	}
+	if parsed.Connection.RoomID != "room-abc123" {
+		t.Errorf("parsed.Connection.RoomID = %s, want room-abc123", parsed.Connection.RoomID)
+	}
+}
+
+func TestMiniGameStartWithoutConnection(t *testing.T) {
+	start := MiniGameStart{
+		GameType: "dice_race",
+		Players:  []string{"p1", "p2"},
+		// Connection is nil (frontend-driven mode)
+	}
+
+	jsonBytes, err := json.Marshal(start)
+	if err != nil {
+		t.Fatalf("json.Marshal() error: %v", err)
+	}
+
+	// Verify connection field is omitted in JSON (omitempty)
+	jsonStr := string(jsonBytes)
+	if strings.Contains(jsonStr, "connection") {
+		t.Errorf("JSON should not contain 'connection' field when nil, got: %s", jsonStr)
+	}
+
+	var parsed MiniGameStart
+	err = json.Unmarshal(jsonBytes, &parsed)
+	if err != nil {
+		t.Fatalf("json.Unmarshal() error: %v", err)
+	}
+	if parsed.Connection != nil {
+		t.Error("parsed.Connection should be nil for frontend-driven mode")
+	}
+}
+
+func TestMiniGameDataSubmitJSON(t *testing.T) {
+	submit := MiniGameDataSubmit{
+		GameType: "dice_race",
+		GameData: map[string]interface{}{
+			"score": 150.0,
+			"time":  3.5,
+		},
+	}
+
+	jsonBytes, err := json.Marshal(submit)
+	if err != nil {
+		t.Fatalf("json.Marshal() error: %v", err)
+	}
+
+	var parsed MiniGameDataSubmit
+	err = json.Unmarshal(jsonBytes, &parsed)
+	if err != nil {
+		t.Fatalf("json.Unmarshal() error: %v", err)
+	}
+	if parsed.GameType != "dice_race" {
+		t.Errorf("parsed.GameType = %s, want dice_race", parsed.GameType)
+	}
+	score, ok := parsed.GameData["score"]
+	if !ok {
+		t.Error("parsed.GameData should contain 'score' key")
+	}
+	if score != 150.0 {
+		t.Errorf("parsed.GameData['score'] = %v, want 150.0", score)
+	}
+}
+
+func TestMiniGameConnJSON(t *testing.T) {
+	conn := MiniGameConn{
+		URL:    "ws://minigame.example.com",
+		RoomID: "room-abc123",
+		Token:  "token-xyz789",
+	}
+
+	jsonBytes, err := json.Marshal(conn)
+	if err != nil {
+		t.Fatalf("json.Marshal() error: %v", err)
+	}
+
+	var parsed MiniGameConn
+	err = json.Unmarshal(jsonBytes, &parsed)
+	if err != nil {
+		t.Fatalf("json.Unmarshal() error: %v", err)
+	}
+	if parsed.URL != "ws://minigame.example.com" {
+		t.Errorf("parsed.URL = %s, want ws://minigame.example.com", parsed.URL)
+	}
+	if parsed.RoomID != "room-abc123" {
+		t.Errorf("parsed.RoomID = %s, want room-abc123", parsed.RoomID)
+	}
+	if parsed.Token != "token-xyz789" {
+		t.Errorf("parsed.Token = %s, want token-xyz789", parsed.Token)
+	}
+}

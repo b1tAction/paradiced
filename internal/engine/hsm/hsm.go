@@ -11,6 +11,7 @@ import (
 	"github.com/b1tAction/paradiced/internal/engine"
 	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/internal/gamemap"
+	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
 )
 
@@ -702,7 +703,51 @@ type UseItemHandler interface {
 
 // ========== Mini-Game Result Handler ==========
 
-// OnMiniGameResult handles mini-game result submission.
+// OnMiniGameDataSubmit handles mini-game data submission from client.
+// Must be called when in RoundMiniGame state.
+// Returns error if state is wrong or game_type mismatch.
+func (hsm *HSM) OnMiniGameDataSubmit(playerID string, gameType string, gameData map[string]interface{}, ctx *StateContext) error {
+	// Must be in RoundMiniGame state
+	if hsm.globalStateID != StateRoundMiniGame {
+		return errors.New("OnMiniGameDataSubmit requires RoundMiniGame state")
+	}
+
+	// Get the global state
+	globalState := hsm.GetGlobalState()
+	if globalState == nil {
+		return errors.New("no global state active")
+	}
+
+	// Type assertion to RoundMiniGameState
+	miniGameState, ok := globalState.(*RoundMiniGameState)
+	if !ok {
+		return errors.New("current global state is not RoundMiniGameState")
+	}
+
+	// Verify game_type matches current round
+	submittedType := constants.MiniGameType(gameType)
+	if submittedType != miniGameState.GetGameType() {
+		return fmt.Errorf("game_type mismatch: submitted %s, expected %s", gameType, miniGameState.GetGameType())
+	}
+
+	// Create context if not provided
+	if ctx == nil {
+		ctx = NewStateContext().WithHSM(hsm)
+	}
+
+	// Call the state's OnMiniGameDataSubmit method
+	miniGameState.OnMiniGameDataSubmit(ctx, playerID, submittedType, gameData)
+
+	// Trigger update to check for state transition (allReceived = transition to RoundPrep)
+	nextID := globalState.Update(ctx)
+	if nextID != StateNone && nextID != hsm.globalStateID {
+		return hsm.TransitionTo(nextID, ctx)
+	}
+
+	return nil
+}
+
+// OnMiniGameResult handles mini-game result submission (internal/RPC mode).
 // Must be called when in RoundMiniGame state.
 func (hsm *HSM) OnMiniGameResult(playerID string, rank int, ctx *StateContext) error {
 	// Must be in RoundMiniGame state

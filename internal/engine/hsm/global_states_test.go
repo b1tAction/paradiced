@@ -1,10 +1,13 @@
 package hsm
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/engine"
+	"github.com/b1tAction/paradiced/internal/engine/minigame"
+	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/rng"
@@ -490,4 +493,209 @@ func TestRoundEndWaitState_CanTransitionTo(t *testing.T) {
 	if state.CanTransitionTo(StateTurnUpkeep) {
 		t.Error("RoundEndWait should NOT transition to TurnUpkeep")
 	}
+}
+
+// ========== RoundMiniGameState MiniGameDataSubmit Tests ==========
+
+func TestRoundMiniGameState_GameTypeRandomSelection(t *testing.T) {
+	state := NewRoundMiniGameState()
+
+	game := engine.NewGame(id.NewGameID(), 42) // Fixed seed for deterministic test
+	p1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	p2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(p1)
+	game.AddPlayer(p2)
+
+	ctx := NewStateContext().WithHSM(NewHSM(game))
+	mockBroadcast := pkgnet.NewMockBroadcastAdapter()
+	ctx.Broadcast = mockBroadcast
+
+	state.Enter(ctx)
+
+	// game_type should be a valid type (not hardcoded "dice_race")
+	gameType := state.GetGameType()
+	if !gameType.IsValid() {
+		t.Errorf("GetGameType() = %s, want valid MiniGameType", gameType)
+	}
+
+	// MiniGameStart broadcast should contain the selected game_type
+	if len(mockBroadcast.MiniGameStarts) != 1 {
+		t.Fatalf("MiniGameStarts count = %d, want 1", len(mockBroadcast.MiniGameStarts))
+	}
+	start := mockBroadcast.MiniGameStarts[0]
+	if start.GameType != string(gameType) {
+		t.Errorf("MiniGameStart.GameType = %s, want %s", start.GameType, string(gameType))
+	}
+}
+
+func TestRoundMiniGameState_GameTypeDeterministic(t *testing.T) {
+	// Same seed should produce same game_type
+	game1 := engine.NewGame(id.NewGameID(), 12345)
+	game2 := engine.NewGame(id.NewGameID(), 12345)
+
+	type1 := minigame.SelectMiniGameType(game1.RNG)
+	type2 := minigame.SelectMiniGameType(game2.RNG)
+
+	if type1 != type2 {
+		t.Errorf("Same seed produced different game types: %s vs %s", type1, type2)
+	}
+}
+
+func TestRoundMiniGameState_OnMiniGameDataSubmit(t *testing.T) {
+	state := NewRoundMiniGameState()
+
+	game := engine.NewGame(id.NewGameID(), 0)
+	p1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	p2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(p1)
+	game.AddPlayer(p2)
+
+	ctx := NewStateContext().WithHSM(NewHSM(game))
+	state.Enter(ctx)
+
+	gameType := state.GetGameType()
+
+	// Submit data for p1 (first player)
+	allReceived := state.OnMiniGameDataSubmit(ctx, p1.ID.UUID(), gameType, map[string]interface{}{
+		"score": 200,
+		"time":  2.0,
+	})
+	if allReceived {
+		t.Error("OnMiniGameDataSubmit should return false when not all players submitted")
+	}
+	if state.resultsReceived != 1 {
+		t.Errorf("resultsReceived = %d, want 1", state.resultsReceived)
+	}
+
+	// Submit data for p2 (second player) - should trigger rank calculation
+	allReceived = state.OnMiniGameDataSubmit(ctx, p2.ID.UUID(), gameType, map[string]interface{}{
+		"score": 100,
+		"time":  5.0,
+	})
+	if !allReceived {
+		t.Error("OnMiniGameDataSubmit should return true when all players submitted")
+	}
+	if state.resultsReceived != 2 {
+		t.Errorf("resultsReceived = %d, want 2", state.resultsReceived)
+	}
+
+	// Verify ranks were calculated and stored in context
+	rank1 := ctx.GetMiniGameRank(p1.ID.UUID())
+	rank2 := ctx.GetMiniGameRank(p2.ID.UUID())
+	if rank1 == 0 || rank2 == 0 {
+		t.Errorf("Ranks should be non-zero: p1=%d, p2=%d", rank1, rank2)
+	}
+	// p1 has higher score (200 vs 100) or lower time (2.0 vs 5.0) → rank 1
+	if rank1 != 1 {
+		t.Errorf("p1 rank = %d, want 1 (better performance)", rank1)
+	}
+	if rank2 != 2 {
+		t.Errorf("p2 rank = %d, want 2", rank2)
+	}
+
+	// State should transition to RoundPrep
+	nextID := state.Update(ctx)
+	if nextID != StateRoundPrep {
+		t.Errorf("Update should return StateRoundPrep after all data, got %s", nextID.String())
+	}
+}
+
+func TestRoundMiniGameState_OnMiniGameDataSubmit_GameTypeMismatch(t *testing.T) {
+	state := NewRoundMiniGameState()
+
+	game := engine.NewGame(id.NewGameID(), 0)
+	p1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	p2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(p1)
+	game.AddPlayer(p2)
+
+	ctx := NewStateContext().WithHSM(NewHSM(game))
+	state.Enter(ctx)
+
+	// Submit with wrong game_type - should return false
+	wrongType := constants.MiniGameType("wrong_type")
+	allReceived := state.OnMiniGameDataSubmit(ctx, p1.ID.UUID(), wrongType, map[string]interface{}{
+		"score": 100,
+	})
+	if allReceived {
+		t.Error("OnMiniGameDataSubmit should return false for mismatched game_type")
+	}
+	// resultsReceived should NOT increment on mismatch
+	if state.resultsReceived != 0 {
+		t.Errorf("resultsReceived = %d, want 0 (mismatched game_type should not count)", state.resultsReceived)
+	}
+}
+
+func TestRoundMiniGameState_OnMiniGameDataSubmit_RPCMode(t *testing.T) {
+	state := NewRoundMiniGameState().WithMode(constants.MiniGameModeRPC)
+
+	game := engine.NewGame(id.NewGameID(), 0)
+	p1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(p1)
+
+	ctx := NewStateContext().WithHSM(NewHSM(game))
+	state.Enter(ctx)
+
+	// In RPC mode, OnMiniGameDataSubmit should return false (not applicable)
+	allReceived := state.OnMiniGameDataSubmit(ctx, p1.ID.UUID(), state.GetGameType(), map[string]interface{}{
+		"score": 100,
+	})
+	if allReceived {
+		t.Error("OnMiniGameDataSubmit should return false in RPC mode")
+	}
+}
+
+func TestRoundMiniGameState_WithCustomRankCalculator(t *testing.T) {
+	// Create a mock RankCalculator that reverses rankings
+	mockCalc := &mockRankCalculator{}
+	state := NewRoundMiniGameState().WithRankCalculator(mockCalc)
+
+	game := engine.NewGame(id.NewGameID(), 0)
+	p1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	p2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(p1)
+	game.AddPlayer(p2)
+
+	ctx := NewStateContext().WithHSM(NewHSM(game))
+	state.Enter(ctx)
+
+	// Submit data for both players
+	state.OnMiniGameDataSubmit(ctx, p1.ID.UUID(), state.GetGameType(), map[string]interface{}{"score": 100})
+	state.OnMiniGameDataSubmit(ctx, p2.ID.UUID(), state.GetGameType(), map[string]interface{}{"score": 200})
+
+	// Mock calculator should have been called and ranks assigned
+	// The mock reverses rankings by sorting playerIDs alphabetically and assigning
+	// rank N to the first and rank 1 to the last. Since UUIDs are random,
+	// we just verify that both players got different ranks (not both 1).
+	rank1 := ctx.GetMiniGameRank(p1.ID.UUID())
+	rank2 := ctx.GetMiniGameRank(p2.ID.UUID())
+
+	if rank1 == 0 || rank2 == 0 {
+		t.Errorf("ranks should be assigned: p1=%d, p2=%d", rank1, rank2)
+	}
+	if rank1 == rank2 {
+		t.Errorf("mock should produce different ranks: p1=%d, p2=%d", rank1, rank2)
+	}
+	// Verify mock reverses: one player should have rank 1, the other rank 2
+	if rank1+rank2 != 3 { // 1+2=3
+		t.Errorf("ranks should be 1 and 2 (sum=3): p1=%d, p2=%d (sum=%d)", rank1, rank2, rank1+rank2)
+	}
+}
+
+// mockRankCalculator reverses rankings for testing (deterministic: sorts playerIDs for stable order)
+type mockRankCalculator struct{}
+
+func (m *mockRankCalculator) Calculate(gameType constants.MiniGameType, submissions map[string]map[string]interface{}) map[string]int {
+	ranks := make(map[string]int, len(submissions))
+	// Sort playerIDs to ensure deterministic ordering
+	playerIDs := make([]string, 0, len(submissions))
+	for playerID := range submissions {
+		playerIDs = append(playerIDs, playerID)
+	}
+	sort.Strings(playerIDs)
+	// Reverse order: last playerID gets rank 1, first gets rank N
+	for i, playerID := range playerIDs {
+		ranks[playerID] = len(playerIDs) - i
+	}
+	return ranks
 }
