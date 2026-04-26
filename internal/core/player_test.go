@@ -809,3 +809,41 @@ func TestPlayerGetFaction(t *testing.T) {
 		t.Errorf("GetFaction() = %s, expected bai_hu", player.GetFaction())
 	}
 }
+
+// ========== AddBuff Error Path Tests ==========
+
+func TestPlayerAddBuffNil(t *testing.T) {
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
+	err := player.AddBuff(nil)
+	if err == nil {
+		t.Error("AddBuff(nil) should return error")
+	}
+}
+
+func TestPlayerAddBuffDurationExtend(t *testing.T) {
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
+
+	// Add first buff with duration 3
+	buff1 := NewBuff(constants.BuffTypeDivine, 3)
+	err := player.AddBuff(buff1)
+	if err != nil {
+		t.Errorf("AddBuff first instance failed: %v", err)
+	}
+
+	// Add same buff type again - should extend duration
+	buff2 := NewBuff(constants.BuffTypeDivine, 2)
+	err = player.AddBuff(buff2)
+	if err != nil {
+		t.Errorf("AddBuff duration extend failed: %v", err)
+	}
+
+	// Should still have only one buff instance
+	if len(player.ActiveBuffs) != 1 {
+		t.Errorf("After duration extend, buff count = %d, want 1", len(player.ActiveBuffs))
+	}
+
+	// Duration should be extended: 3 + 2 = 5
+	if player.ActiveBuffs[0].Duration != 5 {
+		t.Errorf("Extended duration = %d, want 5", player.ActiveBuffs[0].Duration)
+	}
+}

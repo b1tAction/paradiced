@@ -348,6 +348,21 @@ func TestSelectBossTarget(t *testing.T) {
 	}
 }
 
+func TestDiceString(t *testing.T) {
+	rng := rand.New(rand.NewSource(42))
+	dice := NewDice(DiceTypeGold, rng)
+	str := dice.String()
+	if str != "Dice{type=gold}" {
+		t.Errorf("Dice.String() = %s, want Dice{type=gold}", str)
+	}
+
+	dice2 := NewDice(DiceTypeNormal, rng)
+	str2 := dice2.String()
+	if str2 != "Dice{type=normal}" {
+		t.Errorf("Dice.String() = %s, want Dice{type=normal}", str2)
+	}
+}
+
 func TestCalcPlayerCritRate(t *testing.T) {
 	tests := []struct {
 		diceType DiceType

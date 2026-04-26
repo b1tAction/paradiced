@@ -146,3 +146,10 @@ func TestLoadMapFromJSON(t *testing.T) {
 		t.Errorf("cell[0].ProbGood = %f, want 1.0", cell0.ProbGood)
 	}
 }
+
+func TestLoadMapFromJSONInvalid(t *testing.T) {
+	_, err := LoadMapFromJSON([]byte("invalid json"))
+	if err == nil {
+		t.Error("LoadMapFromJSON with invalid JSON should return error")
+	}
+}
