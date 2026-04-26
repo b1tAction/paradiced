@@ -145,21 +145,31 @@ func TestMilkTeaEventHandler(t *testing.T) {
 }
 
 func TestRelicEventHandler(t *testing.T) {
-	// Test Relic draw item
+	// Test Relic produces DrawItemAction as DerivedAction
+	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
 
 	handler := GetEventHandlerConfig(constants.EventTypeRelic).Handler
 
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
 	handler(constants.PhaseOnLand, ctx)
 
-	// Should signal draw_item
-	drawItem, err := ctx.GetBool("draw_item")
-	if err != nil {
-		t.Error("draw_item should be set")
+	// Should have DrawItemAction derived action
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
 	}
-	if !drawItem {
-		t.Error("draw_item should be true")
+
+	drawItemAction, ok := derived[0].(*engineaction.DrawItemAction)
+	if !ok {
+		t.Fatal("expected DrawItemAction")
+	}
+	if drawItemAction.Source() != "Event_Relic" {
+		t.Errorf("Source = %s, expected Event_Relic", drawItemAction.Source())
 	}
 }
 
@@ -193,21 +203,40 @@ func TestDivineBlessEventHandler(t *testing.T) {
 }
 
 func TestExchangeEventHandler(t *testing.T) {
-	// Test Exchange swap position
-	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	// Test Exchange produces two TeleportActions for position swap
+	game := NewGame(id.NewGameID(), 0)
+	player1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player1.Position = 10
+	player2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player2.Position = 20
+	game.AddPlayer(player1)
+	game.AddPlayer(player2)
 
 	handler := GetEventHandlerConfig(constants.EventTypeExchange).Handler
 
-	ctx := event.NewContext(player)
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player1)
+	ctx.Set("action_context", actionCtx)
+
 	handler(constants.PhaseOnLand, ctx)
 
-	// Should signal swap_position
-	swap, err := ctx.GetBool("swap_position")
-	if err != nil {
-		t.Error("swap_position should be set")
+	// Should have two TeleportActions derived actions
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 2 {
+		t.Fatalf("expected 2 derived actions, got %d", len(derived))
 	}
-	if !swap {
-		t.Error("swap_position should be true")
+
+	tp1, ok1 := derived[0].(*engineaction.TeleportAction)
+	tp2, ok2 := derived[1].(*engineaction.TeleportAction)
+	if !ok1 || !ok2 {
+		t.Fatal("expected both derived actions to be TeleportAction")
+	}
+	// Player1 teleports to player2's position, player2 teleports to player1's position
+	if tp1.TargetPos != 20 {
+		t.Errorf("TeleportAction1.TargetPos = %d, expected 20", tp1.TargetPos)
+	}
+	if tp2.TargetPos != 10 {
+		t.Errorf("TeleportAction2.TargetPos = %d, expected 10", tp2.TargetPos)
 	}
 }
 
@@ -241,21 +270,31 @@ func TestHiddenBuffEventHandler(t *testing.T) {
 }
 
 func TestTasteTestEventHandler(t *testing.T) {
-	// Test TasteTest random buff
+	// Test TasteTest produces DrawBuffAction as DerivedAction
+	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
 
 	handler := GetEventHandlerConfig(constants.EventTypeTasteTest).Handler
 
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
 	handler(constants.PhaseOnLand, ctx)
 
-	// Should signal random_buff
-	randomBuff, err := ctx.GetBool("random_buff")
-	if err != nil {
-		t.Error("random_buff should be set")
+	// Should have DrawBuffAction derived action
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
 	}
-	if !randomBuff {
-		t.Error("random_buff should be true")
+
+	drawBuffAction, ok := derived[0].(*engineaction.DrawBuffAction)
+	if !ok {
+		t.Fatal("expected DrawBuffAction")
+	}
+	if drawBuffAction.Source() != "Event_TasteTest" {
+		t.Errorf("Source = %s, expected Event_TasteTest", drawBuffAction.Source())
 	}
 }
 
@@ -349,21 +388,32 @@ func TestDogPoopEventHandler(t *testing.T) {
 }
 
 func TestThiefEventHandler(t *testing.T) {
-	// Test Thief lose item
+	// Test Thief produces RemoveItemAction when player has items
+	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+	player.AddItem(core.NewItem(constants.ItemTypeReverseClock))
 
 	handler := GetEventHandlerConfig(constants.EventTypeThief).Handler
 
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
 	handler(constants.PhaseOnLand, ctx)
 
-	// Should signal lose_item
-	loseItem, err := ctx.GetBool("lose_item")
-	if err != nil {
-		t.Error("lose_item should be set")
+	// Should have RemoveItemAction derived action
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
 	}
-	if !loseItem {
-		t.Error("lose_item should be true")
+
+	removeItemAction, ok := derived[0].(*engineaction.RemoveItemAction)
+	if !ok {
+		t.Fatal("expected RemoveItemAction")
+	}
+	if removeItemAction.ItemType != constants.ItemTypeReverseClock {
+		t.Errorf("ItemType = %s, expected ReverseClock", removeItemAction.ItemType)
 	}
 }
 
@@ -644,14 +694,13 @@ func TestTasteTestHandlerNilPlayer(t *testing.T) {
 }
 
 func TestRelicHandlerNilPlayer(t *testing.T) {
-	// Relic handler signals draw item, requires player
+	// Relic handler requires player to produce DrawItemAction
 	ctx := event.NewContext(nil)
 	handler := GetEventHandlerConfig(constants.EventTypeRelic).Handler
 	handler(constants.PhaseOnLand, ctx)
 
-	// Should not panic, and should not set draw_item
-	drawItem, err := ctx.GetBool("draw_item")
-	if err == nil && drawItem {
-		t.Error("Relic handler should not set draw_item with nil player")
+	// Should not produce derived actions with nil player
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Relic handler should not produce derived actions with nil player")
 	}
 }

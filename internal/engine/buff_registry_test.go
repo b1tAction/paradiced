@@ -1043,3 +1043,57 @@ func TestHiddenImmuneIsBossBypass(t *testing.T) {
 		})
 	}
 }
+
+// ========== BuildBuffPool Tests ==========
+
+func TestBuildBuffPool(t *testing.T) {
+	// BuildBuffPool should produce an EvaluatedItem for every registered BuffDefinition
+	// where IsDraw() is true (excludes DeathMark/Thorns which are Boss/Hidden)
+	pool := BuildBuffPool()
+
+	// Verify pool only contains drawable buffs (not Boss/Hidden)
+	for _, item := range pool {
+		bt := constants.ParseBuffType(item.Type)
+		if !bt.IsDraw() {
+			t.Errorf("pool entry Type=%s should have IsDraw=true but it doesn't", item.Type)
+		}
+	}
+
+	// Verify Boss/Hidden buffs are excluded
+	for _, bt := range GetAllBuffTypes() {
+		if bt.IsBoss() || bt.IsHidden() {
+			for _, item := range pool {
+				if item.Type == string(bt) {
+					t.Errorf("Boss/Hidden BuffType(%s) should not be in BuffPool", bt)
+				}
+			}
+		}
+	}
+
+	// Verify each pool entry matches its Definition's Type and Eval
+	for _, item := range pool {
+		def := GetBuffDefinition(constants.ParseBuffType(item.Type))
+		if def == nil {
+			t.Errorf("pool entry Type=%s has no matching BuffDefinition", item.Type)
+			continue
+		}
+		if item.Eval != def.Eval {
+			t.Errorf("pool entry Type=%s Eval=%d, expected %d from Definition", item.Type, item.Eval, def.Eval)
+		}
+	}
+}
+
+func TestHasEventHandler(t *testing.T) {
+	// Test HasEventHandler for known event types
+	allEvents := GetAllEventTypes()
+	for _, et := range allEvents {
+		if !HasEventHandler(et) {
+			t.Errorf("EventType(%s) should have handler", et)
+		}
+	}
+
+	// Test HasEventHandler for non-existent event type
+	if HasEventHandler(constants.EventTypeNone) {
+		t.Error("EventTypeNone should not have handler")
+	}
+}

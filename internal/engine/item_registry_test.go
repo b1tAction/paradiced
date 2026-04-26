@@ -9,6 +9,7 @@ import (
 	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
+	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
 // ========== ItemRegistry Tests ==========
@@ -44,8 +45,7 @@ func TestItemHandlerConfigFields(t *testing.T) {
 	}{
 		{constants.ItemTypeReverseClock, constants.PhaseAnyTime, 50, true},
 		{constants.ItemTypeAnyDoor, constants.PhaseOnLand, 60, true},
-		{constants.ItemTypeDiceSwap, constants.PhaseAnyTime, 40, true},
-		{constants.ItemTypeDiceUpgrade, constants.PhaseBeforeTurn, 70, true},
+		{constants.ItemTypeDiceUpgrade, constants.PhaseItemUsed, 70, true},
 	}
 
 	for _, tt := range tests {
@@ -78,7 +78,6 @@ func TestItemDefinitionsFields(t *testing.T) {
 	}{
 		{constants.ItemTypeReverseClock, constants.EvaluationGood, "ReverseClock", "反方向的钟"},
 		{constants.ItemTypeAnyDoor, constants.EvaluationNeutral, "AnyDoor", "任意门"},
-		{constants.ItemTypeDiceSwap, constants.EvaluationNeutral, "DiceSwap", "骰子交换"},
 		{constants.ItemTypeDiceUpgrade, constants.EvaluationGood, "DiceUpgrade", "骰子升级卡"},
 	}
 
@@ -166,52 +165,33 @@ func TestAnyDoorHandlerBehavior(t *testing.T) {
 	}
 }
 
-func TestDiceSwapHandlerBehavior(t *testing.T) {
-	// Test DiceSwap signals dice swap target
-	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
-
-	handler := GetItemHandlerConfig(constants.ItemTypeDiceSwap).Handler
-
-	ctx := event.NewContext(player)
-	ctx.SetString("target_id", "swap-target-456")
-	handler(constants.PhaseAnyTime, ctx)
-
-	// Should signal dice_swap_target
-	target, err := ctx.GetString("dice_swap_target")
-	if err != nil {
-		t.Error("dice_swap_target should be set")
-	}
-	if target != "swap-target-456" {
-		t.Errorf("dice_swap_target = %s, expected swap-target-456", target)
-	}
-}
-
 func TestDiceUpgradeHandlerBehavior(t *testing.T) {
-	// Test DiceUpgrade signals upgrade from current dice
+	// Test DiceUpgrade produces DiceUpgradeAction as DerivedAction
+	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
 
 	handler := GetItemHandlerConfig(constants.ItemTypeDiceUpgrade).Handler
 
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
 	ctx.SetString("current_dice_type", "silver")
+
 	handler(constants.PhaseBeforeTurn, ctx)
 
-	// Should signal dice_upgrade_from
-	from, err := ctx.GetString("dice_upgrade_from")
-	if err != nil {
-		t.Error("dice_upgrade_from should be set")
-	}
-	if from != "silver" {
-		t.Errorf("dice_upgrade_from = %s, expected silver", from)
+	// Should have DiceUpgradeAction derived action
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
 	}
 
-	// Should signal dice_upgrade
-	upgrade, err := ctx.GetBool("dice_upgrade")
-	if err != nil {
-		t.Error("dice_upgrade should be set")
+	upgradeAction, ok := derived[0].(*engineaction.DiceUpgradeAction)
+	if !ok {
+		t.Fatal("expected DiceUpgradeAction")
 	}
-	if !upgrade {
-		t.Error("dice_upgrade should be true")
+	if upgradeAction.FromDice != rng.DiceTypeSilver {
+		t.Errorf("FromDice = %v, expected Silver", upgradeAction.FromDice)
 	}
 }
 
@@ -222,7 +202,6 @@ func TestGetItemName(t *testing.T) {
 	}{
 		{constants.ItemTypeReverseClock, "反方向的钟"},
 		{constants.ItemTypeAnyDoor, "任意门"},
-		{constants.ItemTypeDiceSwap, "骰子交换"},
 		{constants.ItemTypeDiceUpgrade, "骰子升级卡"},
 	}
 
@@ -361,24 +340,8 @@ func TestTeleportHandlerNoTargetID(t *testing.T) {
 	}
 }
 
-func TestDiceSwapHandlerNoTargetID(t *testing.T) {
-	// handleDiceSwap requires target_id
-	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
-	ctx := event.NewContext(player)
-	// No target_id set
-
-	handler := GetItemHandlerConfig(constants.ItemTypeDiceSwap).Handler
-	handler(constants.PhaseAnyTime, ctx)
-
-	// Should not set dice_swap_target without target_id
-	_, err := ctx.GetString("dice_swap_target")
-	if err == nil {
-		t.Error("DiceSwap handler should not set dice_swap_target without target_id")
-	}
-}
-
 func TestDiceUpgradeHandlerNoCurrentDice(t *testing.T) {
-	// handleDiceUpgrade requires current_dice_type
+	// handleDiceUpgrade requires current_dice_type to produce DiceUpgradeAction
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	ctx := event.NewContext(player)
 	// No current_dice_type set
@@ -386,9 +349,8 @@ func TestDiceUpgradeHandlerNoCurrentDice(t *testing.T) {
 	handler := GetItemHandlerConfig(constants.ItemTypeDiceUpgrade).Handler
 	handler(constants.PhaseBeforeTurn, ctx)
 
-	// Should not set dice_upgrade_from without current_dice_type
-	_, err := ctx.GetString("dice_upgrade_from")
-	if err == nil {
-		t.Error("DiceUpgrade handler should not set dice_upgrade_from without current_dice_type")
+	// Should not produce derived actions without current_dice_type
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("DiceUpgrade handler should not produce actions without current_dice_type")
 	}
 }

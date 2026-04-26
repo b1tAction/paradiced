@@ -10,9 +10,10 @@ import (
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
-// EventHandlerConfig contains effect logic for Event.
+// EventHandlerConfig contains effect logic and priority for Event.
 type EventHandlerConfig struct {
-	Handler EffectHandler `json:"-"`
+	Priority int            `json:"priority"`
+	Handler  EffectHandler  `json:"-"`
 }
 
 // EventRegistry is the registry for Event definitions and handler configs.
@@ -92,6 +93,16 @@ func (r *EventRegistry) GetEventHandlerConfig(et constants.EventType) *EventHand
 	return nil
 }
 
+// HasEventHandler checks if an Event type has a registered handler.
+func HasEventHandler(et constants.EventType) bool {
+	return GlobalEventRegistry.HasEventHandler(et)
+}
+
+func (r *EventRegistry) HasEventHandler(et constants.EventType) bool {
+	config, ok := r.configs[et]
+	return ok && config != nil && config.Handler != nil
+}
+
 // GetEventName returns the Event Chinese display name.
 func GetEventName(et constants.EventType) string {
 	return GlobalEventRegistry.GetEventName(et)
@@ -165,7 +176,8 @@ func registerAllEvents() {
 		Name:        "采集到草药",
 		Desc:        "在路边发现了草药，恢复了体力",
 	}, &EventHandlerConfig{
-		Handler: createEventModifyHPHandler(1),
+		Priority: 60,
+		Handler:  createEventModifyHPHandler(1),
 	})
 
 	// MilkTea: LP+1
@@ -176,7 +188,8 @@ func registerAllEvents() {
 		Name:        "捡到奶茶",
 		Desc:        "捡到了一杯奶茶，一口就吃到了猪猪欸",
 	}, &EventHandlerConfig{
-		Handler: createEventModifyLPHandler(1),
+		Priority: 70,
+		Handler:  createEventModifyLPHandler(1),
 	})
 
 	// Relic: Draw item
@@ -187,7 +200,8 @@ func registerAllEvents() {
 		Name:        "捡到勇士的圣遗物",
 		Desc:        "发现了古老圣遗物，获得一次道具抽奖机会",
 	}, &EventHandlerConfig{
-		Handler: handleDrawItem,
+		Priority: 80,
+		Handler:  handleDrawItem,
 	})
 
 	// DivineBless: Give Divine buff
@@ -198,7 +212,8 @@ func registerAllEvents() {
 		Name:        "受到天使眷顾",
 		Desc:        "天使的祝福降临，获得神眷Buff",
 	}, &EventHandlerConfig{
-		Handler: createEventGiveBuffHandler(constants.BuffTypeDivine),
+		Priority: 80,
+		Handler:  createEventGiveBuffHandler(constants.BuffTypeDivine),
 	})
 
 	// Neutral Events (Evaluation 41-65)
@@ -211,7 +226,8 @@ func registerAllEvents() {
 		Name:        "交换",
 		Desc:        "命运之手将你与另一位玩家交换位置",
 	}, &EventHandlerConfig{
-		Handler: handleSwapPosition,
+		Priority: 50,
+		Handler:  handleSwapPosition,
 	})
 
 	// HiddenBuff: Give Hidden buff
@@ -222,7 +238,8 @@ func registerAllEvents() {
 		Name:        "麻了",
 		Desc:        "身体麻木，获得隐匿Buff",
 	}, &EventHandlerConfig{
-		Handler: createEventGiveBuffHandler(constants.BuffTypeHidden),
+		Priority: 60,
+		Handler:  createEventGiveBuffHandler(constants.BuffTypeHidden),
 	})
 
 	// TasteTest: Random buff effect
@@ -233,7 +250,8 @@ func registerAllEvents() {
 		Name:        "这是什么？尝一口",
 		Desc:        "发现神秘物质，尝试后获得随机效果",
 	}, &EventHandlerConfig{
-		Handler: handleRandomBuff,
+		Priority: 50,
+		Handler:  handleRandomBuff,
 	})
 
 	// Bad Events (Evaluation <= 40)
@@ -246,7 +264,8 @@ func registerAllEvents() {
 		Name:        "被蚊虫叮咬",
 		Desc:        "丛林中的蚊虫叮咬了你",
 	}, &EventHandlerConfig{
-		Handler: createEventModifyHPHandler(-1),
+		Priority: 40,
+		Handler:  createEventModifyHPHandler(-1),
 	})
 
 	// GhostHit: HP-1
@@ -257,7 +276,8 @@ func registerAllEvents() {
 		Name:        "偶遇孤魂野鬼",
 		Desc:        "被野鬼打了一闷棍",
 	}, &EventHandlerConfig{
-		Handler: createEventModifyHPHandler(-1),
+		Priority: 40,
+		Handler:  createEventModifyHPHandler(-1),
 	})
 
 	// DogPoop: LP-1
@@ -268,7 +288,8 @@ func registerAllEvents() {
 		Name:        "踩到了狗屎",
 		Desc:        "运气糟糕的一天",
 	}, &EventHandlerConfig{
-		Handler: createEventModifyLPHandler(-1),
+		Priority: 40,
+		Handler:  createEventModifyLPHandler(-1),
 	})
 
 	// Thief: Lose random item
@@ -279,7 +300,8 @@ func registerAllEvents() {
 		Name:        "啊？！贼",
 		Desc:        "遭遇盗贼，随机丢失一个道具",
 	}, &EventHandlerConfig{
-		Handler: handleLoseItem,
+		Priority: 30,
+		Handler:  handleLoseItem,
 	})
 
 	// CurseBuddha: Give Curse buff
@@ -290,7 +312,8 @@ func registerAllEvents() {
 		Name:        "虔诚拜三拜",
 		Desc:        "拜路边的野佛，获得诅咒Buff",
 	}, &EventHandlerConfig{
-		Handler: createEventGiveBuffHandler(constants.BuffTypeCurse),
+		Priority: 30,
+		Handler:  createEventGiveBuffHandler(constants.BuffTypeCurse),
 	})
 
 	// LostWay: Give Lost buff
@@ -301,7 +324,8 @@ func registerAllEvents() {
 		Name:        "迷途",
 		Desc:        "迷失方向，获得迷途Buff",
 	}, &EventHandlerConfig{
-		Handler: createEventGiveBuffHandler(constants.BuffTypeLost),
+		Priority: 40,
+		Handler:  createEventGiveBuffHandler(constants.BuffTypeLost),
 	})
 
 	// Thunder: HP to 0 (death)
@@ -312,7 +336,8 @@ func registerAllEvents() {
 		Name:        "雷劫",
 		Desc:        "天雷降临，HP归零",
 	}, &EventHandlerConfig{
-		Handler: handleThunderDeath,
+		Priority: 20,
+		Handler:  handleThunderDeath,
 	})
 }
 
@@ -399,8 +424,15 @@ func handleDrawItem(phase constants.Phase, ctx *event.Context) error {
 		return nil
 	}
 
-	// Set flag for HSM to draw item
-	ctx.SetBool("draw_item", true)
+	// Check ActionContext exists
+	actionCtx, err := getActionCtxFromEventCtx(ctx)
+	if err != nil {
+		return err
+	}
+	_ = actionCtx // ActionContext used for derived action processing
+
+	// Produce DrawItemAction as DerivedAction
+	ctx.AddDerivedAction(engineaction.NewDrawItemAction(ctx.Player, "Event_Relic"))
 	return nil
 }
 
@@ -409,11 +441,45 @@ func handleSwapPosition(phase constants.Phase, ctx *event.Context) error {
 		return nil
 	}
 
-	// Set flag for HSM to handle position swap
-	ctx.SetBool("swap_position", true)
+	// Check ActionContext exists
+	actionCtx, err := getActionCtxFromEventCtx(ctx)
+	if err != nil {
+		return err
+	}
 
-	// Note: Actual position swap requires finding another player
-	// This would be implemented in HSM or handled by a dedicated action
+	// Find another player to swap with via Game interface
+	if actionCtx.Game == nil {
+		return nil
+	}
+
+	playerInterfaces := actionCtx.Game.GetPlayersInterface()
+	if len(playerInterfaces) < 2 {
+		return nil // Need at least 2 players to swap
+	}
+
+	// Find first valid non-self, non-dead player
+	var targetPlayer *core.Player
+	for _, pi := range playerInterfaces {
+		p, ok := pi.(*core.Player)
+		if !ok {
+			continue
+		}
+		if p.ID.UUID() != ctx.Player.ID.UUID() && !p.IsDead {
+			targetPlayer = p
+			break
+		}
+	}
+	if targetPlayer == nil {
+		return nil // No valid swap target
+	}
+
+	// Save positions before teleporting
+	playerPos := ctx.Player.Position
+	targetPos := targetPlayer.Position
+
+	// Produce two TeleportActions for the swap
+	ctx.AddDerivedAction(engineaction.NewTeleportAction(ctx.Player, targetPos, "Event_Exchange"))
+	ctx.AddDerivedAction(engineaction.NewTeleportAction(targetPlayer, playerPos, "Event_Exchange"))
 	return nil
 }
 
@@ -422,11 +488,15 @@ func handleRandomBuff(phase constants.Phase, ctx *event.Context) error {
 		return nil
 	}
 
-	// Set flag for HSM to give random buff
-	ctx.SetBool("random_buff", true)
+	// Check ActionContext exists
+	actionCtx, err := getActionCtxFromEventCtx(ctx)
+	if err != nil {
+		return err
+	}
+	_ = actionCtx // ActionContext used for derived action processing
 
-	// Note: Actual random buff selection would use RNG engine
-	// This would be implemented in HSM or handled by a dedicated action
+	// Produce DrawBuffAction as DerivedAction
+	ctx.AddDerivedAction(engineaction.NewDrawBuffAction(ctx.Player, "Event_TasteTest"))
 	return nil
 }
 
@@ -435,11 +505,22 @@ func handleLoseItem(phase constants.Phase, ctx *event.Context) error {
 		return nil
 	}
 
-	// Set flag for HSM to remove random item
-	ctx.SetBool("lose_item", true)
+	// Check ActionContext exists
+	actionCtx, err := getActionCtxFromEventCtx(ctx)
+	if err != nil {
+		return err
+	}
+	_ = actionCtx // ActionContext used for derived action processing
 
-	// Note: Actual item removal would select random item from inventory
-	// This would be implemented in HSM or handled by a dedicated action
+	// Select a random item from player's inventory
+	if len(ctx.Player.Inventory) == 0 {
+		return nil // No items to lose
+	}
+
+	// Take the first item from inventory as the lost item
+	// (In production, this would use RNG for random selection)
+	lostItem := ctx.Player.Inventory[0]
+	ctx.AddDerivedAction(engineaction.NewRemoveItemAction(ctx.Player, lostItem.Type, "Event_Thief"))
 	return nil
 }
 

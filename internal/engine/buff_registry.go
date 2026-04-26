@@ -8,6 +8,7 @@ import (
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
 // EffectHandler defines the handler signature for Buff/Item/Event effects.
@@ -159,6 +160,26 @@ func HasBuffHandler(bt constants.BuffType) bool {
 func (r *BuffRegistry) HasBuffHandler(bt constants.BuffType) bool {
 	config, ok := r.configs[bt]
 	return ok && config != nil && config.Handler != nil
+}
+
+// BuildBuffPool builds an []*rng.EvaluatedItem pool from all registered BuffDefinitions
+// that can participate in lottery pool draws (IsDraw == true).
+// This excludes Boss buffs (Thorns) and Hidden buffs (DeathMark).
+func BuildBuffPool() []*rng.EvaluatedItem {
+	return GlobalBuffRegistry.buildBuffPool()
+}
+
+func (r *BuffRegistry) buildBuffPool() []*rng.EvaluatedItem {
+	pool := make([]*rng.EvaluatedItem, 0, len(r.defs))
+	for _, def := range r.defs {
+		if def.Type.IsDraw() {
+			pool = append(pool, &rng.EvaluatedItem{
+				Type: string(def.Type),
+				Eval: def.Eval,
+			})
+		}
+	}
+	return pool
 }
 
 // IsHidden checks if a Buff type is hidden (not visible to player/client).

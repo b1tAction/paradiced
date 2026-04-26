@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/b1tAction/paradiced/internal/core"
-	"github.com/b1tAction/paradiced/internal/event"
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
+	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
@@ -186,20 +186,6 @@ func registerAllItems() {
 		Handler:     handleTeleport,
 	})
 
-	// DiceSwap: Swap dice level with target player
-	GlobalItemRegistry.RegisterItem(&core.ItemDefinition{
-		Type:        constants.ItemTypeDiceSwap,
-		Eval:        constants.EvaluationNeutral,
-		EnglishName: "DiceSwap",
-		Name:        "骰子交换",
-		Desc:        "与指定玩家交换骰子等级",
-	}, &ItemHandlerConfig{
-		Phase:       constants.PhaseAnyTime,
-		Priority:    40,
-		NeedConfirm: true,
-		Handler:     handleDiceSwap,
-	})
-
 	// DiceUpgrade: Upgrade current dice level
 	GlobalItemRegistry.RegisterItem(&core.ItemDefinition{
 		Type:        constants.ItemTypeDiceUpgrade,
@@ -208,7 +194,7 @@ func registerAllItems() {
 		Name:        "骰子升级卡",
 		Desc:        "将当前骰子升级为更高等级",
 	}, &ItemHandlerConfig{
-		Phase:       constants.PhaseBeforeTurn,
+		Phase:       constants.PhaseItemUsed,
 		Priority:    70,
 		NeedConfirm: true,
 		Handler:     handleDiceUpgrade,
@@ -266,40 +252,23 @@ func handleTeleport(phase constants.Phase, ctx *event.Context) error {
 	return nil
 }
 
-func handleDiceSwap(phase constants.Phase, ctx *event.Context) error {
-	if ctx == nil || ctx.Player == nil {
-		return nil
-	}
-
-	targetID, _ := ctx.GetString("target_id")
-	if targetID == "" {
-		return nil
-	}
-
-	// Set flag for HSM to handle dice swap
-	ctx.SetString("dice_swap_target", targetID)
-
-	// Note: Actual dice swap requires game state access to get other player's dice
-	// This would be implemented in HSM or a dedicated DiceManager
-	return nil
-}
-
 func handleDiceUpgrade(phase constants.Phase, ctx *event.Context) error {
 	if ctx == nil || ctx.Player == nil {
 		return nil
 	}
+
+	actionCtx, err := getActionCtxFromEventCtx(ctx)
+	if err != nil {
+		return err
+	}
+	_ = actionCtx // ActionContext used for derived action processing
 
 	currentDice, err := ctx.GetString("current_dice_type")
 	if err != nil || currentDice == "" {
 		return nil // No current dice type, cannot upgrade
 	}
 
-	ctx.SetString("dice_upgrade_from", currentDice)
-
-	// Set flag for HSM to upgrade dice
-	ctx.SetBool("dice_upgrade", true)
-
-	// Note: Actual dice upgrade requires DiceManager access
-	// This would be implemented in HSM or a dedicated DiceManager
+	fromDice := rng.DiceTypeFromString(currentDice)
+	ctx.AddDerivedAction(engineaction.NewDiceUpgradeAction(ctx.Player, "Item_DiceUpgrade", fromDice))
 	return nil
 }
