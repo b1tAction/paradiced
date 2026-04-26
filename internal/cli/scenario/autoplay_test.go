@@ -526,22 +526,22 @@ func TestHandleMiniGameStart(t *testing.T) {
 	data, _ := json.Marshal(start)
 	player.handleMiniGameStart(ctx, data)
 
-	// Verify MiniGameResultSubmit was sent
+	// Verify MiniGameDataSubmit was sent
 	sent := mockSocket.GetSentMessages()
 	if len(sent) != 1 {
 		t.Fatalf("Sent messages count = %d, expected 1", len(sent))
 	}
-	if sent[0].opCode != nakama.OpMiniGameResultSubmit {
-		t.Errorf("OpCode = %d, expected OpMiniGameResultSubmit (%d)", sent[0].opCode, nakama.OpMiniGameResultSubmit)
+	if sent[0].opCode != nakama.OpMiniGameDataSubmit {
+		t.Errorf("OpCode = %d, expected OpMiniGameDataSubmit (%d)", sent[0].opCode, nakama.OpMiniGameDataSubmit)
 	}
 
-	submit, ok := sent[0].data.(model.MiniGameResultSubmit)
+	submit, ok := sent[0].data.(model.MiniGameDataSubmit)
 	if !ok {
-		t.Fatal("data should be MiniGameResultSubmit type")
+		t.Fatal("data should be MiniGameDataSubmit type")
 	}
-	// user-001 is at index 0, so rank should be 1
-	if submit.Rank != 1 {
-		t.Errorf("Rank = %d, expected 1 (index 0 + 1)", submit.Rank)
+	// user-001 is at index 0, game_type should match start
+	if submit.GameType != "dice_race" {
+		t.Errorf("GameType = %s, expected dice_race", submit.GameType)
 	}
 }
 
@@ -561,13 +561,12 @@ func TestHandleMiniGameStartDifferentIndex(t *testing.T) {
 	player.handleMiniGameStart(ctx, data)
 
 	sent := mockSocket.GetSentMessages()
-	submit, ok := sent[0].data.(model.MiniGameResultSubmit)
+	submit, ok := sent[0].data.(model.MiniGameDataSubmit)
 	if !ok {
-		t.Fatal("data should be MiniGameResultSubmit type")
+		t.Fatal("data should be MiniGameDataSubmit type")
 	}
-	// user-002 is at index 1, so rank should be 2
-	if submit.Rank != 2 {
-		t.Errorf("Rank = %d, expected 2 (index 1 + 1)", submit.Rank)
+	if submit.GameType != "dice_race" {
+		t.Errorf("GameType = %s, expected dice_race", submit.GameType)
 	}
 }
 

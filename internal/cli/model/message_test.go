@@ -706,9 +706,10 @@ func TestUserChoiceJSON(t *testing.T) {
 	}
 }
 
-func TestMiniGameResultSubmitJSON(t *testing.T) {
-	submit := MiniGameResultSubmit{
-		Rank: 2,
+func TestMiniGameDataSubmitJSON(t *testing.T) {
+	submit := MiniGameDataSubmit{
+		GameType: "dice_race",
+		GameData: map[string]interface{}{"score": 100, "time": 3.5},
 	}
 
 	data, err := json.Marshal(submit)
@@ -716,14 +717,14 @@ func TestMiniGameResultSubmitJSON(t *testing.T) {
 		t.Fatalf("Marshal failed: %v", err)
 	}
 
-	var parsed MiniGameResultSubmit
+	var parsed MiniGameDataSubmit
 	err = json.Unmarshal(data, &parsed)
 	if err != nil {
 		t.Fatalf("Unmarshal failed: %v", err)
 	}
 
-	if parsed.Rank != submit.Rank {
-		t.Errorf("Rank = %d, expected %d", parsed.Rank, submit.Rank)
+	if parsed.GameType != submit.GameType {
+		t.Errorf("GameType = %s, expected %s", parsed.GameType, submit.GameType)
 	}
 }
 

@@ -158,9 +158,11 @@ type UserChoice struct {
 	Choice     int    `json:"choice"`
 }
 
-// MiniGameResultSubmit represents mini-game result submission.
-type MiniGameResultSubmit struct {
-	Rank int `json:"rank"`
+// MiniGameDataSubmit represents mini-game data submission.
+// Client submits game_data (not rank); server calculates ranking.
+type MiniGameDataSubmit struct {
+	GameType string                 `json:"game_type"`
+	GameData map[string]interface{} `json:"game_data"`
 }
 
 // ActionRejected represents an action rejection notification (server -> client).

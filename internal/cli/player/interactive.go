@@ -276,18 +276,21 @@ func (p *InteractivePlayer) handleMiniGameStart(ctx context.Context, data []byte
 
 	p.logger.Debug("Received mini-game start", "game_type", start.GameType, "players", len(start.Players))
 
-	// Get rank from user
-	rank := p.uiAdapter.OnMiniGameStart(ctx, &start)
+	// Get game_data from user (interactive mode lets user choose score/time)
+	gameData := p.uiAdapter.OnMiniGameStart(ctx, &start)
 
-	// Submit rank
-	submit := model.MiniGameResultSubmit{Rank: rank}
-	if err := p.socket.SendMessage(ctx, nakama.OpMiniGameResultSubmit, submit); err != nil {
-		p.logger.Error("Failed to send MiniGameResultSubmit", "error", err)
+	// Submit game_data
+	submit := model.MiniGameDataSubmit{
+		GameType: start.GameType,
+		GameData: gameData,
+	}
+	if err := p.socket.SendMessage(ctx, nakama.OpMiniGameDataSubmit, submit); err != nil {
+		p.logger.Error("Failed to send MiniGameDataSubmit", "error", err)
 		p.uiAdapter.OnError(err)
 		return
 	}
 
-	p.logger.Debug("Submitted mini-game rank", "rank", rank)
+	p.logger.Debug("Submitted mini-game data", "game_type", submit.GameType)
 }
 
 func (p *InteractivePlayer) handleMiniGameResult(ctx context.Context, data []byte) {

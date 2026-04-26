@@ -151,7 +151,7 @@ func TestOpCodeConstants(t *testing.T) {
 		{"OpUseItem", OpUseItem, 101},
 		{"OpUseSkill", OpUseSkill, 102},
 		{"OpUserChoice", OpUserChoice, 103},
-		{"OpMiniGameResultSubmit", OpMiniGameResultSubmit, 104},
+		{"OpMiniGameDataSubmit", OpMiniGameDataSubmit, 107},
 	}
 
 	for _, tt := range tests {

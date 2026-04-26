@@ -409,7 +409,7 @@ const (
 	OpUseItem              int64 = 101
 	OpUseSkill             int64 = 102
 	OpUserChoice           int64 = 103
-	OpMiniGameResultSubmit int64 = 104
+	OpMiniGameDataSubmit int64 = 107 // Client submits game_data, server calculates rank
 	OpStartGame            int64 = 105
 	OpRoundReady           int64 = 106 // Client signals ready for next round after RoundEndWait
 )

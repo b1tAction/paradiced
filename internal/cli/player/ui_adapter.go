@@ -22,8 +22,8 @@ type PlayerUIAdapter interface {
 
 	// OnMiniGameStart prompts user for mini-game participation.
 	// Called when server sends MiniGameStart message.
-	// Returns the rank the user wants to submit.
-	OnMiniGameStart(ctx context.Context, start *model.MiniGameStart) int
+	// Returns the game_data the user wants to submit.
+	OnMiniGameStart(ctx context.Context, start *model.MiniGameStart) map[string]interface{}
 
 	// OnMiniGameResult displays mini-game result.
 	// Called when server sends MiniGameResult message.

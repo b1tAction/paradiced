@@ -555,15 +555,8 @@ func (p *AutoPlayPlayer) handleMiniGameStart(ctx context.Context, data []byte) {
 
 	p.logger.Info("Received mini-game start", "game_type", start.GameType, "players", len(start.Players))
 
-	// Strategy: Assign unique rank based on player index to ensure consecutive and non-duplicate rankings
-	// Example: For 4 players, rankings are 1, 2, 3, 4
-	maxRank := len(start.Players)
-	if maxRank <= 0 {
-		maxRank = 2
-	}
-
-	// Find current player's index in the players list using userID
-	// MiniGameStart.Players contains Nakama UserIDs
+	// Strategy: Submit game_data based on game_type with deterministic values based on player index
+	// Server's RankCalculator will compute actual rankings from game_data
 	playerIndex := 0
 	for i, uid := range start.Players {
 		if uid == p.userID {
@@ -572,23 +565,50 @@ func (p *AutoPlayPlayer) handleMiniGameStart(ctx context.Context, data []byte) {
 		}
 	}
 
-	// Simple strategy: use index + 1 as rank (index 0 -> rank 1, index 1 -> rank 2, etc.)
-	// This ensures all players submit different ranks
-	myRank := playerIndex + 1
-	if myRank > maxRank {
-		myRank = 1 // Wrap around if index exceeds player count
+	// Generate game_data based on game_type
+	var gameData map[string]interface{}
+	switch start.GameType {
+	case "count_seconds":
+		// count_seconds: elapsed close to 5.0, with deviation increasing by player index
+		gameData = map[string]interface{}{
+			"elapsed": 5.0 + float64(playerIndex) * 0.3,
+		}
+	case "dice_race":
+		// dice_race: deterministic dice values, lower playerIndex → higher score
+		// Generate dice1/dice2 such that score decreases with player index
+		d1 := 6 - playerIndex // 6, 5, 4, 3 for 4-player game
+		d2 := 5 - playerIndex // 5, 4, 3, 2
+		if d1 < 1 {
+			d1 = 1
+		}
+		if d2 < 1 {
+			d2 = 1
+		}
+		gameData = map[string]interface{}{
+			"dice1": d1,
+			"dice2": d2,
+			"score": d1 + d2,
+		}
+	default:
+		// coin_flip and others: deterministic score
+		gameData = map[string]interface{}{
+			"score": (len(start.Players) - playerIndex) * 100,
+		}
 	}
 
-	submit := model.MiniGameResultSubmit{Rank: myRank}
-	if err := p.socket.SendMessage(ctx, nakama.OpMiniGameResultSubmit, submit); err != nil {
-		p.logger.Error("Failed to send MiniGameResultSubmit", "error", err)
+	submit := model.MiniGameDataSubmit{
+		GameType: start.GameType,
+		GameData: gameData,
+	}
+	if err := p.socket.SendMessage(ctx, nakama.OpMiniGameDataSubmit, submit); err != nil {
+		p.logger.Error("Failed to send MiniGameDataSubmit", "error", err)
 		p.mu.Lock()
 		p.lastErr = err
 		p.mu.Unlock()
 		return
 	}
 
-	p.logger.Info("Submitted mini-game rank", "rank", submit.Rank, "player_index", playerIndex)
+	p.logger.Info("Submitted mini-game data", "game_type", submit.GameType, "player_index", playerIndex)
 }
 
 func (p *AutoPlayPlayer) handleGameOver(ctx context.Context, data []byte) {

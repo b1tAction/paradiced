@@ -136,15 +136,15 @@ func (ui *CLIUIAdapter) OnAvailable(ctx context.Context, available *model.Availa
 	}
 }
 
-// OnMiniGameStart prompts user for mini-game participation.
-func (ui *CLIUIAdapter) OnMiniGameStart(ctx context.Context, start *model.MiniGameStart) int {
+// OnMiniGameStart prompts user for mini-game data submission.
+func (ui *CLIUIAdapter) OnMiniGameStart(ctx context.Context, start *model.MiniGameStart) map[string]interface{} {
 	fmt.Println()
 	fmt.Println("========== Mini Game Start ==========")
 	fmt.Printf("Game Type: %s\n", start.GameType)
 	fmt.Printf("Participants: %d\n", len(start.Players))
 	fmt.Println()
 
-	// Find my index
+	// Find my index for default values
 	myIndex := 0
 	for i, uid := range start.Players {
 		if uid == ui.userID {
@@ -153,23 +153,120 @@ func (ui *CLIUIAdapter) OnMiniGameStart(ctx context.Context, start *model.MiniGa
 		}
 	}
 
-	// Prompt for rank
-	for {
-		fmt.Printf("Enter your rank (1-%d): ", len(start.Players))
-
-		if !ui.reader.Scan() {
-			// Default to index-based rank
-			return myIndex + 1
+	// Generate game_data based on game_type
+	switch start.GameType {
+	case "count_seconds":
+		// count_seconds: prompt for estimated elapsed time (target: 5.0 seconds)
+		defaultElapsed := 5.0 + float64(myIndex) * 0.3
+		elapsed := 0.0
+		for {
+			fmt.Printf("Enter your estimated seconds (target: 5.0, default %.1f): ", defaultElapsed)
+			if !ui.reader.Scan() {
+				elapsed = defaultElapsed
+				break
+			}
+			input := strings.TrimSpace(ui.reader.Text())
+			if input == "" {
+				elapsed = defaultElapsed
+				break
+			}
+			val, err := strconv.ParseFloat(input, 64)
+			if err != nil {
+				fmt.Println("Invalid time, enter a number")
+				continue
+			}
+			elapsed = val
+			break
+		}
+		return map[string]interface{}{
+			"elapsed": elapsed,
 		}
 
-		input := strings.TrimSpace(ui.reader.Text())
-		rank, err := strconv.Atoi(input)
-		if err != nil || rank < 1 || rank > len(start.Players) {
-			fmt.Printf("Invalid rank, enter 1-%d\n", len(start.Players))
-			continue
+	case "dice_race":
+		// dice_race: prompt for two dice values (1-6)
+		defaultD1 := 6 - myIndex
+		if defaultD1 < 1 {
+			defaultD1 = 1
+		}
+		defaultD2 := 5 - myIndex
+		if defaultD2 < 1 {
+			defaultD2 = 1
 		}
 
-		return rank
+		d1 := defaultD1
+		for {
+			fmt.Printf("Enter dice1 (1-6, default %d): ", defaultD1)
+			if !ui.reader.Scan() {
+				d1 = defaultD1
+				break
+			}
+			input := strings.TrimSpace(ui.reader.Text())
+			if input == "" {
+				d1 = defaultD1
+				break
+			}
+			val, err := strconv.Atoi(input)
+			if err != nil || val < 1 || val > 6 {
+				fmt.Println("Invalid dice value, enter a number 1-6")
+				continue
+			}
+			d1 = val
+			break
+		}
+
+		d2 := defaultD2
+		for {
+			fmt.Printf("Enter dice2 (1-6, default %d): ", defaultD2)
+			if !ui.reader.Scan() {
+				d2 = defaultD2
+				break
+			}
+			input := strings.TrimSpace(ui.reader.Text())
+			if input == "" {
+				d2 = defaultD2
+				break
+			}
+			val, err := strconv.Atoi(input)
+			if err != nil || val < 1 || val > 6 {
+				fmt.Println("Invalid dice value, enter a number 1-6")
+				continue
+			}
+			d2 = val
+			break
+		}
+
+		return map[string]interface{}{
+			"dice1": d1,
+			"dice2": d2,
+			"score": d1 + d2,
+		}
+
+	default:
+		// coin_flip and others: prompt for score
+		score := 0
+		for {
+			fmt.Printf("Enter your score (default %d): ", (len(start.Players) - myIndex) * 100)
+			if !ui.reader.Scan() {
+				score = (len(start.Players) - myIndex) * 100
+				break
+			}
+			input := strings.TrimSpace(ui.reader.Text())
+			if input == "" {
+				score = (len(start.Players) - myIndex) * 100
+				break
+			}
+			val, err := strconv.Atoi(input)
+			if err != nil {
+				fmt.Println("Invalid score, enter a number")
+				continue
+			}
+			score = val
+			break
+		}
+
+		return map[string]interface{}{
+			"score": score,
+		}
 	}
 }
 
