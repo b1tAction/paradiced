@@ -86,3 +86,41 @@ func TestNewBuffWithIDDefaultNotTickEligible(t *testing.T) {
 		t.Error("new buff with ID should have tickEligible=false by default")
 	}
 }
+
+func TestBuffDefinitionIsPositive(t *testing.T) {
+	tests := []struct {
+		eval     constants.Evaluation
+		expected bool
+	}{
+		{constants.EvaluationGood, true},
+		{constants.EvaluationVeryGood, true},
+		{constants.EvaluationMildGood, true},
+		{constants.EvaluationNeutral, false},
+		{constants.EvaluationBad, false},
+	}
+	for _, tt := range tests {
+		def := &BuffDefinition{Type: constants.BuffTypeDivine, Eval: tt.eval}
+		if def.IsPositive() != tt.expected {
+			t.Errorf("BuffDefinition.IsPositive() with Eval=%d = %v, expected %v", tt.eval, def.IsPositive(), tt.expected)
+		}
+	}
+}
+
+func TestBuffDefinitionIsNegative(t *testing.T) {
+	tests := []struct {
+		eval     constants.Evaluation
+		expected bool
+	}{
+		{constants.EvaluationBad, true},
+		{constants.EvaluationVeryBad, true},
+		{constants.EvaluationMildBad, true},
+		{constants.EvaluationNeutral, false},
+		{constants.EvaluationGood, false},
+	}
+	for _, tt := range tests {
+		def := &BuffDefinition{Type: constants.BuffTypeCurse, Eval: tt.eval}
+		if def.IsNegative() != tt.expected {
+			t.Errorf("BuffDefinition.IsNegative() with Eval=%d = %v, expected %v", tt.eval, def.IsNegative(), tt.expected)
+		}
+	}
+}

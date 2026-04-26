@@ -131,6 +131,31 @@ func TestQueueClear(t *testing.T) {
 	}
 }
 
+// ========== ActionContext Tests ==========
+
+func TestSetPools(t *testing.T) {
+	ctx := NewActionContext(nil, nil, nil, nil)
+	eventPool := []*rng.EvaluatedItem{{Type: "herb", Eval: constants.EvaluationGood}}
+	itemPool := []*rng.EvaluatedItem{{Type: "any_door", Eval: constants.EvaluationMildGood}}
+	buffPool := []*rng.EvaluatedItem{{Type: "divine", Eval: constants.EvaluationVeryGood}}
+
+	result := ctx.SetPools(eventPool, itemPool, buffPool)
+
+	// Verify fluent API returns same context
+	if result != ctx {
+		t.Error("SetPools should return the same ActionContext (fluent API)")
+	}
+	if len(ctx.EventPool) != 1 || ctx.EventPool[0].Type != "herb" {
+		t.Errorf("EventPool not set correctly: %v", ctx.EventPool)
+	}
+	if len(ctx.ItemPool) != 1 || ctx.ItemPool[0].Type != "any_door" {
+		t.Errorf("ItemPool not set correctly: %v", ctx.ItemPool)
+	}
+	if len(ctx.BuffPool) != 1 || ctx.BuffPool[0].Type != "divine" {
+		t.Errorf("BuffPool not set correctly: %v", ctx.BuffPool)
+	}
+}
+
 // ========== DamageAction Tests ==========
 
 func TestDamageAction(t *testing.T) {
