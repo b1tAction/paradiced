@@ -14,11 +14,11 @@ import (
 // Broadcast when entering a new state or for reconnecting players.
 type StateSync struct {
 	// GlobalState is the current global state (Layer 1).
-	// Values: "match_init", "round_mini_game", "round_prep", "turn_loop", "boss_battle", "game_over"
+	// Values: "MatchInit", "WaitingForHost", "RoundMiniGame", "RoundPrep", "TurnLoop", "RoundEndWait", "GameOver"
 	GlobalState string `json:"global_state"`
 
 	// TurnState is the current turn state (Layer 2), empty if not in turn loop.
-	// Values: "turn_upkeep", "main_action", "turn_moving", "turn_landed", "turn_event", "turn_end"
+	// Values: "TurnUpkeep", "MainAction", "TurnMoving", "TurnLanded", "TurnDraw", "TurnBossBattle", "TurnEnd"
 	TurnState string `json:"turn_state"`
 
 	// CurrentPlayerID is the player ID whose turn is active.

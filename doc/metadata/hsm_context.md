@@ -86,6 +86,7 @@ func (ctx *StateContext) GetDiceSteps() int {
 | `KeyWaitingForResults` | `waiting_for_results` | bool | RoundMiniGame | 等待小游戏结果 |
 | `KeyTurnLoopActive` | `turn_loop_active` | bool | TurnLoop | 回合循环活跃 |
 | `KeyGameOver` | `game_over` | bool | GameOver | 游戏结束 |
+| `KeyRoundEndWaiting` | `round_end_waiting` | bool | RoundEndWait | 轮结束等待阶段（等待所有客户端Ready） |
 
 ---
 

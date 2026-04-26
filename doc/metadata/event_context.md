@@ -61,6 +61,11 @@ func ExecuteHPChange(ctx *ActionContext, target *Player) {
 - 推送衍生 BossAttackAction（Boss→攻击玩家，SourceThornsReflect）
 - 衍生 BossAttackAction 走 PhasePreDamage → 隐匿可拦截反伤
 
+**骰子拦截机制 (PhasePreDiceRoll)**：
+- RollDiceAction 在构造时计算 Steps（遵循 DamageAction 模式：Amount 构造时设定）
+- PhasePreDiceRoll Handler 通过 `current_action` 类型断言为 `*RollDiceAction`，可修改 `Steps` 字段
+- 例如"强运"Buff：Handler 断言 `action.(*RollDiceAction)`，将 `Steps` 修改为最大值
+
 ### Event 效果信号
 
 | 字段 | 类型 | 来源Event | 用途 | 目标 |

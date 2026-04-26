@@ -231,6 +231,10 @@ interface LogEntry {
         // state
         from?: string;
         to?: string;
+
+        // dice_roll
+        dice_type?: string;    // dice type (gold/silver/copper/wood)
+        dice_steps?: number;   // dice roll result steps
     };
 }
 ```
@@ -243,6 +247,7 @@ interface LogEntry {
 
 | Action | Metadata 字段 | 示例 |
 |--------|--------------|------|
+| RollDiceAction | `dice_type`, `dice_steps` | `dice_type: "gold", dice_steps: 6` |
 | DamageAction | `hp_change: -amount` | `hp_change: -5` |
 | HealAction | `hp_change: amount` | `hp_change: 3` |
 | ModifyLPAction | `lp_change: amount` | `lp_change: 1` |
