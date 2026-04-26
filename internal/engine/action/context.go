@@ -23,6 +23,7 @@ type ActionContext struct {
 	DrawEngine    *rng.DrawEngine       // DrawEngine for random draws (events, buffs, items)
 	EventPool     []*rng.EvaluatedItem  // Event pool for DrawEventAction (all events)
 	ItemPool      []*rng.EvaluatedItem  // Item pool for DrawItemAction (all items)
+	BuffPool      []*rng.EvaluatedItem  // Buff pool for DrawBuffAction (drawable buffs)
 	ActionQueue   *Queue                // Queue for derived actions
 	// Probability weights for cell-based draws
 	ProbGood      float64               // Probability weight for Good pool
@@ -38,6 +39,11 @@ type ActionContext struct {
 	// Injected by engine layer (BuffRegistry). Used by AddBuffAction/DeathAction to
 	// look up duration from definition instead of hardcoding it.
 	GetBuffDuration func(buffType constants.BuffType) int
+
+	// Item lifecycle callbacks - injected by HSM layer (engine.Game)
+	// These handle EventBus subscription/unsubscription for Item add/remove.
+	OnAddItem    func(player *core.Player, item *core.Item)                     // Called after AddItemAction.Execute
+	OnRemoveItem func(player *core.Player, itemType constants.ItemType) *core.Item // Called by RemoveItemAction.Execute
 }
 
 // NewActionContext creates a new ActionContext with required components.
@@ -52,10 +58,11 @@ func NewActionContext(game protocol.Game, bus *event.EventBus, mapEngine *gamema
 	}
 }
 
-// SetPools sets the event and item pools for draw actions.
-func (ctx *ActionContext) SetPools(eventPool, itemPool []*rng.EvaluatedItem) *ActionContext {
+// SetPools sets the event, item, and buff pools for draw actions.
+func (ctx *ActionContext) SetPools(eventPool, itemPool, buffPool []*rng.EvaluatedItem) *ActionContext {
 	ctx.EventPool = eventPool
 	ctx.ItemPool = itemPool
+	ctx.BuffPool = buffPool
 	return ctx
 }
 

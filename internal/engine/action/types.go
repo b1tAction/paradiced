@@ -709,12 +709,9 @@ func (a *DrawItemAction) Execute(ctx *ActionContext) error {
 		a.DrawnType = constants.ItemTypeNone
 	}
 
-	// Add drawn item to player's inventory
+	// Push AddItemAction as DerivedAction for full item lifecycle (EventBus subscription)
 	if a.DrawnType != constants.ItemTypeNone && a.DrawnType.IsValid() {
-		newItem := core.NewItem(a.DrawnType)
-		if err := a.targetPlayer.AddItem(newItem); err != nil {
-			return errors.NewActionExecutionError("draw_item", a.targetPlayer.ID.UUID(), "failed to add drawn item to inventory", err)
-		}
+		ctx.PushDerivedAction(NewAddItemAction(a.targetPlayer, a.DrawnType, a.SourceID))
 	}
 
 	return nil
@@ -1204,6 +1201,276 @@ func (a *RollDiceAction) LogEntry() gamelog.LogEntry {
 	metadata := util.NewMetadata()
 	metadata.SetString("dice_type", a.DiceType.String())
 	metadata.SetInt("dice_steps", a.Steps)
+
+	return gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       constants.EntryTypeAction,
+		ActionType: string(a.Type()),
+		Target:     a.targetPlayer.ID.UUID(),
+		Source:     a.SourceID,
+		Metadata:   metadata,
+	}
+}
+
+// ========== AddItemAction ==========
+
+// AddItemAction represents adding an Item to player inventory.
+// Similar lifecycle to AddBuffAction: OnAddItem callback handles EventBus subscription.
+type AddItemAction struct {
+	targetPlayer *core.Player
+	ItemType     constants.ItemType // Item type to add
+	SourceID     string             // Source identifier (e.g., "CheckpointTreasure", "Event_Relic")
+}
+
+// NewAddItemAction creates a new AddItemAction.
+func NewAddItemAction(target *core.Player, itemType constants.ItemType, sourceID string) *AddItemAction {
+	return &AddItemAction{
+		targetPlayer: target,
+		ItemType:     itemType,
+		SourceID:     sourceID,
+	}
+}
+
+func (a *AddItemAction) Type() constants.ActionType { return constants.ActionAddItem }
+func (a *AddItemAction) CanModify() bool            { return false }
+func (a *AddItemAction) Source() string             { return a.SourceID }
+func (a *AddItemAction) Target() string             { return a.targetPlayer.ID.UUID() }
+func (a *AddItemAction) TargetPlayer() *core.Player { return a.targetPlayer }
+func (a *AddItemAction) PreTriggerPhase() constants.Phase  { return constants.PhaseAnyTime }
+func (a *AddItemAction) PostTriggerPhase() constants.Phase { return constants.PhaseAnyTime }
+
+func (a *AddItemAction) Execute(ctx *ActionContext) error {
+	if a.targetPlayer == nil {
+		return errors.NewActionExecutionError("add_item", "", "target player is nil", nil)
+	}
+	if ctx.OnAddItem == nil {
+		return errors.NewActionExecutionError("add_item", "", "OnAddItem callback is nil", nil)
+	}
+
+	newItem := core.NewItem(a.ItemType)
+	ctx.OnAddItem(a.targetPlayer, newItem)
+	return nil
+}
+
+func (a *AddItemAction) LogEntry() gamelog.LogEntry {
+	metadata := util.NewMetadata()
+	metadata.SetString("item_type", string(a.ItemType))
+
+	return gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       constants.EntryTypeAction,
+		ActionType: string(a.Type()),
+		Target:     a.targetPlayer.ID.UUID(),
+		Source:     a.SourceID,
+		Metadata:   metadata,
+	}
+}
+
+// ========== RemoveItemAction ==========
+
+// RemoveItemAction represents removing an Item from player inventory.
+// Similar lifecycle to RemoveBuffAction: OnRemoveItem callback handles EventBus unsubscription + player.RemoveItem.
+type RemoveItemAction struct {
+	targetPlayer *core.Player
+	ItemType     constants.ItemType // Item type to remove
+	SourceID     string             // Source identifier (e.g., "Item_Consumed", "Event_Thief")
+}
+
+// NewRemoveItemAction creates a new RemoveItemAction.
+func NewRemoveItemAction(target *core.Player, itemType constants.ItemType, sourceID string) *RemoveItemAction {
+	return &RemoveItemAction{
+		targetPlayer: target,
+		ItemType:     itemType,
+		SourceID:     sourceID,
+	}
+}
+
+func (a *RemoveItemAction) Type() constants.ActionType { return constants.ActionRemoveItem }
+func (a *RemoveItemAction) CanModify() bool            { return false }
+func (a *RemoveItemAction) Source() string             { return a.SourceID }
+func (a *RemoveItemAction) Target() string             { return a.targetPlayer.ID.UUID() }
+func (a *RemoveItemAction) TargetPlayer() *core.Player { return a.targetPlayer }
+func (a *RemoveItemAction) PreTriggerPhase() constants.Phase  { return constants.PhaseAnyTime }
+func (a *RemoveItemAction) PostTriggerPhase() constants.Phase { return constants.PhaseAnyTime }
+
+func (a *RemoveItemAction) Execute(ctx *ActionContext) error {
+	if a.targetPlayer == nil {
+		return errors.NewActionExecutionError("remove_item", "", "target player is nil", nil)
+	}
+	if ctx.OnRemoveItem == nil {
+		return errors.NewActionExecutionError("remove_item", "", "OnRemoveItem callback is nil", nil)
+	}
+	// OnRemoveItem handles EventBus unsubscription and player.RemoveItem
+	ctx.OnRemoveItem(a.targetPlayer, a.ItemType)
+	return nil
+}
+
+func (a *RemoveItemAction) LogEntry() gamelog.LogEntry {
+	metadata := util.NewMetadata()
+	metadata.SetString("item_type", string(a.ItemType))
+
+	return gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       constants.EntryTypeAction,
+		ActionType: string(a.Type()),
+		Target:     a.targetPlayer.ID.UUID(),
+		Source:     a.SourceID,
+		Metadata:   metadata,
+	}
+}
+
+// ========== DrawBuffAction ==========
+
+// DrawBuffAction represents drawing a random Buff from BuffPool.
+// Similar to DrawEventAction: PreTrigger can be intercepted by Hidden buff (PhasePreBuffApplied).
+// Execute draws a BuffType from BuffPool, then pushes AddBuffAction as DerivedAction.
+// The actual buff application lifecycle (OnAddBuff, PhasePostBuffApplied) is handled by AddBuffAction.
+type DrawBuffAction struct {
+	targetPlayer *core.Player
+	SourceID     string               // Source identifier (e.g., "Event_TasteTest")
+	DrawnType    constants.BuffType   // Buff type drawn (set after Execute)
+	DrawnName    string               // Buff name (set after Execute)
+}
+
+// NewDrawBuffAction creates a new DrawBuffAction.
+func NewDrawBuffAction(target *core.Player, sourceID string) *DrawBuffAction {
+	return &DrawBuffAction{
+		targetPlayer: target,
+		SourceID:     sourceID,
+	}
+}
+
+func (a *DrawBuffAction) Type() constants.ActionType { return constants.ActionDrawBuff }
+func (a *DrawBuffAction) CanModify() bool            { return true }
+func (a *DrawBuffAction) Source() string             { return a.SourceID }
+func (a *DrawBuffAction) Target() string             { return a.targetPlayer.ID.UUID() }
+func (a *DrawBuffAction) TargetPlayer() *core.Player { return a.targetPlayer }
+func (a *DrawBuffAction) PreTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime // No interception needed; AddBuffAction handles PhasePreBuffApplied
+}
+func (a *DrawBuffAction) PostTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime // Buff entry effects handled by AddBuffAction's PostTrigger
+}
+
+func (a *DrawBuffAction) Execute(ctx *ActionContext) error {
+	if a.targetPlayer == nil {
+		return errors.NewActionExecutionError("draw_buff", "", "target player is nil", nil)
+	}
+
+	// Draw buff requires DrawEngine and BuffPool
+	if ctx.DrawEngine == nil {
+		return errors.NewInternalError("DrawBuffAction", "Execute", nil).
+			WithContext("reason", "draw engine is nil")
+	}
+	if ctx.BuffPool == nil {
+		return errors.NewInternalError("DrawBuffAction", "Execute", nil).
+			WithContext("reason", "buff pool is nil")
+	}
+
+	// Draw buff type from pool using probability weights and player's LP
+	result := ctx.DrawEngine.DrawWithProb(
+		ctx.BuffPool,
+		ctx.ProbGood, ctx.ProbNeutral, ctx.ProbBad,
+		a.targetPlayer.LP,
+	)
+	if result.Item != nil {
+		a.DrawnType = constants.ParseBuffType(result.Item.Type)
+	} else {
+		a.DrawnType = constants.BuffTypeNone
+	}
+	a.DrawnName = ""
+
+	// Push AddBuffAction as DerivedAction for full buff lifecycle
+	if a.DrawnType.IsValid() && a.DrawnType != constants.BuffTypeNone {
+		ctx.PushDerivedAction(NewAddBuffAction(a.targetPlayer, a.DrawnType, a.SourceID))
+	}
+
+	return nil
+}
+
+func (a *DrawBuffAction) LogEntry() gamelog.LogEntry {
+	entry := gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       constants.EntryTypeAction,
+		ActionType: string(a.Type()),
+		Target:     a.targetPlayer.ID.UUID(),
+		Source:     a.SourceID,
+		Metadata:   util.NewMetadata(),
+	}
+
+	// Add buff type to metadata (client uses buff_type to look up local definition table)
+	if a.DrawnType.IsValid() {
+		entry.Metadata.SetString("buff_type", string(a.DrawnType))
+	}
+
+	return entry
+}
+
+// ========== DiceUpgradeAction ==========
+
+// DiceUpgradeAction represents upgrading a player's dice type.
+// Calculates upgrade target from FromDice and writes result to ActionContext metadata
+// for HSM to read back and update DiceManager.
+// Upgrade path: Wood → Copper → Silver → Gold (Gold cannot be upgraded further).
+type DiceUpgradeAction struct {
+	targetPlayer *core.Player
+	SourceID     string         // Source identifier (e.g., "Item_DiceUpgrade")
+	FromDice    rng.DiceType   // Original dice type
+	ToDice      rng.DiceType   // Upgraded dice type (set during Execute)
+}
+
+// NewDiceUpgradeAction creates a new DiceUpgradeAction.
+func NewDiceUpgradeAction(target *core.Player, sourceID string, fromDice rng.DiceType) *DiceUpgradeAction {
+	return &DiceUpgradeAction{
+		targetPlayer: target,
+		SourceID:     sourceID,
+		FromDice:     fromDice,
+	}
+}
+
+func (a *DiceUpgradeAction) Type() constants.ActionType { return constants.ActionDiceUpgrade }
+func (a *DiceUpgradeAction) CanModify() bool            { return false }
+func (a *DiceUpgradeAction) Source() string             { return a.SourceID }
+func (a *DiceUpgradeAction) Target() string             { return a.targetPlayer.ID.UUID() }
+func (a *DiceUpgradeAction) TargetPlayer() *core.Player { return a.targetPlayer }
+func (a *DiceUpgradeAction) PreTriggerPhase() constants.Phase  { return constants.PhaseAnyTime }
+func (a *DiceUpgradeAction) PostTriggerPhase() constants.Phase { return constants.PhaseAnyTime }
+
+func (a *DiceUpgradeAction) Execute(ctx *ActionContext) error {
+	if a.targetPlayer == nil {
+		return errors.NewActionExecutionError("dice_upgrade", "", "target player is nil", nil)
+	}
+
+	// Calculate upgrade: Wood→Copper→Silver→Gold
+	// DiceType enum: Gold=1, Silver=2, Copper=3, Wood=4, Normal=5
+	// Upgrade means going one level up (lower DiceType number = better dice)
+	switch a.FromDice {
+	case rng.DiceTypeWood:
+		a.ToDice = rng.DiceTypeCopper
+	case rng.DiceTypeCopper:
+		a.ToDice = rng.DiceTypeSilver
+	case rng.DiceTypeSilver:
+		a.ToDice = rng.DiceTypeGold
+	case rng.DiceTypeGold:
+		// Gold cannot be upgraded further, stay Gold
+		a.ToDice = rng.DiceTypeGold
+	default:
+		// Normal dice upgrades to Copper
+		a.ToDice = rng.DiceTypeCopper
+	}
+
+	// Write upgrade result to ActionContext metadata for HSM DiceManager update
+	ctx.SetString("dice_upgrade_to", a.ToDice.String())
+	ctx.SetString("dice_upgrade_from", a.FromDice.String())
+	ctx.SetString("dice_upgrade_player", a.targetPlayer.ID.UUID())
+
+	return nil
+}
+
+func (a *DiceUpgradeAction) LogEntry() gamelog.LogEntry {
+	metadata := util.NewMetadata()
+	metadata.SetString("from_dice", a.FromDice.String())
+	metadata.SetString("to_dice", a.ToDice.String())
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),

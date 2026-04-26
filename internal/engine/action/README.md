@@ -54,6 +54,10 @@ const (
     ActionBossDamage ActionType = "boss_damage"  // Player attacks Boss
     ActionBossAttack ActionType = "boss_attack"  // Boss attacks player
     ActionBossSkill  ActionType = "boss_skill"   // Boss uses skill
+    ActionAddItem    ActionType = "add_item"     // Add Item to inventory
+    ActionRemoveItem ActionType = "remove_item"  // Remove Item from inventory
+    ActionDrawBuff   ActionType = "draw_buff"    // Draw random Buff from pool
+    ActionDiceUpgrade ActionType = "dice_upgrade" // Upgrade dice type
     ActionUnknown    ActionType = "unknown"
 )
 ```
@@ -249,6 +253,76 @@ type BossSkillAction struct {
 - `TargetPlayer()` returns `SourcePlayer` (Boss player as actor)
 - LogEntry record only; actual skill effect handled by BossRegistry skill handlers
 
+### AddItemAction
+
+```go
+type AddItemAction struct {
+    targetPlayer *core.Player    // 私有字段
+    ItemType     constants.ItemType
+    SourceID     string          // "CheckpointTreasure", "Event_Relic"
+}
+```
+
+- `CanModify() = false` - Item加入不可拦截
+- `PreTriggerPhase() = PhaseAnyTime` - 不触发拦截Phase
+- `PostTriggerPhase() = PhaseAnyTime` - 无入场效果
+- `Execute()` → 创建 `core.NewItem(ItemType)`，调用 `ctx.OnAddItem(player, item)` callback
+- OnAddItem callback 由 HSM 层注入（`game.ApplyItemToPlayer`）：1. `player.AddItem(item)` 2. `game.SubscribeItem(player, item)` EventBus订阅
+- DrawItemAction 现不再直接 AddItem，改为 `PushDerivedAction(AddItemAction)` 走完整生命周期
+
+### RemoveItemAction
+
+```go
+type RemoveItemAction struct {
+    targetPlayer *core.Player    // 私有字段
+    ItemType     constants.ItemType
+    SourceID     string          // "Item_Consumed", "Event_Thief"
+}
+```
+
+- `CanModify() = false` - Item移除不可拦截
+- `PreTriggerPhase() = PhaseAnyTime` - 不触发拦截Phase
+- `PostTriggerPhase() = PhaseAnyTime`
+- `Execute()` → 调用 `ctx.OnRemoveItem(player, ItemType)` callback
+- OnRemoveItem callback 由 HSM 层注入：在 Inventory 中按 Type 查找，调用 `game.RemoveItemFromPlayer(player, item)`（1. UnsubscribeItem 2. player.RemoveItem）
+- 物品使用后自动消耗：`MainActionState.OnUseItem` 执行 Handler 后追加 `RemoveItemAction`
+
+### DrawBuffAction
+
+```go
+type DrawBuffAction struct {
+    targetPlayer *core.Player    // 私有字段
+    SourceID     string          // "Event_TasteTest"
+    DrawnType    constants.BuffType  // 抽取结果（Execute后设置）
+}
+```
+
+- `CanModify() = true`
+- `PreTriggerPhase() = PhaseAnyTime` - 抽取本身无需拦截，隐匿拦截点在后续 AddBuffAction 的 `PhasePreBuffApplied`
+- `PostTriggerPhase() = PhaseAnyTime` - Buff入场效果由后续 AddBuffAction 的 PostTrigger 处理
+- `Execute()` → 使用 `DrawEngine.DrawWithProb(BuffPool, ...)` 从 BuffPool 随机抽取 BuffType
+- 抽取后 `PushDerivedAction(AddBuffAction)` → AddBuffAction 走完整 Buff 生命周期
+- BuffPool 由 `BuffRegistry.BuildBuffPool()` 构建，仅包含 `IsDraw()` 的 Buff（排除 DeathMark/Thorns）
+- 类似 DrawEventAction 的设计：抽取 + DerivedAction 链路
+
+### DiceUpgradeAction
+
+```go
+type DiceUpgradeAction struct {
+    targetPlayer *core.Player    // 私有字段
+    SourceID     string          // "Item_DiceUpgrade"
+    FromDice    rng.DiceType     // 原始骰子类型
+    ToDice      rng.DiceType     // 升级后类型（Execute时计算）
+}
+```
+
+- `CanModify() = false` - 骰子升级不可拦截
+- `PreTriggerPhase() = PhaseAnyTime`
+- `PostTriggerPhase() = PhaseAnyTime`
+- `Execute()` → 计算升级路径（Wood→Copper→Silver→Gold），Gold不能再升级
+- 升级结果写入 ActionContext Metadata：`dice_upgrade_to`, `dice_upgrade_from`, `dice_upgrade_player`
+- HSM 层读取 metadata 更新 DiceManager 中玩家的 DiceType
+
 ## ActionContext
 
 ```go
@@ -261,6 +335,7 @@ type ActionContext struct {
     DrawEngine    *rng.DrawEngine   // 用于随机抽取（事件、Buff、道具）
     EventPool     []*rng.EvaluatedItem // 事件池（DrawEventAction）
     ItemPool      []*rng.EvaluatedItem // 道具池（DrawItemAction）
+    BuffPool      []*rng.EvaluatedItem // Buff池（DrawBuffAction）
     ActionQueue   *Queue            // 衍生动作队列
     ProbGood      float64           // Good池概率权重
     ProbNeutral   float64           // Neutral池概率权重
@@ -270,6 +345,10 @@ type ActionContext struct {
     OnAddBuff    func(player *core.Player, buff *core.Buff)
     OnRemoveBuff func(player *core.Player, buffType constants.BuffType) *core.Buff
     GetBuffDuration func(buffType constants.BuffType) int
+
+    // Item lifecycle callbacks - injected by HSM layer
+    OnAddItem    func(player *core.Player, item *core.Item)
+    OnRemoveItem func(player *core.Player, itemType constants.ItemType) *core.Item
 }
 ```
 
@@ -318,6 +397,22 @@ func (a *AddBuffAction) PostTriggerPhase() constants.Phase { return constants.Ph
 // RemoveBuffAction - 移除前触发亡语
 func (a *RemoveBuffAction) PreTriggerPhase() constants.Phase { return constants.PhasePreBuffRemoved }
 func (a *RemoveBuffAction) PostTriggerPhase() constants.Phase { return constants.PhaseAnyTime }
+
+// DrawBuffAction - 抽取本身无需拦截，后续AddBuffAction处理PhasePreBuffApplied
+func (a *DrawBuffAction) PreTriggerPhase() constants.Phase { return constants.PhaseAnyTime }
+func (a *DrawBuffAction) PostTriggerPhase() constants.Phase { return constants.PhaseAnyTime }
+
+// AddItemAction - 不可拦截
+func (a *AddItemAction) PreTriggerPhase() constants.Phase { return constants.PhaseAnyTime }
+func (a *AddItemAction) PostTriggerPhase() constants.Phase { return constants.PhaseAnyTime }
+
+// RemoveItemAction - 不可拦截
+func (a *RemoveItemAction) PreTriggerPhase() constants.Phase { return constants.PhaseAnyTime }
+func (a *RemoveItemAction) PostTriggerPhase() constants.Phase { return constants.PhaseAnyTime }
+
+// DiceUpgradeAction - 不可拦截
+func (a *DiceUpgradeAction) PreTriggerPhase() constants.Phase { return constants.PhaseAnyTime }
+func (a *DiceUpgradeAction) PostTriggerPhase() constants.Phase { return constants.PhaseAnyTime }
 ```
 
 ### LogEntry 方法实现

@@ -23,6 +23,7 @@ type ActionContext struct {
     DrawEngine    *rng.DrawEngine    // 随机抽取引擎
     EventPool     []*rng.EvaluatedItem // 事件池
     ItemPool      []*rng.EvaluatedItem // 道具池
+    BuffPool      []*rng.EvaluatedItem // Buff池（仅IsDraw()的BuffType）
     ActionQueue   *Queue             // 派生Action队列
     ProbGood      float64            // Good池概率权重
     ProbNeutral   float64            // Neutral池概率权重
@@ -32,6 +33,10 @@ type ActionContext struct {
     OnAddBuff    func(player *core.Player, buff *core.Buff)
     OnRemoveBuff func(player *core.Player, buffType constants.BuffType) *core.Buff
     GetBuffDuration func(buffType constants.BuffType) int
+
+    // Item lifecycle callbacks - injected by HSM layer
+    OnAddItem    func(player *core.Player, item *core.Item)
+    OnRemoveItem func(player *core.Player, itemType constants.ItemType) *core.Item
 }
 ```
 
@@ -58,6 +63,13 @@ type ActionContext struct {
 |------|------|------|------|------|
 | `target_pos` | int | HSM (TurnMovingState) | 移动目标位置（CalculatePath结果） | MoveAction.Execute() |
 | `path` | []int | HSM (TurnMovingState) | 移动路径（CalculatePath结果） | MoveAction.LogEntry() |
+
+### DiceUpgradeAction 骰子升级字段
+
+| 字段 | 类型 | 来源 | 用途 | 目标 |
+|------|------|------|------|------|
+| `dice_upgrade_from` | string | DiceUpgradeAction.Execute | 原始骰子类型 | DiceUpgradeAction.LogEntry() |
+| `dice_upgrade_to` | string | DiceUpgradeAction.Execute | 升级后骰子类型 | DiceUpgradeAction.LogEntry()、HSM层读取升级目标 |
 
 ### 使用场景
 

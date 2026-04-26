@@ -1574,6 +1574,10 @@ func TestDrawItemActionExecuteWithPool(t *testing.T) {
 	action := NewDrawItemAction(player, "CheckpointTreasure")
 	ctx := NewActionContext(nil, nil, nil, drawEngine)
 	ctx.ItemPool = itemPool
+	// Set OnAddItem callback to add item to player inventory (simulating Game.ApplyItemToPlayer)
+	ctx.OnAddItem = func(p *core.Player, i *core.Item) {
+		p.AddItem(i)
+	}
 
 	err := action.Execute(ctx)
 	if err != nil {
@@ -1588,7 +1592,24 @@ func TestDrawItemActionExecuteWithPool(t *testing.T) {
 		t.Errorf("DrawnType should be valid, got %s", action.DrawnType)
 	}
 
-	// Item should be added to player inventory
+	// Should have AddItemAction as derived action (instead of directly adding to inventory)
+	if ctx.ActionQueue.Len() != 1 {
+		t.Fatalf("Should have 1 derived action (AddItemAction), got %d", ctx.ActionQueue.Len())
+	}
+	addItemAction, ok := ctx.ActionQueue.Peek().(*AddItemAction)
+	if !ok {
+		t.Fatal("Derived action should be AddItemAction")
+	}
+	if addItemAction.ItemType != action.DrawnType {
+		t.Errorf("AddItemAction.ItemType = %s, expected %s", addItemAction.ItemType, action.DrawnType)
+	}
+
+	// Process derived action queue to actually add item to inventory
+	if err := ctx.ProcessQueue(); err != nil {
+		t.Errorf("ProcessQueue should succeed, got error: %v", err)
+	}
+
+	// Item should now be added to player inventory after ProcessQueue
 	if len(player.Inventory) != 1 {
 		t.Errorf("Player should have 1 item in inventory, got %d", len(player.Inventory))
 	}
@@ -1784,5 +1805,391 @@ func TestRollDiceActionSourceID(t *testing.T) {
 	}
 	if timeoutAction.Source() != "DiceRollTimeout" {
 		t.Errorf("Source() should be 'DiceRollTimeout', got %s", timeoutAction.Source())
+	}
+}
+
+// ========== AddItemAction Tests ==========
+
+func TestAddItemActionExecute(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+
+	action := NewAddItemAction(player, constants.ItemTypeReverseClock, "CheckpointTreasure")
+
+	ctx := NewActionContext(nil, nil, nil, nil)
+	// Provide OnAddItem callback (required for item lifecycle)
+	var addedItem *core.Item
+	ctx.OnAddItem = func(p *core.Player, i *core.Item) {
+		p.AddItem(i)
+		addedItem = i
+	}
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Errorf("AddItemAction Execute failed: %v", err)
+	}
+
+	if len(player.Inventory) != 1 {
+		t.Errorf("Player should have 1 item, got %d", len(player.Inventory))
+	}
+	if addedItem == nil {
+		t.Error("OnAddItem should have been called")
+	}
+	if addedItem.Type != constants.ItemTypeReverseClock {
+		t.Errorf("Item type = %s, expected ReverseClock", addedItem.Type)
+	}
+}
+
+func TestAddItemActionNilPlayer(t *testing.T) {
+	action := NewAddItemAction(nil, constants.ItemTypeReverseClock, "CheckpointTreasure")
+	ctx := NewActionContext(nil, nil, nil, nil)
+	ctx.OnAddItem = func(p *core.Player, i *core.Item) { p.AddItem(i) }
+
+	err := action.Execute(ctx)
+	if err == nil {
+		t.Error("AddItemAction with nil player should return error")
+	}
+}
+
+func TestAddItemActionNilCallback(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewAddItemAction(player, constants.ItemTypeReverseClock, "CheckpointTreasure")
+	ctx := NewActionContext(nil, nil, nil, nil)
+	// OnAddItem is nil
+
+	err := action.Execute(ctx)
+	if err == nil {
+		t.Error("AddItemAction with nil OnAddItem callback should return error")
+	}
+}
+
+func TestAddItemActionLogEntry(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewAddItemAction(player, constants.ItemTypeReverseClock, "CheckpointTreasure")
+
+	entry := action.LogEntry()
+	if entry.ActionType != string(constants.ActionAddItem) {
+		t.Errorf("LogEntry ActionType = %s, expected add_item", entry.ActionType)
+	}
+	if entry.Source != "CheckpointTreasure" {
+		t.Errorf("LogEntry Source = %s, expected CheckpointTreasure", entry.Source)
+	}
+	if entry.Metadata.GetStringOrDefault("item_type", "") != string(constants.ItemTypeReverseClock) {
+		t.Errorf("LogEntry item_type = %s, expected reverse_clock", entry.Metadata.GetStringOrDefault("item_type", ""))
+	}
+}
+
+// ========== RemoveItemAction Tests ==========
+
+func TestRemoveItemActionExecute(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	item := core.NewItem(constants.ItemTypeReverseClock)
+	player.AddItem(item)
+
+	if len(player.Inventory) != 1 {
+		t.Fatalf("Player should have 1 item before removal, got %d", len(player.Inventory))
+	}
+
+	action := NewRemoveItemAction(player, constants.ItemTypeReverseClock, "Item_Consumed")
+
+	ctx := NewActionContext(nil, nil, nil, nil)
+	// Provide OnRemoveItem callback
+	var removedItem *core.Item
+	ctx.OnRemoveItem = func(p *core.Player, it constants.ItemType) *core.Item {
+		for _, invItem := range p.Inventory {
+			if invItem.Type == it {
+				removedItem = invItem
+				p.RemoveItem(invItem.ID)
+				return invItem
+			}
+		}
+		return nil
+	}
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Errorf("RemoveItemAction Execute failed: %v", err)
+	}
+
+	if removedItem == nil {
+		t.Error("OnRemoveItem should have been called and found the item")
+	}
+	if removedItem.Type != constants.ItemTypeReverseClock {
+		t.Errorf("Removed item type = %s, expected ReverseClock", removedItem.Type)
+	}
+	if len(player.Inventory) != 0 {
+		t.Errorf("Player should have 0 items after removal, got %d", len(player.Inventory))
+	}
+}
+
+func TestRemoveItemActionNilPlayer(t *testing.T) {
+	action := NewRemoveItemAction(nil, constants.ItemTypeReverseClock, "Item_Consumed")
+	ctx := NewActionContext(nil, nil, nil, nil)
+	ctx.OnRemoveItem = func(p *core.Player, it constants.ItemType) *core.Item { return nil }
+
+	err := action.Execute(ctx)
+	if err == nil {
+		t.Error("RemoveItemAction with nil player should return error")
+	}
+}
+
+func TestRemoveItemActionNilCallback(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewRemoveItemAction(player, constants.ItemTypeReverseClock, "Item_Consumed")
+	ctx := NewActionContext(nil, nil, nil, nil)
+	// OnRemoveItem is nil
+
+	err := action.Execute(ctx)
+	if err == nil {
+		t.Error("RemoveItemAction with nil OnRemoveItem callback should return error")
+	}
+}
+
+func TestRemoveItemActionLogEntry(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewRemoveItemAction(player, constants.ItemTypeReverseClock, "Item_Consumed")
+
+	entry := action.LogEntry()
+	if entry.ActionType != string(constants.ActionRemoveItem) {
+		t.Errorf("LogEntry ActionType = %s, expected remove_item", entry.ActionType)
+	}
+	if entry.Source != "Item_Consumed" {
+		t.Errorf("LogEntry Source = %s, expected Item_Consumed", entry.Source)
+	}
+	if entry.Metadata.GetStringOrDefault("item_type", "") != string(constants.ItemTypeReverseClock) {
+		t.Errorf("LogEntry item_type = %s, expected reverse_clock", entry.Metadata.GetStringOrDefault("item_type", ""))
+	}
+}
+
+// ========== DrawBuffAction Tests ==========
+
+func TestDrawBuffActionExecuteWithPool(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.LP = 5
+
+	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
+	buffPool := []*rng.EvaluatedItem{
+		{Type: "divine", Eval: constants.EvaluationGood},
+		{Type: "curse", Eval: constants.EvaluationBad},
+	}
+
+	action := NewDrawBuffAction(player, "Event_TasteTest")
+	ctx := NewActionContext(nil, nil, nil, drawEngine)
+	ctx.BuffPool = buffPool
+	// Set probability weights for the draw
+	ctx.SetCellDraw(0.5, 0.3, 0.2)
+	// Provide OnAddBuff callback for derived AddBuffAction
+	ctx.OnAddBuff = func(p *core.Player, b *core.Buff) { p.AddBuff(b) }
+	ctx.GetBuffDuration = func(bt constants.BuffType) int { return 3 }
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Errorf("Execute should succeed with pool, got error: %v", err)
+	}
+
+	// DrawnType should be set from pool draw
+	if action.DrawnType == constants.BuffTypeNone {
+		t.Error("DrawnType should not be BuffTypeNone after pool draw")
+	}
+	if !action.DrawnType.IsValid() {
+		t.Errorf("DrawnType should be valid, got %s", action.DrawnType)
+	}
+
+	// Should have AddBuffAction as derived action
+	if ctx.ActionQueue.Len() != 1 {
+		t.Fatalf("Should have 1 derived action (AddBuffAction), got %d", ctx.ActionQueue.Len())
+	}
+	addBuffAction, ok := ctx.ActionQueue.Peek().(*AddBuffAction)
+	if !ok {
+		t.Fatal("Derived action should be AddBuffAction")
+	}
+	if addBuffAction.BuffType != action.DrawnType {
+		t.Errorf("AddBuffAction.BuffType = %s, expected %s", addBuffAction.BuffType, action.DrawnType)
+	}
+
+	// Verify log entry has buff_type metadata
+	entry := action.LogEntry()
+	if entry.Metadata.GetStringOrDefault("buff_type", "") != string(action.DrawnType) {
+		t.Errorf("Log buff_type should be %s, got %s", action.DrawnType, entry.Metadata.GetStringOrDefault("buff_type", ""))
+	}
+}
+
+func TestDrawBuffActionNilBuffPool(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
+
+	action := NewDrawBuffAction(player, "Event_TasteTest")
+	ctx := NewActionContext(nil, nil, nil, drawEngine)
+	// BuffPool is nil
+
+	err := action.Execute(ctx)
+	if err == nil {
+		t.Error("Execute with nil BuffPool should return error")
+	}
+}
+
+func TestDrawBuffActionNilPlayer(t *testing.T) {
+	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
+	buffPool := []*rng.EvaluatedItem{
+		{Type: "divine", Eval: constants.EvaluationGood},
+	}
+
+	action := NewDrawBuffAction(nil, "Event_TasteTest")
+	ctx := NewActionContext(nil, nil, nil, drawEngine)
+	ctx.BuffPool = buffPool
+
+	err := action.Execute(ctx)
+	if err == nil {
+		t.Error("Execute with nil player should return error")
+	}
+}
+
+func TestDrawBuffActionEmptyPool(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
+	buffPool := []*rng.EvaluatedItem{}
+
+	action := NewDrawBuffAction(player, "Event_TasteTest")
+	ctx := NewActionContext(nil, nil, nil, drawEngine)
+	ctx.BuffPool = buffPool
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Errorf("Execute with empty pool should succeed, got: %v", err)
+	}
+	// Empty pool → BuffTypeNone
+	if action.DrawnType != constants.BuffTypeNone {
+		t.Errorf("DrawnType should be BuffTypeNone for empty pool, got %s", action.DrawnType)
+	}
+	// Should have no derived actions
+	if ctx.ActionQueue.Len() != 0 {
+		t.Errorf("Should have 0 derived actions for empty pool, got %d", ctx.ActionQueue.Len())
+	}
+}
+
+func TestDrawBuffActionCanModify(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewDrawBuffAction(player, "Event_TasteTest")
+
+	if !action.CanModify() {
+		t.Error("DrawBuffAction.CanModify() should be true (can be intercepted by Hidden)")
+	}
+}
+
+func TestDrawBuffActionPreTriggerPhase(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewDrawBuffAction(player, "Event_TasteTest")
+
+	if action.PreTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PreTriggerPhase = %s, expected PhaseAnyTime", action.PreTriggerPhase())
+	}
+}
+
+func TestDrawBuffActionLogEntry(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewDrawBuffAction(player, "Event_TasteTest")
+
+	entry := action.LogEntry()
+	if entry.ActionType != string(constants.ActionDrawBuff) {
+		t.Errorf("LogEntry ActionType = %s, expected draw_buff", entry.ActionType)
+	}
+	if entry.Source != "Event_TasteTest" {
+		t.Errorf("LogEntry Source = %s, expected Event_TasteTest", entry.Source)
+	}
+}
+
+// ========== DiceUpgradeAction Tests ==========
+
+func TestDiceUpgradeActionExecute(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+
+	action := NewDiceUpgradeAction(player, "Item_DiceUpgrade", rng.DiceTypeSilver)
+	ctx := NewActionContext(nil, nil, nil, nil)
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Errorf("DiceUpgradeAction Execute failed: %v", err)
+	}
+
+	// Silver should upgrade to Gold
+	if action.ToDice != rng.DiceTypeGold {
+		t.Errorf("ToDice = %v, expected Gold (Silver→Gold)", action.ToDice)
+	}
+}
+
+func TestDiceUpgradeActionUpgradePaths(t *testing.T) {
+	tests := []struct {
+		from     rng.DiceType
+		expected rng.DiceType
+	}{
+		{rng.DiceTypeWood, rng.DiceTypeCopper},
+		{rng.DiceTypeCopper, rng.DiceTypeSilver},
+		{rng.DiceTypeSilver, rng.DiceTypeGold},
+		{rng.DiceTypeGold, rng.DiceTypeGold}, // Gold cannot upgrade further
+	}
+
+	for _, tt := range tests {
+		player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+		action := NewDiceUpgradeAction(player, "Item_DiceUpgrade", tt.from)
+		ctx := NewActionContext(nil, nil, nil, nil)
+
+		err := action.Execute(ctx)
+		if err != nil {
+			t.Errorf("DiceUpgradeAction(%v) Execute failed: %v", tt.from, err)
+		}
+		if action.ToDice != tt.expected {
+			t.Errorf("DiceUpgrade(%v) = %v, expected %v", tt.from, action.ToDice, tt.expected)
+		}
+	}
+}
+
+func TestDiceUpgradeActionMetadata(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewDiceUpgradeAction(player, "Item_DiceUpgrade", rng.DiceTypeCopper)
+	ctx := NewActionContext(nil, nil, nil, nil)
+
+	action.Execute(ctx)
+
+	// Verify metadata written to ActionContext
+	upgradeTo := ctx.GetStringOrDefault("dice_upgrade_to", "")
+	if upgradeTo != rng.DiceTypeSilver.String() {
+		t.Errorf("dice_upgrade_to = %s, expected %s", upgradeTo, rng.DiceTypeSilver.String())
+	}
+	upgradeFrom := ctx.GetStringOrDefault("dice_upgrade_from", "")
+	if upgradeFrom != rng.DiceTypeCopper.String() {
+		t.Errorf("dice_upgrade_from = %s, expected %s", upgradeFrom, rng.DiceTypeCopper.String())
+	}
+}
+
+func TestDiceUpgradeActionNilPlayer(t *testing.T) {
+	action := NewDiceUpgradeAction(nil, "Item_DiceUpgrade", rng.DiceTypeSilver)
+	ctx := NewActionContext(nil, nil, nil, nil)
+
+	err := action.Execute(ctx)
+	if err == nil {
+		t.Error("DiceUpgradeAction with nil player should return error")
+	}
+}
+
+func TestDiceUpgradeActionLogEntry(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewDiceUpgradeAction(player, "Item_DiceUpgrade", rng.DiceTypeWood)
+	ctx := NewActionContext(nil, nil, nil, nil)
+
+	action.Execute(ctx)
+
+	entry := action.LogEntry()
+	if entry.ActionType != string(constants.ActionDiceUpgrade) {
+		t.Errorf("LogEntry ActionType = %s, expected dice_upgrade", entry.ActionType)
+	}
+	if entry.Source != "Item_DiceUpgrade" {
+		t.Errorf("LogEntry Source = %s, expected Item_DiceUpgrade", entry.Source)
+	}
+	fromDice := entry.Metadata.GetStringOrDefault("from_dice", "")
+	if fromDice != rng.DiceTypeWood.String() {
+		t.Errorf("LogEntry from_dice = %s, expected %s", fromDice, rng.DiceTypeWood.String())
+	}
+	toDice := entry.Metadata.GetStringOrDefault("to_dice", "")
+	if toDice != rng.DiceTypeCopper.String() {
+		t.Errorf("LogEntry to_dice = %s, expected %s", toDice, rng.DiceTypeCopper.String())
 	}
 }
