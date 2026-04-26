@@ -11,6 +11,7 @@ import (
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/b1tAction/paradiced/pkg/rng"
+	"github.com/b1tAction/paradiced/pkg/util"
 )
 
 func TestNewStateContext(t *testing.T) {
@@ -235,4 +236,25 @@ func (m *mockBroadcastAdapter) BroadcastMiniGameResult(result interface{}) error
 func (m *mockBroadcastAdapter) BroadcastGameOver(over interface{}) error  { return nil }
 func (m *mockBroadcastAdapter) SendFullSync(playerID string, state, turn interface{}) error {
 	return nil
+}
+
+func TestStateContextWithRoundData(t *testing.T) {
+	ctx := NewStateContext()
+
+	// Initially RoundData is nil
+	if ctx.RoundData != nil {
+		t.Error("RoundData should be nil by default")
+	}
+
+	// Set RoundData via WithRoundData
+	roundData := util.NewMetadata()
+	roundData.SetInt("round_number", 5)
+	ctx = ctx.WithRoundData(roundData)
+
+	if ctx.RoundData != roundData {
+		t.Error("RoundData not set correctly via WithRoundData")
+	}
+	if ctx.RoundData.GetIntOrDefault("round_number", 0) != 5 {
+		t.Error("RoundData content not accessible")
+	}
 }

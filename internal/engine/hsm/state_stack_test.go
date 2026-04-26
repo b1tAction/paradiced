@@ -282,3 +282,40 @@ func TestStateStackGetEntry(t *testing.T) {
 		t.Error("Large index should return nil")
 	}
 }
+
+func TestStateStackRestoreFromIDs(t *testing.T) {
+	stack := NewStateStack()
+	ctx := NewStateContext()
+	ctx.StartTime = time.Now()
+
+	// Push some states first
+	stack.Push(&mockState{id: StateTurnUpkeep}, ctx)
+	stack.Push(&mockState{id: StateTurnMoving}, ctx)
+
+	// Get IDs for restoration
+	ids := stack.GetStackIDs()
+
+	// Clear and restore
+	stack.Clear()
+	factory := &TurnStateFactory{}
+	err := stack.RestoreFromIDs(ids, factory)
+	if err != nil {
+		t.Errorf("RestoreFromIDs failed: %v", err)
+	}
+	if stack.Depth() != len(ids) {
+		t.Errorf("Restored stack depth = %d, want %d", stack.Depth(), len(ids))
+	}
+
+	// Restore with invalid ID should fail
+	err = stack.RestoreFromIDs([]StateID{StateID(9999)}, factory)
+	if err == nil {
+		t.Error("RestoreFromIDs with unknown ID should fail")
+	}
+}
+
+func TestStateStackRestoreFromIDsNil(t *testing.T) {
+	err := (*StateStack)(nil).RestoreFromIDs(nil, nil)
+	if err == nil {
+		t.Error("RestoreFromIDs on nil stack should fail")
+	}
+}
