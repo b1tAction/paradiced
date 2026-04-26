@@ -144,21 +144,21 @@ type BossAttackResult struct {
 
 ### CalcBossCritSkillProb
 
-Boss暴击/技能概率基于Boss格存活玩家的平均LP：
+Boss暴击/技能概率基于Boss格存活玩家的平均LP和Boss当前HP：
 
 ```
-prob = 0.1 + 0.05 × (8 - avgLP)
+prob = 0.25 + 0.05 × (8 - avgLP) + 0.30 × (maxHP - currentHP) / maxHP
 ```
 
-| avgLP | 概率 |
-|-------|------|
-| 0 | 50% |
-| 4 | 30% |
-| 8 | 10% |
+| avgLP | bossHP | bossMaxHP | 概率 |
+|-------|--------|-----------|------|
+| 8 | 50 | 50 | 25% |
+| 4 | 25 | 50 | 60% |
+| 0 | 0 | 50 | 95% |
 
 ### CalcBossAttackType
 
-当暴击/技能触发时，50%概率暴击，50%概率技能。技能从BossSkillPool等权重随机抽取。
+当暴击/技能触发时，30%概率暴击，70%概率技能。技能从BossSkillPool等权重随机抽取。
 
 ### SelectBossTarget
 

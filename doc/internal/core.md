@@ -188,6 +188,17 @@ type Player struct {
 func NewPlayer(config PlayerConfig) *Player
 ```
 
+**协议接口实现**：Player 实现了 `pkg/constants.Player` 接口的以下方法：
+
+```go
+GetID() id.PlayerID        // 玩家唯一标识
+GetIDString() string       // ID的UUID字符串形式
+GetHP() int                // 当前HP
+GetLP() int                // 当前LP
+GetPosition() int          // 当前位置
+GetFaction() constants.Faction  // 阵营
+```
+
 **Metadata 契约**：详见 [doc/metadata/player.md](../metadata/player.md)。
 
 ## 核心功能
