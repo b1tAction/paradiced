@@ -109,10 +109,9 @@ func (h *NakamaMatchHandler) HandlePresenceJoin(userID string, metadata *util.Me
 		h.logDebug("HandlePresenceJoin: sending state sync to late joiner", "user_id", userID)
 		broadcastAdapter := NewNakamaBroadcastAdapter(h)
 		builder := net.NewBuilder(h.hsm)
-		stateSync := builder.BuildStateSync()
-		turnSync := builder.BuildTurnSync()
+		stateSync := builder.BuildFullSyncStateSync()
 		// Send full sync to joining player
-		if err := broadcastAdapter.SendFullSync(userID, stateSync, turnSync); err != nil {
+		if err := broadcastAdapter.SendFullSync(userID, stateSync); err != nil {
 			h.logError("HandlePresenceJoin: failed to send state sync", "error", err)
 			return err
 		}
@@ -136,13 +135,12 @@ func (h *NakamaMatchHandler) handlePlayerRejoin(userID string) error {
 	broadcastAdapter := NewNakamaBroadcastAdapter(h)
 	builder := net.NewBuilder(h.hsm)
 
-	// Build full sync data
-	stateSync := builder.BuildStateSync()
-	turnSync := builder.BuildTurnSync()
+	// Build full sync data (with all current turn entries for reconnecting player)
+	stateSync := builder.BuildFullSyncStateSync()
 
 	// Send full sync to rejoining player
 	h.logDebug("handlePlayerRejoin: sending full sync", "user_id", userID)
-	if err := broadcastAdapter.SendFullSync(userID, stateSync, turnSync); err != nil {
+	if err := broadcastAdapter.SendFullSync(userID, stateSync); err != nil {
 		h.logError("handlePlayerRejoin: failed to send full sync", "user_id", userID, "error", err)
 		return err
 	}

@@ -77,20 +77,6 @@ func (a *NakamaBroadcastAdapter) BroadcastStateSync(state *net.StateSync) error 
 	return a.handler.dispatcher.BroadcastMessage(int64(net.OpStateSync), data)
 }
 
-// BroadcastTurnSync broadcasts turn action list to all players.
-func (a *NakamaBroadcastAdapter) BroadcastTurnSync(turn *net.TurnSync) error {
-	if a.handler.dispatcher == nil {
-		return nil // No dispatcher set
-	}
-
-	data, err := json.Marshal(turn)
-	if err != nil {
-		return err
-	}
-
-	return a.handler.dispatcher.BroadcastMessage(int64(net.OpTurnSync), data)
-}
-
 // SendDecision sends a decision request to a specific player.
 func (a *NakamaBroadcastAdapter) SendDecision(playerID string, decision *net.Decision) error {
 	if a.handler.dispatcher == nil {
@@ -211,20 +197,31 @@ func (a *NakamaBroadcastAdapter) BroadcastGameOver(over *net.GameOver) error {
 }
 
 // SendFullSync sends complete state to a reconnecting player.
-func (a *NakamaBroadcastAdapter) SendFullSync(playerID string, state *net.StateSync, turn *net.TurnSync) error {
+// StateSync includes all current turn entries for the reconnecting player.
+func (a *NakamaBroadcastAdapter) SendFullSync(playerID string, state *net.StateSync) error {
 	if a.handler.dispatcher == nil {
 		return nil // No dispatcher set
 	}
 
 	userID := a.resolveRecipientUserID(playerID)
 
-	// Send state sync and turn sync in one message
-	fullSync := map[string]interface{}{
-		"state_sync": state,
-		"turn_sync":  turn,
+	// Inject DisplayName (same logic as BroadcastStateSync)
+	if state != nil && a.handler != nil {
+		for i := range state.Players {
+			if state.Players[i].IsBoss {
+				state.Players[i].DisplayName = "Boss"
+				continue
+			}
+			for userID, player := range a.handler.players {
+				if player != nil && player.ID.UUID() == state.Players[i].PlayerID {
+					state.Players[i].DisplayName = player.Metadata.GetStringOrDefault("display_name", userID)
+					break
+				}
+			}
+		}
 	}
 
-	data, err := json.Marshal(fullSync)
+	data, err := json.Marshal(state)
 	if err != nil {
 		return err
 	}

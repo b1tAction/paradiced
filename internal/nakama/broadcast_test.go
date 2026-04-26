@@ -54,7 +54,7 @@ func TestBroadcastStateSync(t *testing.T) {
 	}
 }
 
-func TestBroadcastTurnSync(t *testing.T) {
+func TestBroadcastStateSyncWithEntries(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 	mockDispatcher := NewMockDispatcherAdapter()
 	handler.WithDispatcher(mockDispatcher)
@@ -62,16 +62,18 @@ func TestBroadcastTurnSync(t *testing.T) {
 	broadcastAdapter := NewNakamaBroadcastAdapter(handler)
 
 	entry := gamelog.NewActionEntry("damage", "player-001", "Cell_Fragile")
-	turnSync := &net.TurnSync{
-		Round:             1,
-		Turn:              0,
-		CurrentPlayerID:   "player-001",
-		Entries:           []gamelog.LogEntry{entry},
+	stateSync := &net.StateSync{
+		GlobalState:     "turn_end",
+		TurnState:       "turn_end",
+		Round:           1,
+		Turn:            0,
+		CurrentPlayerID: "player-001",
+		Entries:         []gamelog.LogEntry{entry},
 	}
 
-	err := broadcastAdapter.BroadcastTurnSync(turnSync)
+	err := broadcastAdapter.BroadcastStateSync(stateSync)
 	if err != nil {
-		t.Fatalf("BroadcastTurnSync error: %v", err)
+		t.Fatalf("BroadcastStateSync error: %v", err)
 	}
 
 	if mockDispatcher.CountBroadcasts() != 1 {
@@ -80,12 +82,12 @@ func TestBroadcastTurnSync(t *testing.T) {
 
 	// Verify OpCode
 	broadcasts := mockDispatcher.GetBroadcasts()
-	if broadcasts[0].OpCode != int64(net.OpTurnSync) {
-		t.Errorf("OpCode = %d, want %d", broadcasts[0].OpCode, int64(net.OpTurnSync))
+	if broadcasts[0].OpCode != int64(net.OpStateSync) {
+		t.Errorf("OpCode = %d, want %d", broadcasts[0].OpCode, int64(net.OpStateSync))
 	}
 
 	// Parse and verify data
-	var parsed net.TurnSync
+	var parsed net.StateSync
 	err = mockDispatcher.ParseBroadcastData(0, &parsed)
 	if err != nil {
 		t.Fatalf("ParseBroadcastData error: %v", err)
@@ -93,6 +95,12 @@ func TestBroadcastTurnSync(t *testing.T) {
 
 	if parsed.CurrentPlayerID != "player-001" {
 		t.Errorf("parsed.CurrentPlayerID = %s, want player-001", parsed.CurrentPlayerID)
+	}
+	if len(parsed.Entries) != 1 {
+		t.Errorf("len(parsed.Entries) = %d, want 1", len(parsed.Entries))
+	}
+	if parsed.Entries[0].ActionType != "damage" {
+		t.Errorf("parsed.Entries[0].ActionType = %s, want damage", parsed.Entries[0].ActionType)
 	}
 }
 
@@ -318,9 +326,8 @@ func TestSendFullSync(t *testing.T) {
 	broadcastAdapter := NewNakamaBroadcastAdapter(handler)
 
 	stateSync := &net.StateSync{GlobalState: "turn_loop", Round: 1}
-	turnSync := &net.TurnSync{Round: 1, CurrentPlayerID: "player-001"}
 
-	err := broadcastAdapter.SendFullSync("player-001", stateSync, turnSync)
+	err := broadcastAdapter.SendFullSync("player-001", stateSync)
 	if err != nil {
 		t.Fatalf("SendFullSync error: %v", err)
 	}
@@ -334,6 +341,19 @@ func TestSendFullSync(t *testing.T) {
 	if messages[0].OpCode != int64(net.OpFullSync) {
 		t.Errorf("OpCode = %d, want %d", messages[0].OpCode, int64(net.OpFullSync))
 	}
+
+	// Parse and verify data - FullSync now sends plain StateSync
+	var parsed net.StateSync
+	err = mockDispatcher.ParseMessageData("player-001", 0, &parsed)
+	if err != nil {
+		t.Fatalf("ParseMessageData error: %v", err)
+	}
+	if parsed.GlobalState != "turn_loop" {
+		t.Errorf("parsed.GlobalState = %s, want turn_loop", parsed.GlobalState)
+	}
+	if parsed.Round != 1 {
+		t.Errorf("parsed.Round = %d, want 1", parsed.Round)
+	}
 }
 
 func TestBroadcastWithoutDispatcher(t *testing.T) {
@@ -346,11 +366,6 @@ func TestBroadcastWithoutDispatcher(t *testing.T) {
 	err := broadcastAdapter.BroadcastStateSync(&net.StateSync{})
 	if err != nil {
 		t.Errorf("BroadcastStateSync should return nil without dispatcher, got: %v", err)
-	}
-
-	err = broadcastAdapter.BroadcastTurnSync(&net.TurnSync{})
-	if err != nil {
-		t.Errorf("BroadcastTurnSync should return nil without dispatcher, got: %v", err)
 	}
 
 	err = broadcastAdapter.SendDecision("player-001", &net.Decision{})
