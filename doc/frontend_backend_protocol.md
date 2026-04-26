@@ -277,6 +277,7 @@ interface RankingEntry {
     player_id: string;    // 玩家 ID
     display_name: string; // 用户显示名称（fallback: player_id）
     rank: number;         // 排名 (1-4)
+    game_data?: Record<string, any>; // 小游戏原始数据（dice_race: {dice1,dice2,score}; count_seconds: {elapsed,deviation}）
 }
 ```
 
@@ -1161,6 +1162,7 @@ interface RankingEntry {
     player_id: string;
     display_name: string;
     rank: number;
+    game_data?: Record<string, any>;
 }
 
 interface GameOver {
