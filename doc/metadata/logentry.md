@@ -232,23 +232,17 @@ interface LogEntry {
         end_pos?: number;
         path?: number[];
 
-        // add_buff/remove_buff
+        // add_buff/remove_buff/draw_buff
         buff_type?: string;
 
         // draw_event
         event_type?: string;
 
-        // draw_buff
-        buff_type?: string;
-
         // dice_upgrade
         from_dice?: string;
         to_dice?: string;
 
-        // add_item / remove_item
-        item_type?: string;
-
-        // draw_item
+        // add_item / remove_item / draw_item
         item_type?: string;
 
         // teleport
@@ -262,6 +256,19 @@ interface LogEntry {
 
         // steal_buff
         stolen_by?: string;
+
+        // boss_damage
+        damage?: number;
+        is_crit?: boolean;
+        boss_remaining_hp?: number;
+
+        // boss_attack
+        attack_type?: string;
+        target?: string;
+
+        // boss_skill
+        skill_type?: string;
+        targets?: string;
 
         // state
         from?: string;
