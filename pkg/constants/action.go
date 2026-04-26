@@ -40,6 +40,8 @@ const (
 	ActionBossAttack ActionType = "boss_attack"
 	// ActionBossSkill represents boss using a skill (AOE damage, buff, heal).
 	ActionBossSkill ActionType = "boss_skill"
+	// ActionDiceRoll represents dice roll result for client animation (interceptable via PhasePreDiceRoll).
+	ActionDiceRoll ActionType = "dice_roll"
 	// ActionUnknown represents an unknown action type.
 	ActionUnknown ActionType = "unknown"
 )
@@ -51,7 +53,7 @@ func (at ActionType) IsValid() bool {
 		ActionAddBuff, ActionRemoveBuff, ActionRespawn, ActionSkipTurn,
 		ActionDrawEvent, ActionTeleport, ActionStealBuff, ActionFellDown,
 		ActionDrawItem, ActionDeath, ActionBossDamage, ActionBossAttack,
-		ActionBossSkill:
+		ActionBossSkill, ActionDiceRoll:
 		return true
 	default:
 		return false
@@ -96,6 +98,8 @@ func ParseActionType(s string) ActionType {
 		return ActionBossAttack
 	case "boss_skill":
 		return ActionBossSkill
+	case "dice_roll":
+		return ActionDiceRoll
 	default:
 		return ActionUnknown
 	}

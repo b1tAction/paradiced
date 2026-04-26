@@ -29,6 +29,7 @@ const (
 	PhasePreBuffRemoved  Phase = "pre_buff_removed"  // Before buff removed
 	PhasePostBuffRemoved Phase = "post_buff_removed" // After buff removed
 	PhasePreAction       Phase = "pre_action"        // Before any action execution (death mark interception)
+	PhasePreDiceRoll     Phase = "pre_dice_roll"     // Before dice roll result (interceptable, Buff can modify Steps)
 
 	// ========== Special Phases ==========
 
@@ -42,7 +43,7 @@ func (p Phase) IsValid() bool {
 		p == PhasePreDamage || p == PhasePreEvent || p == PhasePreMove ||
 		p == PhasePreRespawn || p == PhasePreBuffApplied || p == PhasePostBuffApplied ||
 		p == PhasePreBuffRemoved || p == PhasePostBuffRemoved ||
-		p == PhasePreAction || p == PhaseAnyTime || p == PhaseItemUsed
+		p == PhasePreAction || p == PhasePreDiceRoll || p == PhaseAnyTime || p == PhaseItemUsed
 }
 
 // NeedsSubscription determines if the Phase needs EventBus subscription.
@@ -60,5 +61,6 @@ func (p Phase) IsHSMPublished() bool {
 func (p Phase) IsActionPublished() bool {
 	return p == PhasePreDamage || p == PhasePreEvent || p == PhasePreMove ||
 		p == PhasePreRespawn || p == PhasePreBuffApplied || p == PhasePostBuffApplied ||
-		p == PhasePreBuffRemoved || p == PhasePostBuffRemoved || p == PhasePreAction
+		p == PhasePreBuffRemoved || p == PhasePostBuffRemoved || p == PhasePreAction ||
+		p == PhasePreDiceRoll
 }

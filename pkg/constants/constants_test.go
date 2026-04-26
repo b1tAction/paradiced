@@ -178,7 +178,7 @@ func TestPhaseIsValid(t *testing.T) {
 		PhasePreDamage, PhasePreEvent, PhasePreMove, PhasePreRespawn,
 		PhasePreBuffApplied, PhasePostBuffApplied,
 		PhasePreBuffRemoved, PhasePostBuffRemoved,
-		PhasePreAction,
+		PhasePreAction, PhasePreDiceRoll,
 		PhaseAnyTime, PhaseItemUsed,
 	}
 	for _, p := range validPhases {
@@ -207,7 +207,7 @@ func TestPhaseNeedsSubscription(t *testing.T) {
 		PhasePreDamage, PhasePreEvent, PhasePreMove, PhasePreRespawn,
 		PhasePreBuffApplied, PhasePostBuffApplied,
 		PhasePreBuffRemoved, PhasePostBuffRemoved,
-		PhasePreAction, PhaseItemUsed,
+		PhasePreAction, PhasePreDiceRoll, PhaseItemUsed,
 	}
 	for _, p := range needsSubscription {
 		if !p.NeedsSubscription() {
@@ -241,7 +241,7 @@ func TestPhaseIsActionPublished(t *testing.T) {
 		PhasePreDamage, PhasePreEvent, PhasePreMove, PhasePreRespawn,
 		PhasePreBuffApplied, PhasePostBuffApplied,
 		PhasePreBuffRemoved, PhasePostBuffRemoved,
-		PhasePreAction,
+		PhasePreAction, PhasePreDiceRoll,
 	}
 	for _, p := range actionPhases {
 		if !p.IsActionPublished() {
@@ -949,6 +949,8 @@ func TestActionTypeIsValid(t *testing.T) {
 		ActionDamage, ActionHeal, ActionModifyLP, ActionMove,
 		ActionAddBuff, ActionRemoveBuff, ActionRespawn, ActionSkipTurn,
 		ActionDrawEvent, ActionTeleport, ActionStealBuff, ActionFellDown,
+		ActionDrawItem, ActionDeath, ActionBossDamage, ActionBossAttack,
+		ActionBossSkill, ActionDiceRoll,
 	}
 	for _, at := range validTypes {
 		if !at.IsValid() {
@@ -981,6 +983,12 @@ func TestParseActionType(t *testing.T) {
 		{"teleport", ActionTeleport},
 		{"steal_buff", ActionStealBuff},
 		{"fell_down", ActionFellDown},
+		{"draw_item", ActionDrawItem},
+		{"death", ActionDeath},
+		{"boss_damage", ActionBossDamage},
+		{"boss_attack", ActionBossAttack},
+		{"boss_skill", ActionBossSkill},
+		{"dice_roll", ActionDiceRoll},
 		{"invalid", ActionUnknown},
 		{"", ActionUnknown},
 	}
