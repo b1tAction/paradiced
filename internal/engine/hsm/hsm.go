@@ -79,6 +79,12 @@ type HSM struct {
 	paused  bool // HSM is paused (e.g., waiting for decision)
 }
 
+// decisionStateResetter is implemented by states that cache pending decisions
+// internally and need explicit cleanup after a decision is resolved.
+type decisionStateResetter interface {
+	ResetPendingDecisions()
+}
+
 // NewHSM creates a new HSM instance.
 func NewHSM(game *engine.Game) *HSM {
 	return &HSM{
@@ -558,9 +564,25 @@ func (hsm *HSM) OnUserChoice(choice int, ctx *StateContext) error {
 	hsm.decision.Execute(choice, execCtx)
 	runDerived(execCtx)
 	hsm.clearPendingDecisionEventContext(ctx)
+	hsm.clearResolvedDecisionFromState()
 
 	// Pop interrupt and resume
 	return hsm.PopInterrupt(ctx)
+}
+
+func (hsm *HSM) clearResolvedDecisionFromState() {
+	entry := hsm.stack.Peek()
+	if entry == nil {
+		return
+	}
+
+	if entry.Context != nil {
+		entry.Context.Decisions = nil
+	}
+
+	if resetter, ok := entry.State.(decisionStateResetter); ok {
+		resetter.ResetPendingDecisions()
+	}
 }
 
 func (hsm *HSM) resolveDecisionExecutionContext(ctx *StateContext) *event.Context {

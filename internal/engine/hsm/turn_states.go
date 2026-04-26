@@ -47,6 +47,11 @@ type TurnUpkeepState struct {
 	actionCtx *engineaction.ActionContext
 }
 
+// ResetPendingDecisions clears cached decision list after a choice is resolved.
+func (s *TurnUpkeepState) ResetPendingDecisions() {
+	s.decisions = make([]*event.Decision, 0)
+}
+
 // NewTurnUpkeepState creates a new TurnUpkeep state.
 func NewTurnUpkeepState() *TurnUpkeepState {
 	return &TurnUpkeepState{
@@ -119,7 +124,28 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 		return
 	}
 
-	// Step 5: Check if any decisions need user input
+	// Step 5: Handle Poison buff's "draw_bad_event" flag
+	// Poison buff handler sets this flag to force a bad event draw
+	if triggerCtx.GetBoolOrDefault("draw_bad_event", false) {
+		drawAction := engineaction.NewDrawEventAction(player, "Poison_BadEvent")
+		// Force 100% bad event probability
+		s.actionCtx.SetCellDraw(0, 0, 1.0)
+		if err := s.actionCtx.ExecuteAction(drawAction); err != nil {
+			ctx.Error = errors.WrapHSMError(
+				err, "TurnUpkeep", 2, "Enter", "poison bad event draw failed")
+			return
+		}
+		// Run event effect for the drawn bad event
+		if drawAction.DrawnType.IsValid() {
+			if err := runEventEffect(drawAction.DrawnType, player, s.actionCtx); err != nil {
+				ctx.Error = errors.WrapHSMError(
+					err, "TurnUpkeep", 2, "Enter", "poison bad event effect failed")
+				return
+			}
+		}
+	}
+
+	// Step 6: Check if any decisions need user input
 	if len(s.decisions) > 0 {
 		// Will be handled in Update - push WaitDecision if needed
 		ctx.Decisions = s.decisions
@@ -358,14 +384,21 @@ func (s *MainActionState) onRollDiceInternal(ctx *StateContext, sourceID string)
 }
 
 // OnUseItem handles item usage input.
+// After the item handler executes, the consumed item is removed via RemoveItemAction.
 func (s *MainActionState) OnUseItem(ctx *StateContext, itemID string) {
 	// Publish PhaseItemUsed to trigger item handler
 	player := ctx.Player
 	triggerCtx := event.NewContext(player)
 	triggerCtx.Set("item_id", itemID)
 	triggerCtx.Set("action_context", s.actionCtx)
+	triggerCtx.Set("current_dice_type", ctx.GetDiceType(player.ID.UUID()).String())
 
-	ctx.GetBus().Publish(constants.PhaseItemUsed, player.ID.UUID(), triggerCtx)
+	decisions := ctx.GetBus().Publish(constants.PhaseItemUsed, player.ID.UUID(), triggerCtx)
+	for _, decision := range decisions {
+		if decision != nil {
+			_ = decision.Execute(0, triggerCtx)
+		}
+	}
 
 	// Check for handler errors
 	if triggerCtx.HasError() {
@@ -379,6 +412,25 @@ func (s *MainActionState) OnUseItem(ctx *StateContext, itemID string) {
 		ctx.Error = errors.WrapHSMError(
 			err, "MainAction", 2, "OnUseItem", "derived action execution failed")
 		return
+	}
+
+	// Apply dice upgrade result to RoundData so subsequent roll uses upgraded dice.
+	upgradedPlayer := s.actionCtx.GetStringOrDefault("dice_upgrade_player", "")
+	upgradeTo := s.actionCtx.GetStringOrDefault("dice_upgrade_to", "")
+	if upgradedPlayer != "" && upgradeTo != "" {
+		ctx.SetDiceType(upgradedPlayer, rng.DiceTypeFromString(upgradeTo))
+	}
+
+	// Consume the item after handler execution (RemoveItemAction handles EventBus unsubscription)
+	itemUUID := id.MustParseItemID(itemID)
+	item := player.GetItem(itemUUID)
+	if item != nil {
+		removeAction := engineaction.NewRemoveItemAction(player, item.Type, "Item_Consumed")
+		if err := s.actionCtx.ExecuteAction(removeAction); err != nil {
+			ctx.Error = errors.WrapHSMError(
+				err, "MainAction", 2, "OnUseItem", "item consumption failed")
+			return
+		}
 	}
 }
 
@@ -408,12 +460,12 @@ func (s *MainActionState) isOnBossCell(ctx *StateContext, player *core.Player) b
 // Data flow: State → ActionContext.Metadata → MoveAction.Execute()
 type TurnMovingState struct {
 	BaseTurnState
-	Steps          int    // Movement steps (from dice, may be modified by 迷途)
-	fellDown       bool   // Player fell from Fragile cell
-	reachedEnd     bool   // Player reached Boss cell (end of map)
-	hasCheckpoint  bool   // CheckPoint detected in path (Enter→Update transition flag)
-	checkpointPos  int    // CheckPoint position (Enter→Update transition data)
-	remainingSteps int    // Remaining steps after CheckPoint (Enter→Update transition data)
+	Steps          int  // Movement steps (from dice, may be modified by 迷途)
+	fellDown       bool // Player fell from Fragile cell
+	reachedEnd     bool // Player reached Boss cell (end of map)
+	hasCheckpoint  bool // CheckPoint detected in path (Enter→Update transition flag)
+	checkpointPos  int  // CheckPoint position (Enter→Update transition data)
+	remainingSteps int  // Remaining steps after CheckPoint (Enter→Update transition data)
 	pathResult     PathResultData
 	actionCtx      *engineaction.ActionContext
 }
@@ -681,7 +733,7 @@ func findFirstCheckpointInPath(path []int, mapEngine *gamemap.MapEngine) int {
 // newActionContextWithPools creates an ActionContext with pool data from Game.
 func newActionContextWithPools(game *engine.Game, bus *event.EventBus, mapEngine *gamemap.MapEngine, drawEngine *rng.DrawEngine) *engineaction.ActionContext {
 	ctx := engineaction.NewActionContext(game, bus, mapEngine, drawEngine)
-	ctx.SetPools(game.EventPool, game.ItemPool)
+	ctx.SetPools(game.EventPool, game.ItemPool, game.BuffPool)
 	ctx.OnAddBuff = func(p *core.Player, b *core.Buff) { game.ApplyBuffToPlayer(p, b) }
 	ctx.OnRemoveBuff = func(p *core.Player, bt constants.BuffType) *core.Buff {
 		buff := p.GetBuff(bt)
@@ -689,6 +741,17 @@ func newActionContextWithPools(game *engine.Game, bus *event.EventBus, mapEngine
 			game.RemoveBuffFromPlayer(p, buff)
 		}
 		return buff
+	}
+	ctx.OnAddItem = func(p *core.Player, i *core.Item) { game.ApplyItemToPlayer(p, i) }
+	ctx.OnRemoveItem = func(p *core.Player, it constants.ItemType) *core.Item {
+		// Find item by type in player's inventory
+		for _, item := range p.Inventory {
+			if item.Type == it {
+				game.RemoveItemFromPlayer(p, item)
+				return item
+			}
+		}
+		return nil
 	}
 	ctx.GetBuffDuration = func(bt constants.BuffType) int {
 		def := engine.GetBuffDefinition(bt)
@@ -744,16 +807,21 @@ func runEventEffect(drawnType constants.EventType, player *core.Player, actionCt
 // - CellTypeBoss: Already handled in TurnMoving (reachedEnd flag)
 type TurnLandedState struct {
 	BaseTurnState
-	cellType   constants.CellType
-	cell       *gamemap.MapCell // Landing cell data (for EventID access)
-	decisions  []*event.Decision
-	actionCtx  *engineaction.ActionContext
-	skipEvent  bool             // Skip TurnDraw (CellTypeCheckpoint/Boss don't need random event)
+	cellType  constants.CellType
+	cell      *gamemap.MapCell // Landing cell data (for EventID access)
+	decisions []*event.Decision
+	actionCtx *engineaction.ActionContext
+	skipEvent bool // Skip TurnDraw (CellTypeCheckpoint/Boss don't need random event)
 	// Cell draw configuration
-	drawType   constants.DrawType
-	probGood   float64
+	drawType    constants.DrawType
+	probGood    float64
 	probNeutral float64
-	probBad    float64
+	probBad     float64
+}
+
+// ResetPendingDecisions clears cached decision list after a choice is resolved.
+func (s *TurnLandedState) ResetPendingDecisions() {
+	s.decisions = make([]*event.Decision, 0)
 }
 
 // NewTurnLandedState creates a new TurnLanded state.
@@ -1032,9 +1100,9 @@ func (s *TurnDrawState) Exit(ctx *StateContext) {
 // - Boss branch: Boss counter-attacks (normal/crit/skill based on avgLP)
 type TurnBossBattleState struct {
 	BaseTurnState
-	isPlayerBranch  bool // true = player attacking Boss, false = Boss counter-attacking
-	bossDefeated    bool // Boss was defeated in this state
-	actionCtx       *engineaction.ActionContext
+	isPlayerBranch bool // true = player attacking Boss, false = Boss counter-attacking
+	bossDefeated   bool // Boss was defeated in this state
+	actionCtx      *engineaction.ActionContext
 }
 
 // NewTurnBossBattleState creates a new TurnBossBattle state.

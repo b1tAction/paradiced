@@ -129,6 +129,7 @@ func NewGameTestHarness(config *HarnessConfig) *GameTestHarness {
 	// Initialize pools from Registry definitions
 	game.EventPool = engine.BuildEventPool()
 	game.ItemPool = engine.BuildItemPool()
+	game.BuffPool = engine.BuildBuffPool()
 
 	// Create HSM
 	hsmInst := NewHSM(game)

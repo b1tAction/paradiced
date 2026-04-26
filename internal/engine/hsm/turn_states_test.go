@@ -288,6 +288,37 @@ func TestMainActionState_RollDiceAction_StepsRange(t *testing.T) {
 	}
 }
 
+func TestMainActionState_OnUseItem_DiceUpgradeAppliesImmediately(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	item := core.NewItem(constants.ItemTypeDiceUpgrade)
+	if err := game.ApplyItemToPlayer(player, item); err != nil {
+		t.Fatalf("ApplyItemToPlayer failed: %v", err)
+	}
+
+	hsmInst := NewHSM(game)
+	ctx := NewStateContext().WithHSM(hsmInst).WithPlayer(player)
+	ctx.SetDiceType(player.ID.UUID(), rng.DiceTypeSilver)
+
+	state := NewMainActionState(45 * time.Second)
+	state.Enter(ctx)
+	state.OnUseItem(ctx, item.ID.UUID())
+
+	if ctx.Error != nil {
+		t.Fatalf("OnUseItem should succeed, got error: %v", ctx.Error)
+	}
+
+	if got := ctx.GetDiceType(player.ID.UUID()); got != rng.DiceTypeGold {
+		t.Errorf("dice type = %s, expected %s", got.String(), rng.DiceTypeGold.String())
+	}
+
+	if len(player.Inventory) != 0 {
+		t.Errorf("item should be consumed after use, inventory len = %d", len(player.Inventory))
+	}
+}
+
 // ========== TurnMovingState Tests ==========
 
 func TestTurnMovingState_Enter_FellDown(t *testing.T) {
@@ -301,7 +332,7 @@ func TestTurnMovingState_Enter_FellDown(t *testing.T) {
 	mapEngine := gamemap.NewMapEngine(100)
 	configs := map[int]constants.CellType{25: constants.CellTypeFragile}
 	mapEngine.GenerateLinearMap(configs)
-	
+
 	state := NewTurnMovingState()
 	hsmInst := NewHSM(game)
 	hsmInst.SetMapEngine(mapEngine)
