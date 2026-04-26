@@ -3,10 +3,12 @@ package net
 
 import (
 	"testing"
+	"time"
 
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/engine"
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
+	"github.com/b1tAction/paradiced/internal/event"
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
@@ -355,5 +357,150 @@ func TestGetNewEntriesAfterStartTurn(t *testing.T) {
 	stateSync = builder.BuildStateSync()
 	if len(stateSync.Entries) != 1 {
 		t.Errorf("len(stateSync.Entries) = %d, want 1", len(stateSync.Entries))
+	}
+}
+
+func TestSetDiceType(t *testing.T) {
+	builder, _, _ := newTestBuilder()
+
+	// Set dice type via string format
+	builder.SetDiceType("gold")
+	if builder.turnDiceType != rng.DiceTypeGold {
+		t.Errorf("SetDiceType gold: turnDiceType = %v, want DiceTypeGold", builder.turnDiceType)
+	}
+
+	builder.SetDiceType("silver")
+	if builder.turnDiceType != rng.DiceTypeSilver {
+		t.Errorf("SetDiceType silver: turnDiceType = %v, want DiceTypeSilver", builder.turnDiceType)
+	}
+
+	builder.SetDiceType("copper")
+	if builder.turnDiceType != rng.DiceTypeCopper {
+		t.Errorf("SetDiceType copper: turnDiceType = %v, want DiceTypeCopper", builder.turnDiceType)
+	}
+
+	builder.SetDiceType("wood")
+	if builder.turnDiceType != rng.DiceTypeWood {
+		t.Errorf("SetDiceType wood: turnDiceType = %v, want DiceTypeWood", builder.turnDiceType)
+	}
+
+	// Unknown dice type defaults to DiceTypeNone
+	builder.SetDiceType("unknown")
+	if builder.turnDiceType != rng.DiceTypeNone {
+		t.Errorf("SetDiceType unknown: turnDiceType = %v, want DiceTypeNone", builder.turnDiceType)
+	}
+}
+
+func TestBuildAvailableNilPlayer(t *testing.T) {
+	builder, game, _ := newTestBuilder()
+
+	// No turn player set
+	game.AddPlayer(newTestPlayer(constants.FactionQingLong))
+
+	available := builder.BuildAvailable()
+	if available != nil {
+		t.Errorf("BuildAvailable with no turn player = %v, want nil", available)
+	}
+}
+
+func TestBuildAvailableWithNonChargeFaction(t *testing.T) {
+	builder, game, hsmInstance := newTestBuilder()
+
+	// ZhuQue doesn't have charge-based skill
+	player := newTestPlayer(constants.FactionZhuQue)
+	game.AddPlayer(player)
+	hsmInstance.SetTurnPlayer(player)
+
+	builder.SetDiceTypeFromRng(rng.DiceTypeCopper)
+	available := builder.BuildAvailable()
+
+	if available.CanUseSkill != false {
+		t.Errorf("ZhuQue CanUseSkill = %v, want false (no charge mechanic)", available.CanUseSkill)
+	}
+	if available.DiceType != "copper" {
+		t.Errorf("DiceType = %s, want copper", available.DiceType)
+	}
+}
+
+func TestBuildAvailableWithUnusableItem(t *testing.T) {
+	builder, game, hsmInstance := newTestBuilder()
+
+	player := newTestPlayer(constants.FactionQingLong)
+	item := core.NewItem(constants.ItemTypeAnyDoor)
+	item.Usable = false // Mark item as unusable
+	player.AddItem(item)
+	game.AddPlayer(player)
+	hsmInstance.SetTurnPlayer(player)
+
+	builder.SetDiceTypeFromRng(rng.DiceTypeGold)
+	available := builder.BuildAvailable()
+
+	if len(available.Items) != 0 {
+		t.Errorf("BuildAvailable with unusable item: len(Items) = %d, want 0", len(available.Items))
+	}
+}
+
+func TestBuildDecisionFromEvent(t *testing.T) {
+	builder, _, _ := newTestBuilder()
+
+	decision := event.NewDecision("Choose action", []event.Option{
+		{ID: "apply", Label: "应用"},
+		{ID: "skip", Label: "跳过"},
+	})
+	decision.WithSource("Buff_Divine", "buff")
+	decision.WithTimeout(30*time.Second, 0)
+
+	result := builder.BuildDecisionFromEvent(decision)
+
+	if result == nil {
+		t.Fatal("BuildDecisionFromEvent should not return nil")
+	}
+	if result.Prompt != "Choose action" {
+		t.Errorf("Prompt = %s, want 'Choose action'", result.Prompt)
+	}
+	if result.Context != "buff_Buff_Divine" {
+		t.Errorf("Context = %s, want 'buff_Buff_Divine'", result.Context)
+	}
+	if len(result.Options) != 2 {
+		t.Errorf("len(Options) = %d, want 2", len(result.Options))
+	}
+	if result.Options[0].ID != "apply" {
+		t.Errorf("Options[0].ID = %s, want 'apply'", result.Options[0].ID)
+	}
+	if result.Options[0].Label != "应用" {
+		t.Errorf("Options[0].Label = %s, want '应用'", result.Options[0].Label)
+	}
+	if result.Options[1].ID != "skip" {
+		t.Errorf("Options[1].ID = %s, want 'skip'", result.Options[1].ID)
+	}
+	if result.Timeout != 30 {
+		t.Errorf("Timeout = %d, want 30", result.Timeout)
+	}
+	if result.Default != 0 {
+		t.Errorf("Default = %d, want 0", result.Default)
+	}
+}
+
+func TestBuildDecisionFromEventNil(t *testing.T) {
+	builder, _, _ := newTestBuilder()
+
+	result := builder.BuildDecisionFromEvent(nil)
+	if result != nil {
+		t.Errorf("BuildDecisionFromEvent(nil) = %v, want nil", result)
+	}
+}
+
+func TestBuildDecisionFromEventNoSourceID(t *testing.T) {
+	builder, _, _ := newTestBuilder()
+
+	decision := event.NewDecision("Test", []event.Option{{ID: "a", Label: "A"}})
+	decision.WithSource("", "event")
+
+	result := builder.BuildDecisionFromEvent(decision)
+	if result == nil {
+		t.Fatal("BuildDecisionFromEvent should not return nil")
+	}
+	if result.Context != "event" {
+		t.Errorf("Context with empty SourceID = %s, want 'event'", result.Context)
 	}
 }

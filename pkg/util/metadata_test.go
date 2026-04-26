@@ -651,3 +651,233 @@ func TestFromMapNil(t *testing.T) {
 		t.Errorf("FromMap(nil) should return empty Metadata, got size %d", m.Size())
 	}
 }
+
+// ========== GetIntSliceOrDefault Tests ==========
+
+func TestGetIntSliceOrDefault(t *testing.T) {
+	m := NewMetadata()
+
+	// Direct []int type
+	m.Set("path", []int{1, 2, 3})
+	result := m.GetIntSliceOrDefault("path", nil)
+	if len(result) != 3 {
+		t.Errorf("GetIntSliceOrDefault path length = %d, expected 3", len(result))
+	}
+	if result[0] != 1 || result[1] != 2 || result[2] != 3 {
+		t.Errorf("GetIntSliceOrDefault path = %v, expected [1,2,3]", result)
+	}
+
+	// []float64 type (from JSON unmarshal)
+	m.Set("float_path", []float64{1.0, 2.0, 3.0})
+	result = m.GetIntSliceOrDefault("float_path", nil)
+	if len(result) != 3 {
+		t.Errorf("GetIntSliceOrDefault float_path length = %d, expected 3", len(result))
+	}
+	if result[0] != 1 || result[1] != 2 || result[2] != 3 {
+		t.Errorf("GetIntSliceOrDefault float_path = %v, expected [1,2,3]", result)
+	}
+
+	// []interface{} type (from JSON unmarshal with mixed types)
+	m.Set("mixed_path", []interface{}{float64(5.0), 6})
+	result = m.GetIntSliceOrDefault("mixed_path", nil)
+	if len(result) != 2 {
+		t.Errorf("GetIntSliceOrDefault mixed_path length = %d, expected 2", len(result))
+	}
+	if result[0] != 5 || result[1] != 6 {
+		t.Errorf("GetIntSliceOrDefault mixed_path = %v, expected [5,6]", result)
+	}
+
+	// Nonexistent key returns default
+	defaultSlice := []int{0}
+	result = m.GetIntSliceOrDefault("nonexistent", defaultSlice)
+	if len(result) != 1 || result[0] != 0 {
+		t.Errorf("GetIntSliceOrDefault nonexistent = %v, expected [0]", result)
+	}
+
+	// Type mismatch returns default
+	m.Set("wrong_type", "not a slice")
+	result = m.GetIntSliceOrDefault("wrong_type", defaultSlice)
+	if len(result) != 1 || result[0] != 0 {
+		t.Errorf("GetIntSliceOrDefault wrong_type = %v, expected default [0]", result)
+	}
+}
+
+// ========== GetMap/SetMap Tests ==========
+
+func TestGetMap(t *testing.T) {
+	m := NewMetadata()
+
+	// Existing map[string]int
+	m.Set("counts", map[string]int{"a": 1, "b": 2})
+	result, err := GetMap[string, int](m, "counts")
+	if err != nil {
+		t.Fatalf("GetMap failed: %v", err)
+	}
+	if result["a"] != 1 || result["b"] != 2 {
+		t.Errorf("GetMap counts = %v, expected {a:1, b:2}", result)
+	}
+
+	// Nonexistent key returns error
+	_, err = GetMap[string, int](m, "nonexistent")
+	if err == nil {
+		t.Error("GetMap nonexistent should return error")
+	}
+
+	// Type mismatch returns error
+	m.Set("string_map", map[string]string{"x": "y"})
+	_, err = GetMap[string, int](m, "string_map")
+	if err == nil {
+		t.Error("GetMap with wrong type should return error")
+	}
+}
+
+func TestGetMapOrDefault(t *testing.T) {
+	m := NewMetadata()
+
+	// Existing map returns value
+	m.Set("counts", map[string]int{"a": 1})
+	defaultMap := map[string]int{"default": 0}
+	result := GetMapOrDefault[string, int](m, "counts", defaultMap)
+	if result["a"] != 1 {
+		t.Errorf("GetMapOrDefault counts[a] = %d, expected 1", result["a"])
+	}
+
+	// Nonexistent key returns default
+	result = GetMapOrDefault[string, int](m, "nonexistent", defaultMap)
+	if result["default"] != 0 {
+		t.Errorf("GetMapOrDefault nonexistent = %v, expected default", result)
+	}
+
+	// Type mismatch returns default
+	m.Set("wrong_type", "not a map")
+	result = GetMapOrDefault[string, int](m, "wrong_type", defaultMap)
+	if result["default"] != 0 {
+		t.Errorf("GetMapOrDefault wrong_type = %v, expected default", result)
+	}
+}
+
+func TestSetMap(t *testing.T) {
+	m := NewMetadata()
+
+	counts := map[string]int{"a": 1, "b": 2}
+	result := SetMap[string, int](m, "counts", counts)
+
+	if result != m {
+		t.Error("SetMap should return Metadata for chaining")
+	}
+
+	val, err := GetMap[string, int](m, "counts")
+	if err != nil {
+		t.Fatalf("GetMap after SetMap failed: %v", err)
+	}
+	if val["a"] != 1 || val["b"] != 2 {
+		t.Errorf("GetMap after SetMap = %v, expected {a:1, b:2}", val)
+	}
+}
+
+func TestSetMapOrDefault(t *testing.T) {
+	m := NewMetadata()
+
+	defaultMap := map[string]int{"default": 0}
+
+	// Missing key stores default and returns it
+	result := SetMapOrDefault[string, int](m, "counts", defaultMap)
+	if result["default"] != 0 {
+		t.Errorf("SetMapOrDefault for missing key = %v, expected default", result)
+	}
+
+	// Existing correct type returns stored value
+	m.Set("existing", map[string]int{"a": 1})
+	existingDefault := map[string]int{"default": 0}
+	result = SetMapOrDefault[string, int](m, "existing", existingDefault)
+	if result["a"] != 1 {
+		t.Errorf("SetMapOrDefault for existing correct type = %v, expected {a:1}", result)
+	}
+
+	// Type mismatch replaces with default
+	m.Set("wrong_type", "not a map")
+	result = SetMapOrDefault[string, int](m, "wrong_type", defaultMap)
+	if result["default"] != 0 {
+		t.Errorf("SetMapOrDefault for type mismatch = %v, expected default", result)
+	}
+}
+
+// ========== GetMapStringInt/SetMapStringInt Tests ==========
+
+func TestGetMapStringInt(t *testing.T) {
+	m := NewMetadata()
+
+	// Existing map[string]int
+	m.SetMapStringInt("counts", map[string]int{"a": 1, "b": 2})
+	result, err := m.GetMapStringInt("counts")
+	if err != nil {
+		t.Fatalf("GetMapStringInt failed: %v", err)
+	}
+	if result["a"] != 1 || result["b"] != 2 {
+		t.Errorf("GetMapStringInt counts = %v, expected {a:1, b:2}", result)
+	}
+
+	// Nonexistent key returns error
+	_, err = m.GetMapStringInt("nonexistent")
+	if err == nil {
+		t.Error("GetMapStringInt nonexistent should return error")
+	}
+
+	// Type mismatch returns error
+	m.Set("string_map", map[string]string{"x": "y"})
+	_, err = m.GetMapStringInt("string_map")
+	if err == nil {
+		t.Error("GetMapStringInt with wrong type should return error")
+	}
+}
+
+func TestGetMapStringIntOrDefault(t *testing.T) {
+	m := NewMetadata()
+
+	// Existing map returns value
+	m.SetMapStringInt("counts", map[string]int{"a": 1})
+	defaultMap := map[string]int{"default": 0}
+	result := m.GetMapStringIntOrDefault("counts", defaultMap)
+	if result["a"] != 1 {
+		t.Errorf("GetMapStringIntOrDefault counts[a] = %d, expected 1", result["a"])
+	}
+
+	// Nonexistent key returns default
+	result = m.GetMapStringIntOrDefault("nonexistent", defaultMap)
+	if result["default"] != 0 {
+		t.Errorf("GetMapStringIntOrDefault nonexistent = %v, expected default", result)
+	}
+
+	// Type mismatch returns default
+	m.Set("wrong_type", "not a map")
+	result = m.GetMapStringIntOrDefault("wrong_type", defaultMap)
+	if result["default"] != 0 {
+		t.Errorf("GetMapStringIntOrDefault wrong_type = %v, expected default", result)
+	}
+}
+
+func TestSetMapStringInt(t *testing.T) {
+	m := NewMetadata()
+
+	counts := map[string]int{"a": 1, "b": 2}
+	result := m.SetMapStringInt("counts", counts)
+
+	if result != m {
+		t.Error("SetMapStringInt should return Metadata for chaining")
+	}
+
+	val, err := m.GetMapStringInt("counts")
+	if err != nil {
+		t.Fatalf("GetMapStringInt after SetMapStringInt failed: %v", err)
+	}
+	if val["a"] != 1 || val["b"] != 2 {
+		t.Errorf("GetMapStringInt after SetMapStringInt = %v, expected {a:1, b:2}", val)
+	}
+
+	// Test chaining with SetInt
+	m.SetMapStringInt("scores", map[string]int{"x": 10}).SetInt("total", 20)
+	total := m.GetIntOrDefault("total", 0)
+	if total != 20 {
+		t.Errorf("chained SetInt total = %d, expected 20", total)
+	}
+}
