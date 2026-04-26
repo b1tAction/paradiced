@@ -115,8 +115,11 @@ type PathResult struct {
 // 导出为 JSON
 data, err := engine.Export()
 
-// 从 JSON 加载
+// 从 JSON 加载（创建新 MapEngine）
 loaded, err := LoadMap(data)
+
+// 从 JSON 导入到已有 MapEngine（替换当前数据）
+err := engine.Import(data)
 ```
 
 ### 4. 辅助方法

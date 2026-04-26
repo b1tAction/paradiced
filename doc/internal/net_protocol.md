@@ -51,6 +51,9 @@
 | 6 | `OpMiniGameResult` | `MiniGameResult` | 小游戏结果广播 |
 | 7 | `OpGameOver` | `GameOver` | 游戏结束 |
 | 8 | `OpFullSync` | `StateSync` | 完整同步（断线重连，含当前回合全部 LogEntry） |
+| 9 | `OpActionRejected` | `ActionRejected` | 操作被拒绝（含ErrorCode） |
+| 10 | `OpWaitingSync` | `StateSync` | 等待同步（断线重连等待期间） |
+| 11 | `OpStartGameAck` | `StartGameAck` | 游戏开始确认（含地图配置） |
 
 ### Client → Server (100+)
 
@@ -60,7 +63,9 @@
 | 101 | `OpUseItem` | `UseItem` | 使用道具 |
 | 102 | `OpUseSkill` | `UseSkill` | 使用阵营技能 |
 | 103 | `OpUserChoice` | `UserChoice` | 决策选择回复 |
-| 104 | `OpMiniGameDataSubmit` | `MiniGameDataSubmit` | 小游戏数据提交（服务器计算排名） |
+| 105 | `OpStartGame` | `StartGame` | 房主开始游戏 |
+| 106 | `OpRoundReady` | `RoundReady` | 回合就绪确认 |
+| 107 | `OpMiniGameDataSubmit` | `MiniGameDataSubmit` | 小游戏数据提交（服务器计算排名） |
 
 ## 核心数据结构
 

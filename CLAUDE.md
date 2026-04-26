@@ -86,8 +86,8 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **Builder interface**: Abstract interface for building protocol sync messages (implemented in internal/net)
 - **BroadcastAdapter**: Broadcast abstraction for client communication
 - **OpCode**: Message operation codes (Server→Client: 1-99, Client→Server: 100+)
-  - Server→Client: OpStateSync(1), OpTurnSync(2), OpDecisionRequest(3), OpAvailable(4), OpMiniGameStart(5), OpMiniGameResult(6), OpGameOver(7), OpFullSync(8), OpActionRejected(9)
-  - Client→Server: OpRollDice(100), OpUseItem(101), OpUseSkill(102), OpUserChoice(103), OpMiniGameResultSubmit(104)
+  - Server→Client: OpStateSync(1), OpDecisionRequest(3), OpAvailable(4), OpMiniGameStart(5), OpMiniGameResult(6), OpGameOver(7), OpFullSync(8), OpActionRejected(9), OpWaitingSync(10), OpStartGameAck(11)
+  - Client→Server: OpRollDice(100), OpUseItem(101), OpUseSkill(102), OpUserChoice(103), OpStartGame(105), OpRoundReady(106), OpMiniGameDataSubmit(107)
 - **StateSync/TurnSync**: Complete state and turn synchronization structures
 - **Decision**: User confirmation request structure
 - **ActionRejected**: Action rejection notification with ErrorCode for client-side error handling
