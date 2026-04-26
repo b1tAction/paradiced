@@ -381,11 +381,6 @@ func (p *AutoPlayPlayer) handleMessage(ctx context.Context, msg *nakama.SocketMe
 		p.handleFullSync(ctx, msg.Data)
 	case nakama.OpGameOver:
 		p.handleGameOver(ctx, msg.Data)
-	case nakama.OpTurnSync:
-		p.mu.Lock()
-		p.turnsCompleted++
-		p.mu.Unlock()
-		p.logger.Debug("Received TurnSync")
 	case nakama.OpActionRejected:
 		p.handleActionRejected(ctx, msg.Data)
 	case nakama.OpStartGameAck:
@@ -421,6 +416,13 @@ func (p *AutoPlayPlayer) handleStateSync(ctx context.Context, data []byte) {
 		}
 	}
 	p.mu.Unlock()
+
+	// Track turns completed when entries are present (actions occurred this turn)
+	if len(stateSync.Entries) > 0 {
+		p.mu.Lock()
+		p.turnsCompleted++
+		p.mu.Unlock()
+	}
 
 	p.logger.Info("Received state sync",
 		"global", stateSync.GlobalState,

@@ -92,6 +92,15 @@ func (ui *CLIUIAdapter) OnStateSync(ctx context.Context, state *model.StateSync)
 	// Display all players
 	ui.displayPlayers(state)
 
+	// Display entries if present
+	if len(state.Entries) > 0 {
+		fmt.Println("Entries:")
+		for _, entry := range state.Entries {
+			ui.displayLogEntry(entry)
+		}
+		fmt.Println()
+	}
+
 	fmt.Println("==================================")
 	fmt.Println()
 }
@@ -324,22 +333,6 @@ func (ui *CLIUIAdapter) OnActionRejected(ctx context.Context, rejected *model.Ac
 	fmt.Println()
 }
 
-// OnTurnSync displays turn update.
-func (ui *CLIUIAdapter) OnTurnSync(ctx context.Context, turnSync *model.TurnSync) {
-	if ui.verbose {
-		fmt.Println()
-		fmt.Println("---------- Turn Sync ----------")
-		fmt.Printf("Round: %d | Turn: %d\n", turnSync.Round, turnSync.Turn)
-		fmt.Printf("Current Player: %s\n", turnSync.CurrentPlayerID)
-		for _, entry := range turnSync.Entries {
-			ui.displayLogEntry(entry)
-		}
-		fmt.Println("------------------------------")
-		fmt.Println()
-	}
-}
-
-// displayLogEntry renders a single log entry with action-specific details.
 func (ui *CLIUIAdapter) displayLogEntry(entry gamelog.LogEntry) {
 	// Resolve display name for target (prefer DisplayName from cached StateSync)
 	targetName := ui.resolveDisplayName(entry.Target)

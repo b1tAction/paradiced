@@ -148,8 +148,6 @@ func (p *InteractivePlayer) handleMessage(ctx context.Context, msg *nakama.Socke
 		p.handleFullSync(handlerCtx, msg.Data)
 	case nakama.OpGameOver:
 		p.handleGameOver(handlerCtx, msg.Data)
-	case nakama.OpTurnSync:
-		p.handleTurnSync(handlerCtx, msg.Data)
 	case nakama.OpActionRejected:
 		p.handleActionRejected(handlerCtx, msg.Data)
 	case nakama.OpWaitingSync:
@@ -216,7 +214,8 @@ func (p *InteractivePlayer) handleStateSync(ctx context.Context, data []byte) {
 		"turn", stateSync.TurnState,
 		"round", stateSync.Round,
 		"current_player_id", stateSync.CurrentPlayerID,
-		"players", len(stateSync.Players))
+		"players", len(stateSync.Players),
+		"entries", len(stateSync.Entries))
 }
 
 func (p *InteractivePlayer) handleAvailable(ctx context.Context, data []byte) {
@@ -358,23 +357,10 @@ func (p *InteractivePlayer) handleFullSync(ctx context.Context, data []byte) {
 
 	p.logger.Debug("Received full sync (reconnection)",
 		"global", stateSync.GlobalState,
-		"players", len(stateSync.Players))
+		"players", len(stateSync.Players),
+		"entries", len(stateSync.Entries))
 }
 
-func (p *InteractivePlayer) handleTurnSync(ctx context.Context, data []byte) {
-	var turnSync model.TurnSync
-	if err := json.Unmarshal(data, &turnSync); err != nil {
-		p.logger.Error("Failed to parse TurnSync", "error", err)
-		return
-	}
-
-	p.uiAdapter.OnTurnSync(ctx, &turnSync)
-
-	p.logger.Debug("Received TurnSync",
-		"round", turnSync.Round,
-		"turn", turnSync.Turn,
-		"entries", len(turnSync.Entries))
-}
 
 func (p *InteractivePlayer) handleActionRejected(ctx context.Context, data []byte) {
 	var rejected model.ActionRejected

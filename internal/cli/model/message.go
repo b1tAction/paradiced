@@ -25,6 +25,7 @@ type StateSync struct {
 	Paused          bool     `json:"paused"`
 	Players         []Player `json:"players"`
 	Map             MapInfo  `json:"map"`
+	Entries         []gamelog.LogEntry `json:"entries"`
 }
 
 // MapInfo represents map data for client synchronization.
@@ -70,14 +71,6 @@ type Item struct {
 	ID   string `json:"id"`
 	Type string `json:"type"`
 	Name string `json:"name"`
-}
-
-// TurnSync represents all events for a turn/phase.
-type TurnSync struct {
-	Round           int                `json:"round"`
-	Turn            int                `json:"turn"`
-	CurrentPlayerID string             `json:"current_player_id"` // 当前回合玩家 ID
-	Entries         []gamelog.LogEntry `json:"entries"`
 }
 
 // Decision represents a decision request sent to client.

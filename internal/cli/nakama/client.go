@@ -393,7 +393,6 @@ type Session struct {
 const (
 	// Server -> Client: 1-99
 	OpStateSync       int64 = 1
-	OpTurnSync        int64 = 2
 	OpDecisionRequest int64 = 3
 	OpAvailable       int64 = 4
 	OpMiniGameStart   int64 = 5

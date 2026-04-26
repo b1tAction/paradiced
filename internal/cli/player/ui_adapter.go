@@ -37,10 +37,6 @@ type PlayerUIAdapter interface {
 	// Called when server sends ActionRejected message.
 	OnActionRejected(ctx context.Context, rejected *model.ActionRejected)
 
-	// OnTurnSync displays turn update.
-	// Called when server sends TurnSync message.
-	OnTurnSync(ctx context.Context, turnSync *model.TurnSync)
-
 	// OnFullSync displays full sync (reconnection).
 	// Called when server sends FullSync message.
 	OnFullSync(ctx context.Context, state *model.StateSync)

@@ -139,7 +139,6 @@ func TestOpCodeConstants(t *testing.T) {
 		expected int64
 	}{
 		{"OpStateSync", OpStateSync, 1},
-		{"OpTurnSync", OpTurnSync, 2},
 		{"OpDecisionRequest", OpDecisionRequest, 3},
 		{"OpAvailable", OpAvailable, 4},
 		{"OpMiniGameStart", OpMiniGameStart, 5},

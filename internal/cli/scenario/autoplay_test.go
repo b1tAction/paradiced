@@ -673,26 +673,6 @@ func TestHandleActionRejected(t *testing.T) {
 	}
 }
 
-func TestHandleTurnSync(t *testing.T) {
-	mockSocket := NewMockSocketClient()
-	logger := nakama.NewLogger(false)
-	player := NewAutoPlayPlayerStandalone(mockSocket, "user-001", logger)
-
-	// Initial turns completed
-	initial := player.TurnsCompleted()
-
-	// Simulate TurnSync message
-	ctx := context.Background()
-	player.handleMessage(ctx, &nakama.SocketMessage{
-		OpCode: nakama.OpTurnSync,
-		Data:   []byte(`{"round": 1, "turn": 0}`),
-	})
-
-	// Verify turns completed incremented
-	if player.TurnsCompleted() != initial+1 {
-		t.Errorf("TurnsCompleted = %d, expected %d", player.TurnsCompleted(), initial+1)
-	}
-}
 
 func TestHandleUnknownOpCode(t *testing.T) {
 	mockSocket := NewMockSocketClient()

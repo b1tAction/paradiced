@@ -759,64 +759,6 @@ func TestActionRejectedJSON(t *testing.T) {
 	}
 }
 
-// ========== TurnSync Tests ==========
-
-func TestTurnSyncJSON(t *testing.T) {
-	turnSync := TurnSync{
-		Round:           1,
-		Turn:            2,
-		CurrentPlayerID: "player-001",
-		Entries: []gamelog.LogEntry{
-			{Type: "action", ActionType: "move"},
-		},
-	}
-
-	data, err := json.Marshal(turnSync)
-	if err != nil {
-		t.Fatalf("Marshal failed: %v", err)
-	}
-
-	var parsed TurnSync
-	err = json.Unmarshal(data, &parsed)
-	if err != nil {
-		t.Fatalf("Unmarshal failed: %v", err)
-	}
-
-	if parsed.Round != turnSync.Round {
-		t.Errorf("Round = %d, expected %d", parsed.Round, turnSync.Round)
-	}
-	if parsed.CurrentPlayerID != turnSync.CurrentPlayerID {
-		t.Errorf("CurrentPlayerID = %s, expected %s", parsed.CurrentPlayerID, turnSync.CurrentPlayerID)
-	}
-	if len(parsed.Entries) != 1 {
-		t.Errorf("Entries count = %d, expected 1", len(parsed.Entries))
-	}
-}
-
-func TestTurnSyncEmptyEntries(t *testing.T) {
-	turnSync := TurnSync{
-		Round:           1,
-		Turn:            0,
-		CurrentPlayerID: "player-001",
-		Entries:         []gamelog.LogEntry{},
-	}
-
-	data, err := json.Marshal(turnSync)
-	if err != nil {
-		t.Fatalf("Marshal failed: %v", err)
-	}
-
-	var parsed TurnSync
-	err = json.Unmarshal(data, &parsed)
-	if err != nil {
-		t.Fatalf("Unmarshal failed: %v", err)
-	}
-
-	if len(parsed.Entries) != 0 {
-		t.Errorf("Entries count = %d, expected 0", len(parsed.Entries))
-	}
-}
-
 // ========== LogEntryWithTime Tests ==========
 
 func TestLogEntryWithTimeJSON(t *testing.T) {
