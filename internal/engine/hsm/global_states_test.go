@@ -699,3 +699,146 @@ func (m *mockRankCalculator) Calculate(gameType constants.MiniGameType, submissi
 	}
 	return ranks
 }
+
+func TestStateRoundMiniGame_ExitBroadcastsResultWithGameData(t *testing.T) {
+	state := NewRoundMiniGameState()
+
+	game := engine.NewGame(id.NewGameID(), 0)
+	p1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	p2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(p1)
+	game.AddPlayer(p2)
+
+	ctx := NewStateContext().WithHSM(NewHSM(game))
+	mockBroadcast := pkgnet.NewMockBroadcastAdapter()
+	ctx.Broadcast = mockBroadcast
+
+	state.Enter(ctx)
+	gameType := state.GetGameType()
+
+	// Submit game_data for both players via frontend-driven mode
+	p1Data := map[string]interface{}{
+		"dice1": 3,
+		"dice2": 5,
+		"score": 8,
+	}
+	p2Data := map[string]interface{}{
+		"dice1": 2,
+		"dice2": 4,
+		"score": 6,
+	}
+	state.OnMiniGameDataSubmit(ctx, p1.ID.UUID(), gameType, p1Data)
+	state.OnMiniGameDataSubmit(ctx, p2.ID.UUID(), gameType, p2Data)
+
+	state.Exit(ctx)
+
+	if len(mockBroadcast.MiniGameResults) != 1 {
+		t.Fatalf("MiniGameResults broadcast count = %d, want 1", len(mockBroadcast.MiniGameResults))
+	}
+
+	result := mockBroadcast.MiniGameResults[0]
+	if result == nil {
+		t.Fatal("MiniGameResult should not be nil")
+	}
+	if len(result.Rankings) != 2 {
+		t.Fatalf("rankings length = %d, want 2", len(result.Rankings))
+	}
+
+	// Verify DisplayName is populated (currently = player UUID, TODO for actual name)
+	for _, ranking := range result.Rankings {
+		if ranking.DisplayName == "" {
+			t.Errorf("RankingEntry.DisplayName should be non-empty for %s", ranking.PlayerID)
+		}
+		if ranking.PlayerID != ranking.DisplayName {
+			t.Errorf("DisplayName should equal PlayerID (current TODO), got display_name=%s, player_id=%s", ranking.DisplayName, ranking.PlayerID)
+		}
+	}
+
+	// Verify GameData is carried through for each player
+	for _, ranking := range result.Rankings {
+		if ranking.GameData == nil {
+			t.Errorf("RankingEntry.GameData should not be nil for player %s (submitted data)", ranking.PlayerID)
+		}
+	}
+
+	// Find rankings for each specific player
+	var p1Ranking, p2Ranking *pkgnet.RankingEntry
+	for i := range result.Rankings {
+		if result.Rankings[i].PlayerID == p1.ID.UUID() {
+			p1Ranking = &result.Rankings[i]
+		}
+		if result.Rankings[i].PlayerID == p2.ID.UUID() {
+			p2Ranking = &result.Rankings[i]
+		}
+	}
+
+	if p1Ranking == nil || p2Ranking == nil {
+		t.Fatal("rankings for p1 and p2 should both exist")
+	}
+
+	// Verify p1's game_data contains submitted values
+	score1, ok := p1Ranking.GameData["score"]
+	if !ok {
+		t.Error("p1 GameData should contain 'score' key")
+	}
+	// gameData is stored as map[string]interface{} directly from Go (not JSON),
+	// so integer values remain as int, not float64
+	if score1 != 8 {
+		t.Errorf("p1 GameData['score'] = %v, want 8", score1)
+	}
+
+	// Verify p2's game_data contains submitted values
+	score2, ok := p2Ranking.GameData["score"]
+	if !ok {
+		t.Error("p2 GameData should contain 'score' key")
+	}
+	if score2 != 6 {
+		t.Errorf("p2 GameData['score'] = %v, want 6", score2)
+	}
+}
+
+func TestStateRoundMiniGame_ExitBroadcastsResultWithDisplayNameOnly(t *testing.T) {
+	// RPC mode: OnMiniGameResult sets rank directly, no gameData stored
+	state := NewRoundMiniGameState()
+
+	game := engine.NewGame(id.NewGameID(), 0)
+	p1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	p2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(p1)
+	game.AddPlayer(p2)
+
+	ctx := NewStateContext().WithHSM(NewHSM(game))
+	mockBroadcast := pkgnet.NewMockBroadcastAdapter()
+	ctx.Broadcast = mockBroadcast
+
+	state.Enter(ctx)
+
+	// Use RPC mode: directly set rank (no game_data stored)
+	state.OnMiniGameResult(ctx, p1.ID.UUID(), 1)
+	state.OnMiniGameResult(ctx, p2.ID.UUID(), 2)
+
+	state.Exit(ctx)
+
+	if len(mockBroadcast.MiniGameResults) != 1 {
+		t.Fatalf("MiniGameResults broadcast count = %d, want 1", len(mockBroadcast.MiniGameResults))
+	}
+
+	result := mockBroadcast.MiniGameResults[0]
+	if len(result.Rankings) != 2 {
+		t.Fatalf("rankings length = %d, want 2", len(result.Rankings))
+	}
+
+	// DisplayName should be populated even without gameData
+	for _, ranking := range result.Rankings {
+		if ranking.DisplayName == "" {
+			t.Errorf("RankingEntry.DisplayName should be non-empty for %s", ranking.PlayerID)
+		}
+	}
+
+	// GameData should be nil since no game_data was submitted (RPC mode)
+	for _, ranking := range result.Rankings {
+		if ranking.GameData != nil {
+			t.Errorf("RankingEntry.GameData should be nil for player %s (RPC mode, no data submitted)", ranking.PlayerID)
+		}
+	}
+}

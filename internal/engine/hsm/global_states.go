@@ -237,9 +237,18 @@ func (s *RoundMiniGameState) Exit(ctx *StateContext) {
 					// Deterministic fallback for players without submission.
 					rank = len(game.Players) + idx + 1
 				}
+
+				// Include game_data submitted by this player for client rendering.
+				var gameData map[string]interface{}
+				if gd, ok := s.gameData[p.ID.UUID()]; ok {
+					gameData = gd
+				}
+
 				rankings = append(rankings, pkgnet.RankingEntry{
-					PlayerID: p.ID.UUID(),
-					Rank:     rank,
+					PlayerID:    p.ID.UUID(),
+					DisplayName: p.ID.UUID(), // TODO: use actual display name from Nakama username
+					Rank:        rank,
+					GameData:    gameData,
 				})
 			}
 
