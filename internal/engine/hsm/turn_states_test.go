@@ -1002,3 +1002,26 @@ func TestStateError(t *testing.T) {
 		t.Errorf("Error string should be '%s', got '%s'", expectedStr, err.Error())
 	}
 }
+
+// ========== TurnMovingState GetSteps/SetSteps Tests ==========
+
+func TestTurnMovingStateGetStepsSetSteps(t *testing.T) {
+	state := NewTurnMovingState()
+
+	// Default steps should be 0
+	if state.GetSteps() != 0 {
+		t.Errorf("GetSteps() = %d, want 0", state.GetSteps())
+	}
+
+	// SetSteps should update steps
+	state.SetSteps(5)
+	if state.GetSteps() != 5 {
+		t.Errorf("GetSteps() after SetSteps(5) = %d, want 5", state.GetSteps())
+	}
+
+	// SetSteps can also set negative values (for 迷途 reversal)
+	state.SetSteps(-3)
+	if state.GetSteps() != -3 {
+		t.Errorf("GetSteps() after SetSteps(-3) = %d, want -3", state.GetSteps())
+	}
+}

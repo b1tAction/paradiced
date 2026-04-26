@@ -192,3 +192,27 @@ func TestDefaultRankCalculator_StableSort(t *testing.T) {
 		t.Errorf("Expected total rank sum = 6 for 3 tied players, got %d", total)
 	}
 }
+
+func TestGetFloatValueAllTypes(t *testing.T) {
+	tests := []struct {
+		name     string
+		data     map[string]interface{}
+		key      string
+		expected float64
+	}{
+		{"missing key", map[string]interface{}{"other": 1}, "score", 0},
+		{"float64", map[string]interface{}{"score": 42.5}, "score", 42.5},
+		{"float32", map[string]interface{}{"score": float32(3.14)}, "score", float64(float32(3.14))},
+		{"int", map[string]interface{}{"score": 7}, "score", 7.0},
+		{"int64", map[string]interface{}{"score": int64(100)}, "score", 100.0},
+		{"int32", map[string]interface{}{"score": int32(9)}, "score", 9.0},
+		{"unsupported type", map[string]interface{}{"score": "hello"}, "score", 0},
+	}
+
+	for _, tt := range tests {
+		result := getFloatValue(tt.data, tt.key)
+		if result != tt.expected {
+			t.Errorf("%s: getFloatValue = %v, want %v", tt.name, result, tt.expected)
+		}
+	}
+}

@@ -1097,3 +1097,43 @@ func TestHasEventHandler(t *testing.T) {
 		t.Error("EventTypeNone should not have handler")
 	}
 }
+
+// ========== createModifyLPHandler Tests ==========
+
+func TestCreateModifyLPHandlerNilContext(t *testing.T) {
+	handler := createModifyLPHandler(1)
+	err := handler(constants.PhaseBeforeTurn, nil)
+	if err == nil {
+		t.Error("createModifyLPHandler should return error for nil context")
+	}
+}
+
+func TestCreateModifyLPHandlerNilPlayer(t *testing.T) {
+	handler := createModifyLPHandler(1)
+	ctx := event.NewContext(nil)
+	err := handler(constants.PhaseBeforeTurn, ctx)
+	if err == nil {
+		t.Error("createModifyLPHandler should return error for nil player")
+	}
+}
+
+func TestCreateModifyLPHandlerWithActionContext(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	handler := createModifyLPHandler(1)
+	ctx := event.NewContext(player)
+
+	// Set action_context so getActionCtxFromEventCtx succeeds
+	actionCtx := engineaction.NewActionContext(nil, nil, nil, nil)
+	ctx.Set("action_context", actionCtx)
+
+	err := handler(constants.PhaseBeforeTurn, ctx)
+	if err != nil {
+		t.Errorf("createModifyLPHandler with valid context should not error: %v", err)
+	}
+
+	// Should have a derived action
+	actions := ctx.GetDerivedActions()
+	if len(actions) == 0 {
+		t.Error("createModifyLPHandler should produce a derived action")
+	}
+}

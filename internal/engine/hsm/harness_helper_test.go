@@ -3,6 +3,7 @@ package hsm
 import (
 	"testing"
 
+	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
 )
 
@@ -159,5 +160,74 @@ func TestHarnessKillPlayer(t *testing.T) {
 	}
 	if player.HP != 0 {
 		t.Errorf("Player HP = %d, expected 0 after KillPlayer", player.HP)
+	}
+}
+
+// ========== builderAdapter Tests ==========
+
+func TestBuilderAdapterBuildFullSyncStateSync(t *testing.T) {
+	harness := NewGameTestHarness(&HarnessConfig{
+		PlayerCount: 2,
+		MapLength:   20,
+		Seed:        42,
+	})
+
+	adapter := harness.Builder
+	sync := adapter.BuildFullSyncStateSync()
+	if sync == nil {
+		t.Error("BuildFullSyncStateSync should not return nil")
+	}
+	if sync.CurrentPlayerID != "" {
+		t.Errorf("CurrentPlayerID = %s, want empty string", sync.CurrentPlayerID)
+	}
+}
+
+func TestBuilderAdapterBuildDecisionFromEvent(t *testing.T) {
+	harness := NewGameTestHarness(&HarnessConfig{
+		PlayerCount: 2,
+		MapLength:   20,
+		Seed:        42,
+	})
+
+	adapter := harness.Builder
+	decision := event.NewDecision("Choose your path", []event.Option{
+		{Label: "Go left"},
+		{Label: "Go right"},
+	})
+	decResult := adapter.BuildDecisionFromEvent(decision)
+	if decResult == nil {
+		t.Error("BuildDecisionFromEvent should not return nil")
+	}
+	if decResult.ID != decision.ID.UUID() {
+		t.Errorf("Decision ID = %s, want %s", decResult.ID, decision.ID.UUID())
+	}
+	if decResult.Prompt != "Choose your path" {
+		t.Errorf("Decision Prompt = %s, want 'Choose your path'", decResult.Prompt)
+	}
+}
+
+func TestBuilderAdapterSetDiceType(t *testing.T) {
+	harness := NewGameTestHarness(&HarnessConfig{
+		PlayerCount: 2,
+		MapLength:   20,
+		Seed:        42,
+	})
+
+	// SetDiceType is a no-op, just verify it doesn't panic
+	adapter := harness.Builder
+	adapter.SetDiceType("p1")
+}
+
+func TestBuilderAdapterBuildMapInfo(t *testing.T) {
+	harness := NewGameTestHarness(&HarnessConfig{
+		PlayerCount: 2,
+		MapLength:   20,
+		Seed:        42,
+	})
+
+	adapter := harness.Builder
+	mapInfo := adapter.BuildMapInfo()
+	if mapInfo == nil {
+		t.Error("BuildMapInfo should not return nil")
 	}
 }
