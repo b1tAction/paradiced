@@ -2218,3 +2218,394 @@ func TestDiceUpgradeActionLogEntry(t *testing.T) {
 		t.Errorf("LogEntry to_dice = %s, expected %s", toDice, rng.DiceTypeCopper.String())
 	}
 }
+
+// ========== DeathAction Interface Tests ==========
+
+func TestDeathActionInterfaceMethods(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewDeathAction(player, "Buff_Corrupt", 15)
+
+	if action.Type() != constants.ActionDeath {
+		t.Errorf("Type() = %s, expected death", action.Type())
+	}
+	if action.CanModify() {
+		t.Error("DeathAction.CanModify() should be false")
+	}
+	if action.Source() != "Buff_Corrupt" {
+		t.Errorf("Source() = %s, expected Buff_Corrupt", action.Source())
+	}
+	if action.Target() != player.ID.UUID() {
+		t.Errorf("Target() = %s, expected %s", action.Target(), player.ID.UUID())
+	}
+	if action.TargetPlayer() != player {
+		t.Error("TargetPlayer() should return the target player")
+	}
+	if action.PreTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PreTriggerPhase() = %s, expected PhaseAnyTime", action.PreTriggerPhase())
+	}
+	if action.PostTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PostTriggerPhase() = %s, expected PhaseAnyTime", action.PostTriggerPhase())
+	}
+}
+
+func TestDeathActionExecute(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewDeathAction(player, "Buff_Corrupt", 15)
+	ctx := NewActionContext(nil, nil, nil, nil)
+	ctx.OnAddBuff = func(p *core.Player, b *core.Buff) { p.AddBuff(b) }
+	ctx.GetBuffDuration = func(bt constants.BuffType) int { return -1 }
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Errorf("Execute should succeed, got: %v", err)
+	}
+
+	// Player should now have DeathMark buff
+	hasDeathMark := false
+	for _, b := range player.ActiveBuffs {
+		if b.Type == constants.BuffTypeDeathMark {
+			hasDeathMark = true
+		}
+	}
+	if !hasDeathMark {
+		t.Error("Player should have DeathMark buff after DeathAction.Execute()")
+	}
+}
+
+func TestDeathActionLogEntry(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewDeathAction(player, "FragileCell", 25)
+
+	entry := action.LogEntry()
+	if entry.ActionType != string(constants.ActionDeath) {
+		t.Errorf("LogEntry ActionType = %s, expected death", entry.ActionType)
+	}
+	if entry.Source != "FragileCell" {
+		t.Errorf("LogEntry Source = %s, expected FragileCell", entry.Source)
+	}
+	pos := entry.Metadata.GetIntOrDefault("position", -1)
+	if pos != 25 {
+		t.Errorf("LogEntry position = %d, expected 25", pos)
+	}
+	src := entry.Metadata.GetStringOrDefault("death_source", "")
+	if src != "FragileCell" {
+		t.Errorf("LogEntry death_source = %s, expected FragileCell", src)
+	}
+}
+
+func TestDeathActionNilPlayer(t *testing.T) {
+	action := NewDeathAction(nil, "test", 10)
+	ctx := NewActionContext(nil, nil, nil, nil)
+
+	err := action.Execute(ctx)
+	if err == nil {
+		t.Error("DeathAction with nil player should return error")
+	}
+}
+
+func TestDeathActionNilCallback(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewDeathAction(player, "test", 10)
+	ctx := NewActionContext(nil, nil, nil, nil)
+	// OnAddBuff is nil
+
+	err := action.Execute(ctx)
+	if err == nil {
+		t.Error("DeathAction with nil OnAddBuff should return error")
+	}
+}
+
+// ========== BossDamageAction Tests ==========
+
+func TestBossDamageActionInterfaceMethods(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	boss := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewBossDamageAction(player, boss, 5, true, "boss_damage")
+
+	if action.Type() != constants.ActionBossDamage {
+		t.Errorf("Type() = %s, expected boss_damage", action.Type())
+	}
+	if action.CanModify() {
+		t.Error("BossDamageAction.CanModify() should be false")
+	}
+	if action.Source() != "boss_damage" {
+		t.Errorf("Source() = %s, expected boss_damage", action.Source())
+	}
+	if action.Target() != boss.ID.UUID() {
+		t.Errorf("Target() = %s, expected %s", action.Target(), boss.ID.UUID())
+	}
+	if action.TargetPlayer() != boss {
+		t.Error("TargetPlayer() should return boss player")
+	}
+	if action.PreTriggerPhase() != constants.PhasePreDamage {
+		t.Errorf("PreTriggerPhase() = %s, expected PhasePreDamage", action.PreTriggerPhase())
+	}
+	if action.PostTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PostTriggerPhase() = %s, expected PhaseAnyTime", action.PostTriggerPhase())
+	}
+}
+
+func TestBossDamageActionExecute(t *testing.T) {
+	boss := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	boss.HP = 50
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewBossDamageAction(player, boss, 5, false, "boss_damage")
+	ctx := NewActionContext(nil, nil, nil, nil)
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Errorf("Execute should succeed, got: %v", err)
+	}
+	if boss.HP != 45 {
+		t.Errorf("Boss HP = %d, expected 45 (50-5)", boss.HP)
+	}
+}
+
+func TestBossDamageActionExecuteWithCrit(t *testing.T) {
+	boss := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	boss.HP = 50
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewBossDamageAction(player, boss, 10, true, "boss_damage")
+	ctx := NewActionContext(nil, nil, nil, nil)
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Errorf("Execute should succeed, got: %v", err)
+	}
+	if boss.HP != 40 {
+		t.Errorf("Boss HP = %d, expected 40 (50-10)", boss.HP)
+	}
+}
+
+func TestBossDamageActionZeroDamage(t *testing.T) {
+	boss := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	boss.HP = 50
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewBossDamageAction(player, boss, 0, false, "boss_damage")
+	ctx := NewActionContext(nil, nil, nil, nil)
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Errorf("Execute with zero damage should succeed, got: %v", err)
+	}
+	if boss.HP != 50 {
+		t.Errorf("Boss HP should not change with zero damage, got %d", boss.HP)
+	}
+}
+
+func TestBossDamageActionNilBoss(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewBossDamageAction(player, nil, 5, false, "boss_damage")
+	ctx := NewActionContext(nil, nil, nil, nil)
+
+	err := action.Execute(ctx)
+	if err == nil {
+		t.Error("BossDamageAction with nil boss should return error")
+	}
+}
+
+func TestBossDamageActionLogEntry(t *testing.T) {
+	boss := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	boss.HP = 50
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewBossDamageAction(player, boss, 10, true, "boss_damage")
+	ctx := NewActionContext(nil, nil, nil, nil)
+	action.Execute(ctx)
+
+	entry := action.LogEntry()
+	if entry.ActionType != string(constants.ActionBossDamage) {
+		t.Errorf("LogEntry ActionType = %s, expected boss_damage", entry.ActionType)
+	}
+	if entry.Type != constants.EntryTypeBoss {
+		t.Errorf("LogEntry Type = %s, expected boss", entry.Type)
+	}
+	damage := entry.Metadata.GetIntOrDefault("damage", 0)
+	if damage != 10 {
+		t.Errorf("LogEntry damage = %d, expected 10", damage)
+	}
+	isCrit := entry.Metadata.GetBoolOrDefault("is_crit", false)
+	if !isCrit {
+		t.Error("LogEntry is_crit should be true")
+	}
+	remainingHP := entry.Metadata.GetIntOrDefault("boss_remaining_hp", 0)
+	if remainingHP != 40 {
+		t.Errorf("LogEntry boss_remaining_hp = %d, expected 40", remainingHP)
+	}
+}
+
+// ========== BossAttackAction Tests ==========
+
+func TestBossAttackActionInterfaceMethods(t *testing.T) {
+	boss := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewBossAttackAction(boss, player, 2, constants.BossAttackCrit, "boss_attack")
+
+	if action.Type() != constants.ActionBossAttack {
+		t.Errorf("Type() = %s, expected boss_attack", action.Type())
+	}
+	if action.CanModify() {
+		t.Error("BossAttackAction.CanModify() should be false")
+	}
+	if action.Source() != "boss_attack" {
+		t.Errorf("Source() = %s, expected boss_attack", action.Source())
+	}
+	if action.Target() != player.ID.UUID() {
+		t.Errorf("Target() = %s, expected %s", action.Target(), player.ID.UUID())
+	}
+	if action.TargetPlayer() != player {
+		t.Error("TargetPlayer() should return target player")
+	}
+	if action.PreTriggerPhase() != constants.PhasePreDamage {
+		t.Errorf("PreTriggerPhase() = %s, expected PhasePreDamage", action.PreTriggerPhase())
+	}
+	if action.PostTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PostTriggerPhase() = %s, expected PhaseAnyTime", action.PostTriggerPhase())
+	}
+}
+
+func TestBossAttackActionExecute(t *testing.T) {
+	boss := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.HP = 5
+	player.LP = 3
+	action := NewBossAttackAction(boss, player, 2, constants.BossAttackCrit, "boss_attack")
+	ctx := NewActionContext(nil, nil, nil, nil)
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Errorf("Execute should succeed, got: %v", err)
+	}
+	if player.HP != 3 {
+		t.Errorf("Player HP = %d, expected 3 (5-2)", player.HP)
+	}
+}
+
+func TestBossAttackActionKillsPlayer(t *testing.T) {
+	boss := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.HP = 2
+	player.LP = 0
+	player.Position = 10
+	action := NewBossAttackAction(boss, player, 2, constants.BossAttackNormal, "boss_attack")
+	ctx := NewActionContext(nil, nil, nil, nil)
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Errorf("Execute should succeed, got: %v", err)
+	}
+	if !player.IsDead {
+		t.Error("Player should be dead after lethal boss attack")
+	}
+	// Should push DeathAction as derived action
+	if ctx.ActionQueue.Len() != 1 {
+		t.Fatalf("Should have 1 derived DeathAction, got %d", ctx.ActionQueue.Len())
+	}
+}
+
+func TestBossAttackActionNilTarget(t *testing.T) {
+	boss := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewBossAttackAction(boss, nil, 1, constants.BossAttackNormal, "boss_attack")
+	ctx := NewActionContext(nil, nil, nil, nil)
+
+	err := action.Execute(ctx)
+	if err == nil {
+		t.Error("BossAttackAction with nil target should return error")
+	}
+}
+
+func TestBossAttackActionLogEntry(t *testing.T) {
+	boss := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewBossAttackAction(boss, player, 2, constants.BossAttackCrit, "boss_attack")
+
+	entry := action.LogEntry()
+	if entry.ActionType != string(constants.ActionBossAttack) {
+		t.Errorf("LogEntry ActionType = %s, expected boss_attack", entry.ActionType)
+	}
+	if entry.Type != constants.EntryTypeBoss {
+		t.Errorf("LogEntry Type = %s, expected boss", entry.Type)
+	}
+	attackType := entry.Metadata.GetStringOrDefault("attack_type", "")
+	if attackType != string(constants.BossAttackCrit) {
+		t.Errorf("LogEntry attack_type = %s, expected %s", attackType, constants.BossAttackCrit)
+	}
+	damage := entry.Metadata.GetIntOrDefault("damage", 0)
+	if damage != 2 {
+		t.Errorf("LogEntry damage = %d, expected 2", damage)
+	}
+}
+
+// ========== BossSkillAction Tests ==========
+
+func TestBossSkillActionInterfaceMethods(t *testing.T) {
+	boss := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewBossSkillAction(boss, constants.BossSkillThunder, []*core.Player{player1, player2}, "boss_skill")
+
+	if action.Type() != constants.ActionBossSkill {
+		t.Errorf("Type() = %s, expected boss_skill", action.Type())
+	}
+	if action.CanModify() {
+		t.Error("BossSkillAction.CanModify() should be false")
+	}
+	if action.Source() != "boss_skill" {
+		t.Errorf("Source() = %s, expected boss_skill", action.Source())
+	}
+	if action.Target() != player1.ID.UUID() {
+		t.Errorf("Target() = %s, expected %s (first target)", action.Target(), player1.ID.UUID())
+	}
+	if action.TargetPlayer() != boss {
+		t.Error("TargetPlayer() should return boss (actor)")
+	}
+	if action.PreTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PreTriggerPhase() = %s, expected PhaseAnyTime", action.PreTriggerPhase())
+	}
+	if action.PostTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PostTriggerPhase() = %s, expected PhaseAnyTime", action.PostTriggerPhase())
+	}
+}
+
+func TestBossSkillActionExecute(t *testing.T) {
+	boss := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewBossSkillAction(boss, constants.BossSkillThunder, []*core.Player{player}, "boss_skill")
+	ctx := NewActionContext(nil, nil, nil, nil)
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Errorf("Execute should succeed (delegated to handler), got: %v", err)
+	}
+}
+
+func TestBossSkillActionLogEntry(t *testing.T) {
+	boss := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewBossSkillAction(boss, constants.BossSkillCurse, []*core.Player{player1, player2}, "boss_skill")
+
+	entry := action.LogEntry()
+	if entry.ActionType != string(constants.ActionBossSkill) {
+		t.Errorf("LogEntry ActionType = %s, expected boss_skill", entry.ActionType)
+	}
+	if entry.Type != constants.EntryTypeBoss {
+		t.Errorf("LogEntry Type = %s, expected boss", entry.Type)
+	}
+	skillType := entry.Metadata.GetStringOrDefault("skill_type", "")
+	if skillType != string(constants.BossSkillCurse) {
+		t.Errorf("LogEntry skill_type = %s, expected %s", skillType, constants.BossSkillCurse)
+	}
+	targets := entry.Metadata.GetStringOrDefault("targets", "")
+	if targets != player1.ID.UUID()+","+player2.ID.UUID() {
+		t.Errorf("LogEntry targets = %s, expected comma-separated target IDs", targets)
+	}
+}
+
+func TestBossSkillActionEmptyTargets(t *testing.T) {
+	boss := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewBossSkillAction(boss, constants.BossSkillRest, []*core.Player{}, "boss_skill")
+
+	if action.Target() != "" {
+		t.Errorf("Target() with empty targets should return empty string, got %s", action.Target())
+	}
+}
