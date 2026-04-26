@@ -78,8 +78,9 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 #### Action System (`internal/engine/action`)
 - **ActionType**: String type with snake_case naming (damage, heal, move, etc.)
 - **Action interface**: Core interface with PreTriggerPhase/PostTriggerPhase/TargetPlayer
-- **Action implementations**: Concrete implementations (DamageAction, HealAction, RespawnAction, FellDownAction, DrawItemAction, DrawEventAction, BossDamageAction, BossAttackAction, BossSkillAction, etc.)
-- **ActionContext**: Execution context with EventBus and global GameLog integration
+- **Action implementations**: Concrete implementations (DamageAction, HealAction, RespawnAction, FellDownAction, DrawItemAction, DrawEventAction, DrawBuffAction, AddItemAction, RemoveItemAction, DiceUpgradeAction, BossDamageAction, BossAttackAction, BossSkillAction, etc.)
+- **ActionContext**: Execution context with EventBus, GameLog, pools (EventPool/ItemPool/BuffPool), and lifecycle callbacks (OnAddBuff/OnRemoveBuff/OnAddItem/OnRemoveItem)
+- **DerivedAction pattern**: Event/Item handlers push concrete Actions via ctx.AddDerivedAction() instead of setting flags
 
 #### Protocol Layer (`pkg/net`)
 - **Builder interface**: Abstract interface for building protocol sync messages (implemented in internal/net)
@@ -133,9 +134,10 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **Event**: Random events with evaluation scores (uses constants.EventType, constants.Evaluation)
 
 #### Game Engine (`internal/engine`)
-- **Game**: Game instance managing EventBus, players, and GameLog
-- **Handlers**: Custom Buff effect handlers (strategy pattern)
+- **Game**: Game instance managing EventBus, players, GameLog, and pools (EventPool/ItemPool/BuffPool)
+- **Handlers**: Custom Buff/Item/Event effect handlers (strategy pattern, DerivedAction pattern)
 - **Action Integration**: All effects use Action system and record to GameLog
+- **Item Lifecycle**: ApplyItemToPlayer/RemoveItemFromPlayer manage EventBus subscription + data layer
 
 #### HSM System (`internal/engine/hsm`)
 - **HSM**: Hierarchical State Machine with three layers
@@ -143,6 +145,8 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **Turn States**: TurnUpkeep, MainAction, TurnMoving, TurnCheckpoint, TurnLanded, TurnDraw, TurnBossBattle, TurnEnd
 - **Interrupt States**: WaitDecision for user input
 - **TurnDrawState**: Unified draw state that handles both Event and Item draws based on cell's DrawType configuration. Entered from TurnLanded when cell has a valid DrawType (event/item) and prob settings.
+- **decisionStateResetter**: Interface for states that cache pending decisions, called after decision resolution
+- **OnUseItem**: Handler execution + item consumption via RemoveItemAction
 
 #### Map System (`internal/gamemap`)
 - **MapEngine**: Linear map generation and path calculation
@@ -152,7 +156,7 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 #### RNG Engine (`pkg/rng`)
 - **WeightedPool**: Weighted random draw
 - **LuckModifier**: Luck-based weight adjustment
-- **EventPool/ItemPool**: Predefined pools for game content
+- **EventPool/ItemPool/BuffPool**: Predefined pools for game content
 - **DrawEngine**: Probability-based drawing with `DrawWithProb` method that supports weighted pool selection (Good/Neutral/Bad) and fallback to all items when total probability < 1.0
 - **Boss Attack Calculation**: CalcBossAttackType, SelectBossTarget, CalcPlayerCrit for Boss battle RNG
 
@@ -167,8 +171,8 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 
 **Phase Design Principle: Who produces timing, who publishes Phase**
 
-1. **BeforeTurn** (HSM publishes): Trigger BeforeTurn phase effects (神眷/诅咒 LP±1, 离火 every 4 turns). Boss player skips.
-2. **MainAction**: Player can use items or faction skills. If on Boss cell → TurnBossBattle.
+1. **BeforeTurn** (HSM publishes): Trigger BeforeTurn phase effects (神眷/诅咒 LP±1, 离火 every 4 turns). Poison buff draws bad event (100% bad probability). Boss player skips.
+2. **MainAction**: Player can use items or faction skills. OnUseItem executes handler + consumes item via RemoveItemAction. If on Boss cell → TurnBossBattle.
 3. **PreMove** (HSM publishes): TurnMovingState publishes PreMove, 迷途 handler modifies Steps via StepsModifier interface
 4. **OnLand** (HSM publishes): Trigger landing events
 5. **TurnDraw** (HSM state): When landing on a cell with DrawType (event/item), enter TurnDraw state to perform probability-based draw
@@ -331,6 +335,21 @@ Git Commit信息必须使用英文提交
 | 离火 (Fire) | BeforeTurn | ZhuQue passive, LP+1 every 4 turns |
 | 死亡标记 (DeathMark) | PreAction (Hidden) | Block all actions for dead players (exempt: RespawnAction, RemoveBuffAction(DeathMark)) |
 | 反刺 (Thorns) | PreDamage (Boss self) | Boss reflect: 30% damage back as BossAttackAction (Hidden can block reflect) |
+
+## Item System
+
+| Item | Phase | Effect |
+|------|-------|--------|
+| 反方向的钟 (ReverseClock) | AnyTime | Give target player Lost buff |
+| 任意门 (AnyDoor) | OnLand | Teleport player to target position |
+| 骰子升级卡 (DiceUpgrade) | ItemUsed | Upgrade dice type (Wood→Copper→Silver→Gold) |
+
+**Item Lifecycle**: Items follow complete lifecycle through Action system:
+- **AddItemAction** → OnAddItem callback → game.ApplyItemToPlayer (data + EventBus subscription)
+- **RemoveItemAction** → OnRemoveItem callback → game.RemoveItemFromPlayer (unsubscribe + data removal)
+- **Consumption**: OnUseItem handler execution followed by RemoveItemAction for item consumption
+
+**DerivedAction pattern**: Event/Item handlers push concrete Actions (DrawItemAction, DrawBuffAction, TeleportAction, RemoveItemAction, DiceUpgradeAction) instead of setting flags.
 
 ## Boss System
 

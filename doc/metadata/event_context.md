@@ -66,14 +66,22 @@ func ExecuteHPChange(ctx *ActionContext, target *Player) {
 - PhasePreDiceRoll Handler 通过 `current_action` 类型断言为 `*RollDiceAction`，可修改 `Steps` 字段
 - 例如"强运"Buff：Handler 断言 `action.(*RollDiceAction)`，将 `Steps` 修改为最大值
 
-### Event 效果信号
+### Event 效果信号（DerivedAction 模式）
+
+Event Handler 现通过 `ctx.AddDerivedAction()` 推送具体 Action，而非设置 flag。
+
+| Handler | 之前（flag模式） | 现在（DerivedAction模式） |
+|---------|-----------------|--------------------------|
+| 遗物(Relic) | `ctx.SetBool("draw_item", true)` | `ctx.AddDerivedAction(NewDrawItemAction(...))` |
+| 交换(Exchange) | `ctx.SetBool("swap_position", true)` | `ctx.AddDerivedAction(NewTeleportAction(...))` ×2 |
+| 尝一口(TasteTest) | `ctx.SetBool("random_buff", true)` | `ctx.AddDerivedAction(NewDrawBuffAction(...))` |
+| 盗贼(Thief) | `ctx.SetBool("lose_item", true)` | `ctx.AddDerivedAction(NewRemoveItemAction(...))` |
+| 雷劫(Thunder) | 直接HP归零 | 仍直接执行（无flag，无DerivedAction） |
+
+**保留的旧字段**（仅在非 DerivedAction 场景使用）：
 
 | 字段 | 类型 | 来源Event | 用途 | 目标 |
 |------|------|----------|------|------|
-| `draw_item` | bool | Event Handler | 抽取道具标志 | GiveItemAction |
-| `swap_position` | bool | Event Handler | 交换位置标志 | SwapPositionAction |
-| `random_buff` | bool | Event Handler | 随机Buff标志 | AddBuffAction |
-| `lose_item` | bool | Event Handler | 失去道具标志 | RemoveItemAction |
 | `instant_death` | bool | Event Handler | 即死标志 | DeathAction |
 
 ### Item 效果信号
@@ -82,9 +90,17 @@ func ExecuteHPChange(ctx *ActionContext, target *Player) {
 |------|------|----------|------|------|
 | `target_id` | string | Item Handler | 目标玩家ID | Decision/Action |
 | `teleport_target` | string | Item_AnyDoor（任意门） | 传送目标玩家 | TeleportAction |
-| `dice_swap_target` | string | Item Handler | 骰子交换目标 | Decision |
-| `dice_upgrade_from` | string | Item Handler | 骰子升级来源类型 | LogEntry.Metadata |
-| `current_dice_type` | string | Item Handler | 当前骰子类型 | Item Handler |
+| `current_dice_type` | string | HSM (OnUseItem) → Item Handler | 当前骰子类型 | DiceUpgradeAction |
+
+**DiceSwap 已移除**：`dice_swap_target` 字段不再使用。DiceUpgrade 取代了 DiceSwap 的功能，通过 DiceUpgradeAction 实现骰子升级（Wood→Copper→Silver→Gold）。
+
+**DerivedAction 模式**：
+Item Handler 同样使用 DerivedAction 模式：
+
+| Item Handler | DerivedAction | 说明 |
+|-------------|---------------|------|
+| 任意门(AnyDoor) | `NewTeleportAction(...)` | 传送玩家至目标位置 |
+| 骰子升级(DiceUpgrade) | `NewDiceUpgradeAction(...)` | 升级骰子类型，FromDice 从 `current_dice_type` 字段获取 |
 
 ---
 

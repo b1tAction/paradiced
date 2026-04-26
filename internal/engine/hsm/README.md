@@ -106,7 +106,7 @@ ctx.GetDiceSteps() // 返回 5
 
 | State | 描述 | Phase 触发 |
 |-------|------|-----------|
-| TurnUpkeep | 回合准备：检查死亡/跳过、触发 BeforeTurn（Boss跳过） | PhaseBeforeTurn |
+| TurnUpkeep | 回合准备：检查死亡/跳过、触发 BeforeTurn（Boss跳过）、毒瘴恶性事件抽取 | PhaseBeforeTurn |
 | MainAction | 主要行动：等待骰子/道具/技能输入 | - |
 | TurnMoving | 移动处理：HSM 预扫描路径、迷途 Steps 修改、CheckPoint 拆分、FellDown | PhasePreMove (HSM 发布) |
 | TurnCheckpoint | CheckPoint 结算：DrawItemAction（宝箱道具） | - |
@@ -182,6 +182,20 @@ TurnEnd
 |-------|------|
 | WaitDecision | 等待决策：暂停当前状态，等待用户选择 |
 
+## decisionStateResetter 接口
+
+决策状态（TurnUpkeep、TurnLanded）缓存 pending decisions，在决策被解决后需要清理。`decisionStateResetter` 接口确保缓存被正确清空：
+
+```go
+type decisionStateResetter interface {
+    ResetPendingDecisions()
+}
+```
+
+- `TurnUpkeepState.ResetPendingDecisions()` - 清空缓存的 decisions 列表
+- `TurnLandedState.ResetPendingDecisions()` - 清空缓存的 decisions 列表
+- `HSM.OnUserChoice()` 在决策解决后调用 `clearResolvedDecisionFromState()`，同时清理 `StateContext.Decisions` 和状态内部的缓存
+
 ## Phase 触发机制
 
 设计原则：**谁产生时机，谁发布 Phase**
@@ -194,7 +208,33 @@ TurnEnd
 | PreMove | HSM | TurnMoving.Enter() |
 | PreEvent | Action | DrawEventAction.Execute() |
 | PreDamage | Action | DamageAction / BossDamageAction / BossAttackAction |
-| ItemUsed | Game | Game.UseItem() |
+| ItemUsed | Game | Game.UseItem() / MainAction.OnUseItem() |
+
+## 毒瘴(Poison)恶性事件处理
+
+TurnUpkeepState 在 BeforeTurn phase 触发后检查 `draw_bad_event` flag：
+
+```go
+// Step 5 in TurnUpkeepState.Enter()
+if triggerCtx.GetBoolOrDefault("draw_bad_event", false) {
+    drawAction := engineaction.NewDrawEventAction(player, "Poison_BadEvent")
+    actionCtx.SetCellDraw(0, 0, 1.0)  // 100% bad probability
+    actionCtx.ExecuteAction(drawAction)
+    if drawAction.DrawnType.IsValid() {
+        runEventEffect(drawAction.DrawnType, player, actionCtx)
+    }
+}
+```
+
+## OnUseItem 道具消耗流程
+
+MainActionState.OnUseItem 处理道具使用的完整流程：
+
+1. **Publish PhaseItemUsed** - 触发道具 Handler 执行
+2. **Execute decisions** - 立即执行 Handler 产生的 decisions
+3. **Run derived actions** - 执行 Handler 推送的 DerivedAction（如 DiceUpgradeAction）
+4. **Apply dice upgrade** - 读取 ActionContext metadata 更新 DiceManager
+5. **Consume item** - 追加 RemoveItemAction 消耗道具
 
 ## 与 Action 系统集成
 

@@ -251,7 +251,49 @@ func GetBuffDefinition(bt constants.BuffType) *core.BuffDefinition
 
 // 获取 HandlerConfig（来自 engine）
 func GetBuffHandlerConfig(bt constants.BuffType) *BuffHandlerConfig
+
+// internal/engine/event_registry.go
+type EventHandlerConfig struct {
+    Priority int            // 执行优先级
+    Handler  EffectHandler  // 定义在 engine 层
+}
+
+// internal/engine/item_registry.go
+type ItemHandlerConfig struct {
+    Phase       constants.Phase // 触发时机（PhaseItemUsed/PhaseOnLand/PhaseAnyTime）
+    Priority    int             // 执行优先级
+    NeedConfirm bool            // 是否需要用户确认
+    Handler     EffectHandler   // 定义在 engine 层
+}
 ```
+
+## Item 生命周期管理（在 engine 层）
+
+Item 的完整生命周期由 Game 层管理，与 Buff 生命周期类似：
+
+```go
+// Game.ApplyItemToPlayer 流程（添加Item + EventBus订阅）
+func (g *Game) ApplyItemToPlayer(player *core.Player, item *core.Item) error {
+    1. player.AddItem(item)           // 底层数据添加
+    2. g.SubscribeItem(player, item)  // 挂载到EventBus（按Phase注册）
+    return nil
+}
+
+// Game.RemoveItemFromPlayer 流程（EventBus取消订阅 + 数据移除）
+func (g *Game) RemoveItemFromPlayer(player *core.Player, item *core.Item) bool {
+    1. g.UnsubscribeItem(item)            // 取消EventBus订阅
+    2. player.RemoveItem(item.ID)         // 底层数据移除
+    return removed != nil
+}
+```
+
+**Item 生命周期与 Action 系统集成**：
+- `AddItemAction.Execute()` → 调用 `ctx.OnAddItem(player, item)` callback → `game.ApplyItemToPlayer`
+- `RemoveItemAction.Execute()` → 调用 `ctx.OnRemoveItem(player, itemType)` callback → 在 Inventory 中按 Type 查找 → `game.RemoveItemFromPlayer`
+- `DrawItemAction.Execute()` → 不再直接 AddItem，改为 `PushDerivedAction(AddItemAction)` 走完整生命周期
+- `MainActionState.OnUseItem()` → Handler 执行后追加 `RemoveItemAction` 消耗道具
+
+**Callback 注入**：OnAddItem/OnRemoveItem 由 HSM 层通过 `newActionContextWithPools` 注入到 ActionContext。
 
 ## 新增内容流程
 

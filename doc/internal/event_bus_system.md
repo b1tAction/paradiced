@@ -194,7 +194,7 @@ Buff 的生命周期 Phase（`PhasePostBuffApplied`、`PhasePreBuffRemoved`）�
 
 ```go
 // EffectHandler 是统一的效果处理函数签名
-// Handler 使用 ctx.SetInt/SetBool/SetString 信号意图，engine层通过Action执行
+// Handler 使用 ctx.AddDerivedAction() 推送具体Action，engine层通过ActionContext执行
 // 返回 error 用于错误向上传播至 HSM 层
 type EffectHandler func(phase constants.Phase, ctx *event.Context) error
 
@@ -205,6 +205,41 @@ GlobalBuffRegistry.RegisterBuff(&BuffDefinition{...}, &BuffHandlerConfig{
     NeedConfirm: false,
     Handler:     handleZhuQueFire,  // 朱雀离火：每4回合LP+1
 })
+```
+
+### DerivedAction 模式
+
+Event/Item Handler 通过 `ctx.AddDerivedAction()` 推送具体 Action 作为派生动作，而非设置 flag 等待 HSM 层处理。
+
+**模式优势**：
+1. **类型安全**：派生动作是具体 Action 类型，而非模糊的 flag
+2. **生命周期完整**：DerivedAction 走完整的 ExecuteAction 流程（PreTrigger/PostTrigger/LogEntry）
+3. **解耦**：Handler 不依赖 HSM 层读取 flag，Action 系统自行处理派生链路
+
+**示例**：
+
+```go
+// 遗物(Relic) Event Handler - 抽取道具
+func handleDrawItem(phase constants.Phase, ctx *event.Context) error {
+    // 直接推送 DrawItemAction，而非 ctx.SetBool("draw_item", true)
+    ctx.AddDerivedAction(engineaction.NewDrawItemAction(ctx.Player, "Event_Relic"))
+    return nil
+}
+
+// 交换(Exchange) Event Handler - 位置交换
+func handleSwapPosition(phase constants.Phase, ctx *event.Context) error {
+    // 推送两个 TeleportAction 实现位置交换
+    ctx.AddDerivedAction(engineaction.NewTeleportAction(ctx.Player, targetPos, "Event_Exchange"))
+    ctx.AddDerivedAction(engineaction.NewTeleportAction(targetPlayer, playerPos, "Event_Exchange"))
+    return nil
+}
+
+// 骰子升级(DiceUpgrade) Item Handler
+func handleDiceUpgrade(phase constants.Phase, ctx *event.Context) error {
+    fromDice := rng.DiceTypeFromString(currentDice)
+    ctx.AddDerivedAction(engineaction.NewDiceUpgradeAction(ctx.Player, "Item_DiceUpgrade", fromDice))
+    return nil
+}
 ```
 
 **Handler 使用示例**：
@@ -292,8 +327,7 @@ func handleZhuQueFire(phase constants.Phase, ctx *event.Context) {
 |------|-------|----------|-------------|------|
 | 反方向的钟 | AnyTime | 50 | true | 主动使用，需确认目标 |
 | 任意门 | OnLand | 60 | true | 落地后使用，需确认目标 |
-| 骰子交换 | AnyTime | 40 | true | 主动使用，需确认目标 |
-| 骰子升级卡 | BeforeTurn | 70 | true | 回合开始前，需确认 |
+| 骰子升级卡 | ItemUsed | 70 | true | 道具使用时触发，需确认 |
 
 ## 测试覆盖
 
@@ -369,6 +403,16 @@ const (
     ActionTeleport   ActionType = "teleport"    // 传送
     ActionStealBuff  ActionType = "steal_buff"  // 偷取Buff
     ActionFellDown   ActionType = "fell_down"   // Fragile坠落
+    ActionDrawItem   ActionType = "draw_item"   // 抽取道具
+    ActionDeath      ActionType = "death"       // 死亡
+    ActionBossDamage ActionType = "boss_damage" // 玩家攻击Boss
+    ActionBossAttack ActionType = "boss_attack" // Boss攻击玩家
+    ActionBossSkill  ActionType = "boss_skill"  // Boss技能
+    ActionDiceRoll   ActionType = "dice_roll"   // 骰子结果
+    ActionAddItem    ActionType = "add_item"    // 添加Item（含EventBus订阅）
+    ActionRemoveItem ActionType = "remove_item" // 移除Item（含EventBus取消订阅）
+    ActionDrawBuff   ActionType = "draw_buff"  // 随机抽取Buff
+    ActionDiceUpgrade ActionType = "dice_upgrade" // 骰子升级
 )
 ```
 

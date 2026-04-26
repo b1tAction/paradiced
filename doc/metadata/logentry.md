@@ -159,6 +159,31 @@ for (const entry of turnSync.entries) {
 | `skill_type` | string | 是 | 技能类型（"thunder"/"curse"/"lost"/"rest"） | 技能动画类型 |
 | `targets` | string | 是 | 目标玩家ID列表（逗号分隔） | 目标标识 |
 
+### draw_buff 类型
+
+| 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
+|------|------|------|------|-----------|
+| `buff_type` | string | 是（抽取成功时） | Buff类型标识 | 显示Buff获取动画 |
+
+### dice_upgrade 类型
+
+| 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
+|------|------|------|------|-----------|
+| `from_dice` | string | 是 | 原始骰子类型 | 显示升级起点 |
+| `to_dice` | string | 是 | 升级后骰子类型 | 显示升级终点 |
+
+### add_item 类型
+
+| 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
+|------|------|------|------|-----------|
+| `item_type` | string | 是 | 道具类型标识 | 显示道具获得动画 |
+
+### remove_item 类型
+
+| 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
+|------|------|------|------|-----------|
+| `item_type` | string | 是 | 道具类型标识 | 显示道具移除动画 |
+
 ### death 类型
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
@@ -213,6 +238,16 @@ interface LogEntry {
         // draw_event
         event_type?: string;
 
+        // draw_buff
+        buff_type?: string;
+
+        // dice_upgrade
+        from_dice?: string;
+        to_dice?: string;
+
+        // add_item / remove_item
+        item_type?: string;
+
         // draw_item
         item_type?: string;
 
@@ -255,6 +290,10 @@ interface LogEntry {
 | AddBuffAction | `buff_type`, `duration: duration` | `duration: 3` |
 | FellDownAction | `position`, `hp_change: -damage` | `hp_change: -10` |
 | DeathAction | `position`, `death_source` | `death_source: "Buff_Corrupt"` |
+| DrawBuffAction | `buff_type`（抽取成功时） | `buff_type: "divine"` |
+| DiceUpgradeAction | `from_dice`, `to_dice` | `from_dice: "silver", to_dice: "gold"` |
+| AddItemAction | `item_type` | `item_type: "reverse_clock"` |
+| RemoveItemAction | `item_type` | `item_type: "reverse_clock"` |
 
 ---
 
