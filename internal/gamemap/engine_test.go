@@ -623,3 +623,68 @@ func TestClone(t *testing.T) {
 		t.Error("original cell 15 should not be affected")
 	}
 }
+
+// ========== PathResult Getter Tests ==========
+
+func TestPathResultGetTargetIndex(t *testing.T) {
+	result := &PathResult{TargetIndex: 42}
+	if result.GetTargetIndex() != 42 {
+		t.Errorf("GetTargetIndex() = %d, want 42", result.GetTargetIndex())
+	}
+}
+
+func TestPathResultGetPath(t *testing.T) {
+	path := []int{0, 1, 2, 3, 4, 5}
+	result := &PathResult{Path: path}
+	got := result.GetPath()
+	if len(got) != len(path) {
+		t.Errorf("GetPath() length = %d, want %d", len(got), len(path))
+	}
+	for i, v := range got {
+		if v != path[i] {
+			t.Errorf("GetPath()[%d] = %d, want %d", i, v, path[i])
+		}
+	}
+}
+
+// ========== Import Tests ==========
+
+func TestMapEngineImport(t *testing.T) {
+	original := NewMapEngine(50)
+	original.SetCellType(10, constants.CellTypeFragile)
+	original.SetCellType(15, constants.CellTypeFog)
+	original.Cells[10].IsBroken = true
+
+	data, err := original.Export()
+	if err != nil {
+		t.Fatalf("Export failed: %v", err)
+	}
+
+	// Import into a fresh engine
+	loaded := NewMapEngine(1) // Start with length 1 (will be overwritten)
+	err = loaded.Import(data)
+	if err != nil {
+		t.Fatalf("Import failed: %v", err)
+	}
+
+	if loaded.Length != 50 {
+		t.Errorf("loaded.Length = %d, want 50", loaded.Length)
+	}
+	if loaded.Cells[10].CellType != constants.CellTypeFragile {
+		t.Error("loaded cell 10 should be Fragile")
+	}
+	if !loaded.Cells[10].IsBroken {
+		t.Error("loaded cell 10 should be broken")
+	}
+	if loaded.Cells[15].CellType != constants.CellTypeFog {
+		t.Error("loaded cell 15 should be Fog")
+	}
+}
+
+func TestMapEngineImportInvalidData(t *testing.T) {
+	engine := NewMapEngine(10)
+	err := engine.Import([]byte("invalid json"))
+	if err == nil {
+		t.Error("Import with invalid JSON should return error")
+	}
+}

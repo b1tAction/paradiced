@@ -249,3 +249,41 @@ func TestMockBroadcastAdapterMultipleCalls(t *testing.T) {
 		t.Errorf("mock.StateSyncs[4].Round = %d, want 5", mock.StateSyncs[4].Round)
 	}
 }
+
+func TestMockBroadcastAdapterStartGameAck(t *testing.T) {
+	mock := NewMockBroadcastAdapter()
+
+	ack := &StartGameAck{
+		MapConfig: MapConfig{
+			Length:     50,
+			StartIndex: 0,
+			EndIndex:   49,
+			Cells:      []MapCellConfig{{Index: 10, CellType: "fragile"}, {Index: 49, CellType: "boss"}},
+		},
+	}
+
+	err := mock.BroadcastStartGameAck(ack)
+	if err != nil {
+		t.Fatalf("BroadcastStartGameAck() error: %v", err)
+	}
+	if len(mock.StartGameAcks) != 1 {
+		t.Errorf("len(mock.StartGameAcks) = %d, want 1", len(mock.StartGameAcks))
+	}
+	if mock.StartGameAcks[0].MapConfig.Length != 50 {
+		t.Errorf("mock.StartGameAcks[0].MapConfig.Length = %d, want 50", mock.StartGameAcks[0].MapConfig.Length)
+	}
+}
+
+func TestMockBroadcastAdapterClearIncludingStartGameAck(t *testing.T) {
+	mock := NewMockBroadcastAdapter()
+
+	mock.BroadcastStartGameAck(&StartGameAck{})
+	if len(mock.StartGameAcks) != 1 {
+		t.Error("StartGameAcks should have 1 entry before Clear")
+	}
+
+	mock.Clear()
+	if len(mock.StartGameAcks) != 0 {
+		t.Errorf("len(mock.StartGameAcks) = %d after Clear, want 0", len(mock.StartGameAcks))
+	}
+}
