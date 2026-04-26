@@ -6,6 +6,7 @@ import (
 
 	"github.com/b1tAction/paradiced/internal/core"
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
+	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/b1tAction/paradiced/pkg/rng"
@@ -856,6 +857,84 @@ func TestGetBossSkillPool(t *testing.T) {
 	pool := GlobalBossRegistry.GetBossSkillPool()
 	if len(pool) == 0 {
 		t.Error("GetBossSkillPool should return non-empty pool")
+	}
+}
+
+// ========== Boss Skill Handler Closure Tests ==========
+
+func TestBossSkillThunderHandler(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	game.InitializeBoss(19)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+
+	handlerConfig := GlobalBossRegistry.GetBossSkillHandler(constants.BossSkillThunder)
+	err := handlerConfig.Handler(game, actionCtx, []*core.Player{player})
+	if err != nil {
+		t.Errorf("Thunder handler error: %v", err)
+	}
+
+	// Thunder should push BossAttackAction for each target
+	if actionCtx.ActionQueue.Len() != 1 {
+		t.Errorf("Thunder should push 1 derived action, got %d", actionCtx.ActionQueue.Len())
+	}
+}
+
+func TestBossSkillCurseHandler(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	game.InitializeBoss(19)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+
+	handlerConfig := GlobalBossRegistry.GetBossSkillHandler(constants.BossSkillCurse)
+	err := handlerConfig.Handler(game, actionCtx, []*core.Player{player})
+	if err != nil {
+		t.Errorf("Curse handler error: %v", err)
+	}
+
+	// Curse should push AddBuffAction(Curse) for each target
+	if actionCtx.ActionQueue.Len() != 1 {
+		t.Errorf("Curse should push 1 derived action, got %d", actionCtx.ActionQueue.Len())
+	}
+}
+
+func TestBossSkillRestHandler(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	game.InitializeBoss(19)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+
+	handlerConfig := GlobalBossRegistry.GetBossSkillHandler(constants.BossSkillRest)
+	err := handlerConfig.Handler(game, actionCtx, nil)
+	if err != nil {
+		t.Errorf("Rest handler error: %v", err)
+	}
+
+	// Rest should push HealAction(boss, 20)
+	if actionCtx.ActionQueue.Len() != 1 {
+		t.Errorf("Rest should push 1 derived action, got %d", actionCtx.ActionQueue.Len())
+	}
+}
+
+func TestBossSkillThornsHandler(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	game.InitializeBoss(19)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+
+	handlerConfig := GlobalBossRegistry.GetBossSkillHandler(constants.BossSkillThorns)
+	err := handlerConfig.Handler(game, actionCtx, nil)
+	if err != nil {
+		t.Errorf("Thorns handler error: %v", err)
+	}
+
+	// Thorns should push AddBuffAction(Thorns) on boss
+	if actionCtx.ActionQueue.Len() != 1 {
+		t.Errorf("Thorns should push 1 derived action, got %d", actionCtx.ActionQueue.Len())
 	}
 }
 

@@ -842,3 +842,16 @@ func TestStateRoundMiniGame_ExitBroadcastsResultWithDisplayNameOnly(t *testing.T
 		}
 	}
 }
+
+// ========== GameOverState.Exit Tests ==========
+
+func TestGameOverStateExit(t *testing.T) {
+	state := NewGameOverState()
+	state.winner = core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+
+	state.Exit(nil)
+
+	if state.winner != nil {
+		t.Error("GameOverState.Exit should clear winner")
+	}
+}

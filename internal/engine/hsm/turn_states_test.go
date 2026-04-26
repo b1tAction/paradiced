@@ -1025,3 +1025,24 @@ func TestTurnMovingStateGetStepsSetSteps(t *testing.T) {
 		t.Errorf("GetSteps() after SetSteps(-3) = %d, want -3", state.GetSteps())
 	}
 }
+
+// ========== TurnCheckpointState.Exit Tests ==========
+
+func TestTurnCheckpointStateExit(t *testing.T) {
+	state := NewTurnCheckpointState()
+	state.actionCtx = engineaction.NewActionContext(nil, nil, nil, nil)
+	state.actionCtx.Metadata.SetBool("test_key", true)
+
+	state.Exit(nil)
+
+	// Exit should clear the actionCtx
+	if state.actionCtx.Metadata.HasKey("test_key") {
+		t.Error("TurnCheckpointState.Exit should clear actionCtx")
+	}
+}
+
+func TestTurnCheckpointStateExitNilActionCtx(t *testing.T) {
+	state := NewTurnCheckpointState()
+	// actionCtx is nil by default - Exit should not panic
+	state.Exit(nil)
+}
