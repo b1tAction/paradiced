@@ -61,10 +61,13 @@ type TurnSegment struct {
 
 ```go
 type GameLog struct {
-    segments []*TurnSegment
-    current  *TurnSegment  // 当前回合分段
+    segments           []*TurnSegment
+    current            *TurnSegment  // 当前回合分段
+    lastBroadcastIndex int           // 跟踪已通过 StateSync 广播的 LogEntry 索引
 }
 ```
+
+`lastBroadcastIndex` 用于增量广播机制：每次 `BuildStateSync()` 调用 `GetNewEntries()` 获取新增 LogEntry，然后通过 `MarkBroadcasted()` 更新索引。
 
 ## 关键方法
 
@@ -72,7 +75,7 @@ type GameLog struct {
 // 创建日志
 log := gamelog.NewGameLog()
 
-// 开始回合
+// 开始回合（重置广播索引）
 log.StartTurn(round, turn, playerID)
 
 // 添加日志条目（由 Action 系统自动调用）
@@ -89,6 +92,11 @@ json, err := log.ToJSON()
 
 // 快捷方法
 log.LogStateTransition(from, to, playerID)
+
+// 增量广播相关
+entries := log.GetNewEntries()           // 获取自上次广播以来的新增 LogEntry
+log.MarkBroadcasted()                    // 标记当前 LogEntry 已广播
+allEntries := log.GetAllCurrentEntries() // 获取当前回合全部 LogEntry（用于断线重连）
 ```
 
 ## 使用示例
@@ -175,8 +183,10 @@ func (ctx *ActionContext) ExecuteAction(action Action) error {
 1. **单一日志源** - Game 持有唯一的 GameLog 实例
 2. **分段存储** - 按 Round/Turn 分段，便于 Client 按回合回放
 3. **Action 集成** - 所有游戏效果通过 Action 系统，自动生成日志
-4. **类型安全** - 使用 util.Metadata 存储元数据，支持类型安全访问
-5. **snake_case 命名** - ActionType 使用 snake_case，符合 JSON 常规命名习惯
+4. **增量广播** - `GetNewEntries()` + `MarkBroadcasted()` 支持 StateSync 增量同步，避免重复发送已广播的 LogEntry
+5. **断线重连** - `GetAllCurrentEntries()` 返回当前回合全部 LogEntry，用于 FullSync
+6. **类型安全** - 使用 util.Metadata 存储元数据，支持类型安全访问
+7. **snake_case 命名** - ActionType 使用 snake_case，符合 JSON 常规命名习惯
 
 ## Metadata 契约
 

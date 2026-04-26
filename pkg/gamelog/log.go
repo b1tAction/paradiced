@@ -8,9 +8,10 @@ import (
 // GameLog is the unified game event log for client playback.
 // It maintains a list of turn segments, each containing events for one turn.
 type GameLog struct {
-	mutex    sync.RWMutex
-	segments []*TurnSegment
-	current  *TurnSegment // Current turn segment (nil if no turn active)
+	mutex              sync.RWMutex
+	segments           []*TurnSegment
+	current            *TurnSegment // Current turn segment (nil if no turn active)
+	lastBroadcastIndex int          // Tracks which entries have been broadcast via StateSync
 }
 
 // NewGameLog creates a new empty game log.
@@ -35,6 +36,8 @@ func (l *GameLog) StartTurn(round, turn int, playerID string) {
 	// Create new segment
 	l.current = NewTurnSegment(round, turn, playerID)
 	l.segments = append(l.segments, l.current)
+	// Reset broadcast index for new turn
+	l.lastBroadcastIndex = 0
 }
 
 // EndTurn ends the current turn segment.
@@ -139,4 +142,46 @@ func (l *GameLog) IsTurnActive() bool {
 	l.mutex.RLock()
 	defer l.mutex.RUnlock()
 	return l.current != nil
+}
+
+// GetNewEntries returns entries added since the last broadcast.
+// Used by StateSync to include incremental LogEntry data.
+func (l *GameLog) GetNewEntries() []LogEntry {
+	l.mutex.RLock()
+	defer l.mutex.RUnlock()
+
+	if l.current == nil {
+		return nil
+	}
+	if l.lastBroadcastIndex >= len(l.current.Entries) {
+		return nil
+	}
+	result := make([]LogEntry, len(l.current.Entries)-l.lastBroadcastIndex)
+	copy(result, l.current.Entries[l.lastBroadcastIndex:])
+	return result
+}
+
+// MarkBroadcasted marks all current entries as broadcasted.
+// Should be called after GetNewEntries to update the tracking index.
+func (l *GameLog) MarkBroadcasted() {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	if l.current != nil {
+		l.lastBroadcastIndex = len(l.current.Entries)
+	}
+}
+
+// GetAllCurrentEntries returns all entries for the current turn.
+// Used by FullSync to send complete turn data to reconnecting players.
+func (l *GameLog) GetAllCurrentEntries() []LogEntry {
+	l.mutex.RLock()
+	defer l.mutex.RUnlock()
+
+	if l.current == nil {
+		return nil
+	}
+	result := make([]LogEntry, len(l.current.Entries))
+	copy(result, l.current.Entries)
+	return result
 }
