@@ -266,6 +266,10 @@ type RankingEntry struct {
 
 	// Rank is the player's ranking (1-4).
 	Rank int `json:"rank"`
+
+	// GameData contains the original mini-game data submitted by the player.
+	// Enables client to render game-specific details (e.g. dice values, elapsed time).
+	GameData map[string]interface{} `json:"game_data,omitempty"`
 }
 
 // GameOver represents game end notification.

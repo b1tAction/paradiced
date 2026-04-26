@@ -753,3 +753,104 @@ func TestMiniGameConnJSON(t *testing.T) {
 		t.Errorf("parsed.Token = %s, want token-xyz789", parsed.Token)
 	}
 }
+
+func TestRankingEntryWithGameData(t *testing.T) {
+	entry := RankingEntry{
+		PlayerID:    "player-001",
+		DisplayName: "Alice",
+		Rank:        1,
+		GameData: map[string]interface{}{
+			"dice1": 3,
+			"dice2": 5,
+			"score": 8,
+		},
+	}
+
+	jsonBytes, err := json.Marshal(entry)
+	if err != nil {
+		t.Fatalf("json.Marshal() error: %v", err)
+	}
+
+	jsonStr := string(jsonBytes)
+
+	// Verify game_data field is present with correct content
+	if !strings.Contains(jsonStr, `"game_data"`) {
+		t.Error("JSON should contain 'game_data' field when GameData is populated")
+	}
+	if !strings.Contains(jsonStr, `"dice1"`) {
+		t.Error("JSON game_data should contain 'dice1' key")
+	}
+	if !strings.Contains(jsonStr, `"score"`) {
+		t.Error("JSON game_data should contain 'score' key")
+	}
+	if !strings.Contains(jsonStr, `"display_name":"Alice"`) {
+		t.Error("JSON should contain display_name: Alice")
+	}
+
+	// Roundtrip: unmarshal and verify GameData content
+	var parsed RankingEntry
+	err = json.Unmarshal(jsonBytes, &parsed)
+	if err != nil {
+		t.Fatalf("json.Unmarshal() error: %v", err)
+	}
+	if parsed.PlayerID != "player-001" {
+		t.Errorf("parsed.PlayerID = %s, want player-001", parsed.PlayerID)
+	}
+	if parsed.DisplayName != "Alice" {
+		t.Errorf("parsed.DisplayName = %s, want Alice", parsed.DisplayName)
+	}
+	if parsed.Rank != 1 {
+		t.Errorf("parsed.Rank = %d, want 1", parsed.Rank)
+	}
+	if parsed.GameData == nil {
+		t.Fatal("parsed.GameData should not be nil")
+	}
+	dice1, ok := parsed.GameData["dice1"]
+	if !ok {
+		t.Error("parsed.GameData should contain 'dice1' key")
+	}
+	// JSON numbers unmarshal as float64 by default
+	if dice1 != float64(3) {
+		t.Errorf("parsed.GameData['dice1'] = %v, want 3", dice1)
+	}
+	score, ok := parsed.GameData["score"]
+	if !ok {
+		t.Error("parsed.GameData should contain 'score' key")
+	}
+	if score != float64(8) {
+		t.Errorf("parsed.GameData['score'] = %v, want 8", score)
+	}
+}
+
+func TestRankingEntryGameDataOmitempty(t *testing.T) {
+	// RankingEntry without GameData — field should be omitted in JSON
+	entry := RankingEntry{
+		PlayerID:    "player-001",
+		DisplayName: "Bob",
+		Rank:        2,
+		GameData:    nil,
+	}
+
+	jsonBytes, err := json.Marshal(entry)
+	if err != nil {
+		t.Fatalf("json.Marshal() error: %v", err)
+	}
+
+	jsonStr := string(jsonBytes)
+	if strings.Contains(jsonStr, `"game_data"`) {
+		t.Errorf("JSON should NOT contain 'game_data' field when nil (omitempty), got: %s", jsonStr)
+	}
+
+	// Roundtrip: unmarshal and verify GameData is nil
+	var parsed RankingEntry
+	err = json.Unmarshal(jsonBytes, &parsed)
+	if err != nil {
+		t.Fatalf("json.Unmarshal() error: %v", err)
+	}
+	if parsed.GameData != nil {
+		t.Errorf("parsed.GameData should be nil, got: %v", parsed.GameData)
+	}
+	if parsed.DisplayName != "Bob" {
+		t.Errorf("parsed.DisplayName = %s, want Bob", parsed.DisplayName)
+	}
+}
