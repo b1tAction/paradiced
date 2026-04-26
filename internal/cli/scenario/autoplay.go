@@ -429,6 +429,18 @@ func (p *AutoPlayPlayer) handleStateSync(ctx context.Context, data []byte) {
 		"current_player_id", stateSync.CurrentPlayerID,
 		"players", len(stateSync.Players),
 		"my_player_id", p.playerID)
+
+	// When in RoundEndWait state, auto-send RoundReady signal
+	// (client would send this after finishing rendering; autoplay sends immediately)
+	if stateSync.GlobalState == "RoundEndWait" {
+		p.logger.Info("Auto strategy: send round ready")
+		if err := p.socket.SendMessage(ctx, nakama.OpRoundReady, model.RoundReady{}); err != nil {
+			p.logger.Error("Failed to send RoundReady", "error", err)
+			p.mu.Lock()
+			p.lastErr = err
+			p.mu.Unlock()
+		}
+	}
 }
 
 func (p *AutoPlayPlayer) handleAvailable(ctx context.Context, data []byte) {
@@ -636,6 +648,17 @@ func (p *AutoPlayPlayer) handleFullSync(ctx context.Context, data []byte) {
 		"turn", stateSync.TurnState,
 		"round", stateSync.Round,
 		"players", len(stateSync.Players))
+
+	// When in RoundEndWait state, auto-send RoundReady signal (same as handleStateSync)
+	if stateSync.GlobalState == "RoundEndWait" {
+		p.logger.Info("Auto strategy: send round ready (from FullSync)")
+		if err := p.socket.SendMessage(ctx, nakama.OpRoundReady, model.RoundReady{}); err != nil {
+			p.logger.Error("Failed to send RoundReady", "error", err)
+			p.mu.Lock()
+			p.lastErr = err
+			p.mu.Unlock()
+		}
+	}
 }
 
 func (p *AutoPlayPlayer) handleActionRejected(ctx context.Context, data []byte) {

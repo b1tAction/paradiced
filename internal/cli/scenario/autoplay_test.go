@@ -847,3 +847,96 @@ func TestAutoPlayPlayerConcurrentAccess(t *testing.T) {
 		t.Errorf("MessagesReceived = %d, expected 5", player.MessagesReceived())
 	}
 }
+
+// ========== RoundEndWait Tests ==========
+
+func TestHandleStateSyncRoundEndWait(t *testing.T) {
+	mockSocket := NewMockSocketClient()
+	logger := nakama.NewLogger(false)
+	player := NewAutoPlayPlayerStandalone(mockSocket, "player-001", logger)
+
+	// Simulate StateSync with RoundEndWait global state
+	stateSync := model.StateSync{
+		GlobalState: "RoundEndWait",
+		TurnState:   "",
+		Round:       1,
+		Players: []model.Player{
+			{PlayerID: "player-001", Faction: "qing_long"},
+		},
+	}
+
+	ctx := context.Background()
+	data, _ := json.Marshal(stateSync)
+	player.handleStateSync(ctx, data)
+
+	// Verify globalState updated
+	if player.GlobalState() != "RoundEndWait" {
+		t.Errorf("GlobalState = %s, expected RoundEndWait", player.GlobalState())
+	}
+
+	// Verify OpRoundReady was sent
+	sent := mockSocket.GetSentMessages()
+	if len(sent) != 1 {
+		t.Fatalf("Sent messages count = %d, expected 1", len(sent))
+	}
+	if sent[0].opCode != nakama.OpRoundReady {
+		t.Errorf("OpCode = %d, expected OpRoundReady (%d)", sent[0].opCode, nakama.OpRoundReady)
+	}
+}
+
+func TestHandleStateSyncRoundEndWaitNotTriggeredForOtherStates(t *testing.T) {
+	mockSocket := NewMockSocketClient()
+	logger := nakama.NewLogger(false)
+	player := NewAutoPlayPlayerStandalone(mockSocket, "player-001", logger)
+
+	// Simulate StateSync with turn_loop (not round_end_wait)
+	stateSync := model.StateSync{
+		GlobalState:     "turn_loop",
+		TurnState:       "main_action",
+		CurrentPlayerID: "player-001",
+		Round:           1,
+		Players: []model.Player{
+			{PlayerID: "player-001", Faction: "qing_long"},
+		},
+	}
+
+	ctx := context.Background()
+	data, _ := json.Marshal(stateSync)
+	player.handleStateSync(ctx, data)
+
+	// Verify no OpRoundReady was sent
+	sent := mockSocket.GetSentMessages()
+	if len(sent) != 0 {
+		t.Errorf("Sent messages count = %d, expected 0 (no RoundReady for non-round_end_wait)", len(sent))
+	}
+}
+
+func TestHandleFullSyncRoundEndWait(t *testing.T) {
+	mockSocket := NewMockSocketClient()
+	logger := nakama.NewLogger(false)
+	player := NewAutoPlayPlayerStandalone(mockSocket, "player-001", logger)
+
+	// Simulate FullSync with RoundEndWait global state
+	stateSync := model.StateSync{
+		GlobalState: "RoundEndWait",
+		Round:       2,
+	}
+
+	ctx := context.Background()
+	data, _ := json.Marshal(stateSync)
+	player.handleFullSync(ctx, data)
+
+	// Verify globalState updated
+	if player.GlobalState() != "RoundEndWait" {
+		t.Errorf("GlobalState = %s, expected RoundEndWait", player.GlobalState())
+	}
+
+	// Verify OpRoundReady was sent
+	sent := mockSocket.GetSentMessages()
+	if len(sent) != 1 {
+		t.Fatalf("Sent messages count = %d, expected 1", len(sent))
+	}
+	if sent[0].opCode != nakama.OpRoundReady {
+		t.Errorf("OpCode = %d, expected OpRoundReady (%d)", sent[0].opCode, nakama.OpRoundReady)
+	}
+}

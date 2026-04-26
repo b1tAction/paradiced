@@ -198,6 +198,16 @@ func (p *InteractivePlayer) handleStateSync(ctx context.Context, data []byte) {
 	}
 	p.mu.Unlock()
 
+	// When in RoundEndWait state, auto-send RoundReady signal
+	// (client would send this after finishing rendering; CLI sends immediately)
+	if stateSync.GlobalState == "RoundEndWait" {
+		p.logger.Info("Sending RoundReady (round end wait)")
+		if err := p.socket.SendMessage(ctx, nakama.OpRoundReady, model.RoundReady{}); err != nil {
+			p.logger.Error("Failed to send RoundReady", "error", err)
+			p.uiAdapter.OnError(err)
+		}
+	}
+
 	// Notify UI
 	p.uiAdapter.OnStateSync(ctx, &stateSync)
 
@@ -331,6 +341,15 @@ func (p *InteractivePlayer) handleFullSync(ctx context.Context, data []byte) {
 	p.globalState = stateSync.GlobalState
 	p.stateSync = &stateSync
 	p.mu.Unlock()
+
+	// When in RoundEndWait state, auto-send RoundReady signal (same as handleStateSync)
+	if stateSync.GlobalState == "RoundEndWait" {
+		p.logger.Info("Sending RoundReady (round end wait, from FullSync)")
+		if err := p.socket.SendMessage(ctx, nakama.OpRoundReady, model.RoundReady{}); err != nil {
+			p.logger.Error("Failed to send RoundReady", "error", err)
+			p.uiAdapter.OnError(err)
+		}
+	}
 
 	p.uiAdapter.OnFullSync(ctx, &stateSync)
 

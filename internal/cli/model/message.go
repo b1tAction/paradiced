@@ -139,6 +139,10 @@ type PlayerStats struct {
 // RollDice represents a dice roll request (client -> server).
 type RollDice struct{}
 
+// RoundReady represents a round-ready signal (client -> server).
+// Sent after client finishes rendering current round when in RoundEndWait state.
+type RoundReady struct{}
+
 // UseItem represents an item usage request.
 type UseItem struct {
 	ItemID   string `json:"item_id"`

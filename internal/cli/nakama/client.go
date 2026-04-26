@@ -411,6 +411,7 @@ const (
 	OpUserChoice           int64 = 103
 	OpMiniGameResultSubmit int64 = 104
 	OpStartGame            int64 = 105
+	OpRoundReady           int64 = 106 // Client signals ready for next round after RoundEndWait
 )
 
 // IClient interface for both Nakama and Standalone clients.
