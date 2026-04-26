@@ -164,6 +164,7 @@ func (a *NakamaBroadcastAdapter) BroadcastMiniGameStart(start *net.MiniGameStart
 func (a *NakamaBroadcastAdapter) BroadcastMiniGameResult(result *net.MiniGameResult) error
 func (a *NakamaBroadcastAdapter) BroadcastGameOver(over *net.GameOver) error
 func (a *NakamaBroadcastAdapter) SendFullSync(playerID string, state *net.StateSync, turn *net.TurnSync) error
+func (a *NakamaBroadcastAdapter) BroadcastStartGameAck(ack *net.StartGameAck) error
 ```
 
 ### HSM 集成
@@ -209,8 +210,10 @@ func (h *NakamaMatchHandler) HandleMessage(sender string, data []byte) error {
         return h.handleUseSkill(sender)
     case strconv.FormatInt(int64(net.OpUserChoice), 10):
         return h.handleUserChoice(sender, data)
-    case strconv.FormatInt(int64(net.OpMiniGameResultSubmit), 10):
-        return h.handleMiniGameResult(sender, data)
+    case strconv.FormatInt(int64(net.OpMiniGameDataSubmit), 10):
+        return h.handleMiniGameDataSubmit(sender, data)
+    case strconv.FormatInt(int64(net.OpRoundReady), 10):
+        return h.handleRoundReady(sender)
     default:
         return nil // 未知 OpCode 忽略
     }
@@ -259,7 +262,7 @@ func (h *NakamaMatchHandler) handleRollDice(sender string) error {
 
 【RoundMiniGame】
 → 广播 MiniGameStart
-→ 等待所有玩家提交排名
+→ 等待所有玩家提交 MiniGameDataSubmit（客户端提交 game_data，服务器计算排名）
 → MiniGameResult 广播
 
 【RoundPrep】

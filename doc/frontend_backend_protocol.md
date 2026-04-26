@@ -20,6 +20,7 @@
 | 8 | `OpFullSync` | FullSync | 玩家断线重连 |
 | 9 | `OpActionRejected` | ActionRejected | 玩家操作被拒绝 |
 | 10 | `OpWaitingSync` | WaitingSync | 等待房间玩家变更 |
+| 11 | `OpStartGameAck` | StartGameAck | 主机开始游戏后广播地图配置 |
 
 ### Client → Server (100+)
 
@@ -29,8 +30,9 @@
 | 101 | `OpUseItem` | UseItem | 玩家使用道具 |
 | 102 | `OpUseSkill` | UseSkill | 玩家使用阵营技能 |
 | ~~103~~ | ~~`OpUserChoice`~~ | ~~UserChoice~~ | ~~玩家回复决策选择~~ |
-| 104 | `OpMiniGameResultSubmit` | MiniGameResultSubmit | 小游戏排名提交 |
+| 107 | `OpMiniGameDataSubmit` | MiniGameDataSubmit | 小游戏数据提交（服务器计算排名） |
 | 105 | `OpStartGame` | StartGame | 主机请求开始游戏 |
+| 106 | `OpRoundReady` | RoundReady | 客户端完成当前回合渲染，准备下一回合 |
 
 ---
 
@@ -60,6 +62,7 @@ interface StateSync {
 | `waiting_for_host` | 等待主机开始 | 显示等待房间 UI |
 | `round_mini_game` | 小游戏阶段 | 显示小游戏界面 |
 | `round_prep` | 回合准备 | 显示骰子分配结果 |
+| `round_end_wait` | 回合结束等待 | 等待所有玩家发送 OpRoundReady |
 | `turn_loop` | 回合循环 | 显示回合 UI |
 | `boss_battle` | Boss 战 | 显示 Boss 战界面 |
 | `game_over` | 游戏结束 | 显示结算界面 |
@@ -237,16 +240,29 @@ interface Option {
 
 ```typescript
 interface MiniGameStart {
-    game_type: string;  // 小游戏类型标识
-    players: string[];  // 参赛玩家 ID 列表
+    game_type: string;              // 小游戏类型标识
+    players: string[];              // 参赛玩家 ID 列表
+    connection?: MiniGameConn;      // 小游戏服务连接信息（前端模式为 undefined）
+}
+
+interface MiniGameConn {
+    url: string;     // 小游戏服务 WebSocket URL
+    room_id: string; // Colyseus 房间 ID
+    token: string;   // 认证 Token
 }
 ```
 
-**game_type 可选值**：
+**game_type 可选值与排名规则**：
 
-| 值 | 含义 |
-|----|------|
-| `dice_race` | 骰子竞速小游戏 |
+| 值 | 含义 | game_data 格式 | 排名规则 |
+|----|------|----------------|----------|
+| `dice_race` | 投骰比大小 | `{ dice1: number, dice2: number, score: dice1+dice2 }` | score 降序（越大越好） |
+| `count_seconds` | 计秒小游戏 | `{ elapsed: number, deviation: \|elapsed-5.0\| }` | deviation 升序（越接近5秒越好） |
+| `coin_flip` | 翻硬币 | 未实现，暂不可用 | - |
+
+**connection 说明**：
+- `connection` 为 `undefined` 表示前端驱动模式（Frontend）：客户端在本地运行小游戏，完成后提交 `game_data`
+- `connection` 非 `undefined` 表示 RPC 模式：客户端连接到 Colyseus 小游戏服务，服务端直接上报排名
 
 ---
 
@@ -258,8 +274,9 @@ interface MiniGameResult {
 }
 
 interface RankingEntry {
-    player_id: string; // 玩家 ID
-    rank: number;      // 排名 (1-4)
+    player_id: string;    // 玩家 ID
+    display_name: string; // 用户显示名称（fallback: player_id）
+    rank: number;         // 排名 (1-4)
 }
 ```
 
@@ -389,13 +406,27 @@ interface UserChoice {
 
 ---
 
-### 3.5 MiniGameResultSubmit（小游戏排名提交）
+### 3.5 MiniGameDataSubmit（小游戏数据提交）
+
+**用途**：客户端提交小游戏原始数据（score/time 等），服务器根据 `game_type` 的排名规则计算排名。
 
 ```typescript
-interface MiniGameResultSubmit {
-    rank: number; // 玩家自己的排名 (1-4)
+interface MiniGameDataSubmit {
+    game_type: string;               // 小游戏类型（必须匹配 MiniGameStart.game_type）
+    game_data: Record<string, any>;  // 原始小游戏数据
 }
 ```
+
+**各 game_type 的 game_data 格式**：
+
+| game_type | game_data 字段 | 说明 |
+|-----------|----------------|------|
+| `dice_race` | `{ dice1: number, dice2: number, score: dice1+dice2 }` | 两骰之和，score 降序排名 |
+| `count_seconds` | `{ elapsed: number, deviation: \|elapsed-5.0\| }` | 计秒偏差，deviation 升序排名 |
+
+**与旧 MiniGameResultSubmit 的区别**：
+- 旧方案：客户端提交 `rank`（排名），服务器直接使用
+- 新方案：客户端提交 `game_data`（原始数据），服务器通过 `RankCalculator` 计算排名
 
 ---
 
@@ -404,6 +435,16 @@ interface MiniGameResultSubmit {
 ```typescript
 interface StartGame {
     // 空结构，服务器验证主机身份和最小玩家数
+}
+```
+
+---
+
+### 3.7 RoundReady（回合就绪信号）
+
+```typescript
+interface RoundReady {
+    // 空结构，客户端完成当前回合渲染后发送
 }
 ```
 
@@ -753,16 +794,20 @@ interface LogEntry {
 
 ---
 
-#### OpMiniGameResultSubmit (104)
+#### OpMiniGameDataSubmit (107)
 
-**发送时机**：小游戏结束后，客户端计算出排名时
+**发送时机**：小游戏完成后，客户端提交 game_data 时
 
 **前置条件**：
 1. 当前状态为 `RoundMiniGame`
-2. 小游戏已完成
+2. 小游戏已完成（客户端已收集 game_data）
+
+**game_data 格式**：
+- `dice_race`: `{ dice1: number, dice2: number, score: dice1+dice2 }`
+- `count_seconds`: `{ elapsed: number, deviation: |elapsed-5.0| }`
 
 **服务器响应**：
-- 成功：等待所有玩家提交后进入 `RoundPrep`
+- 成功：等待所有玩家提交后，服务器通过 RankCalculator 计算排名 → 进入 `RoundPrep`
 - 失败：发送 `OpActionRejected`
 
 ---
@@ -811,6 +856,19 @@ interface LogEntry {
 
 ---
 
+#### OpRoundReady (106)
+
+**发送时机**：客户端完成当前回合动画渲染后，通知服务器准备进入下一回合
+
+**前置条件**：
+1. 当前全局状态为 `RoundEndWait`
+
+**服务器响应**：
+- 成功：等待所有玩家发送就绪信号后，进入下一回合 `RoundMiniGame`
+- 失败：发送 `OpActionRejected`（`invalid_state`）
+
+---
+
 ### 6.3 消息时序图
 
 #### 游戏启动流程
@@ -834,11 +892,11 @@ interface LogEntry {
      |                        |
      |<== 小游戏执行 ==>       |
      |                        |
-     |--- OpMiniGameResultSubmit -->| (每个玩家发送)
+     |--- OpMiniGameDataSubmit -->| (每个玩家提交 game_data)
      |                        |
      |<== 等待所有玩家提交 ==>  |
      |                        |
-     |<-- OpMiniGameResult ---| (广播排名)
+     |<-- OpMiniGameResult ---| (服务器计算排名后广播)
      |                        |
      |<-- OpStateSync --------| (RoundPrep完成)
      |                        |
@@ -887,6 +945,7 @@ interface LogEntry {
 | `waiting_for_host` | 等待房间界面，显示玩家列表、等待主机开始 |
 | `round_mini_game` | 小游戏界面，根据 `game_type` 加载 |
 | `round_prep` | 回合准备界面，显示骰子分配结果 |
+| `round_end_wait` | 等待界面，等待所有玩家就绪后进入下一回合 |
 | `turn_loop` | 回合循环界面，显示地图和玩家位置 |
 | `game_over` | 结算界面，显示胜利者和统计数据 |
 
@@ -896,6 +955,8 @@ interface LogEntry {
 | `main_action` | 操作面板（投骰子、道具、技能按钮），等待当前玩家操作 |
 | `turn_moving` | 移动动画播放中 |
 | `turn_landed` | 落地效果动画 |
+| `turn_draw` | 抽取事件/道具动画 |
+| `turn_boss_battle` | Boss 战斗动画 |
 | `turn_event` | 事件卡片显示 |
 | `turn_end` | 回合结束动画（Buff 消耗、甘霖/腐化触发） |
 
@@ -919,8 +980,9 @@ interface LogEntry {
 ┌─────────────────────────────────────────────────────────────┐
 │                    RoundMiniGame                             │
 │  广播 MiniGameStart                                          │
-│  等待所有玩家提交 MiniGameResultSubmit                         │
-│  清空 RoundData                                              │
+│  等待所有玩家提交 MiniGameDataSubmit                           │
+│  服务器通过 RankCalculator 计算排名                            │
+│  广播 MiniGameResult                                         │
 └───────────────────────┬─────────────────────────────────────┘
                         ↓
 ┌─────────────────────────────────────────────────────────────┐
@@ -1000,14 +1062,16 @@ enum OpCode {
     FullSync = 8,
     ActionRejected = 9,
     WaitingSync = 10,
+    StartGameAck = 11,
 
     // Client → Server
     RollDice = 100,
     UseItem = 101,
     UseSkill = 102,
     UserChoice = 103,
-    MiniGameResultSubmit = 104,
+    MiniGameDataSubmit = 107,
     StartGame = 105,
+    RoundReady = 106,
 }
 
 // ========== 数据结构 ==========
@@ -1080,6 +1144,13 @@ interface Option {
 interface MiniGameStart {
     game_type: string;
     players: string[];
+    connection?: MiniGameConn;
+}
+
+interface MiniGameConn {
+    url: string;
+    room_id: string;
+    token: string;
 }
 
 interface MiniGameResult {
@@ -1088,6 +1159,7 @@ interface MiniGameResult {
 
 interface RankingEntry {
     player_id: string;
+    display_name: string;
     rank: number;
 }
 
@@ -1123,6 +1195,7 @@ interface WaitingSync {
 
 interface WaitingPlayer {
     user_id: string;
+    display_name: string;
     faction: string;
     is_host: boolean;
 }
@@ -1130,6 +1203,10 @@ interface WaitingPlayer {
 interface FullSync {
     state: StateSync;
     turn: TurnSync;
+}
+
+interface StartGameAck {
+    map_config: MapConfig;
 }
 
 // ========== LogEntry ==========
@@ -1181,11 +1258,14 @@ interface UserChoice {
     choice: number;
 }
 
-interface MiniGameResultSubmit {
-    rank: number;
+interface MiniGameDataSubmit {
+    game_type: string;
+    game_data: Record<string, any>;
 }
 
 interface StartGame {}
+
+interface RoundReady {}
 ```
 
 ---

@@ -61,7 +61,7 @@
 | 101 | `OpUseItem` | `UseItem` | 使用道具 |
 | 102 | `OpUseSkill` | `UseSkill` | 使用阵营技能 |
 | 103 | `OpUserChoice` | `UserChoice` | 决策选择回复 |
-| 104 | `OpMiniGameResultSubmit` | `MiniGameResultSubmit` | 小游戏排名提交 |
+| 104 | `OpMiniGameDataSubmit` | `MiniGameDataSubmit` | 小游戏数据提交（服务器计算排名） |
 
 ## 核心数据结构
 
@@ -216,14 +216,26 @@ type Available struct {
 | DiceTypeCopper | "copper" | 1-6 | 5-6权重40% | 排名 3 |
 | DiceTypeWood | "wood" | 1-6 | 均匀分布 | 排名 4 |
 
-### MiniGameStart/MiniGameResult
+### MiniGameStart/MiniGameResult/MiniGameDataSubmit
 
 小游戏相关：
 
 ```go
 type MiniGameStart struct {
-    GameType string   `json:"game_type"` // "dice_race"
-    Players  []string `json:"players"`   // 参赛玩家ID列表
+    GameType  string       `json:"game_type"`            // "dice_race", "count_seconds"
+    Players   []string     `json:"players"`              // 参赛玩家ID列表
+    Connection *MiniGameConn `json:"connection,omitempty"` // 小游戏服务连接信息（前端模式为nil）
+}
+
+type MiniGameConn struct {
+    URL    string `json:"url"`     // 小游戏服务 WebSocket URL
+    RoomID string `json:"room_id"` // Colyseus 房间 ID
+    Token  string `json:"token"`   // 认证 Token
+}
+
+type MiniGameDataSubmit struct {
+    GameType string                 `json:"game_type"` // 必须匹配 MiniGameStart.GameType
+    GameData map[string]interface{} `json:"game_data"` // 原始小游戏数据（score/time等）
 }
 
 type MiniGameResult struct {
@@ -231,10 +243,27 @@ type MiniGameResult struct {
 }
 
 type RankingEntry struct {
-    PlayerID string `json:"player_id"`
-    Rank     int    `json:"rank"`
+    PlayerID    string `json:"player_id"`
+    DisplayName string `json:"display_name"`
+    Rank        int    `json:"rank"`
 }
 ```
+
+**game_type 可选值与排名规则**：
+
+| game_type | 含义 | game_data 格式 | 排名规则 |
+|-----------|------|----------------|----------|
+| `dice_race` | 投骰比大小 | `{ dice1: int, dice2: int, score: dice1+dice2 }` | score 降序（越大越好） |
+| `count_seconds` | 计秒小游戏 | `{ elapsed: float64, deviation: |elapsed-5.0| }` | deviation 升序（越接近5秒越好） |
+| `coin_flip` | 翻硬币 | 未实现，暂不可用 | - |
+
+**MiniGameStart.Connection 说明**：
+- `connection` 为 `nil` 表示前端驱动模式（Frontend）：客户端在本地运行小游戏，完成后提交 `game_data`
+- `connection` 非 `nil` 表示 RPC 模式：客户端连接到 Colyseus 小游戏服务，服务端直接上报排名
+
+**MiniGameDataSubmit vs 旧 MiniGameResultSubmit**：
+- 客户端提交 `game_data`（原始数据），而非 `rank`（排名）
+- 服务器通过 `RankCalculator` 根据 `game_type` 的排名规则计算排名
 
 ### FullSync
 
