@@ -12,13 +12,8 @@ const (
 	// ========== Server -> Client Messages ==========
 
 	// OpStateSync broadcasts current game state when entering a new state.
-	// Data: StateSync
+	// Data: StateSync (includes incremental LogEntry entries for animation)
 	OpStateSync OpCode = 1
-
-	// OpTurnSync broadcasts turn/phase action list for client rendering.
-	// Data: TurnSync (contains Actions array)
-	// Client loops through actions and plays animations sequentially.
-	OpTurnSync OpCode = 2
 
 	// OpDecisionRequest requests user decision input (dice roll, item selection, etc).
 	// Data: Decision
@@ -41,7 +36,7 @@ const (
 	OpGameOver OpCode = 7
 
 	// OpFullSync sends complete game state for reconnecting players.
-	// Data: StateSync (complete snapshot) + TurnSync (current turn actions)
+	// Data: StateSync (complete snapshot with all current turn entries)
 	OpFullSync OpCode = 8
 
 	// OpActionRejected notifies client that their action was rejected.
@@ -91,7 +86,6 @@ const (
 func (op OpCode) String() string {
 	names := map[OpCode]string{
 		OpStateSync:            "state_sync",
-		OpTurnSync:             "turn_sync",
 		OpDecisionRequest:      "decision_request",
 		OpAvailable:            "available",
 		OpMiniGameStart:        "mini_game_start",

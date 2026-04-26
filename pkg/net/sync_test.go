@@ -47,7 +47,7 @@ func TestStateSyncJSON(t *testing.T) {
 	}
 }
 
-func TestTurnSyncWithLogEntries(t *testing.T) {
+func TestStateSyncWithLogEntries(t *testing.T) {
 	// Create LogEntries using gamelog
 	entry1 := gamelog.NewActionEntry("damage", "player-abc123", "Cell_Fragile")
 
@@ -55,11 +55,13 @@ func TestTurnSyncWithLogEntries(t *testing.T) {
 	entry2Meta.Set("path", []int{10, 11, 12, 13})
 	entry2 := gamelog.NewActionEntryWithMetadata("move", "player-abc123", "DiceRoll", entry2Meta)
 
-	sync := &TurnSync{
-		Round:             1,
-		Turn:              0,
-		CurrentPlayerID:   "player-abc123",
-		Entries:           []gamelog.LogEntry{entry1, entry2},
+	sync := &StateSync{
+		GlobalState:     "turn_loop",
+		TurnState:       "turn_end",
+		CurrentPlayerID: "player-abc123",
+		Round:           1,
+		Turn:            0,
+		Entries:         []gamelog.LogEntry{entry1, entry2},
 	}
 
 	jsonBytes, err := json.Marshal(sync)
@@ -67,7 +69,7 @@ func TestTurnSyncWithLogEntries(t *testing.T) {
 		t.Fatalf("json.Marshal() error: %v", err)
 	}
 
-	var parsed TurnSync
+	var parsed StateSync
 	err = json.Unmarshal(jsonBytes, &parsed)
 	if err != nil {
 		t.Fatalf("json.Unmarshal() error: %v", err)
@@ -86,12 +88,15 @@ func TestTurnSyncWithLogEntries(t *testing.T) {
 	}
 }
 
-func TestTurnSyncJSONFieldNames(t *testing.T) {
-	sync := &TurnSync{
+func TestStateSyncEntriesJSONFieldNames(t *testing.T) {
+	entry := gamelog.NewActionEntry("damage", "player-001", "Test")
+	sync := &StateSync{
+		GlobalState:     "turn_loop",
+		TurnState:       "turn_end",
+		CurrentPlayerID: "player-abc123",
 		Round:           1,
 		Turn:            0,
-		CurrentPlayerID: "player-abc123",
-		Entries:         []gamelog.LogEntry{},
+		Entries:         []gamelog.LogEntry{entry},
 	}
 
 	jsonBytes, err := json.Marshal(sync)
@@ -101,12 +106,47 @@ func TestTurnSyncJSONFieldNames(t *testing.T) {
 
 	jsonStr := string(jsonBytes)
 
-	// Verify field names are correct (entries not actions)
+	// Verify entries field name is correct when populated
 	if !strings.Contains(jsonStr, `"entries"`) {
-		t.Error("JSON should contain 'entries' field (not 'actions')")
+		t.Error("JSON should contain 'entries' field when populated")
 	}
-	if strings.Contains(jsonStr, `"actions"`) {
-		t.Error("JSON should NOT contain 'actions' field (use 'entries' now)")
+}
+
+func TestStateSyncEntriesOmitempty(t *testing.T) {
+	// StateSync with nil Entries - field should be omitted in JSON
+	syncNil := &StateSync{
+		GlobalState: "turn_loop",
+		Round:       1,
+		Turn:        0,
+		// Entries is nil
+	}
+
+	jsonBytes, err := json.Marshal(syncNil)
+	if err != nil {
+		t.Fatalf("json.Marshal() error: %v", err)
+	}
+
+	jsonStr := string(jsonBytes)
+	if strings.Contains(jsonStr, `"entries"`) {
+		t.Errorf("JSON should NOT contain 'entries' field when nil (omitempty), got: %s", jsonStr)
+	}
+
+	// StateSync with empty Entries slice - also omitted (omitempty)
+	syncEmpty := &StateSync{
+		GlobalState: "turn_loop",
+		Round:       1,
+		Turn:        0,
+		Entries:     []gamelog.LogEntry{},
+	}
+
+	jsonBytes, err = json.Marshal(syncEmpty)
+	if err != nil {
+		t.Fatalf("json.Marshal() error: %v", err)
+	}
+
+	jsonStr = string(jsonBytes)
+	if strings.Contains(jsonStr, `"entries"`) {
+		t.Errorf("JSON should NOT contain 'entries' field when empty slice (omitempty), got: %s", jsonStr)
 	}
 }
 
@@ -407,49 +447,6 @@ func TestAvailableWithItems(t *testing.T) {
 	}
 	if parsed.DiceType != "gold" {
 		t.Errorf("parsed.DiceType = %s, want gold", parsed.DiceType)
-	}
-}
-
-func TestFullSync(t *testing.T) {
-	stateSync := &StateSync{
-		GlobalState:     "turn_loop",
-		TurnState:       "main_action",
-		CurrentPlayerID: "player-001",
-		Round:           1,
-		Turn:            0,
-		Players:         []Player{{PlayerID: "player-001", Faction: "qing_long"}},
-	}
-
-	turnSync := &TurnSync{
-		Round:             1,
-		Turn:              0,
-		CurrentPlayerID:   "player-001",
-		Entries:           []gamelog.LogEntry{gamelog.NewActionEntry("damage", "player-001", "Test")},
-	}
-
-	fullSync := &FullSync{
-		State: stateSync,
-		Turn:  turnSync,
-	}
-
-	jsonBytes, err := json.Marshal(fullSync)
-	if err != nil {
-		t.Fatalf("json.Marshal() error: %v", err)
-	}
-
-	var parsed FullSync
-	err = json.Unmarshal(jsonBytes, &parsed)
-	if err != nil {
-		t.Fatalf("json.Unmarshal() error: %v", err)
-	}
-	if parsed.State.GlobalState != "turn_loop" {
-		t.Errorf("parsed.State.GlobalState = %s, want turn_loop", parsed.State.GlobalState)
-	}
-	if parsed.Turn.Round != 1 {
-		t.Errorf("parsed.Turn.Round = %d, want 1", parsed.Turn.Round)
-	}
-	if len(parsed.Turn.Entries) != 1 {
-		t.Errorf("len(parsed.Turn.Entries) = %d, want 1", len(parsed.Turn.Entries))
 	}
 }
 

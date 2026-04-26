@@ -9,10 +9,6 @@ type BroadcastAdapter interface {
 	// Called when HSM transitions to a new state.
 	BroadcastStateSync(state *StateSync) error
 
-	// BroadcastTurnSync broadcasts turn action list to all players.
-	// Called after executing turn effects.
-	BroadcastTurnSync(turn *TurnSync) error
-
 	// SendDecision sends a decision request to a specific player.
 	// Called when HSM enters WaitDecision state.
 	SendDecision(playerID string, decision *Decision) error
@@ -35,7 +31,8 @@ type BroadcastAdapter interface {
 
 	// SendFullSync sends complete state to a reconnecting player.
 	// Called when a player rejoins the match.
-	SendFullSync(playerID string, state *StateSync, turn *TurnSync) error
+	// StateSync includes all current turn entries for the reconnecting player.
+	SendFullSync(playerID string, state *StateSync) error
 
 	// BroadcastStartGameAck broadcasts game start acknowledgment with map config.
 	// Called when host starts the game (after OpStartGame received).
@@ -47,9 +44,6 @@ type BroadcastAdapter interface {
 type MockBroadcastAdapter struct {
 	// StateSyncs captures all BroadcastStateSync calls.
 	StateSyncs []*StateSync
-
-	// TurnSyncs captures all BroadcastTurnSync calls.
-	TurnSyncs []*TurnSync
 
 	// Decisions captures SendDecision calls (keyed by playerID).
 	Decisions map[string]*Decision
@@ -67,10 +61,7 @@ type MockBroadcastAdapter struct {
 	GameOvers []*GameOver
 
 	// FullSyncs captures SendFullSync calls (keyed by playerID).
-	FullSyncs map[string]struct {
-		State *StateSync
-		Turn  *TurnSync
-	}
+	FullSyncs map[string]*StateSync
 
 	// StartGameAcks captures BroadcastStartGameAck calls.
 	StartGameAcks []*StartGameAck
@@ -80,29 +71,19 @@ type MockBroadcastAdapter struct {
 func NewMockBroadcastAdapter() *MockBroadcastAdapter {
 	return &MockBroadcastAdapter{
 		StateSyncs:      make([]*StateSync, 0),
-		TurnSyncs:       make([]*TurnSync, 0),
 		Decisions:       make(map[string]*Decision),
 		Availables:      make(map[string]*Available),
 		MiniGameStarts:  make([]*MiniGameStart, 0),
 		MiniGameResults: make([]*MiniGameResult, 0),
 		GameOvers:       make([]*GameOver, 0),
-		FullSyncs:       make(map[string]struct {
-			State *StateSync
-			Turn  *TurnSync
-		}),
-		StartGameAcks:  make([]*StartGameAck, 0),
+		FullSyncs:       make(map[string]*StateSync),
+		StartGameAcks:   make([]*StartGameAck, 0),
 	}
 }
 
 // BroadcastStateSync captures state sync.
 func (m *MockBroadcastAdapter) BroadcastStateSync(state *StateSync) error {
 	m.StateSyncs = append(m.StateSyncs, state)
-	return nil
-}
-
-// BroadcastTurnSync captures turn sync.
-func (m *MockBroadcastAdapter) BroadcastTurnSync(turn *TurnSync) error {
-	m.TurnSyncs = append(m.TurnSyncs, turn)
 	return nil
 }
 
@@ -137,11 +118,8 @@ func (m *MockBroadcastAdapter) BroadcastGameOver(over *GameOver) error {
 }
 
 // SendFullSync captures full sync for reconnect.
-func (m *MockBroadcastAdapter) SendFullSync(playerID string, state *StateSync, turn *TurnSync) error {
-	m.FullSyncs[playerID] = struct {
-		State *StateSync
-		Turn  *TurnSync
-	}{State: state, Turn: turn}
+func (m *MockBroadcastAdapter) SendFullSync(playerID string, state *StateSync) error {
+	m.FullSyncs[playerID] = state
 	return nil
 }
 
@@ -154,15 +132,11 @@ func (m *MockBroadcastAdapter) BroadcastStartGameAck(ack *StartGameAck) error {
 // Clear resets all captured messages.
 func (m *MockBroadcastAdapter) Clear() {
 	m.StateSyncs = make([]*StateSync, 0)
-	m.TurnSyncs = make([]*TurnSync, 0)
 	m.Decisions = make(map[string]*Decision)
 	m.Availables = make(map[string]*Available)
 	m.MiniGameStarts = make([]*MiniGameStart, 0)
 	m.MiniGameResults = make([]*MiniGameResult, 0)
 	m.GameOvers = make([]*GameOver, 0)
-	m.FullSyncs = make(map[string]struct {
-		State *StateSync
-		Turn  *TurnSync
-	})
+	m.FullSyncs = make(map[string]*StateSync)
 	m.StartGameAcks = make([]*StartGameAck, 0)
 }

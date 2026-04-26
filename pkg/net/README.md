@@ -4,30 +4,27 @@
 
 ## 设计目标
 
-1. **状态同步**：向客户端广播当前游戏状态
-2. **回合同步**：直接使用 GameLog 的 LogEntry 列表（无需转换）
+1. **状态同步**：向客户端广播当前游戏状态，包含增量 LogEntry 数据
+2. **断线重连**：支持玩家重新连接后恢复游戏状态（含当前回合完整 LogEntry）
 3. **决策请求**：等待玩家输入（投骰子、使用道具、选择选项）
-4. **断线重连**：支持玩家重新连接后恢复游戏状态
-5. **错误反馈**：通过 ActionRejected 返回标准化错误码
+4. **错误反馈**：通过 ActionRejected 返回标准化错误码
 
 ## 核心设计
 
-### TurnSync 直接使用 LogEntry
+### StateSync 包含增量 LogEntry
 
-```go
-// TurnSync 直接包含 gamelog.LogEntry 列表（无需转换为 Action）
-type TurnSync struct {
-    Round             int                `json:"round"`
-    Turn              int                `json:"turn"`
-    CurrentPlayerID   string             `json:"current_player_id"` // 当前回合玩家 ID
-    Entries           []gamelog.LogEntry `json:"entries"` // 直接发送 GameLog
-}
-```
+`StateSync` 通过 `Entries` 字段携带增量 `gamelog.LogEntry` 数据。每次 HSM 状态转换时，`BuildStateSync()` 自动获取自上次广播以来的新 LogEntry，客户端按顺序渲染动画。
+
+**增量机制**：
+- `GameLog.GetNewEntries()` 返回自上次 `MarkBroadcasted()` 以来新增的 LogEntry
+- `Builder.BuildStateSync()` 调用 `GetNewEntries()` + `MarkBroadcasted()` 实现增量同步
+- `Builder.BuildFullSyncStateSync()` 调用 `GetAllCurrentEntries()` 返回当前回合全部 LogEntry（用于断线重连）
+- `Entries` 字段使用 `omitempty`，当无新 LogEntry 时 JSON 中不包含此字段
 
 **设计理由**：
-- GameLog 是权威数据源，无需二次转换
-- Metadata 字段契约文档化（见 `doc/internal/metadata.md`）
-- 新增 ActionType 无需更新协议层转换逻辑
+- StateSync 既承载状态信息又承载动画数据，减少客户端消息量
+- 增量 Entries 避免重复发送已广播的 LogEntry
+- FullSync 通过同一个 StateSync 结构携带完整回合数据，无需额外协议
 
 ### Metadata 字段契约
 
@@ -64,7 +61,7 @@ type TurnSync struct {
 │                    pkg/net 协议层 (本包)                           │
 │  - OpCode: 消息操作码                                              │
 │  - Message: 基础消息结构                                           │
-│  - StateSync/TurnSync: 同步数据结构                                │
+│  - StateSync: 同步数据结构（含增量 LogEntry）                           │
 │  - Decision: 决策请求结构                                          │
 │  - BroadcastAdapter: 广播抽象接口                                  │
 │  - ActionRejected: 动作拒绝（带错误码）                            │
@@ -85,7 +82,7 @@ type TurnSync struct {
 |------|------|
 | `opcode.go` | 消息操作码定义（Server→Client: 1-99, Client→Server: 100+） |
 | `message.go` | 基础消息结构 `Message` |
-| `sync.go` | 状态同步数据结构：`StateSync`, `Player`, `TurnSync`, `ActionRejected` |
+| `sync.go` | 状态同步数据结构：`StateSync`, `Player`, `ActionRejected` |
 | `decision.go` | 决策请求/回复结构：`Decision`, `Option`, `RollDice`, `UseItem`, `UserChoice` |
 | `broadcast.go` | 广播抽象接口 `BroadcastAdapter` 和测试实现 `MockBroadcastAdapter` |
 
@@ -95,14 +92,13 @@ type TurnSync struct {
 
 | OpCode | 名称 | 数据类型 | 说明 |
 |--------|------|----------|------|
-| 1 | `OpStateSync` | `StateSync` | 状态同步（进入新状态） |
-| 2 | `OpTurnSync` | `TurnSync` | 回合内 LogEntry 列表 |
+| 1 | `OpStateSync` | `StateSync` | 状态同步（含增量 LogEntry） |
 | 3 | `OpDecisionRequest` | `Decision` | 决策请求 |
 | 4 | `OpAvailable` | `Available` | 可用操作列表 |
 | 5 | `OpMiniGameStart` | `MiniGameStart` | 小游戏开始 |
 | 6 | `OpMiniGameResult` | `MiniGameResult` | 小游戏结果广播 |
 | 7 | `OpGameOver` | `GameOver` | 游戏结束 |
-| 8 | `OpFullSync` | `FullSync` | 完整同步（断线重连） |
+| 8 | `OpFullSync` | `StateSync` | 完整同步（断线重连，含当前回合全部 LogEntry） |
 | 9 | `OpActionRejected` | `ActionRejected` | 动作拒绝（带错误码） |
 
 ### Client → Server (100+)
@@ -119,7 +115,7 @@ type TurnSync struct {
 
 ### StateSync
 
-完整游戏状态同步，用于客户端状态更新和断线重连：
+完整游戏状态同步，用于客户端状态更新、动画渲染和断线重连：
 
 ```go
 type StateSync struct {
@@ -130,23 +126,16 @@ type StateSync struct {
     Turn            int       `json:"turn"`
     Paused          bool      `json:"paused"`        // 等待决策中
     Players         []Player  `json:"players"`
+    Map             MapInfo   `json:"map"`
+    Entries         []gamelog.LogEntry `json:"entries,omitempty"` // 增量 LogEntry（omitempty: nil/空时不包含）
 }
 ```
 
-### TurnSync
-
-回合内所有效果同步，使用 `gamelog.LogEntry` 列表供客户端顺序渲染：
-
-```go
-type TurnSync struct {
-    Round             int                `json:"round"`
-    Turn              int                `json:"turn"`
-    CurrentPlayerID   string             `json:"current_player_id"`    // 回合玩家 ID
-    Entries           []gamelog.LogEntry `json:"entries"`   // 直接发送 GameLog
-}
-```
-
-客户端循环遍历 Entries 数组，按顺序播放每个效果的动画。
+**Entries 增量机制**：
+- 每次 `BuildStateSync()` 获取自上次广播以来的新 LogEntry
+- 调用后自动 `MarkBroadcasted()`，下次广播只返回新增部分
+- `omitempty` 确保无新 LogEntry 时 JSON 不包含空数组
+- 断线重连使用 `BuildFullSyncStateSync()` 获取当前回合全部 LogEntry
 
 ### Player
 
@@ -241,13 +230,12 @@ type RankingEntry struct {
 
 ### FullSync
 
-完整同步（断线重连）：
+完整同步（断线重连）直接使用 `StateSync` 结构，通过 `BuildFullSyncStateSync()` 获取包含当前回合全部 LogEntry 的 StateSync：
 
 ```go
-type FullSync struct {
-    State *StateSync `json:"state"`
-    Turn  *TurnSync  `json:"turn"`
-}
+// OpFullSync 发送包含全部当前回合 LogEntry 的 StateSync
+stateSync := builder.BuildFullSyncStateSync()
+broadcastAdapter.SendFullSync(playerID, stateSync)
 ```
 
 ### ActionRejected
@@ -290,16 +278,17 @@ type ActionRejected struct {
 ```go
 type BroadcastAdapter interface {
     BroadcastStateSync(stateSync *StateSync) error
-    BroadcastTurnSync(turnSync *TurnSync) error
     SendDecision(playerID string, decision *Decision) error
     SendAvailable(playerID string, available *Available) error
     BroadcastMiniGameStart(start *MiniGameStart) error
     BroadcastMiniGameResult(result *MiniGameResult) error
     BroadcastGameOver(over *GameOver) error
-    SendFullSync(playerID string, state *StateSync, turn *TurnSync) error
-    SendActionRejected(playerID string, rejected *ActionRejected) error
+    SendFullSync(playerID string, state *StateSync) error
+    BroadcastStartGameAck(ack *StartGameAck) error
 }
 ```
+
+**注意**：`BroadcastTurnSync` 和 `TurnSync` 已移除，LogEntry 数据现在通过 `StateSync.Entries` 增量携带。
 
 ### MockBroadcastAdapter
 
@@ -308,11 +297,10 @@ type BroadcastAdapter interface {
 ```go
 mock := NewMockBroadcastAdapter()
 mock.BroadcastStateSync(stateSync)
-mock.BroadcastTurnSync(turnSync)
 
 // 检查捕获的消息
 if mock.StateSyncs[0].GlobalState == "turn_loop" { ... }
-if mock.TurnSyncs[0].Entries[0].ActionType == "damage" { ... }
+if len(mock.StateSyncs[0].Entries) > 0 { ... }
 
 mock.Clear() // 清空所有捕获的消息
 ```
@@ -327,11 +315,14 @@ import (
     "github.com/b1tAction/paradiced/pkg/gamelog"
 )
 
-// 创建回合同步消息
-turnSync := &net.TurnSync{
+// 创建状态同步消息（含增量 LogEntry）
+stateSync := &net.StateSync{
+    GlobalState:     "turn_loop",
+    TurnState:       "turn_landed",
+    CurrentPlayerID: "player-001",
     Round:           1,
     Turn:            0,
-    CurrentPlayerID: "player-001",
+    Players:         []net.Player{...},
     Entries: []gamelog.LogEntry{
         {
             ActionType: "damage",
@@ -345,21 +336,21 @@ turnSync := &net.TurnSync{
         },
     },
 }
-msg, err := net.NewMessage(net.OpTurnSync, turnSync)
+msg, err := net.NewMessage(net.OpStateSync, stateSync)
 ```
 
 ### 解析消息
 
 ```go
 // 解析消息数据
-var turnSync net.TurnSync
-err := msg.ParseData(&turnSync)
+var stateSync net.StateSync
+err := msg.ParseData(&stateSync)
 
-// 遍历 Entries 渲染
-for _, entry := range turnSync.Entries {
+// 遍历 Entries 渲染动画
+for _, entry := range stateSync.Entries {
     switch entry.ActionType {
     case "damage":
-        // 播放伤害动画，使用 entry.Delta 和 entry.Source
+        // 播放伤害动画，使用 entry.Metadata 中的 hp_change
     case "move":
         // 播放移动动画，使用 entry.Metadata 中的 path
     }
@@ -371,7 +362,6 @@ for _, entry := range turnSync.Entries {
 所有同步数据结构使用**无后缀命名**：
 
 - `StateSync`（不是 `StateSyncData`）
-- `TurnSync`（不是 `TurnSyncData`）
 - `Player`（不是 `PlayerSync`）
 - `Buff`（不是 `BuffSync`）
 - `Item`（不是 `ItemSync`）
@@ -405,12 +395,12 @@ Faction 字段使用 **snake_case** 值：
 
 ## Builder 接口
 
-定义在 `internal/net/builder.go`，用于构建协议同步消息。接口设计避免 internal/engine/hsm 和 internal/net 之间的循环引用：
+定义在 `pkg/net/builder.go`，用于构建协议同步消息。接口设计避免 internal/engine/hsm 和 internal/net 之间的循环引用：
 
 ```go
 type Builder interface {
-    BuildStateSync() *StateSync
-    BuildTurnSync() *TurnSync
+    BuildStateSync() *StateSync          // 增量 Entries（每次广播后自动 MarkBroadcasted）
+    BuildFullSyncStateSync() *StateSync  // 全量当前回合 Entries（断线重连用，不 MarkBroadcasted）
     BuildAvailable() *Available
     SetDiceType(diceType string)
 }
@@ -425,11 +415,11 @@ type Builder struct {
 }
 
 func NewBuilder(hsmInstance *hsm.HSM) *Builder
-func (b *Builder) BuildStateSync() *StateSync
-func (b *Builder) BuildTurnSync() *TurnSync
+func (b *Builder) BuildStateSync() *StateSync                   // 增量 Entries
+func (b *Builder) BuildFullSyncStateSync() *StateSync           // 全量 Entries（断线重连）
 func (b *Builder) BuildAvailable() *Available
-func (b *Builder) SetDiceType(diceType string)      // pkg/net.Builder interface
-func (b *Builder) SetDiceTypeFromRng(diceType rng.DiceType)  // internal use
+func (b *Builder) SetDiceType(diceType string)                  // pkg/net.Builder interface
+func (b *Builder) SetDiceTypeFromRng(diceType rng.DiceType)     // internal use
 func (b *Builder) BuildAvailableForPlayer(player *core.Player) *Available  // specific player
 ```
 

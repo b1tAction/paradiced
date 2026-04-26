@@ -5,11 +5,12 @@ package net
 // Implemented by internal/net.Builder, used by HSM states to build client messages.
 // This interface avoids import cycle between internal/engine/hsm and internal/net.
 type Builder interface {
-	// BuildStateSync builds a complete state sync message.
+	// BuildStateSync builds a complete state sync message with incremental entries.
 	BuildStateSync() *StateSync
 
-	// BuildTurnSync builds a turn sync message with log entries.
-	BuildTurnSync() *TurnSync
+	// BuildFullSyncStateSync builds a state sync for reconnecting players
+	// with all current turn entries (not incremental).
+	BuildFullSyncStateSync() *StateSync
 
 	// BuildAvailable builds available actions for current player.
 	BuildAvailable() *Available

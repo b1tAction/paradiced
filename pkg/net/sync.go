@@ -39,59 +39,11 @@ type StateSync struct {
 
 	// Map contains the map information for client rendering.
 	Map MapInfo `json:"map"`
-}
 
-// TurnSync represents all events for a turn/phase.
-// Broadcast after executing effects, client renders entries sequentially.
-//
-// LogEntry.Metadata Field Contract:
-// Each action_type has specific metadata fields that client should parse.
-//
-// | action_type   | metadata fields                                                      | client usage                |
-// |---------------|----------------------------------------------------------------------|----------------------------|
-// | damage        | hp_change: int, blocked_by?: string, piercing?: bool                 | 显示伤害数值、阻挡来源、穿透效果 |
-// | heal          | hp_change: int                                                       | 显示治疗数值动画             |
-// | modify_lp     | lp_change: int                                                       | 显示LP变化数值动画           |
-// | move          | steps: int, start_pos: int, end_pos: int, path: []int                | 显示移动路径动画             |
-// | add_buff      | buff_type: string, duration: int                                     | 显示获得Buff动画及持续时间   |
-// | remove_buff   | buff_type: string                                                    | 显示移除Buff动画           |
-// | teleport      | from_pos: int, to_pos: int                                           | 显示传送动画               |
-// | steal_buff    | stolen_by: string, buff_type: string                                 | 显示白虎劫运动画           |
-// | respawn       | checkpoint_pos: int                                                  | 显示重生动画               |
-// | fell_down     | position: int, hp_change: int                                        | 显示落坑动画及坠落伤害       |
-// | draw_event    | event_type: string                                                 | 显示抽取事件动画           |
-// | draw_item     | item_type: string                                                  | 显示道具获取动画           |
-// | dice_roll     | dice_type: string, dice_steps: int                                   | 显示骰子动画               |
-// | state         | from: string, to: string                                             | 状态转换记录               |
-//
-// Client rendering example (TypeScript):
-//
-//	for (const entry of turnSync.entries) {
-//	    switch (entry.action_type) {
-//	        case "move":
-//	            const path = entry.metadata?.path || [];
-//	            playMoveAnimation(entry.target, path);
-//	            break;
-//	        case "add_buff":
-//	            const buffType = entry.metadata?.buff_type;
-//	            playBuffGainAnimation(entry.target, buffType);
-//	            break;
-//	    }
-//	}
-type TurnSync struct {
-	// Round is the current round number.
-	Round int `json:"round"`
-
-	// Turn is the current turn index.
-	Turn int `json:"turn"`
-
-	// CurrentPlayerID is the player ID whose turn is active.
-	// Matches core.Player.ID.UUID() format.
-	CurrentPlayerID string `json:"current_player_id"`
-
-	// Entries contains all log entries for this turn/phase.
-	// Directly uses gamelog.LogEntry (no conversion to Action).
-	Entries []gamelog.LogEntry `json:"entries"`
+	// Entries contains incremental LogEntry data since the last StateSync broadcast.
+	// Client renders these entries as animations and then updates UI state.
+	// Empty if no new actions since last broadcast.
+	Entries []gamelog.LogEntry `json:"entries,omitempty"`
 }
 
 // MapInfo represents map data for client synchronization.
@@ -296,15 +248,6 @@ type PlayerStats struct {
 
 	// ItemsUsed is the number of items consumed.
 	ItemsUsed int `json:"items_used"`
-}
-
-// FullSync represents complete sync data for reconnecting players.
-type FullSync struct {
-	// State is the current game state.
-	State *StateSync `json:"state"`
-
-	// Turn is the current turn's log entries.
-	Turn *TurnSync `json:"turn"`
 }
 
 // ActionRejected notifies client that their action was rejected.

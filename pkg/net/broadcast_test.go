@@ -27,34 +27,33 @@ func TestMockBroadcastAdapterStateSync(t *testing.T) {
 	}
 }
 
-func TestMockBroadcastAdapterTurnSync(t *testing.T) {
+func TestMockBroadcastAdapterStateSyncWithEntries(t *testing.T) {
 	mock := NewMockBroadcastAdapter()
 
-	// Create LogEntry using gamelog
 	entry := gamelog.NewActionEntry("damage", "player-001", "Cell_Fragile")
 
-	turnSync := &TurnSync{
-		Round:             1,
-		Turn:              0,
-		CurrentPlayerID:   "player-001",
-		Entries:           []gamelog.LogEntry{entry},
+	stateSync := &StateSync{
+		Round:           1,
+		Turn:            0,
+		CurrentPlayerID: "player-001",
+		Entries:         []gamelog.LogEntry{entry},
 	}
 
-	err := mock.BroadcastTurnSync(turnSync)
+	err := mock.BroadcastStateSync(stateSync)
 	if err != nil {
-		t.Fatalf("BroadcastTurnSync() error: %v", err)
+		t.Fatalf("BroadcastStateSync() error: %v", err)
 	}
-	if len(mock.TurnSyncs) != 1 {
-		t.Errorf("len(mock.TurnSyncs) = %d, want 1", len(mock.TurnSyncs))
+	if len(mock.StateSyncs) != 1 {
+		t.Errorf("len(mock.StateSyncs) = %d, want 1", len(mock.StateSyncs))
 	}
-	if mock.TurnSyncs[0].CurrentPlayerID != "player-001" {
-		t.Errorf("mock.TurnSyncs[0].CurrentPlayerID = %s, want player-001", mock.TurnSyncs[0].CurrentPlayerID)
+	if mock.StateSyncs[0].CurrentPlayerID != "player-001" {
+		t.Errorf("mock.StateSyncs[0].CurrentPlayerID = %s, want player-001", mock.StateSyncs[0].CurrentPlayerID)
 	}
-	if len(mock.TurnSyncs[0].Entries) != 1 {
-		t.Errorf("len(mock.TurnSyncs[0].Entries) = %d, want 1", len(mock.TurnSyncs[0].Entries))
+	if len(mock.StateSyncs[0].Entries) != 1 {
+		t.Errorf("len(mock.StateSyncs[0].Entries) = %d, want 1", len(mock.StateSyncs[0].Entries))
 	}
-	if mock.TurnSyncs[0].Entries[0].ActionType != "damage" {
-		t.Errorf("mock.TurnSyncs[0].Entries[0].ActionType = %s, want damage", mock.TurnSyncs[0].Entries[0].ActionType)
+	if mock.StateSyncs[0].Entries[0].ActionType != "damage" {
+		t.Errorf("mock.StateSyncs[0].Entries[0].ActionType = %s, want damage", mock.StateSyncs[0].Entries[0].ActionType)
 	}
 }
 
@@ -168,21 +167,20 @@ func TestMockBroadcastAdapterGameOver(t *testing.T) {
 func TestMockBroadcastAdapterFullSync(t *testing.T) {
 	mock := NewMockBroadcastAdapter()
 
-	stateSync := &StateSync{GlobalState: "turn_loop"}
-	turnSync := &TurnSync{Round: 1, CurrentPlayerID: "player-001"}
+	stateSync := &StateSync{GlobalState: "turn_loop", Round: 1, CurrentPlayerID: "player-001"}
 
-	err := mock.SendFullSync("player-001", stateSync, turnSync)
+	err := mock.SendFullSync("player-001", stateSync)
 	if err != nil {
 		t.Fatalf("SendFullSync() error: %v", err)
 	}
-	if mock.FullSyncs["player-001"].State == nil {
-		t.Fatal("mock.FullSyncs[player-001].State should not be nil")
+	if mock.FullSyncs["player-001"] == nil {
+		t.Fatal("mock.FullSyncs[player-001] should not be nil")
 	}
-	if mock.FullSyncs["player-001"].State.GlobalState != "turn_loop" {
-		t.Errorf("mock.FullSyncs[player-001].State.GlobalState = %s, want turn_loop", mock.FullSyncs["player-001"].State.GlobalState)
+	if mock.FullSyncs["player-001"].GlobalState != "turn_loop" {
+		t.Errorf("mock.FullSyncs[player-001].GlobalState = %s, want turn_loop", mock.FullSyncs["player-001"].GlobalState)
 	}
-	if mock.FullSyncs["player-001"].Turn.Round != 1 {
-		t.Errorf("mock.FullSyncs[player-001].Turn.Round = %d, want 1", mock.FullSyncs["player-001"].Turn.Round)
+	if mock.FullSyncs["player-001"].Round != 1 {
+		t.Errorf("mock.FullSyncs[player-001].Round = %d, want 1", mock.FullSyncs["player-001"].Round)
 	}
 }
 
@@ -191,20 +189,16 @@ func TestMockBroadcastAdapterClear(t *testing.T) {
 
 	// Add some messages
 	mock.BroadcastStateSync(&StateSync{})
-	mock.BroadcastTurnSync(&TurnSync{})
 	mock.SendDecision("p1", &Decision{})
 	mock.SendAvailable("p1", &Available{})
 	mock.BroadcastMiniGameStart(&MiniGameStart{})
 	mock.BroadcastMiniGameResult(&MiniGameResult{})
 	mock.BroadcastGameOver(&GameOver{})
-	mock.SendFullSync("p1", &StateSync{}, &TurnSync{})
+	mock.SendFullSync("p1", &StateSync{})
 
 	// Verify messages exist
 	if len(mock.StateSyncs) != 1 {
 		t.Error("mock.StateSyncs should have 1 entry before Clear")
-	}
-	if len(mock.TurnSyncs) != 1 {
-		t.Error("mock.TurnSyncs should have 1 entry before Clear")
 	}
 	if mock.Decisions["p1"] == nil {
 		t.Error("mock.Decisions[p1] should exist before Clear")
@@ -219,9 +213,6 @@ func TestMockBroadcastAdapterClear(t *testing.T) {
 	// Verify all cleared
 	if len(mock.StateSyncs) != 0 {
 		t.Errorf("len(mock.StateSyncs) = %d after Clear, want 0", len(mock.StateSyncs))
-	}
-	if len(mock.TurnSyncs) != 0 {
-		t.Errorf("len(mock.TurnSyncs) = %d after Clear, want 0", len(mock.TurnSyncs))
 	}
 	if mock.Decisions["p1"] != nil {
 		t.Error("mock.Decisions[p1] should be nil after Clear")
@@ -246,14 +237,10 @@ func TestMockBroadcastAdapterMultipleCalls(t *testing.T) {
 	// Multiple broadcasts
 	for i := 0; i < 5; i++ {
 		mock.BroadcastStateSync(&StateSync{Round: i + 1})
-		mock.BroadcastTurnSync(&TurnSync{Round: i + 1})
 	}
 
 	if len(mock.StateSyncs) != 5 {
 		t.Errorf("len(mock.StateSyncs) = %d, want 5", len(mock.StateSyncs))
-	}
-	if len(mock.TurnSyncs) != 5 {
-		t.Errorf("len(mock.TurnSyncs) = %d, want 5", len(mock.TurnSyncs))
 	}
 	if mock.StateSyncs[0].Round != 1 {
 		t.Errorf("mock.StateSyncs[0].Round = %d, want 1", mock.StateSyncs[0].Round)

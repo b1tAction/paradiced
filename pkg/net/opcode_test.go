@@ -11,7 +11,6 @@ func TestOpCodeString(t *testing.T) {
 		want string
 	}{
 		{OpStateSync, "state_sync"},
-		{OpTurnSync, "turn_sync"},
 		{OpDecisionRequest, "decision_request"},
 		{OpAvailable, "available"},
 		{OpMiniGameStart, "mini_game_start"},
@@ -41,7 +40,7 @@ func TestOpCodeUnknown(t *testing.T) {
 func TestOpCodeIsServerToClient(t *testing.T) {
 	// Server -> Client: 1-99
 	serverToClient := []OpCode{
-		OpStateSync, OpTurnSync, OpDecisionRequest, OpAvailable,
+		OpStateSync, OpDecisionRequest, OpAvailable,
 		OpMiniGameStart, OpMiniGameResult, OpGameOver, OpFullSync,
 	}
 	for _, op := range serverToClient {
@@ -69,7 +68,7 @@ func TestOpCodeIsClientToServer(t *testing.T) {
 	}
 
 	// Server -> Client: 1-99
-	serverToClient := []OpCode{OpStateSync, OpTurnSync, OpGameOver}
+	serverToClient := []OpCode{OpStateSync, OpGameOver}
 	for _, op := range serverToClient {
 		if op.IsClientToServer() {
 			t.Errorf("OpCode(%s).IsClientToServer() should be false", op.String())
