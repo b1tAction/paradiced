@@ -256,3 +256,141 @@ func TestDiceTypeFromString(t *testing.T) {
 		}
 	}
 }
+
+// ========== Boss Attack Calculation Tests ==========
+
+func TestCalcBossCritSkillProb(t *testing.T) {
+	tests := []struct {
+		name     string
+		avgLP    float64
+		bossHP   int
+		bossMax  int
+		expected float64
+	}{
+		{"base rate", 8, 50, 50, 0.25},
+		{"lowLP wounded boss", 4, 25, 50, 0.60},
+		{"zeroLP zeroHP", 0, 0, 50, 0.95},
+	}
+	for _, tt := range tests {
+		result := CalcBossCritSkillProb(tt.avgLP, tt.bossHP, tt.bossMax)
+		// Use approximate comparison due to floating point
+		if result < tt.expected-0.01 || result > tt.expected+0.01 {
+			t.Errorf("%s: CalcBossCritSkillProb(%v, %d, %d) = %.4f, want %.2f",
+				tt.name, tt.avgLP, tt.bossHP, tt.bossMax, result, tt.expected)
+		}
+	}
+}
+
+func TestCalcBossAttackType(t *testing.T) {
+	r := rand.New(rand.NewSource(42))
+
+	// Test normal attack when probability is very low (avgLP=8, bossHP=50)
+	result := CalcBossAttackType(r, 8.0, 50, 50, nil)
+	if result.AttackType != "normal" && result.AttackType != "crit" && result.AttackType != "skill" {
+		t.Errorf("CalcBossAttackType returned invalid attack type: %s", result.AttackType)
+	}
+
+	// Test with skill pool
+	pool := []*EvaluatedItem{
+		{Type: "thunder", Eval: 50},
+		{Type: "curse", Eval: 50},
+	}
+	result2 := CalcBossAttackType(r, 8.0, 50, 50, pool)
+	// Result should be one of the valid types
+	if result2.AttackType != "normal" && result2.AttackType != "crit" && result2.AttackType != "skill" {
+		t.Errorf("CalcBossAttackType with pool returned invalid type: %s", result2.AttackType)
+	}
+	// If skill, check damage is 0 and skill type is from pool
+	if result2.AttackType == "skill" {
+		if result2.Damage != 0 {
+			t.Errorf("Skill damage = %d, expected 0", result2.Damage)
+		}
+		if result2.SkillType != "thunder" && result2.SkillType != "curse" {
+			t.Errorf("Skill type = %s, expected thunder or curse", result2.SkillType)
+		}
+	}
+}
+
+func TestSelectBossTarget(t *testing.T) {
+	r := rand.New(rand.NewSource(42))
+
+	// Empty players returns empty string
+	result := SelectBossTarget(r, nil)
+	if result != "" {
+		t.Errorf("SelectBossTarget with nil players = %s, want empty", result)
+	}
+
+	// Single player always selected
+	single := []BossTargetCandidate{{PlayerID: "p1", LP: 5}}
+	result = SelectBossTarget(r, single)
+	if result != "p1" {
+		t.Errorf("SelectBossTarget single player = %s, want p1", result)
+	}
+
+	// Multiple players - low LP player should be more likely
+	players := []BossTargetCandidate{
+		{PlayerID: "p1", LP: 8},
+		{PlayerID: "p2", LP: 2},
+		{PlayerID: "p3", LP: 5},
+	}
+	// Run many iterations to check distribution
+	p2Count := 0
+	for i := 0; i < 1000; i++ {
+		r2 := rand.New(rand.NewSource(int64(i)))
+		target := SelectBossTarget(r2, players)
+		if target == "p2" {
+			p2Count++
+		}
+	}
+	// p2 (LP=2) should be selected more often than random (~1/3 = 333)
+	if p2Count < 400 {
+		t.Errorf("p2 selection count = %d, expected >400 (low LP should be targeted more)", p2Count)
+	}
+}
+
+func TestCalcPlayerCritRate(t *testing.T) {
+	tests := []struct {
+		diceType DiceType
+		expected float64
+	}{
+		{DiceTypeGold, 0.30},
+		{DiceTypeSilver, 0.20},
+		{DiceTypeCopper, 0.10},
+		{DiceTypeWood, 0.05},
+		{DiceTypeNormal, 0.05},
+		{DiceTypeNone, 0.05}, // defaults to wood rate
+	}
+	for _, tt := range tests {
+		result := CalcPlayerCritRate(tt.diceType)
+		if result != tt.expected {
+			t.Errorf("CalcPlayerCritRate(%s) = %.2f, want %.2f", tt.diceType.String(), result, tt.expected)
+		}
+	}
+}
+
+func TestCalcPlayerCrit(t *testing.T) {
+	r := rand.New(rand.NewSource(42))
+
+	// Gold dice should crit more often
+	goldCritCount := 0
+	for i := 0; i < 1000; i++ {
+		if CalcPlayerCrit(r, DiceTypeGold) {
+			goldCritCount++
+		}
+	}
+	if goldCritCount < 200 || goldCritCount > 400 {
+		t.Errorf("Gold dice crit count = %d, expected ~300 (±100)", goldCritCount)
+	}
+
+	// Wood dice should rarely crit
+	r2 := rand.New(rand.NewSource(42))
+	woodCritCount := 0
+	for i := 0; i < 1000; i++ {
+		if CalcPlayerCrit(r2, DiceTypeWood) {
+			woodCritCount++
+		}
+	}
+	if woodCritCount > 100 {
+		t.Errorf("Wood dice crit count = %d, expected <100", woodCritCount)
+	}
+}

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"sync"
 	"testing"
+
+	"github.com/b1tAction/paradiced/pkg/constants"
 )
 
 // ========== Base ID Tests ==========
@@ -249,6 +251,26 @@ func TestPlayerID(t *testing.T) {
 	}
 }
 
+func TestPlayerIDIsBoss(t *testing.T) {
+	// Boss UUID player should be detected
+	bossID := MustParsePlayerID(constants.BossPlayerUUID)
+	if !bossID.IsBoss() {
+		t.Error("PlayerID with Boss UUID should return IsBoss=true")
+	}
+
+	// Normal player should not be detected
+	normalID := NewPlayerID()
+	if normalID.IsBoss() {
+		t.Error("Normal PlayerID should return IsBoss=false")
+	}
+
+	// Zero player ID should not be boss
+	zeroID := ZeroPlayerID()
+	if zeroID.IsBoss() {
+		t.Error("Zero PlayerID should return IsBoss=false")
+	}
+}
+
 func TestBuffID(t *testing.T) {
 	id := NewBuffID()
 	if !stringsContains(id.String(), "buff-") {
@@ -359,6 +381,36 @@ func TestPlayerIDJSONRoundtrip(t *testing.T) {
 // Helper function
 func stringsContains(s, substr string) bool {
 	return len(s) >= len(substr) && s[:len(substr)] == substr
+}
+
+func TestTestUUID(t *testing.T) {
+	u1 := TestUUID(1)
+	if len(u1) != 36 {
+		t.Errorf("TestUUID(1) length = %d, expected 36", len(u1))
+	}
+	// Should end with the index
+	if u1[24:] != "000000000001" {
+		t.Errorf("TestUUID(1) suffix = %s, expected 000000000001", u1[24:])
+	}
+
+	u0 := TestUUID(0)
+	if u0[24:] != "000000000000" {
+		t.Errorf("TestUUID(0) suffix = %s, expected 000000000000", u0[24:])
+	}
+
+	u999 := TestUUID(999)
+	if u999[24:] != "000000000999" {
+		t.Errorf("TestUUID(999) suffix = %s, expected 000000000999", u999[24:])
+	}
+
+	// Should produce valid UUIDs usable for parsing
+	parsed, err := ParsePlayerID(TestUUID(42))
+	if err != nil {
+		t.Errorf("ParsePlayerID(TestUUID(42)) failed: %v", err)
+	}
+	if parsed.UUID() != TestUUID(42) {
+		t.Errorf("Parsed UUID = %s, expected %s", parsed.UUID(), TestUUID(42))
+	}
 }
 
 // ========== Parse Functions Tests ==========

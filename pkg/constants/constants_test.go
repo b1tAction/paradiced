@@ -576,6 +576,136 @@ func TestActionSourceIsFaction(t *testing.T) {
 	}
 }
 
+func TestActionSourceIsBoss(t *testing.T) {
+	bossSources := []ActionSource{
+		SourceBossNormal, SourceBossCrit, SourceBossDamage,
+		SourceBossSkillThunder, SourceBossSkillCurse, SourceBossSkillLost,
+		SourceBossSkillRest, SourceBossSkillThorns,
+	}
+	for _, as := range bossSources {
+		if !as.IsBoss() {
+			t.Errorf("ActionSource(%s).IsBoss() should be true", as)
+		}
+	}
+
+	nonBossSources := []ActionSource{
+		SourceBuffDivine, SourceItemReverseClock, SourceEventTrap,
+		SourceFactionBaiHu, SourceSystemDice, SourceThornsReflect,
+	}
+	for _, as := range nonBossSources {
+		if as.IsBoss() {
+			t.Errorf("ActionSource(%s).IsBoss() should be false", as)
+		}
+	}
+}
+
+// ========== BossType Tests ==========
+
+func TestBossTypeIsValid(t *testing.T) {
+	if !BossTypeBeast.IsValid() {
+		t.Error("BossTypeBeast.IsValid() should be true")
+	}
+
+	invalidTypes := []BossType{"invalid", ""}
+	for _, bt := range invalidTypes {
+		if bt.IsValid() {
+			t.Errorf("BossType(%s).IsValid() should be false", bt)
+		}
+	}
+}
+
+func TestBossSkillTypeIsValid(t *testing.T) {
+	validTypes := []BossSkillType{
+		BossSkillThunder, BossSkillCurse, BossSkillLost, BossSkillRest, BossSkillThorns,
+	}
+	for _, bst := range validTypes {
+		if !bst.IsValid() {
+			t.Errorf("BossSkillType(%s).IsValid() should be true", bst)
+		}
+	}
+
+	invalidTypes := []BossSkillType{"invalid", ""}
+	for _, bst := range invalidTypes {
+		if bst.IsValid() {
+			t.Errorf("BossSkillType(%s).IsValid() should be false", bst)
+		}
+	}
+}
+
+func TestParseBossSkillType(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected BossSkillType
+	}{
+		{"thunder", BossSkillThunder},
+		{"curse", BossSkillCurse},
+		{"lost", BossSkillLost},
+		{"rest", BossSkillRest},
+		{"thorns", BossSkillThorns},
+		{"invalid", BossSkillType("invalid")},
+	}
+	for _, tt := range tests {
+		result := ParseBossSkillType(tt.input)
+		if result != tt.expected {
+			t.Errorf("ParseBossSkillType(%s) = %s, want %s", tt.input, result, tt.expected)
+		}
+	}
+}
+
+func TestBossAttackTypeIsValid(t *testing.T) {
+	validTypes := []BossAttackType{BossAttackNormal, BossAttackCrit, BossAttackSkill}
+	for _, bat := range validTypes {
+		if !bat.IsValid() {
+			t.Errorf("BossAttackType(%s).IsValid() should be true", bat)
+		}
+	}
+
+	invalidTypes := []BossAttackType{"invalid", ""}
+	for _, bat := range invalidTypes {
+		if bat.IsValid() {
+			t.Errorf("BossAttackType(%s).IsValid() should be false", bat)
+		}
+	}
+}
+
+// ========== DrawType Tests ==========
+
+func TestDrawTypeIsValid(t *testing.T) {
+	validTypes := []DrawType{DrawTypeNone, DrawTypeEvent, DrawTypeItem}
+	for _, dt := range validTypes {
+		if !dt.IsValid() {
+			t.Errorf("DrawType(%s).IsValid() should be true", dt)
+		}
+	}
+
+	invalidTypes := []DrawType{"invalid"}
+	for _, dt := range invalidTypes {
+		if dt.IsValid() {
+			t.Errorf("DrawType(%s).IsValid() should be false", dt)
+		}
+	}
+}
+
+func TestParseDrawType(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected DrawType
+	}{
+		{"none", DrawTypeNone},
+		{"None", DrawTypeNone},
+		{"event", DrawTypeEvent},
+		{"Event", DrawTypeEvent},
+		{"item", DrawTypeItem},
+		{"Item", DrawTypeItem},
+		{"invalid", DrawTypeNone},
+	}
+	for _, tt := range tests {
+		result := ParseDrawType(tt.input)
+		if result != tt.expected {
+			t.Errorf("ParseDrawType(%s) = %s, want %s", tt.input, result, tt.expected)
+		}
+	}
+}
 func TestActionSourceIsSystem(t *testing.T) {
 	systemSources := []ActionSource{
 		SourceSystemDice, SourceSystemRespawn, SourceSystemFell,

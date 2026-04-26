@@ -1,6 +1,7 @@
 package event
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -572,5 +573,160 @@ func TestContextClear(t *testing.T) {
 	}
 	if len(ctx.DerivedActions) != 0 {
 		t.Error("DerivedActions should be empty after Clear")
+	}
+}
+
+// ========== Context Error Tests ==========
+
+func TestContextAddError(t *testing.T) {
+	ctx := NewContext(nil)
+
+	ctx.AddError(fmt.Errorf("first error"))
+	ctx.AddError(fmt.Errorf("second error"))
+
+	if len(ctx.Errors) != 2 {
+		t.Errorf("Errors count = %d, expected 2", len(ctx.Errors))
+	}
+
+	// Adding nil error should be ignored
+	ctx.AddError(nil)
+	if len(ctx.Errors) != 2 {
+		t.Errorf("Errors count should remain 2 after AddError(nil), got %d", len(ctx.Errors))
+	}
+}
+
+func TestContextHasError(t *testing.T) {
+	ctx := NewContext(nil)
+
+	if ctx.HasError() {
+		t.Error("HasError() should be false with no errors")
+	}
+
+	ctx.AddError(fmt.Errorf("test error"))
+	if !ctx.HasError() {
+		t.Error("HasError() should be true with errors")
+	}
+}
+
+func TestContextGetErrors(t *testing.T) {
+	ctx := NewContext(nil)
+
+	errs := ctx.GetErrors()
+	if errs != nil {
+		t.Errorf("GetErrors() without errors = %v, expected nil", errs)
+	}
+
+	ctx.AddError(fmt.Errorf("err1"))
+	ctx.AddError(fmt.Errorf("err2"))
+	errs = ctx.GetErrors()
+	if len(errs) != 2 {
+		t.Errorf("GetErrors() count = %d, expected 2", len(errs))
+	}
+}
+
+func TestContextFirstError(t *testing.T) {
+	ctx := NewContext(nil)
+
+	if ctx.FirstError() != nil {
+		t.Error("FirstError() should be nil with no errors")
+	}
+
+	ctx.AddError(fmt.Errorf("first"))
+	ctx.AddError(fmt.Errorf("second"))
+	if ctx.FirstError().Error() != "first" {
+		t.Errorf("FirstError() = %v, expected 'first'", ctx.FirstError())
+	}
+}
+
+func TestContextClearErrors(t *testing.T) {
+	ctx := NewContext(nil)
+	ctx.AddError(fmt.Errorf("test"))
+
+	ctx.ClearErrors()
+
+	if ctx.HasError() {
+		t.Error("HasError() should be false after ClearErrors")
+	}
+	if ctx.Errors != nil {
+		t.Errorf("Errors should be nil after ClearErrors, got %v", ctx.Errors)
+	}
+}
+
+// ========== Decision Advanced Tests ==========
+
+func TestDecisionWithNeedConfirm(t *testing.T) {
+	d := NewDecision("test", []Option{{ID: "ok", Label: "OK"}})
+	d.WithNeedConfirm(false)
+
+	if d.NeedConfirm {
+		t.Error("WithNeedConfirm(false) should set NeedConfirm to false")
+	}
+
+	// Auto decisions don't need confirm
+	d2 := NewAutoDecision("auto", []Option{{ID: "ok", Label: "OK"}})
+	if d2.NeedConfirm {
+		t.Error("AutoDecision should not need confirm")
+	}
+}
+
+func TestDecisionExecuteTimeout(t *testing.T) {
+	executed := false
+	d := NewDecision("test", []Option{
+		{ID: "a", Label: "A"},
+		{ID: "b", Label: "B", Action: func(ctx *Context) error { executed = true; return nil }},
+	})
+	d.WithTimeout(30*time.Second, 1) // Default option is index 1
+
+	ctx := NewContext(nil)
+	// ExecuteTimeout uses the default option
+	d.ExecuteTimeout(ctx)
+
+	if !executed {
+		t.Error("ExecuteTimeout should execute the default option action")
+	}
+}
+
+func TestDecisionIsTimedOut(t *testing.T) {
+	d := NewDecision("test", []Option{{ID: "a", Label: "A"}})
+	d.WithTimeout(1*time.Nanosecond, 0) // Very short timeout
+
+	startTime := time.Now()
+	time.Sleep(10 * time.Millisecond) // Wait for timeout
+
+	if !d.IsTimedOut(startTime) {
+		t.Error("Decision should be timed out after timeout duration")
+	}
+
+	// Decision without timeout should not be timed out
+	d2 := NewDecision("test", []Option{{ID: "a", Label: "A"}})
+	if d2.IsTimedOut(startTime) {
+		t.Error("Decision without timeout should not be timed out")
+	}
+}
+
+func TestDecisionSetCondition(t *testing.T) {
+	d := NewDecisionBuilder("test").
+		AddOption("a", "A", nil).
+		SetCondition(func() bool { return true }).
+		Build()
+
+	if !d.ShouldAsk() {
+		t.Error("Decision with true condition should ask")
+	}
+}
+
+func TestDecisionSetOnChoice(t *testing.T) {
+	chosenIdx := -1
+	d := NewDecisionBuilder("test").
+		AddOption("a", "A", nil).
+		AddOption("b", "B", nil).
+		SetOnChoice(func(c int, ctx *Context) error { chosenIdx = c; return nil }).
+		Build()
+
+	ctx := NewContext(nil)
+	d.Execute(0, ctx)
+
+	if chosenIdx != 0 {
+		t.Errorf("SetOnChoice callback received index = %d, expected 0", chosenIdx)
 	}
 }

@@ -75,10 +75,21 @@ func TestActionExecutionError(t *testing.T) {
 		t.Errorf("unexpected error message: %s", err.Error())
 	}
 
+	// Test Unwrap
+	unwrapped := err.Unwrap()
+	if unwrapped != ErrTest {
+		t.Errorf("expected unwrapped error to be ErrTest, got %v", unwrapped)
+	}
+
 	// Test without underlying error
 	errNoErr := NewActionExecutionError("heal", "player-001", "target not found", nil)
 	if errNoErr.Error() != "action heal on target player-001 failed (target not found)" {
 		t.Errorf("unexpected error message: %s", errNoErr.Error())
+	}
+
+	// Test Unwrap returns nil when no underlying error
+	if errNoErr.Unwrap() != nil {
+		t.Errorf("expected Unwrap to return nil, got %v", errNoErr.Unwrap())
 	}
 }
 
@@ -214,6 +225,31 @@ func TestWrapHSMError(t *testing.T) {
 	notWrapped := WrapHSMError(alreadyHSM, "Other", 2, "Exit", "")
 	if notWrapped != alreadyHSM {
 		t.Error("expected WrapHSMError to return same error when already HSMError")
+	}
+}
+
+func TestIsHSMError(t *testing.T) {
+	// HSMError should be detected
+	hsmErr := NewHSMError("TurnUpkeep", 2, "Enter", ErrTest, "")
+	if !IsHSMError(hsmErr) {
+		t.Error("IsHSMError should return true for HSMError")
+	}
+
+	// Other error types should not be detected
+	internalErr := NewInternalError("HSM", "Update", ErrTest)
+	if IsHSMError(internalErr) {
+		t.Error("IsHSMError should return false for InternalError")
+	}
+
+	// Nil should not be detected
+	if IsHSMError(nil) {
+		t.Error("IsHSMError should return false for nil")
+	}
+
+	// Wrapped HSMError should be detected
+	wrapped := WrapHSMError(ErrTest, "Test", 1, "Enter", "")
+	if !IsHSMError(wrapped) {
+		t.Error("IsHSMError should return true for wrapped HSMError")
 	}
 }
 
