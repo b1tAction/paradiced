@@ -99,13 +99,15 @@ CLI 需要覆盖以下服务端 OpCode（1-99）：
 | OpCode | 名称 | 数据类型 | 处理状态 |
 |--------|------|----------|----------|
 | 1 | `OpStateSync` | `StateSync` | ✅ 已实现 |
-| 2 | `OpTurnSync` | `TurnSync` | ✅ 已实现 |
 | 3 | `OpDecisionRequest` | `Decision` | ✅ 已实现 |
 | 4 | `OpAvailable` | `Available` | ✅ 已实现 |
 | 5 | `OpMiniGameStart` | `MiniGameStart` | ✅ 已实现 |
-| 6 | `OpMiniGameResult` | `MiniGameResult` | ⏳ 待实现 |
+| 6 | `OpMiniGameResult` | `MiniGameResult` | ✅ 已实现 |
 | 7 | `OpGameOver` | `GameOver` | ✅ 已实现 |
-| 8 | `OpFullSync` | `FullSync` | ⏳ 待实现 |
+| 8 | `OpFullSync` | `StateSync` (完整快照) | ✅ 已实现 |
+| 9 | `OpActionRejected` | `ActionRejected` | ✅ 已实现 |
+| 10 | `OpWaitingSync` | `WaitingSync` | ✅ 已实现 |
+| 11 | `OpStartGameAck` | `StartGameAck` | ✅ 已实现 |
 
 客户端发送 OpCode（100+）：
 
@@ -115,7 +117,9 @@ CLI 需要覆盖以下服务端 OpCode（1-99）：
 | 101 | `OpUseItem` | `UseItem` | ✅ 已实现 |
 | 102 | `OpUseSkill` | `UseSkill` | ✅ 已实现 |
 | 103 | `OpUserChoice` | `UserChoice` | ✅ 已实现 |
-| 104 | `OpMiniGameResultSubmit` | `MiniGameResultSubmit` | ✅ 已实现 |
+| 105 | `OpStartGame` | `StartGame` | ✅ 已实现 |
+| 106 | `OpRoundReady` | `RoundReady` | ✅ 已实现 |
+| 107 | `OpMiniGameDataSubmit` | `MiniGameDataSubmit` | ✅ 已实现 |
 
 ## 使用示例
 

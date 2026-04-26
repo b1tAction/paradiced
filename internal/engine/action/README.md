@@ -110,10 +110,9 @@ type ModifyLPAction struct {
 type MoveAction struct {
     targetPlayer *core.Player   // 私有字段
     Steps        int            // 可为负数（迷途反向）
-    SourceID     string         // "DiceRoll"
-    TargetPos    int            // 执行后设置
-    Path         []int          // 计算后的路径
-    Overtaken    []*core.Player // 反超的玩家（白虎劫运）
+    SourceID     string         // "DiceRoll" / "DiceRollCheckpoint"
+    targetPos    int            // 私有字段，执行后设置
+    path         []int          // 私有字段，计算后的路径
 }
 ```
 
@@ -390,13 +389,13 @@ func (a *BossDamageAction) PostTriggerPhase() constants.Phase { return constants
 func (a *MoveAction) PreTriggerPhase() constants.Phase { return constants.PhasePreMove }
 func (a *MoveAction) PostTriggerPhase() constants.Phase { return constants.PhaseAnyTime }
 
-// AddBuffAction - 添加后触发入场效果
-func (a *AddBuffAction) PreTriggerPhase() constants.Phase { return constants.PhaseAnyTime }
+// AddBuffAction - 添加前可被隐匿拦截
+func (a *AddBuffAction) PreTriggerPhase() constants.Phase { return constants.PhasePreBuffApplied }
 func (a *AddBuffAction) PostTriggerPhase() constants.Phase { return constants.PhasePostBuffApplied }
 
-// RemoveBuffAction - 移除前触发亡语
+// RemoveBuffAction - 移除前触发亡语，移除后触发PostBuffRemoved
 func (a *RemoveBuffAction) PreTriggerPhase() constants.Phase { return constants.PhasePreBuffRemoved }
-func (a *RemoveBuffAction) PostTriggerPhase() constants.Phase { return constants.PhaseAnyTime }
+func (a *RemoveBuffAction) PostTriggerPhase() constants.Phase { return constants.PhasePostBuffRemoved }
 
 // DrawBuffAction - 抽取本身无需拦截，后续AddBuffAction处理PhasePreBuffApplied
 func (a *DrawBuffAction) PreTriggerPhase() constants.Phase { return constants.PhaseAnyTime }

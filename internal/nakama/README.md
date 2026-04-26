@@ -17,7 +17,7 @@
 | `dispatcher.go` | DispatcherAdapter 接口定义、BroadcastRecord/MessageRecord |
 | `dispatcher_mock.go` | MockDispatcherAdapter 测试实现（消息捕获） |
 | `dispatcher_real.go` | RealDispatcherAdapter 生产实现（真实 Nakama SDK） |
-| `adapter.go` | NakamaMatchAdapter/NakamaMatchHandlerWrapper（Nakama 包装器） |
+| `adapter.go` | NakamaMatchHandlerAdapter（Nakama 包装器，实现 runtime.MatchHandler 接口） |
 | `broadcast.go` | NakamaBroadcastAdapter 实现 pkg/net.BroadcastAdapter |
 | `lifecycle.go` | MatchInit/MatchLoop/MatchStop、addPlayer/assignFactions |
 | `message.go` | HandleMessage 消息路由、各 OpCode 处理器 |
@@ -49,9 +49,9 @@ handler := nakama.NewNakamaMatchHandler("match-001", 12345, 4, 100)
 mockDispatcher := nakama.NewMockDispatcherAdapter()
 handler.WithDispatcher(mockDispatcher)
 
-// 添加玩家
-handler.addPlayer(id.TestUUID(1), protocol.FactionQingLong)
-handler.addPlayer(id.TestUUID(2), protocol.FactionZhuQue)
+// 添加玩家（需要 userID、faction、displayName 三个参数）
+handler.addPlayer("user-001-uuid", constants.FactionQingLong, "Alice")
+handler.addPlayer("user-002-uuid", constants.FactionZhuQue, "Bob")
 
 // 初始化游戏
 handler.MatchInit()
@@ -258,9 +258,6 @@ broadcast := nakama.NewNakamaBroadcastAdapter(handler)
 
 // 广播状态同步
 broadcast.BroadcastStateSync(stateSync)
-
-// 广播回合 Action 列表
-broadcast.BroadcastTurnSync(turnSync)
 
 // 发送决策请求
 broadcast.SendDecision(playerID, decision)
