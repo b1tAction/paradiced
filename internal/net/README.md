@@ -84,35 +84,29 @@ func (b *Builder) BuildFullSyncStateSync() *pkgnet.StateSync {
 
 ## Buff/Item Name 提取
 
-Builder 从定义获取显示名：
+Builder 从 engine Registry 获取显示名：
 
 ```go
-func (b *Builder) BuildBuffs(activeBuffs []*buff.Buff) []pkgnet.Buff {
-    for i, bf := range activeBuffs {
-        def := buff.GetBuffDefinition(bf.Type)
-        name := ""
-        if def != nil {
-            name = def.Name // "神眷", "诅咒" 等中文名
+func (b *Builder) BuildBuffs(activeBuffs []*core.Buff) []pkgnet.Buff {
+    for _, bf := range activeBuffs {
+        // Skip hidden buffs (internal mechanism, not visible to player)
+        if engine.IsHidden(bf.Type) {
+            continue
         }
-        result[i] = pkgnet.Buff{
+        result = append(result, pkgnet.Buff{
             Type:     string(bf.Type),
-            Name:     name,
+            Name:     engine.GetBuffName(bf.Type), // "神眷", "诅咒" 等中文名
             Duration: bf.Duration,
-        }
+        })
     }
 }
 
-func (b *Builder) BuildItems(inventory []*item.Item) []pkgnet.Item {
+func (b *Builder) BuildItems(inventory []*core.Item) []pkgnet.Item {
     for i, it := range inventory {
-        def := item.GetItemDefinition(it.Type)
-        name := ""
-        if def != nil {
-            name = def.Name // "任意门", "反方向的钟" 等中文名
-        }
         result[i] = pkgnet.Item{
             ID:   it.ID.UUID(),
             Type: string(it.Type),
-            Name: name,
+            Name: engine.GetItemName(it.Type), // "任意门", "反方向的钟" 等中文名
         }
     }
 }

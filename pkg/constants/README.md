@@ -19,7 +19,7 @@ pkg/constants/
 ├── event.go        # EventType - 事件类型
 ├── item.go         # ItemType - 道具类型
 ├── faction.go      # Faction - 四神兽阵营
-├── cell.go         # CellType - 地图格子类型
+├── cell.go         # CellType - 地图格子类型 + DrawType - 格子抽取类型
 ├── boss.go         # BossType, BossSkillType, BossAttackType, BossPlayerUUID - Boss相关类型
 ├── action.go       # ActionType - Action 类型
 ├── state.go        # StateID - HSM 状态标识
@@ -27,8 +27,10 @@ pkg/constants/
 ├── source.go       # ActionSource - Action 来源标识
 ├── evaluation.go   # Evaluation - 评分系统（int 类型）
 ├── error_code.go   # ErrorCode - 错误码系统
-├── draw_type.go    # DrawType - 格子抽取类型
+├── minigame.go     # MiniGameType - 小游戏类型, MiniGameMode - 小游戏模式
 ├── constants_test.go # 单元测试
+├── error_code_test.go # ErrorCode 单元测试
+├── minigame_test.go   # MiniGame 单元测试
 └── README.md       # 本文档
 ```
 
@@ -128,6 +130,19 @@ pkg/constants/
 | `CellTypeFog` | `fog` | 迷雾格子（毒瘴区域） |
 | `CellTypeCheckpoint` | `checkpoint` | 检查点（重生点） |
 | `CellTypeBoss` | `boss` | Boss格子（终点） |
+| `CellTypeEvent` | `event` | 事件格子（触发绑定事件） |
+
+### DrawType - 格子抽取类型
+
+定义在 `cell.go`，与 CellType 同文件。指定地图格子的抽取行为配置。
+
+提供 `IsValid()`、`ParseDrawType()` 方法。
+
+| 常量 | 值 | 说明 |
+|------|-----|------|
+| `DrawTypeNone` | `none` | 无抽取 |
+| `DrawTypeEvent` | `event` | 抽取事件 |
+| `DrawTypeItem` | `item` | 抽取道具 |
 
 ### BossType - Boss 类型标识
 
@@ -136,6 +151,25 @@ pkg/constants/
 | 常量 | 值 | 说明 |
 |------|-----|------|
 | `BossTypeBeast` | `beast` | 凶兽（主Boss） |
+
+### MiniGameType - 小游戏类型标识
+
+提供 `IsValid()` 方法。`AllMiniGameTypes` 变量提供所有可用类型列表。
+
+| 常量 | 值 | 说明 |
+|------|-----|------|
+| `MiniGameTypeDiceRace` | `dice_race` | 骰子赛跑：按分数（骰子总和）降序排名 |
+| `MiniGameTypeCoinFlip` | `coin_flip` | 翻硬币：按成功次数降序排名（未实现，暂不可用） |
+| `MiniGameTypeCountSeconds` | `count_seconds` | 数秒：按偏差升序排名（偏差 = |提交秒数 - 5.0|） |
+
+### MiniGameMode - 小游戏执行模式
+
+`int` 类型，定义小游戏的结果提交方式。
+
+| 常量 | 值 | 说明 |
+|------|-----|------|
+| `MiniGameModeFrontend` | 0 | 前端提交游戏数据，服务器计算排名 |
+| `MiniGameModeRPC` | 1 | 小游戏服务 RPC 直接上报排名 |
 
 ### BossSkillType - Boss 技能类型标识
 
@@ -311,6 +345,9 @@ pkg/constants/
 | BossSkillType | - | pkg/constants | ✓ 已添加 |
 | BossAttackType | - | pkg/constants | ✓ 已添加 |
 | BossPlayerUUID | - | pkg/constants | ✓ 已添加 |
+| MiniGameType | - | pkg/constants | ✓ 已添加 |
+| MiniGameMode | - | pkg/constants | ✓ 已添加 |
+| DrawType | internal/gamemap | pkg/constants (cell.go) | ✓ 已添加 |
 
 ## Metadata 契约
 
