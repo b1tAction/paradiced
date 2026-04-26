@@ -112,23 +112,39 @@ MatchLoop() 每个 tick
 ### 4. Turn State 广播
 
 ```
+TurnLandedState.Enter(ctx)
+    │
+    ├─→ PhaseOnLand 触发
+    │
+    └─→ broadcastStateSync(ctx)  // 落地效果后广播 StateSync（含增量 Entries）
+            │
+            └─→ ctx.Builder.BuildStateSync()  ✅
+                    │
+                    └─→ ctx.Broadcast.BroadcastStateSync()
+
+TurnDrawState.Enter(ctx)
+    │
+    ├─→ DrawEvent/DrawItem 执行
+    │
+    └─→ broadcastStateSync(ctx)  // 抽取效果后广播 StateSync（含增量 Entries）
+            │
+            └─→ ctx.Builder.BuildStateSync()  ✅
+                    │
+                    └─→ ctx.Broadcast.BroadcastStateSync()
+
 TurnEndState.Enter(ctx)
     │
     ├─→ PhaseAfterTurn 触发
     ├─→ Tick Buffs
     ├─→ Faction Charging
     │
-    └─→ broadcastTurnSync(ctx)
-            │
-            └─→ ctx.Builder.BuildTurnSync()  ✅
-                    │
-                    └─→ ctx.Broadcast.BroadcastTurnSync()
-
-    └─→ broadcastStateSync(ctx)
-            │
+    └─→ broadcastStateSync(ctx)  // 回合结束时广播 StateSync（含剩余增量 Entries）
+            │                       // 必须在 EndTurn 之前，因为 EndTurn 会清除 GameLog.current
             └─→ ctx.Builder.BuildStateSync()  ✅
                     │
                     └─→ ctx.Broadcast.BroadcastStateSync()
+
+    └─→ game.Log.EndTurn()  // 结束回合日志
 ```
 
 ## 关键点
@@ -147,7 +163,8 @@ TurnEndState.Enter(ctx)
 2. **每次 MatchLoop 创建新 Builder** - 确保 HSM 状态是最新的
 3. **TransitionTo 不创建 ctx** - 依赖外部传入的完整 ctx
 4. **PhasePreMove 由 HSM 发布** - TurnMovingState.Enter() 中发布，迷途 handler 通过 StepsModifier 接口修改 Steps（非 MoveAction.PreTrigger）
-5. **TurnCheckpoint 不单独广播** - DrawItem LogEntry 记录到 GameLog，回合结束时统一广播 TurnSync
+5. **TurnLanded/TurnDraw 广播 StateSync** - 落地和抽取效果执行后广播 StateSync（含增量 Entries），客户端按 Entries 顺序播放动画
+6. **TurnEnd 广播必须在 EndTurn 之前** - `game.Log.EndTurn()` 会将 `GameLog.current` 设为 nil，导致 `GetNewEntries()` 返回空
 
 ## 协议消息对应表
 
@@ -158,8 +175,8 @@ TurnEndState.Enter(ctx)
 | TurnUpkeep | TurnUpkeepState.Enter | BuildStateSync | BroadcastStateSync | OpStateSync |
 | MainAction | MainActionState.Enter | BuildAvailable | SendAvailable | OpAvailable |
 | TurnMoving | TurnMovingState.Enter (PhasePreMove) | - | - | - (纯移动，不单独广播) |
-| TurnCheckpoint | TurnCheckpointState.Enter | - | - | - (DrawItem，不单独广播) |
-| TurnLanded | TurnLandedState.Enter (PhaseOnLand) | - | - | - (落地，不单独广播) |
-| TurnBossBattle | TurnBossBattleState.Enter | BuildTurnSync + BuildStateSync | BroadcastTurnSync + BroadcastStateSync | OpTurnSync + OpStateSync |
-| TurnEnd | TurnEndState.Enter | BuildTurnSync + BuildStateSync | BroadcastTurnSync + BroadcastStateSync | OpTurnSync + OpStateSync |
+| TurnLanded | TurnLandedState.Enter (PhaseOnLand) | BuildStateSync | BroadcastStateSync | OpStateSync |
+| TurnDraw | TurnDrawState.Enter (DrawEvent/DrawItem) | BuildStateSync | BroadcastStateSync | OpStateSync |
+| TurnBossBattle | TurnBossBattleState.Enter | BuildStateSync | BroadcastStateSync | OpStateSync |
+| TurnEnd | TurnEndState.Enter | BuildStateSync | BroadcastStateSync | OpStateSync |
 | GameOver | GameOverState.Enter | BuildStateSync | BroadcastGameOver | OpGameOver |

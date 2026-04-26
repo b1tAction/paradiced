@@ -14,7 +14,7 @@
 │                    pkg/net 协议层                                  │
 │  - OpCode: 消息操作码                                              │
 │  - Message: 基础消息结构                                           │
-│  - StateSync/TurnSync: 同步数据结构                                │
+│  - StateSync: 同步数据结构（含增量 LogEntry）                                │
 │  - Decision: 决策请求结构                                          │
 │  - BroadcastAdapter: 广播抽象接口                                  │
 ├──────────────────────────────────────────────────────────────────┤
@@ -34,7 +34,7 @@
 
 1. **权威服务器模式**：所有计算在服务端完成，客户端只负责渲染和发送请求
 2. **抽象接口设计**：`pkg/net.BroadcastAdapter` 定义抽象接口，不引入 Nakama SDK 依赖
-3. **LogEntry 模式**：使用 TurnSync 包含 LogEntry 数组，客户端顺序渲染
+3. **增量 LogEntry 模式**：StateSync 通过 `Entries` 字段携带增量 LogEntry，客户端顺序渲染
 4. **Metadata 契约**：LogEntry.Metadata 字段遵循 [doc/metadata/logentry.md](../metadata/logentry.md) 契约
 5. **命名统一**：所有同步数据结构使用无后缀命名（StateSync、Player、Buff）
 
@@ -44,14 +44,13 @@
 
 | OpCode | 名称 | 数据类型 | 说明 |
 |--------|------|----------|------|
-| 1 | `OpStateSync` | `StateSync` | 状态同步（进入新状态） |
-| 2 | `OpTurnSync` | `TurnSync` | 回合内效果列表（使用LogEntry） |
+| 1 | `OpStateSync` | `StateSync` | 状态同步（含增量 LogEntry） |
 | 3 | `OpDecisionRequest` | `Decision` | 决策请求 |
 | 4 | `OpAvailable` | `Available` | 可用操作列表（道具/技能） |
 | 5 | `OpMiniGameStart` | `MiniGameStart` | 小游戏开始 |
 | 6 | `OpMiniGameResult` | `MiniGameResult` | 小游戏结果广播 |
 | 7 | `OpGameOver` | `GameOver` | 游戏结束 |
-| 8 | `OpFullSync` | `FullSync` | 完整同步（断线重连） |
+| 8 | `OpFullSync` | `StateSync` | 完整同步（断线重连，含当前回合全部 LogEntry） |
 
 ### Client → Server (100+)
 
@@ -67,7 +66,7 @@
 
 ### StateSync
 
-完整游戏状态同步，用于客户端状态更新和断线重连：
+完整游戏状态同步，含增量 LogEntry 数据。每次 HSM 状态转换时，`BuildStateSync()` 获取自上次广播以来的新 LogEntry：
 
 ```go
 type StateSync struct {
@@ -78,23 +77,15 @@ type StateSync struct {
     Turn        int       `json:"turn"`
     Paused      bool      `json:"paused"`        // 等待决策中
     Players     []Player  `json:"players"`
+    Map         MapInfo   `json:"map"`
+    Entries     []gamelog.LogEntry `json:"entries,omitempty"` // 增量 LogEntry
 }
 ```
 
-### TurnSync
-
-回合内所有效果同步，使用 LogEntry 数组供客户端顺序渲染：
-
-```go
-type TurnSync struct {
-    Round   int               `json:"round"`
-    Turn    int               `json:"turn"`
-    Player  string            `json:"player"`    // 回合玩家ID
-    Entries []gamelog.LogEntry `json:"entries"`  // 效果列表（使用LogEntry）
-}
-```
-
-**设计理由**：`TurnSync.Entries` 直接使用 `gamelog.LogEntry`，避免额外的 Action 展平结构。客户端根据 `LogEntry.ActionType` 和 `LogEntry.Metadata` 解析效果详情。
+**Entries 增量机制**：
+- 每次 `BuildStateSync()` 调用 `GameLog.GetNewEntries()` + `MarkBroadcasted()` 获取增量 LogEntry
+- `omitempty` 确保无新 LogEntry 时 JSON 不包含此字段
+- 断线重连使用 `BuildFullSyncStateSync()` 获取当前回合全部 LogEntry
 
 ### LogEntry 结构
 
@@ -268,40 +259,41 @@ type RankingEntry struct {
 
 ### FullSync
 
-完整同步（断线重连）：
+完整同步（断线重连）直接使用 `StateSync` 结构。通过 `BuildFullSyncStateSync()` 获取包含当前回合全部 LogEntry 的 StateSync：
 
 ```go
-type FullSync struct {
-    State *StateSync `json:"state"`
-    Turn  *TurnSync  `json:"turn"`
-}
+// 断线重连使用 BuildFullSyncStateSync 获取完整状态
+stateSync := builder.BuildFullSyncStateSync()
+broadcastAdapter.SendFullSync(playerID, stateSync)
 ```
 
 ## BroadcastAdapter 接口
 
-抽象广播接口，供 HSM 和 ActionContext 使用。接口使用 `interface{}` 参数以支持不同实现：
+抽象广播接口，供 HSM 和 ActionContext 使用：
 
 ```go
 type BroadcastAdapter interface {
-    // 状态广播
-    BroadcastStateSync(state interface{}) error
-    BroadcastTurnSync(turn interface{}) error
-    
+    // 状态广播（含增量 LogEntry）
+    BroadcastStateSync(state *StateSync) error
+
     // 单播
-    SendDecision(playerID string, decision interface{}) error
-    SendAvailable(playerID string, available interface{}) error
-    SendFullSync(playerID string, state, turn interface{}) error
-    
+    SendDecision(playerID string, decision *Decision) error
+    SendAvailable(playerID string, available *Available) error
+    SendFullSync(playerID string, state *StateSync) error  // 断线重连（含全部当前回合 LogEntry）
+
     // 小游戏
-    BroadcastMiniGameStart(start interface{}) error
-    BroadcastMiniGameResult(result interface{}) error
-    
+    BroadcastMiniGameStart(start *MiniGameStart) error
+    BroadcastMiniGameResult(result *MiniGameResult) error
+
     // 游戏结束
-    BroadcastGameOver(over interface{}) error
+    BroadcastGameOver(over *GameOver) error
+
+    // 开始游戏确认
+    BroadcastStartGameAck(ack *StartGameAck) error
 }
 ```
 
-**注意**：接口使用 `interface{}` 参数，实现方需要进行类型断言。
+**注意**：`BroadcastTurnSync` 和 `TurnSync` 已移除，LogEntry 数据现在通过 `StateSync.Entries` 增量携带。
 
 ## Faction SnakeCase 转换
 
@@ -354,13 +346,14 @@ type NakamaBroadcastAdapter struct {
     handler *NakamaMatchHandler
 }
 
-func (a *NakamaBroadcastAdapter) BroadcastStateSync(state interface{}) error {
-    stateSync, ok := state.(*pkgnet.StateSync)
-    if !ok {
-        return nil // Invalid type, skip
-    }
-    data, _ := json.Marshal(stateSync)
+func (a *NakamaBroadcastAdapter) BroadcastStateSync(state *pkgnet.StateSync) error {
+    data, _ := json.Marshal(state)
     return a.handler.dispatcher.BroadcastMessage(int64(pkgnet.OpStateSync), data)
+}
+
+func (a *NakamaBroadcastAdapter) SendFullSync(playerID string, state *pkgnet.StateSync) error {
+    data, _ := json.Marshal(state)
+    return a.handler.dispatcher.SendMessage(playerID, int64(pkgnet.OpFullSync), data)
 }
 ```
 

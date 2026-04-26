@@ -29,7 +29,7 @@
 │                    pkg/net 协议层                                  │
 │  - BroadcastAdapter: 广播抽象接口                                  │
 │  - OpCode/Message: 消息操作码和结构                                │
-│  - StateSync/TurnSync: 同步数据结构                                │
+│  - StateSync: 同步数据结构（含增量 LogEntry）                                │
 ├──────────────────────────────────────────────────────────────────┤
 │                    游戏核心层                                      │
 │  - HSM: 分层状态机                                                 │
@@ -157,13 +157,12 @@ type NakamaBroadcastAdapter struct {
 
 // 实现 BroadcastAdapter 所有方法
 func (a *NakamaBroadcastAdapter) BroadcastStateSync(state *net.StateSync) error
-func (a *NakamaBroadcastAdapter) BroadcastTurnSync(turn *net.TurnSync) error
 func (a *NakamaBroadcastAdapter) SendDecision(playerID string, decision *net.Decision) error
 func (a *NakamaBroadcastAdapter) SendAvailable(playerID string, available *net.Available) error
 func (a *NakamaBroadcastAdapter) BroadcastMiniGameStart(start *net.MiniGameStart) error
 func (a *NakamaBroadcastAdapter) BroadcastMiniGameResult(result *net.MiniGameResult) error
 func (a *NakamaBroadcastAdapter) BroadcastGameOver(over *net.GameOver) error
-func (a *NakamaBroadcastAdapter) SendFullSync(playerID string, state *net.StateSync, turn *net.TurnSync) error
+func (a *NakamaBroadcastAdapter) SendFullSync(playerID string, state *net.StateSync) error
 func (a *NakamaBroadcastAdapter) BroadcastStartGameAck(ack *net.StartGameAck) error
 ```
 
@@ -293,17 +292,16 @@ func (h *NakamaMatchHandler) handleRollDice(sender string) error {
 → 路径效果（坠落/反超）
 
 【TurnLanded】
-→ BroadcastStateSync(turn_landed)
+→ BroadcastStateSync(turn_landed) // 含增量 LogEntry
 → 触发 OnLand 效果
 
-【TurnEvent】
-→ BroadcastStateSync(turn_event)
+【TurnDraw】
+→ BroadcastStateSync(turn_draw) // 含增量 LogEntry
 → 抽取事件、执行效果
 
 【TurnEnd】
-→ BroadcastStateSync(turn_end)
+→ BroadcastStateSync(turn_end) // 含增量 LogEntry（必须在 EndTurn 之前）
 → TickBuffs、阵营充能
-→ BroadcastTurnSync(本回合 Action)
 → 下一玩家
 ```
 
@@ -314,11 +312,10 @@ func (h *NakamaMatchHandler) handleRollDice(sender string) error {
 func (h *NakamaMatchHandler) HandlePresenceJoin(userID string, metadata map[string]string) error {
     // 检查玩家是否已在游戏中
     if h.players[userID] != nil {
-        // 重连：发送完整状态
+        // 重连：发送完整状态（含当前回合全部 LogEntry）
         broadcast := NewNakamaBroadcastAdapter(h)
-        stateSync := buildStateSync(h)
-        turnSync := buildTurnSync(h)
-        broadcast.SendFullSync(userID, stateSync, turnSync)
+        stateSync := builder.BuildFullSyncStateSync()
+        broadcast.SendFullSync(userID, stateSync)
         return nil
     }
 
