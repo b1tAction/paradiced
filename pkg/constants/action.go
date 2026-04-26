@@ -42,6 +42,14 @@ const (
 	ActionBossSkill ActionType = "boss_skill"
 	// ActionDiceRoll represents dice roll result for client animation (interceptable via PhasePreDiceRoll).
 	ActionDiceRoll ActionType = "dice_roll"
+	// ActionAddItem represents adding an Item to player inventory.
+	ActionAddItem ActionType = "add_item"
+	// ActionRemoveItem represents removing an Item from player inventory.
+	ActionRemoveItem ActionType = "remove_item"
+	// ActionDrawBuff represents drawing a random Buff from BuffPool.
+	ActionDrawBuff ActionType = "draw_buff"
+	// ActionDiceUpgrade represents upgrading a player's dice type.
+	ActionDiceUpgrade ActionType = "dice_upgrade"
 	// ActionUnknown represents an unknown action type.
 	ActionUnknown ActionType = "unknown"
 )
@@ -53,7 +61,8 @@ func (at ActionType) IsValid() bool {
 		ActionAddBuff, ActionRemoveBuff, ActionRespawn, ActionSkipTurn,
 		ActionDrawEvent, ActionTeleport, ActionStealBuff, ActionFellDown,
 		ActionDrawItem, ActionDeath, ActionBossDamage, ActionBossAttack,
-		ActionBossSkill, ActionDiceRoll:
+		ActionBossSkill, ActionDiceRoll, ActionAddItem, ActionRemoveItem,
+		ActionDrawBuff, ActionDiceUpgrade:
 		return true
 	default:
 		return false
@@ -100,6 +109,14 @@ func ParseActionType(s string) ActionType {
 		return ActionBossSkill
 	case "dice_roll":
 		return ActionDiceRoll
+	case "add_item":
+		return ActionAddItem
+	case "remove_item":
+		return ActionRemoveItem
+	case "draw_buff":
+		return ActionDrawBuff
+	case "dice_upgrade":
+		return ActionDiceUpgrade
 	default:
 		return ActionUnknown
 	}

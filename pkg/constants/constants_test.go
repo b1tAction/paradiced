@@ -154,7 +154,7 @@ func TestEventTypeIsValid(t *testing.T) {
 
 func TestItemTypeIsValid(t *testing.T) {
 	validTypes := []ItemType{
-		ItemTypeReverseClock, ItemTypeAnyDoor, ItemTypeDiceSwap, ItemTypeDiceUpgrade,
+		ItemTypeReverseClock, ItemTypeAnyDoor, ItemTypeDiceUpgrade,
 	}
 	for _, it := range validTypes {
 		if !it.IsValid() {
@@ -906,7 +906,7 @@ func TestParseItemType(t *testing.T) {
 	}{
 		{"reverse_clock", ItemTypeReverseClock},
 		{"any_door", ItemTypeAnyDoor},
-		{"dice_swap", ItemTypeDiceSwap},
+		{"dice_swap", ItemTypeNone}, // DiceSwap removed, should parse as None
 		{"dice_upgrade", ItemTypeDiceUpgrade},
 		{"invalid", ItemTypeNone},
 		{"", ItemTypeNone},

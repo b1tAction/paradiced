@@ -81,8 +81,7 @@ pkg/constants/
 |------|-----|------|
 | `ItemTypeReverseClock` | `reverse_clock` | 反方向的钟：给目标迷途Buff |
 | `ItemTypeAnyDoor` | `any_door` | 任意门：传送 |
-| `ItemTypeDiceSwap` | `dice_swap` | 骰子交换：交换骰子 |
-| `ItemTypeDiceUpgrade` | `dice_upgrade` | 骰子升级：升级骰子 |
+| `ItemTypeDiceUpgrade` | `dice_upgrade` | 骰子升级：升级骰子（Wood→Copper→Silver→Gold） |
 
 ### Phase - 触发时机
 
@@ -185,6 +184,36 @@ pkg/constants/
 | Layer 2 | `StateTurnBossBattle` | `turn_boss_battle` | Boss战斗 |
 | Layer 2 | `StateTurnEnd` | `turn_end` | 回合结束 |
 | Layer 3 | `StateWaitDecision` | `wait_decision` | 等待决策 |
+
+### ActionType - Action 类型标识
+
+提供 `IsValid()`、`ParseActionType()` 方法。
+
+| 常量 | 值 | 说明 |
+|------|-----|------|
+| `ActionDamage` | `damage` | HP减少（可被护盾拦截） |
+| `ActionHeal` | `heal` | HP恢复 |
+| `ActionModifyLP` | `modify_lp` | LP修改（±1） |
+| `ActionMove` | `move` | 地图移动（可被迷途拦截） |
+| `ActionAddBuff` | `add_buff` | 添加Buff |
+| `ActionRemoveBuff` | `remove_buff` | 移除Buff |
+| `ActionRespawn` | `respawn` | 检查点重生 |
+| `ActionSkipTurn` | `skip_turn` | 跳过回合 |
+| `ActionDrawEvent` | `draw_event` | 随机抽取Event |
+| `ActionTeleport` | `teleport` | 传送至指定位置 |
+| `ActionStealBuff` | `steal_buff` | 偷取其他玩家Buff |
+| `ActionFellDown` | `fell_down` | 易碎格子穿透 |
+| `ActionDrawItem` | `draw_item` | 随机抽取Item |
+| `ActionDeath` | `death` | 玩家死亡（客户端动画） |
+| `ActionBossDamage` | `boss_damage` | 玩家攻击Boss |
+| `ActionBossAttack` | `boss_attack` | Boss攻击玩家 |
+| `ActionBossSkill` | `boss_skill` | Boss使用技能 |
+| `ActionDiceRoll` | `dice_roll` | 骰子投掷结果 |
+| `ActionAddItem` | `add_item` | 添加Item到背包（含EventBus订阅） |
+| `ActionRemoveItem` | `remove_item` | 从背包移除Item（含EventBus取消订阅） |
+| `ActionDrawBuff` | `draw_buff` | 随机抽取Buff（可被隐匿拦截） |
+| `ActionDiceUpgrade` | `dice_upgrade` | 骰子升级 |
+| `ActionUnknown` | `unknown` | 未知Action类型 |
 
 ### EntryType - GameLog 条目类型
 
