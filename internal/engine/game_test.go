@@ -1,9 +1,11 @@
 package engine
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/b1tAction/paradiced/internal/core"
+	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/b1tAction/paradiced/pkg/rng"
@@ -612,5 +614,89 @@ func TestApplyItemToPlayerWithSubscription(t *testing.T) {
 		if sub.SourceID == item.ID.UUID() {
 			t.Error("AnyDoor subscription should be removed after RemoveItemFromPlayer")
 		}
+	}
+}
+
+// ========== DrawBuffAction Integration Tests ==========
+
+func TestDrawBuffActionWithEngineBuffPool(t *testing.T) {
+	// Test DrawBuffAction using the real BuffPool built from BuffRegistry
+	game := NewGame(id.NewGameID(), 42)
+	game.BuffPool = BuildBuffPool()
+	game.EventPool = BuildEventPool()
+	game.ItemPool = BuildItemPool()
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.LP = 5
+	game.AddPlayer(player)
+
+	if len(game.BuffPool) == 0 {
+		t.Fatal("BuffPool should not be empty from BuildBuffPool()")
+	}
+
+	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
+	action := engineaction.NewDrawBuffAction(player, "Event_TasteTest")
+	ctx := engineaction.NewActionContext(game, game.Bus, nil, drawEngine)
+	ctx.SetPools(game.EventPool, game.ItemPool, game.BuffPool)
+	ctx.SetCellDraw(0.5, 0.3, 0.2)
+	ctx.OnAddBuff = func(p *core.Player, b *core.Buff) { game.ApplyBuffToPlayer(p, b) }
+	ctx.GetBuffDuration = func(bt constants.BuffType) int {
+		def := GetBuffDefinition(bt)
+		if def != nil {
+			return def.Duration
+		}
+		return 3
+	}
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Errorf("Execute with engine BuffPool should succeed, got: %v", err)
+	}
+
+	if !action.DrawnType.IsValid() {
+		t.Errorf("DrawnType should be valid, got %s", action.DrawnType)
+	}
+
+	// Boss/Hidden buffs should never be drawn
+	if action.DrawnType.IsBoss() || action.DrawnType.IsHidden() {
+		t.Errorf("DrawnType %s should not be drawn (Boss/Hidden excluded from pool)", action.DrawnType)
+	}
+
+	// Should push AddBuffAction as derived action
+	if ctx.ActionQueue.Len() != 1 {
+		t.Fatalf("Should have 1 derived AddBuffAction, got %d", ctx.ActionQueue.Len())
+	}
+}
+
+func TestDrawBuffActionDrawWithProbBadOnly(t *testing.T) {
+	// Test that 100% bad probability always draws a bad buff
+	game := NewGame(id.NewGameID(), 42)
+	game.BuffPool = BuildBuffPool()
+	game.EventPool = BuildEventPool()
+	game.ItemPool = BuildItemPool()
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.LP = 5
+	game.AddPlayer(player)
+
+	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
+	action := engineaction.NewDrawBuffAction(player, "Poison_BadEvent")
+	ctx := engineaction.NewActionContext(game, game.Bus, nil, drawEngine)
+	ctx.SetPools(game.EventPool, game.ItemPool, game.BuffPool)
+	ctx.SetCellDraw(0, 0, 1.0) // 100% bad probability
+	ctx.OnAddBuff = func(p *core.Player, b *core.Buff) { game.ApplyBuffToPlayer(p, b) }
+	ctx.GetBuffDuration = func(bt constants.BuffType) int { return 3 }
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Errorf("Execute with 100%% bad probability should succeed, got: %v", err)
+	}
+
+	if !action.DrawnType.IsValid() {
+		t.Errorf("DrawnType should be valid, got %s", action.DrawnType)
+	}
+
+	// Drawn buff should be a bad buff (Evaluation ≤ 40)
+	def := GetBuffDefinition(action.DrawnType)
+	if def != nil && def.Eval > constants.EvaluationBadThreshold {
+		t.Errorf("Drawn buff %s with Eval=%d should be bad (≤40)", action.DrawnType, def.Eval)
 	}
 }

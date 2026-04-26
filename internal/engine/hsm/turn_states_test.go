@@ -7,6 +7,7 @@ import (
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/engine"
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
+	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
@@ -956,6 +957,32 @@ func TestTurnStateFactory_CreateState(t *testing.T) {
 	state := factory.CreateState(StateNone)
 	if state != nil {
 		t.Error("CreateState should return nil for StateNone")
+	}
+}
+
+func TestTurnUpkeepState_ResetPendingDecisions(t *testing.T) {
+	state := NewTurnUpkeepState()
+	state.decisions = []*event.Decision{
+		event.NewDecision("test", []event.Option{{ID: "1", Label: "option1"}}),
+	}
+
+	state.ResetPendingDecisions()
+
+	if len(state.decisions) != 0 {
+		t.Errorf("ResetPendingDecisions should clear decisions, got %d", len(state.decisions))
+	}
+}
+
+func TestTurnLandedState_ResetPendingDecisions(t *testing.T) {
+	state := NewTurnLandedState()
+	state.decisions = []*event.Decision{
+		event.NewDecision("test", []event.Option{{ID: "1", Label: "option1"}}),
+	}
+
+	state.ResetPendingDecisions()
+
+	if len(state.decisions) != 0 {
+		t.Errorf("ResetPendingDecisions should clear decisions, got %d", len(state.decisions))
 	}
 }
 
