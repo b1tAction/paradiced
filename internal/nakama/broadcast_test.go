@@ -525,3 +525,105 @@ func TestResolveRecipientUserID(t *testing.T) {
 		t.Errorf("resolveRecipientUserID with known userID should return same, got: %s", result)
 	}
 }
+
+func TestBroadcastStartGameAck(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	mockDispatcher := NewMockDispatcherAdapter()
+	handler.WithDispatcher(mockDispatcher)
+
+	broadcastAdapter := NewNakamaBroadcastAdapter(handler)
+
+	ack := &net.StartGameAck{
+		MapConfig: net.MapConfig{
+			Length:     100,
+			StartIndex: 0,
+			EndIndex:   99,
+		},
+	}
+
+	err := broadcastAdapter.BroadcastStartGameAck(ack)
+	if err != nil {
+		t.Fatalf("BroadcastStartGameAck error: %v", err)
+	}
+
+	broadcasts := mockDispatcher.GetBroadcasts()
+	if len(broadcasts) != 1 {
+		t.Fatalf("Expected 1 broadcast, got %d", len(broadcasts))
+	}
+
+	if broadcasts[0].OpCode != int64(net.OpStartGameAck) {
+		t.Errorf("Expected OpCode %d, got %d", net.OpStartGameAck, broadcasts[0].OpCode)
+	}
+}
+
+func TestBroadcastStartGameAckNilDispatcher(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	// No dispatcher set
+	broadcastAdapter := NewNakamaBroadcastAdapter(handler)
+
+	ack := &net.StartGameAck{
+		MapConfig: net.MapConfig{
+			Length: 100,
+		},
+	}
+
+	err := broadcastAdapter.BroadcastStartGameAck(ack)
+	if err != nil {
+		t.Errorf("BroadcastStartGameAck with nil dispatcher should return nil error, got: %v", err)
+	}
+}
+
+func TestSendFullSyncBasic(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	mockDispatcher := NewMockDispatcherAdapter()
+	handler.WithDispatcher(mockDispatcher)
+
+	broadcastAdapter := NewNakamaBroadcastAdapter(handler)
+
+	stateSync := &net.StateSync{
+		GlobalState: "turn_loop",
+		Round:       1,
+	}
+
+	err := broadcastAdapter.SendFullSync("user-001", stateSync)
+	if err != nil {
+		t.Fatalf("SendFullSync error: %v", err)
+	}
+
+	// Verify the message was sent
+	count := mockDispatcher.CountMessages("user-001")
+	if count != 1 {
+		t.Errorf("SendFullSync should send 1 message, got %d", count)
+	}
+}
+
+func TestSendFullSyncWithBossPlayer(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	mockDispatcher := NewMockDispatcherAdapter()
+	handler.WithDispatcher(mockDispatcher)
+	broadcastAdapter := NewNakamaBroadcastAdapter(handler)
+
+	// Add a player so DisplayName resolution works
+	userID := "00000000-0000-0000-0000-000000000001"
+	player := handler.addPlayer(userID, constants.FactionQingLong, "TestPlayer")
+
+	stateSync := &net.StateSync{
+		GlobalState:     "turn_loop",
+		Round:           1,
+		CurrentPlayerID: player.ID.UUID(),
+		Players: []net.Player{
+			{PlayerID: player.ID.UUID(), IsBoss: false},
+			{PlayerID: constants.BossPlayerUUID, IsBoss: true, DisplayName: ""},
+		},
+	}
+
+	err := broadcastAdapter.SendFullSync("user-001", stateSync)
+	if err != nil {
+		t.Fatalf("SendFullSync error: %v", err)
+	}
+
+	// Verify Boss DisplayName is set
+	if stateSync.Players[1].DisplayName != "Boss" {
+		t.Errorf("Boss DisplayName should be 'Boss', got '%s'", stateSync.Players[1].DisplayName)
+	}
+}
