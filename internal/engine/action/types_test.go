@@ -2609,3 +2609,216 @@ func TestBossSkillActionEmptyTargets(t *testing.T) {
 		t.Errorf("Target() with empty targets should return empty string, got %s", action.Target())
 	}
 }
+
+// ========== Interface Method Coverage Tests ==========
+// TargetPlayer, CanModify, Source, Target, PreTriggerPhase, PostTriggerPhase
+// for actions that had 0% coverage on these interface methods.
+
+func TestHealActionInterfaceMethods(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewHealAction(player, 5, "buff_divine")
+
+	if action.TargetPlayer() != player {
+		t.Error("HealAction TargetPlayer should return target player")
+	}
+}
+
+func TestModifyLPActionInterfaceMethods(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewModifyLPAction(player, 1, "faction_zhu_que")
+
+	if action.TargetPlayer() != player {
+		t.Error("ModifyLPAction TargetPlayer should return target player")
+	}
+}
+
+func TestMoveActionInterfaceMethods(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewMoveAction(player, 5, "system_dice")
+
+	if action.TargetPlayer() != player {
+		t.Error("MoveAction TargetPlayer should return target player")
+	}
+}
+
+func TestAddBuffActionInterfaceMethods(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewAddBuffAction(player, constants.BuffTypeCurse, "event_trap")
+
+	if action.TargetPlayer() != player {
+		t.Error("AddBuffAction TargetPlayer should return target player")
+	}
+}
+
+func TestRemoveBuffActionInterfaceMethods(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewRemoveBuffAction(player, constants.BuffTypeCurse, "system")
+
+	if action.TargetPlayer() != player {
+		t.Error("RemoveBuffAction TargetPlayer should return target player")
+	}
+}
+
+func TestTeleportActionInterfaceMethods(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewTeleportAction(player, 20, "item_any_door")
+
+	if action.TargetPlayer() != player {
+		t.Error("TeleportAction TargetPlayer should return target player")
+	}
+}
+
+func TestStealBuffActionInterfaceMethods(t *testing.T) {
+	victim := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	stealer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewStealBuffAction(victim, stealer, "faction_bai_hu")
+
+	if action.TargetPlayer() != victim {
+		t.Error("StealBuffAction TargetPlayer should return victim")
+	}
+	if action.CanModify() {
+		t.Error("StealBuffAction CanModify should return false")
+	}
+}
+
+func TestDrawEventActionInterfaceMethods(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewDrawEventAction(player, "event_trap")
+
+	if action.TargetPlayer() != player {
+		t.Error("DrawEventAction TargetPlayer should return target player")
+	}
+}
+
+func TestDrawItemActionInterfaceMethods(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewDrawItemAction(player, "item_reverse_clock")
+
+	if action.CanModify() {
+		t.Error("DrawItemAction CanModify should return false")
+	}
+	if action.Source() != "item_reverse_clock" {
+		t.Errorf("DrawItemAction Source = %s, expected item_reverse_clock", action.Source())
+	}
+	if action.Target() != player.ID.UUID() {
+		t.Errorf("DrawItemAction Target = %s, expected %s", action.Target(), player.ID.UUID())
+	}
+	if action.TargetPlayer() != player {
+		t.Error("DrawItemAction TargetPlayer should return target player")
+	}
+}
+
+func TestRespawnActionInterfaceMethods(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewRespawnAction(player, 10, "system_respawn")
+
+	if action.TargetPlayer() != player {
+		t.Error("RespawnAction TargetPlayer should return target player")
+	}
+}
+
+func TestFellDownActionInterfaceMethods(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewFellDownAction(player, 20, 5, "cell_fragile")
+
+	if action.TargetPlayer() != player {
+		t.Error("FellDownAction TargetPlayer should return target player")
+	}
+}
+
+func TestRollDiceActionInterfaceMethods(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	rngInst := rand.New(rand.NewSource(42))
+	action := NewRollDiceAction(player, rng.DiceTypeGold, rngInst, "system_dice")
+
+	if action.Target() != player.ID.UUID() {
+		t.Errorf("RollDiceAction Target = %s, expected %s", action.Target(), player.ID.UUID())
+	}
+	if action.TargetPlayer() != player {
+		t.Error("RollDiceAction TargetPlayer should return target player")
+	}
+}
+
+func TestAddItemActionInterfaceMethods(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewAddItemAction(player, constants.ItemTypeReverseClock, "event")
+
+	if action.CanModify() {
+		t.Error("AddItemAction CanModify should return false")
+	}
+	if action.Source() != "event" {
+		t.Errorf("AddItemAction Source = %s, expected event", action.Source())
+	}
+	if action.Target() != player.ID.UUID() {
+		t.Errorf("AddItemAction Target = %s, expected %s", action.Target(), player.ID.UUID())
+	}
+	if action.TargetPlayer() != player {
+		t.Error("AddItemAction TargetPlayer should return target player")
+	}
+}
+
+func TestRemoveItemActionInterfaceMethods(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewRemoveItemAction(player, constants.ItemTypeReverseClock, "item_used")
+
+	if action.CanModify() {
+		t.Error("RemoveItemAction CanModify should return false")
+	}
+	if action.Source() != "item_used" {
+		t.Errorf("RemoveItemAction Source = %s, expected item_used", action.Source())
+	}
+	if action.Target() != player.ID.UUID() {
+		t.Errorf("RemoveItemAction Target = %s, expected %s", action.Target(), player.ID.UUID())
+	}
+	if action.TargetPlayer() != player {
+		t.Error("RemoveItemAction TargetPlayer should return target player")
+	}
+	if action.PreTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("RemoveItemAction PreTriggerPhase = %s, expected any_time", action.PreTriggerPhase())
+	}
+	if action.PostTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("RemoveItemAction PostTriggerPhase = %s, expected any_time", action.PostTriggerPhase())
+	}
+}
+
+func TestDrawBuffActionInterfaceMethods(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewDrawBuffAction(player, "pool_draw")
+
+	if action.Source() != "pool_draw" {
+		t.Errorf("DrawBuffAction Source = %s, expected pool_draw", action.Source())
+	}
+	if action.Target() != player.ID.UUID() {
+		t.Errorf("DrawBuffAction Target = %s, expected %s", action.Target(), player.ID.UUID())
+	}
+	if action.TargetPlayer() != player {
+		t.Error("DrawBuffAction TargetPlayer should return target player")
+	}
+	if action.PostTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("DrawBuffAction PostTriggerPhase = %s, expected any_time", action.PostTriggerPhase())
+	}
+}
+
+func TestDiceUpgradeActionInterfaceMethods(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewDiceUpgradeAction(player, "item_dice_upgrade", rng.DiceTypeCopper)
+
+	if action.CanModify() {
+		t.Error("DiceUpgradeAction CanModify should return false")
+	}
+	if action.Source() != "item_dice_upgrade" {
+		t.Errorf("DiceUpgradeAction Source = %s, expected item_dice_upgrade", action.Source())
+	}
+	if action.Target() != player.ID.UUID() {
+		t.Errorf("DiceUpgradeAction Target = %s, expected %s", action.Target(), player.ID.UUID())
+	}
+	if action.TargetPlayer() != player {
+		t.Error("DiceUpgradeAction TargetPlayer should return target player")
+	}
+	if action.PreTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("DiceUpgradeAction PreTriggerPhase = %s, expected any_time", action.PreTriggerPhase())
+	}
+	if action.PostTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("DiceUpgradeAction PostTriggerPhase = %s, expected any_time", action.PostTriggerPhase())
+	}
+}

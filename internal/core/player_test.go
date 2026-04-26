@@ -754,3 +754,58 @@ func TestPlayerMetadataDirectUsage(t *testing.T) {
 		t.Error("chained keys should all exist")
 	}
 }
+
+// ========== protocol.Player Getter Tests ==========
+
+func TestPlayerGetID(t *testing.T) {
+	testID := id.NewPlayerID()
+	player := NewPlayer(PlayerConfig{ID: testID})
+
+	if player.GetID() != testID {
+		t.Errorf("GetID() = %v, expected %v", player.GetID(), testID)
+	}
+}
+
+func TestPlayerGetIDString(t *testing.T) {
+	testID := id.NewPlayerID()
+	player := NewPlayer(PlayerConfig{ID: testID})
+
+	if player.GetIDString() != testID.UUID() {
+		t.Errorf("GetIDString() = %s, expected %s", player.GetIDString(), testID.UUID())
+	}
+}
+
+func TestPlayerGetHP(t *testing.T) {
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	player.HP = 5
+
+	if player.GetHP() != 5 {
+		t.Errorf("GetHP() = %d, expected 5", player.GetHP())
+	}
+}
+
+func TestPlayerGetLP(t *testing.T) {
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID(), MaxLP: 8})
+	player.LP = 3
+
+	if player.GetLP() != 3 {
+		t.Errorf("GetLP() = %d, expected 3", player.GetLP())
+	}
+}
+
+func TestPlayerGetPosition(t *testing.T) {
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
+	player.Position = 20
+
+	if player.GetPosition() != 20 {
+		t.Errorf("GetPosition() = %d, expected 20", player.GetPosition())
+	}
+}
+
+func TestPlayerGetFaction(t *testing.T) {
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID(), Faction: constants.FactionBaiHu})
+
+	if player.GetFaction() != constants.FactionBaiHu {
+		t.Errorf("GetFaction() = %s, expected bai_hu", player.GetFaction())
+	}
+}

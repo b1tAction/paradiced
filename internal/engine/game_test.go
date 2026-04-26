@@ -9,6 +9,7 @@ import (
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/b1tAction/paradiced/pkg/rng"
+	"github.com/b1tAction/paradiced/pkg/util"
 )
 
 // ========== Game Creation Tests ==========
@@ -698,5 +699,177 @@ func TestDrawBuffActionDrawWithProbBadOnly(t *testing.T) {
 	def := GetBuffDefinition(action.DrawnType)
 	if def != nil && def.Eval > constants.EvaluationBadThreshold {
 		t.Errorf("Drawn buff %s with Eval=%d should be bad (≤40)", action.DrawnType, def.Eval)
+	}
+}
+
+// ========== Game Method Tests ==========
+
+func TestGetPlayerInterface(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	result := game.GetPlayerInterface(player.ID)
+	if result == nil {
+		t.Error("GetPlayerInterface should return matching player")
+	}
+
+	// Non-existent player: GetPlayer returns nil *core.Player,
+	// which becomes a non-nil interface{} (*core.Player)(nil) in Go.
+	// Use type assertion to check the underlying value.
+	unknownResult := game.GetPlayerInterface(id.NewPlayerID())
+	if unknownResult != nil {
+		// nil *core.Player wrapped as interface{} is not nil in Go
+		typed, ok := unknownResult.(*core.Player)
+		if !ok || typed != nil {
+			t.Error("GetPlayerInterface with unknown ID should return nil player")
+		}
+	}
+}
+
+func TestGetBossPlayer(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+
+	// Without boss initialized
+	boss := game.GetBossPlayer()
+	if boss != nil {
+		t.Error("GetBossPlayer should return nil before InitializeBoss")
+	}
+
+	// After boss initialization
+	game.InitializeBoss(50)
+
+	boss = game.GetBossPlayer()
+	if boss == nil {
+		t.Error("GetBossPlayer should return boss player after InitializeBoss")
+	}
+	if !boss.ID.IsBoss() {
+		t.Error("Boss player ID should be IsBoss")
+	}
+}
+
+func TestInitializeBoss(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+
+	game.InitializeBoss(50)
+
+	boss := game.GetBossPlayer()
+	if boss == nil {
+		t.Error("Boss should not be nil after InitializeBoss")
+	}
+	if boss.HP != 50 {
+		t.Errorf("Boss HP = %d, expected 50", boss.HP)
+	}
+	if !boss.ID.IsBoss() {
+		t.Error("Boss ID should return IsBoss=true")
+	}
+}
+
+// ========== Registry Query Tests ==========
+
+func TestGetBuffName(t *testing.T) {
+	name := GetBuffName(constants.BuffTypeCurse)
+	if name == "" {
+		t.Error("GetBuffName(Curse) should return non-empty name")
+	}
+
+	// Unknown buff type
+	unknownName := GetBuffName(constants.BuffType("unknown"))
+	if unknownName != "" {
+		t.Errorf("GetBuffName(unknown) = %s, expected empty string", unknownName)
+	}
+}
+
+func TestIsHidden(t *testing.T) {
+	if !IsHidden(constants.BuffTypeDeathMark) {
+		t.Error("IsHidden(DeathMark) should return true")
+	}
+	if IsHidden(constants.BuffTypeCurse) {
+		t.Error("IsHidden(Curse) should return false")
+	}
+	if IsHidden(constants.BuffTypeHidden) {
+		t.Error("IsHidden(Hidden) should return false (only DeathMark is hidden)")
+	}
+}
+
+func TestGetBuffTypesByCategory(t *testing.T) {
+	positiveTypes := GetBuffTypesByCategory("positive")
+	if len(positiveTypes) == 0 {
+		t.Error("GetBuffTypesByCategory(positive) should return positive buff types")
+	}
+
+	negativeTypes := GetBuffTypesByCategory("negative")
+	if len(negativeTypes) == 0 {
+		t.Error("GetBuffTypesByCategory(negative) should return negative buff types")
+	}
+}
+
+func TestGetBossDefinition(t *testing.T) {
+	def := GlobalBossRegistry.GetBossDefinition(constants.BossTypeBeast)
+	if def == nil {
+		t.Error("GetBossDefinition(Beast) should return non-nil")
+	}
+	if def.MaxHP != 50 {
+		t.Errorf("BossDefinition MaxHP = %d, expected 50", def.MaxHP)
+	}
+}
+
+func TestGetBossSkillHandler(t *testing.T) {
+	for _, skill := range []constants.BossSkillType{
+		constants.BossSkillThunder, constants.BossSkillCurse,
+		constants.BossSkillRest, constants.BossSkillThorns,
+	} {
+		handler := GlobalBossRegistry.GetBossSkillHandler(skill)
+		if handler == nil {
+			t.Errorf("GetBossSkillHandler(%s) should return non-nil", skill)
+		}
+	}
+
+	// Lost is not registered as a skill handler (it's a BuffType)
+	handler := GlobalBossRegistry.GetBossSkillHandler(constants.BossSkillLost)
+	if handler != nil {
+		t.Error("GetBossSkillHandler(Lost) should return nil (not registered)")
+	}
+}
+
+func TestGetBossSkillPool(t *testing.T) {
+	pool := GlobalBossRegistry.GetBossSkillPool()
+	if len(pool) == 0 {
+		t.Error("GetBossSkillPool should return non-empty pool")
+	}
+}
+
+// ========== RoundData Tests ==========
+
+func TestRoundDataGetSetMiniGameRanks(t *testing.T) {
+	rd := util.NewMetadata()
+
+	ranks := GetMiniGameRanks(rd)
+	if len(ranks) != 0 {
+		t.Errorf("GetMiniGameRanks on empty = %d entries, expected 0", len(ranks))
+	}
+
+	SetMiniGameRanks(rd, map[string]int{"p1": 1, "p2": 2, "p3": 3, "p4": 4})
+	ranks = GetMiniGameRanks(rd)
+	if len(ranks) != 4 {
+		t.Errorf("GetMiniGameRanks after set = %d entries, expected 4", len(ranks))
+	}
+	if ranks["p1"] != 1 {
+		t.Errorf("ranks[p1] = %d, expected 1", ranks["p1"])
+	}
+}
+
+func TestRoundDataGetSetDiceTypes(t *testing.T) {
+	rd := util.NewMetadata()
+
+	types := GetDiceTypes(rd)
+	if len(types) != 0 {
+		t.Errorf("GetDiceTypes on empty = %d entries, expected 0", len(types))
+	}
+
+	SetDiceTypes(rd, map[string]int{"p1": int(rng.DiceTypeGold), "p2": int(rng.DiceTypeSilver)})
+	types = GetDiceTypes(rd)
+	if len(types) != 2 {
+		t.Errorf("GetDiceTypes after set = %d entries, expected 2", len(types))
 	}
 }
