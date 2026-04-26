@@ -82,5 +82,5 @@ func (as ActionSource) IsSystem() bool {
 
 // IsBoss checks if source is from Boss.
 func (as ActionSource) IsBoss() bool {
-	return len(as) > 4 && as[:4] == "boss_"
+	return len(as) > 5 && as[:5] == "boss_"
 }
