@@ -1,6 +1,7 @@
 package action
 
 import (
+	"math/rand"
 	"strings"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/errors"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
+	"github.com/b1tAction/paradiced/pkg/rng"
 	"github.com/b1tAction/paradiced/pkg/util"
 )
 
@@ -1137,6 +1139,78 @@ func (a *BossSkillAction) LogEntry() gamelog.LogEntry {
 		ActionType: string(a.Type()),
 		Target:     a.Target(),
 		Source:     a.SourcePlayer.ID.UUID(),
+		Metadata:   metadata,
+	}
+}
+
+// ========== RollDiceAction ==========
+
+// RollDiceAction represents dice roll result for client animation.
+// Steps is calculated at construction time using RNG (like DamageAction.Amount).
+// Interceptable via PhasePreDiceRoll — Buffs can modify Steps field.
+// Execute writes final (possibly modified) Steps to ActionContext metadata
+// for HSM to read back after ExecuteAction completes.
+type RollDiceAction struct {
+	targetPlayer *core.Player
+	DiceType     rng.DiceType // Dice type (gold/silver/copper/wood/normal)
+	Steps        int          // Dice result (calculated at construction, may be modified by interception)
+	SourceID     string       // Source identifier (e.g., "DiceRoll", "DiceRollTimeout")
+}
+
+// NewRollDiceAction creates a new RollDiceAction with dice roll calculated at construction.
+// Uses the provided RNG source to calculate Steps via rng.NewDice(diceType, rngInst).Roll().
+func NewRollDiceAction(target *core.Player, diceType rng.DiceType, rngInst *rand.Rand, sourceID string) *RollDiceAction {
+	var steps int
+	if rngInst != nil {
+		dice := rng.NewDice(diceType, rngInst)
+		steps = dice.Roll()
+	} else {
+		steps = 1 // Fallback for nil RNG
+	}
+
+	return &RollDiceAction{
+		targetPlayer: target,
+		DiceType:     diceType,
+		Steps:        steps,
+		SourceID:     sourceID,
+	}
+}
+
+func (a *RollDiceAction) Type() constants.ActionType { return constants.ActionDiceRoll }
+func (a *RollDiceAction) CanModify() bool            { return true } // Buffs can modify Steps via PhasePreDiceRoll
+func (a *RollDiceAction) Source() string             { return a.SourceID }
+func (a *RollDiceAction) Target() string             { return a.targetPlayer.ID.UUID() }
+func (a *RollDiceAction) TargetPlayer() *core.Player { return a.targetPlayer }
+
+// PreTriggerPhase returns PhasePreDiceRoll for interception (Buffs can modify Steps).
+func (a *RollDiceAction) PreTriggerPhase() constants.Phase {
+	return constants.PhasePreDiceRoll
+}
+
+// PostTriggerPhase returns PhaseAnyTime (no post-trigger lifecycle for dice roll).
+func (a *RollDiceAction) PostTriggerPhase() constants.Phase {
+	return constants.PhaseAnyTime
+}
+
+func (a *RollDiceAction) Execute(ctx *ActionContext) error {
+	// Write final Steps (possibly modified by PhasePreDiceRoll interception) to metadata
+	// for HSM to read after ExecuteAction completes.
+	ctx.SetInt("dice_steps_result", a.Steps)
+	ctx.SetString("dice_type_result", a.DiceType.String())
+	return nil
+}
+
+func (a *RollDiceAction) LogEntry() gamelog.LogEntry {
+	metadata := util.NewMetadata()
+	metadata.SetString("dice_type", a.DiceType.String())
+	metadata.SetInt("dice_steps", a.Steps)
+
+	return gamelog.LogEntry{
+		Timestamp:  time.Now(),
+		Type:       constants.EntryTypeAction,
+		ActionType: string(a.Type()),
+		Target:     a.targetPlayer.ID.UUID(),
+		Source:     a.SourceID,
 		Metadata:   metadata,
 	}
 }

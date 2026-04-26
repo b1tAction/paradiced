@@ -1654,3 +1654,135 @@ func TestDrawItemActionEmptyPool(t *testing.T) {
 		t.Errorf("Player should have no items for empty pool, got %d", len(player.Inventory))
 	}
 }
+
+// ========== RollDiceAction Tests ==========
+
+func TestRollDiceActionType(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewRollDiceAction(player, rng.DiceTypeWood, rand.New(rand.NewSource(42)), "DiceRoll")
+
+	if action.Type() != constants.ActionDiceRoll {
+		t.Errorf("Type() should be ActionDiceRoll, got %s", action.Type())
+	}
+}
+
+func TestRollDiceActionCanModify(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewRollDiceAction(player, rng.DiceTypeWood, rand.New(rand.NewSource(42)), "DiceRoll")
+
+	if !action.CanModify() {
+		t.Error("CanModify() should be true (Buffs can modify Steps)")
+	}
+}
+
+func TestRollDiceActionPreTriggerPhase(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewRollDiceAction(player, rng.DiceTypeWood, rand.New(rand.NewSource(42)), "DiceRoll")
+
+	if action.PreTriggerPhase() != constants.PhasePreDiceRoll {
+		t.Errorf("PreTriggerPhase() should be PhasePreDiceRoll, got %s", action.PreTriggerPhase())
+	}
+}
+
+func TestRollDiceActionPostTriggerPhase(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewRollDiceAction(player, rng.DiceTypeWood, rand.New(rand.NewSource(42)), "DiceRoll")
+
+	if action.PostTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PostTriggerPhase() should be PhaseAnyTime, got %s", action.PostTriggerPhase())
+	}
+}
+
+func TestRollDiceActionStepsCalculated(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	rngInst := rand.New(rand.NewSource(42))
+
+	// Test each dice type produces valid steps (1-6)
+	diceTypes := []rng.DiceType{rng.DiceTypeGold, rng.DiceTypeSilver, rng.DiceTypeCopper, rng.DiceTypeWood, rng.DiceTypeNormal}
+	for _, diceType := range diceTypes {
+		action := NewRollDiceAction(player, diceType, rngInst, "DiceRoll")
+		if action.Steps < 1 || action.Steps > 6 {
+			t.Errorf("RollDiceAction Steps for %s should be 1-6, got %d", diceType.String(), action.Steps)
+		}
+	}
+}
+
+func TestRollDiceActionNilRNGFallback(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewRollDiceAction(player, rng.DiceTypeWood, nil, "DiceRoll")
+
+	if action.Steps != 1 {
+		t.Errorf("RollDiceAction with nil RNG should fallback to 1, got %d", action.Steps)
+	}
+}
+
+func TestRollDiceActionExecute(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	rngInst := rand.New(rand.NewSource(42))
+	action := NewRollDiceAction(player, rng.DiceTypeWood, rngInst, "DiceRoll")
+
+	ctx := NewActionContext(nil, nil, nil, nil)
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Errorf("Execute() should return nil, got %v", err)
+	}
+
+	// Check metadata
+	stepsResult := ctx.GetIntOrDefault("dice_steps_result", 0)
+	if stepsResult != action.Steps {
+		t.Errorf("dice_steps_result should be %d, got %d", action.Steps, stepsResult)
+	}
+
+	diceTypeResult := ctx.GetStringOrDefault("dice_type_result", "")
+	if diceTypeResult != "wood" {
+		t.Errorf("dice_type_result should be 'wood', got %s", diceTypeResult)
+	}
+}
+
+func TestRollDiceActionLogEntry(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	rngInst := rand.New(rand.NewSource(42))
+	action := NewRollDiceAction(player, rng.DiceTypeGold, rngInst, "DiceRoll")
+
+	entry := action.LogEntry()
+
+	if entry.ActionType != "dice_roll" {
+		t.Errorf("LogEntry ActionType should be 'dice_roll', got %s", entry.ActionType)
+	}
+	if entry.Target != player.ID.UUID() {
+		t.Errorf("LogEntry Target should be %s, got %s", player.ID.UUID(), entry.Target)
+	}
+	if entry.Source != "DiceRoll" {
+		t.Errorf("LogEntry Source should be 'DiceRoll', got %s", entry.Source)
+	}
+	if entry.Type != constants.EntryTypeAction {
+		t.Errorf("LogEntry Type should be EntryTypeAction, got %s", entry.Type)
+	}
+
+	// Check metadata
+	diceType := entry.Metadata.GetStringOrDefault("dice_type", "")
+	if diceType != "gold" {
+		t.Errorf("LogEntry metadata dice_type should be 'gold', got %s", diceType)
+	}
+	diceSteps := entry.Metadata.GetIntOrDefault("dice_steps", 0)
+	if diceSteps != action.Steps {
+		t.Errorf("LogEntry metadata dice_steps should be %d, got %d", action.Steps, diceSteps)
+	}
+}
+
+func TestRollDiceActionSourceID(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	rngInst := rand.New(rand.NewSource(42))
+
+	// Test different source IDs
+	rollAction := NewRollDiceAction(player, rng.DiceTypeWood, rngInst, "DiceRoll")
+	timeoutAction := NewRollDiceAction(player, rng.DiceTypeWood, rngInst, "DiceRollTimeout")
+
+	if rollAction.Source() != "DiceRoll" {
+		t.Errorf("Source() should be 'DiceRoll', got %s", rollAction.Source())
+	}
+	if timeoutAction.Source() != "DiceRollTimeout" {
+		t.Errorf("Source() should be 'DiceRollTimeout', got %s", timeoutAction.Source())
+	}
+}
