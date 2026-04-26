@@ -793,14 +793,34 @@ func TestIsHidden(t *testing.T) {
 }
 
 func TestGetBuffTypesByCategory(t *testing.T) {
-	positiveTypes := GetBuffTypesByCategory("positive")
-	if len(positiveTypes) == 0 {
-		t.Error("GetBuffTypesByCategory(positive) should return positive buff types")
+	goodTypes := GetBuffTypesByCategory("Good")
+	if len(goodTypes) == 0 {
+		t.Error("GetBuffTypesByCategory(Good) should return good buff types")
 	}
 
-	negativeTypes := GetBuffTypesByCategory("negative")
-	if len(negativeTypes) == 0 {
-		t.Error("GetBuffTypesByCategory(negative) should return negative buff types")
+	badTypes := GetBuffTypesByCategory("Bad")
+	if len(badTypes) == 0 {
+		t.Error("GetBuffTypesByCategory(Bad) should return bad buff types")
+	}
+
+	neutralTypes := GetBuffTypesByCategory("Neutral")
+	if len(neutralTypes) == 0 {
+		t.Error("GetBuffTypesByCategory(Neutral) should return neutral buff types")
+	}
+
+	// Unknown category returns all buff types
+	allTypes := GetBuffTypesByCategory("unknown")
+	if len(allTypes) == 0 {
+		t.Error("GetBuffTypesByCategory(unknown) should return all buff types as fallback")
+	}
+}
+
+func TestBuffRegistryIsHidden(t *testing.T) {
+	if !GlobalBuffRegistry.IsHidden(constants.BuffTypeDeathMark) {
+		t.Error("BuffRegistry.IsHidden(DeathMark) should return true")
+	}
+	if GlobalBuffRegistry.IsHidden(constants.BuffTypeCurse) {
+		t.Error("BuffRegistry.IsHidden(Curse) should return false")
 	}
 }
 

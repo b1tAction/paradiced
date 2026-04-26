@@ -9,6 +9,7 @@ import (
 	"github.com/b1tAction/paradiced/internal/engine"
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
 	"github.com/b1tAction/paradiced/internal/event"
+	"github.com/b1tAction/paradiced/internal/gamemap"
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
@@ -502,5 +503,76 @@ func TestBuildDecisionFromEventNoSourceID(t *testing.T) {
 	}
 	if result.Context != "event" {
 		t.Errorf("Context with empty SourceID = %s, want 'event'", result.Context)
+	}
+}
+
+func TestBuildMapInfo(t *testing.T) {
+	builder, _, hsmInstance := newTestBuilder()
+
+	// Create and set map engine with various cell types
+	mapEngine := gamemap.NewMapEngine(20)
+	mapEngine.SetCellType(5, constants.CellTypeFragile)
+	mapEngine.SetCellType(10, constants.CellTypeFog)
+	mapEngine.SetCellType(15, constants.CellTypeCheckpoint)
+	mapEngine.SetCellType(19, constants.CellTypeBoss)
+	hsmInstance.SetMapEngine(mapEngine)
+
+	mapInfo := builder.BuildMapInfo()
+
+	if mapInfo == nil {
+		t.Fatal("BuildMapInfo should not return nil")
+	}
+	if mapInfo.Length != 20 {
+		t.Errorf("mapInfo.Length = %d, want 20", mapInfo.Length)
+	}
+	if len(mapInfo.Cells) != 20 {
+		t.Errorf("len(mapInfo.Cells) = %d, want 20", len(mapInfo.Cells))
+	}
+	if mapInfo.Cells[0].CellType != "normal" {
+		t.Errorf("mapInfo.Cells[0].CellType = %s, want normal", mapInfo.Cells[0].CellType)
+	}
+	if mapInfo.Cells[5].CellType != "fragile" {
+		t.Errorf("mapInfo.Cells[5].CellType = %s, want fragile", mapInfo.Cells[5].CellType)
+	}
+	if mapInfo.Cells[10].CellType != "fog" {
+		t.Errorf("mapInfo.Cells[10].CellType = %s, want fog", mapInfo.Cells[10].CellType)
+	}
+	if mapInfo.Cells[15].CellType != "checkpoint" {
+		t.Errorf("mapInfo.Cells[15].CellType = %s, want checkpoint", mapInfo.Cells[15].CellType)
+	}
+	if mapInfo.Cells[19].CellType != "boss" {
+		t.Errorf("mapInfo.Cells[19].CellType = %s, want boss", mapInfo.Cells[19].CellType)
+	}
+}
+
+func TestBuildMapInfoWithBrokenFragile(t *testing.T) {
+	builder, _, hsmInstance := newTestBuilder()
+
+	mapEngine := gamemap.NewMapEngine(10)
+	mapEngine.SetCellType(5, constants.CellTypeFragile)
+	mapEngine.Cells[5].IsBroken = true
+	hsmInstance.SetMapEngine(mapEngine)
+
+	mapInfo := builder.BuildMapInfo()
+
+	if !mapInfo.Cells[5].IsBroken {
+		t.Error("Fragile cell at index 5 should be broken in MapInfo")
+	}
+	if mapInfo.Cells[3].IsBroken {
+		t.Error("Normal cell should not be broken in MapInfo")
+	}
+}
+
+func TestBuildMapInfoNoMapEngine(t *testing.T) {
+	builder, _, _ := newTestBuilder()
+
+	// No map engine set
+	mapInfo := builder.BuildMapInfo()
+
+	if mapInfo == nil {
+		t.Fatal("BuildMapInfo should not return nil even without map engine")
+	}
+	if mapInfo.Length != 0 {
+		t.Errorf("mapInfo.Length = %d, want 0 (empty MapInfo)", mapInfo.Length)
 	}
 }
