@@ -10,14 +10,14 @@
 
 | OpCode | 名称 | 数据类型 | 触发时机 |
 |--------|------|----------|----------|
-| 1 | `OpStateSync` | StateSync | 进入新全局状态时 |
-| 2 | `OpTurnSync` | TurnSync | 回合效果执行后 |
+| 1 | `OpStateSync` | StateSync | 进入新状态/效果执行后（含增量 LogEntry） |
+| ~~2~~ | ~~`OpTurnSync`~~ | ~~TurnSync~~ | ~~已移除，LogEntry 数据合并到 StateSync~~ |
 | ~~3~~ | ~~`OpDecisionRequest`~~ | ~~Decision~~ | ~~需要玩家决策时~~ |
 | 4 | `OpAvailable` | Available | 进入 MainAction 状态 |
 | 5 | `OpMiniGameStart` | MiniGameStart | 小游戏阶段开始 |
 | 6 | `OpMiniGameResult` | MiniGameResult | 小游戏结束广播排名 |
 | 7 | `OpGameOver` | GameOver | 游戏结束 |
-| 8 | `OpFullSync` | FullSync | 玩家断线重连 |
+| 8 | `OpFullSync` | StateSync | 玩家断线重连（含当前回合全部 LogEntry） |
 | 9 | `OpActionRejected` | ActionRejected | 玩家操作被拒绝 |
 | 10 | `OpWaitingSync` | WaitingSync | 等待房间玩家变更 |
 | 11 | `OpStartGameAck` | StartGameAck | 主机开始游戏后广播地图配置 |
@@ -40,7 +40,7 @@
 
 ### 2.1 StateSync（状态同步）
 
-**用途**：广播当前游戏状态，用于客户端 UI 更新和断线重连。
+**用途**：广播当前游戏状态，含增量 LogEntry 供客户端渲染动画。
 
 ```typescript
 interface StateSync {
@@ -51,6 +51,8 @@ interface StateSync {
     turn: number;               // 当前回合索引 (0-3)
     paused: boolean;            // 是否等待决策
     players: Player[];          // 所有玩家状态
+    map: MapInfo;               // 地图信息
+    entries?: LogEntry[];       // 增量 LogEntry（自上次 StateSync 以来新增的效果，omitempty）
 }
 ```
 
@@ -80,29 +82,20 @@ interface StateSync {
 
 ---
 
-### 2.2 TurnSync（回合同步）
+### ~~2.2 TurnSync（回合同步）~~ - 已移除
 
-**用途**：发送回合内所有效果，客户端按顺序渲染动画。
+**TurnSync 已移除**，LogEntry 数据现在合并到 `StateSync.entries` 字段中，采用增量机制。
 
-```typescript
-interface TurnSync {
-    round: number;              // 当前回合数
-    turn: number;               // 当前回合索引
-    current_player_id: string;  // 回合玩家 UUID
-    entries: LogEntry[];        // 效果列表（顺序渲染）
-}
-```
-
-**客户端渲染逻辑**：
+客户端渲染逻辑（使用 `StateSync.entries`）：
 
 ```typescript
-for (const entry of turnSync.entries) {
+for (const entry of stateSync.entries || []) {
     switch (entry.action_type) {
         case "damage":
-            playDamageAnimation(entry.target, entry.metadata.hp_change);
+            playDamageAnimation(entry.target, entry.metadata?.hp_change);
             break;
         case "move":
-            playMoveAnimation(entry.target, entry.metadata.path);
+            playMoveAnimation(entry.target, entry.metadata?.path);
             break;
         // ...
     }
@@ -656,11 +649,17 @@ interface LogEntry {
 | `MatchInit.Enter` | 游戏初始化完成（生成地图、分配阵营、初始化 Buff）后 | 广播初始游戏状态 |
 | `TurnUpkeep.Enter` | 进入回合维护阶段时 | 更新回合玩家状态 |
 | `MainAction.Enter` | 进入主行动阶段时 | 更新当前行动玩家状态 |
-| `TurnEnd.Enter` | 回合结束时 | 广播回合结束后的最终状态 |
+| `TurnLanded.Enter` | 落地效果执行后 | 广播增量 LogEntry（落地伤害、OnLand 效果） |
+| `TurnDraw.Enter` | 事件/道具抽取效果执行后 | 广播增量 LogEntry（抽取事件/道具） |
+| `TurnBossBattle.Enter` | Boss 战斗效果执行后 | 广播增量 LogEntry（Boss 战斗） |
+| `TurnEnd.Enter` | 回合结束时（必须在 EndTurn 之前） | 广播增量 LogEntry + 最终状态 |
 
 **接收对象**：广播给所有玩家
 
-**客户端行为**：更新 UI 显示当前全局状态、回合状态、玩家列表
+**客户端行为**：
+1. 更新 UI 显示当前全局状态、回合状态、玩家列表
+2. 如果 `entries` 不为空，按顺序遍历 entries 播放动画
+3. 动画完成后等待下一个 `StateSync`
 
 ---
 
@@ -709,22 +708,17 @@ interface LogEntry {
 
 ---
 
-#### OpTurnSync (2)
+#### ~~OpTurnSync (2)~~ - 已移除
 
-**发送时机**：
+**OpTurnSync 已移除**。LogEntry 数据现在通过 `OpStateSync (1)` 的 `StateSync.entries` 增量携带。
 
-| 状态 | 发送时机 | 包含内容 |
-|------|----------|----------|
-| `TurnEnd.Enter` | 回合结束时 | 该回合所有 Action 效果 |
+**旧流程**（已废弃）：
+- `TurnEnd.Enter` 时发送 `TurnSync`（含整个回合的 LogEntry）
+- 客户端按 `entries` 顺序播放动画
 
-**注意**：`TurnSync` 在 `TurnEnd.Enter` 时发送，包含整个回合的 `LogEntry` 列表
-
-**接收对象**：广播给所有玩家
-
-**客户端行为**：
-1. 按顺序遍历 `entries` 数组
-2. 根据 `action_type` 播放对应动画
-3. 动画完成后等待下一个 `StateSync`
+**新流程**：
+- `TurnLanded/TurnDraw/TurnBossBattle/TurnEnd` 状态转换时，`OpStateSync` 的 `entries` 字段携带增量 LogEntry
+- 客户端收到 `StateSync` 后，先渲染 `entries` 动画，再更新 UI 状态
 
 ---
 
@@ -753,9 +747,11 @@ interface LogEntry {
 
 **触发条件**：`HandlePresenceJoin` 且游戏已在进行中（`hsm.IsRunning()`）
 
+**数据类型**：`StateSync`（与 OpStateSync 相同结构，但 `entries` 包含当前回合全部 LogEntry）
+
 **客户端行为**：
-1. 从 `state` 恢复完整游戏状态
-2. 从 `turn` 恢复当前回合效果
+1. 从 StateSync 恢复完整游戏状态
+2. 从 `entries` 渲染当前回合全部动画
 3. 同步显示当前界面
 
 ---
@@ -908,7 +904,7 @@ interface LogEntry {
 ```
 [Current Player]           [Server]                  [All Clients]
      |                        |                          |
-     |                        |--- OpStateSync --------->| (TurnUpkeep)
+     |                        |--- OpStateSync --------->| (TurnUpkeep, 无 entries)
      |                        |                          |
      |                        |--- OpAvailable --------->| (仅发给当前玩家)
      |                        |                          |
@@ -917,9 +913,14 @@ interface LogEntry {
      |--- OpRollDice -------->|                          |
      |                        |<== 执行移动 ==>           |
      |                        |                          |
-     |                        |<== 状态转换 ==>           |
-     |                        |--- OpTurnSync ---------->| (TurnEnd)
-     |                        |--- OpStateSync --------->| (回合结束状态)
+     |                        |--- OpStateSync --------->| (TurnLanded, 含 entries: 伤害/移动等)
+     |                        |                          |
+     |                        |<== 抽取事件/道具 ==>       |
+     |                        |                          |
+     |                        |--- OpStateSync --------->| (TurnDraw, 含 entries: 事件/道具)
+     |                        |                          |
+     |                        |<== 回合结束 ==>           |
+     |                        |--- OpStateSync --------->| (TurnEnd, 含 entries: Buff消耗等)
      |                        |                          |
      |<== 下一个玩家回合 ==>   |                          |
 ```
@@ -1017,7 +1018,7 @@ interface LogEntry {
 ┌───────────────────┐
 │    TurnMoving     │
 │  执行 MoveAction  │
-│  广播 TurnSync    │
+│  StateSync(entries)│
 │  检查 Fragile     │
 └─────────┬─────────┘
           ↓
@@ -1028,10 +1029,10 @@ interface LogEntry {
 └─────────┬─────────┘
           ↓
 ┌───────────────────┐
-│    TurnEvent      │
+│    TurnDraw       │
 │  PreEvent Phase   │
 │  抽取随机事件      │
-│  广播 TurnSync    │
+│  StateSync(entries)│
 └─────────┬─────────┘
           ↓
 ┌───────────────────┐
@@ -1054,7 +1055,7 @@ interface LogEntry {
 enum OpCode {
     // Server → Client
     StateSync = 1,
-    TurnSync = 2,
+    // TurnSync = 2,  // 已移除，entries 合并到 StateSync
     DecisionRequest = 3,
     Available = 4,
     MiniGameStart = 5,
@@ -1085,14 +1086,11 @@ interface StateSync {
     turn: number;
     paused: boolean;
     players: Player[];
+    map: MapInfo;
+    entries?: LogEntry[];  // 增量 LogEntry（omitempty: 无新效果时不包含）
 }
 
-interface TurnSync {
-    round: number;
-    turn: number;
-    current_player_id: string;
-    entries: LogEntry[];
-}
+// TurnSync 已移除，LogEntry 数据合并到 StateSync.entries
 
 interface Player {
     player_id: string;
@@ -1202,10 +1200,7 @@ interface WaitingPlayer {
     is_host: boolean;
 }
 
-interface FullSync {
-    state: StateSync;
-    turn: TurnSync;
-}
+// FullSync 已移除，断线重连直接使用 StateSync（含全部当前回合 LogEntry）
 
 interface StartGameAck {
     map_config: MapConfig;
