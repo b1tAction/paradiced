@@ -13,7 +13,8 @@ const (
 	StateRoundMiniGame                   // 102: Mini-game phase, wait for rankings
 	StateRoundPrep                       // 103: Round preparation, assign dice types
 	StateTurnLoop                        // 104: Turn loop, iterate through player turns
-	StateGameOver                        // 105: Game ended, broadcast winner
+	StateRoundEndWait                     // 105: Wait for all clients to signal ready before next round
+	StateGameOver                         // 106: Game ended, broadcast winner
 )
 
 // ========== Layer 2: Player Turn States ==========
@@ -52,7 +53,8 @@ func (s StateID) String() string {
 		StateRoundMiniGame:  "RoundMiniGame",
 		StateRoundPrep:      "RoundPrep",
 		StateTurnLoop:       "TurnLoop",
-		StateGameOver:       "GameOver",
+		StateRoundEndWait:  "RoundEndWait",
+		StateGameOver:      "GameOver",
 		StateTurnUpkeep:     "TurnUpkeep",
 		StateMainAction:     "MainAction",
 		StateTurnMoving:     "TurnMoving",

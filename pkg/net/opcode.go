@@ -81,6 +81,10 @@ const (
 	// OpStartGame requests host to start the game manually.
 	// Data: StartGame (empty, server validates host and minimum players)
 	OpStartGame OpCode = 105
+
+	// OpRoundReady signals that client has finished rendering current round and is ready for next.
+	// Data: RoundReady (empty, server checks all clients have signaled)
+	OpRoundReady OpCode = 106
 )
 
 // String returns the opcode name for logging and debugging.
@@ -103,6 +107,7 @@ func (op OpCode) String() string {
 		OpUserChoice:           "user_choice",
 		OpMiniGameResultSubmit: "mini_game_result_submit",
 		OpStartGame:            "start_game",
+		OpRoundReady:           "round_ready",
 	}
 	if name, ok := names[op]; ok {
 		return name

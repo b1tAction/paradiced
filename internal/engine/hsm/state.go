@@ -36,6 +36,7 @@ const (
 	KeyTurnLoopActive    = "turn_loop_active"    // Turn loop active flag
 	KeyBossBattleActive  = "boss_battle_active"  // Boss battle active flag
 	KeyGameOver          = "game_over"           // Game over flag
+	KeyRoundEndWaiting   = "round_end_waiting"   // Round end wait phase flag
 )
 
 // State defines the interface for all states in the HSM.

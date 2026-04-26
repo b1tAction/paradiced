@@ -398,10 +398,10 @@ func (s *TurnLoopState) Exit(ctx *StateContext) {
 func (s *TurnLoopState) CanTransitionTo(target StateID) bool {
 	// TurnLoop can transition to:
 	// - GameOver (when Boss is defeated)
-	// - RoundMiniGame (when round completes)
+	// - RoundEndWait (when round completes, wait for clients)
 	// - Turn states (when starting player turn)
 	return target == StateGameOver ||
-		target == StateRoundMiniGame ||
+		target == StateRoundEndWait ||
 		target.IsTurnState()
 }
 
@@ -417,7 +417,7 @@ func (s *TurnLoopState) StartPlayerTurn(ctx *StateContext) StateID {
 		// Increment round counter for next round
 		ctx.IncrementRound()
 
-		return StateRoundMiniGame
+		return StateRoundEndWait
 	}
 
 	// Set current player turn index via HSM
@@ -456,6 +456,67 @@ func (s *TurnLoopState) OnTurnComplete(ctx *StateContext) {
 			ctx.SetString(KeyWinner, winnerID)
 		}
 	}
+}
+
+// ========== RoundEndWaitState ==========
+// Waits for all clients to signal OpRoundReady before transitioning to RoundMiniGame.
+// This gives clients time to finish rendering the last turn's animations.
+
+type RoundEndWaitState struct {
+	BaseGlobalState
+	readyReceived int
+	totalPlayers  int
+}
+
+// NewRoundEndWaitState creates a new RoundEndWait state.
+func NewRoundEndWaitState() *RoundEndWaitState {
+	return &RoundEndWaitState{
+		BaseGlobalState: BaseGlobalState{id: StateRoundEndWait},
+	}
+}
+
+func (s *RoundEndWaitState) Enter(ctx *StateContext) {
+	game := ctx.GetGame()
+
+	// Count non-Boss players
+	nonBossCount := 0
+	for _, p := range game.Players {
+		if !p.ID.IsBoss() {
+			nonBossCount++
+		}
+	}
+	s.totalPlayers = nonBossCount
+	s.readyReceived = 0
+
+	ctx.SetBool(KeyRoundEndWaiting, true)
+
+	// Broadcast StateSync showing "round_end_wait" global state
+	if ctx.Broadcast != nil && ctx.Builder != nil {
+		stateSync := ctx.Builder.BuildStateSync()
+		ctx.Broadcast.BroadcastStateSync(stateSync)
+	}
+}
+
+func (s *RoundEndWaitState) Update(ctx *StateContext) StateID {
+	// Check if all clients have signaled ready
+	if s.readyReceived >= s.totalPlayers {
+		return StateRoundMiniGame
+	}
+	return StateNone // Stay waiting
+}
+
+func (s *RoundEndWaitState) Exit(ctx *StateContext) {
+	ctx.SetBool(KeyRoundEndWaiting, false)
+}
+
+// CanTransitionTo defines valid transitions from RoundEndWait.
+func (s *RoundEndWaitState) CanTransitionTo(target StateID) bool {
+	return target == StateRoundMiniGame || target == StateGameOver
+}
+
+// OnRoundReady handles client's round-ready signal.
+func (s *RoundEndWaitState) OnRoundReady(ctx *StateContext, playerID string) {
+	s.readyReceived++
 }
 
 // ========== GameOverState ==========
@@ -539,6 +600,8 @@ func (f *GlobalStateFactory) CreateState(id StateID) State {
 		return NewRoundPrepState()
 	case StateTurnLoop:
 		return NewTurnLoopState()
+	case StateRoundEndWait:
+		return NewRoundEndWaitState()
 	case StateGameOver:
 		return NewGameOverState()
 	default:
@@ -555,6 +618,7 @@ func RegisterGlobalStates(hsm *HSM) error {
 		factory.CreateState(StateRoundMiniGame),
 		factory.CreateState(StateRoundPrep),
 		factory.CreateState(StateTurnLoop),
+		factory.CreateState(StateRoundEndWait),
 		factory.CreateState(StateGameOver),
 	}
 	return hsm.RegisterStates(states)
