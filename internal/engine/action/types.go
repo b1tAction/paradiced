@@ -16,7 +16,7 @@ import (
 // ========== DamageAction ==========
 
 // DamageAction represents HP reduction.
-// Can be intercepted by shields/隐匿 to reduce or block damage.
+// Can be intercepted at PhasePreDamage to reduce or block damage amount.
 type DamageAction struct {
 	targetPlayer *core.Player // Player receiving damage
 	SourceID     string       // Source identifier (e.g., "Buff_Curse", "Event_Trap")
@@ -827,15 +827,11 @@ func (a *FellDownAction) Execute(ctx *ActionContext) error {
 	if a.targetPlayer == nil {
 		return errors.NewActionExecutionError("fell_down", "", "target player is nil", nil)
 	}
-	// Falling damage
+	// Derive PiercingDamageAction for actual HP deduction.
+	// FellDownAction itself is a semantic signal for client animation;
+	// the damage effect is delegated to PiercingDamageAction (unblockable).
 	if a.Damage > 0 {
-		if err := a.targetPlayer.ApplyDamage(a.Damage); err != nil {
-			return errors.NewActionExecutionError("fell_down", a.targetPlayer.ID.UUID(), "failed to apply fall damage", err)
-		}
-		// Derive DeathAction if player died from fall damage
-		if a.targetPlayer.IsDead {
-			ctx.PushDerivedAction(NewDeathAction(a.targetPlayer, a.SourceID, a.targetPlayer.Position))
-		}
+		ctx.PushDerivedAction(NewPiercingDamageAction(a.targetPlayer, a.Damage, a.SourceID))
 	}
 	return nil
 }
@@ -843,7 +839,6 @@ func (a *FellDownAction) Execute(ctx *ActionContext) error {
 func (a *FellDownAction) LogEntry() gamelog.LogEntry {
 	metadata := util.NewMetadata()
 	metadata.SetInt("position", a.Position)
-	metadata.SetInt("hp_change", -a.Damage)
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
@@ -858,7 +853,7 @@ func (a *FellDownAction) LogEntry() gamelog.LogEntry {
 // ========== DeathAction ==========
 
 // DeathAction represents a player death event for client animation.
-// Pure rendering signal - does NOT modify IsDead (that's done by DamageAction/FellDownAction).
+// Pure rendering signal - does NOT modify IsDead (that's done by DamageAction).
 // SourceID identifies what caused the death (e.g., "Buff_Corrupt", "FragileCell", "Event_Trap").
 type DeathAction struct {
 	targetPlayer *core.Player // Player who died
@@ -1024,7 +1019,7 @@ func (a *BossAttackAction) Source() string             { return a.SourceID }
 func (a *BossAttackAction) Target() string             { return a.targetPlayer.ID.UUID() }
 func (a *BossAttackAction) TargetPlayer() *core.Player { return a.targetPlayer }
 func (a *BossAttackAction) PreTriggerPhase() constants.Phase {
-	return constants.PhasePreDamage
+	return constants.PhaseAnyTime // No handler intercepts BossAttackAction at PhasePreDamage
 }
 
 // PostTriggerPhase returns PhaseAnyTime (no post-trigger for boss attack).
@@ -1036,17 +1031,11 @@ func (a *BossAttackAction) Execute(ctx *ActionContext) error {
 	if a.targetPlayer == nil {
 		return errors.NewActionExecutionError("boss_attack", "", "target player is nil", nil)
 	}
-	if a.Damage <= 0 {
-		return nil
-	}
-
-	// Apply damage to target player
-	if err := a.targetPlayer.ApplyDamage(a.Damage); err != nil {
-		return errors.NewActionExecutionError("boss_attack", a.targetPlayer.ID.UUID(), "failed to apply damage", err)
-	}
-	// Derive DeathAction if player died
-	if a.targetPlayer.IsDead {
-		ctx.PushDerivedAction(NewDeathAction(a.targetPlayer, a.SourceID, a.targetPlayer.Position))
+	// Derive DamageAction for actual HP deduction.
+	// BossAttackAction itself is a semantic signal for client animation;
+	// the damage effect is delegated to DamageAction.
+	if a.Damage > 0 {
+		ctx.PushDerivedAction(NewDamageAction(a.targetPlayer, a.Damage, a.SourceID))
 	}
 	return nil
 }
@@ -1054,7 +1043,6 @@ func (a *BossAttackAction) Execute(ctx *ActionContext) error {
 func (a *BossAttackAction) LogEntry() gamelog.LogEntry {
 	metadata := util.NewMetadata()
 	metadata.SetString("attack_type", string(a.AttackType))
-	metadata.SetInt("damage", a.Damage)
 	metadata.SetString("target", a.targetPlayer.ID.UUID())
 
 	return gamelog.LogEntry{

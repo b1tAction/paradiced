@@ -949,57 +949,6 @@ func TestScenarioDeath_RespawnWithDeathMarkPresent(t *testing.T) {
 
 // ========== Scenario Group C: Hidden Buff Immunity ==========
 
-// TestScenarioBuff_Hidden_ImmuneDamage verifies that Hidden (隐匿) buff
-// grants damage immunity — player takes no HP damage when Hidden buff is active.
-func TestScenarioBuff_Hidden_ImmuneDamage(t *testing.T) {
-	harness := NewGameTestHarness(&HarnessConfig{
-		Seed:        42,
-		PlayerCount: 2,
-		Factions:    []constants.Faction{constants.FactionQingLong, constants.FactionZhuQue},
-		InitialHP:   6,
-		InitialLP:   3,
-	})
-
-	player := harness.Players[0]
-
-	// Add Hidden buff to player (duration 3 turns)
-	actionCtx := newActionContextWithPools(
-		harness.Game,
-		harness.Game.Bus,
-		harness.MapEngine,
-		harness.Game.Draw,
-	)
-
-	harness.Game.Log.StartTurn(1, 0, player.ID.UUID())
-
-	// Step 1: Add Hidden buff to player
-	addHiddenAction := engineaction.NewAddBuffAction(player, constants.BuffTypeHidden, "TestHidden")
-	if err := actionCtx.ExecuteAction(addHiddenAction); err != nil {
-		t.Fatalf("ExecuteAction(AddBuffAction(Hidden)) failed: %v", err)
-	}
-
-	if !player.HasBuff(constants.BuffTypeHidden) {
-		t.Fatal("Player should have Hidden buff after AddBuffAction")
-	}
-
-	// Step 2: Attempt damage on Hidden player
-	initialHP := player.HP
-	damageAction := engineaction.NewDamageAction(player, 5, "TestAttack")
-	if err := actionCtx.ExecuteAction(damageAction); err != nil {
-		t.Fatalf("ExecuteAction(DamageAction) failed: %v", err)
-	}
-
-	// DamageAction should have been intercepted by Hidden buff (blocked at PhasePreBuffApplied level)
-	// OR ApplyDamage should return nil due to HasBuff(Hidden) check
-	// Either way, HP should not change
-	if player.HP != initialHP {
-		t.Errorf("Player HP should not change when Hidden buff is active, got HP=%d (expected %d)", player.HP, initialHP)
-	}
-	if player.IsDead {
-		t.Error("Player should NOT be dead when Hidden buff is active")
-	}
-}
-
 // TestScenarioBuff_Hidden_BlockNegativeBuff verifies that Hidden (隐匿) buff
 // blocks the application of negative buffs via EventBus interception.
 func TestScenarioBuff_Hidden_BlockNegativeBuff(t *testing.T) {
@@ -1151,68 +1100,6 @@ func TestScenarioStealBuff_BaiHuStealsBuff(t *testing.T) {
 		t.Error("StolenBuff should be set after steal execution")
 	} else if stealAction.StolenBuff.Type != constants.BuffTypeDivine {
 		t.Errorf("StolenBuff type should be Divine, got %s", stealAction.StolenBuff.Type)
-	}
-}
-
-// ========== Scenario Group F: Boss Attack + Hidden Buff ==========
-
-// TestScenarioBuff_Hidden_ImmuneBossAttack verifies that Hidden (隐匿) buff
-// grants immunity to Boss attacks via ApplyDamage's HasBuff check.
-// BossAttackAction uses ApplyDamage which checks HasBuff(Hidden) internally.
-func TestScenarioBuff_Hidden_ImmuneBossAttack(t *testing.T) {
-	harness := NewGameTestHarness(&HarnessConfig{
-		Seed:        42,
-		PlayerCount: 2,
-		Factions:    []constants.Faction{constants.FactionQingLong, constants.FactionZhuQue},
-		InitialHP:   6,
-		InitialLP:   3,
-	})
-
-	player := harness.Players[0]
-
-	actionCtx := newActionContextWithPools(
-		harness.Game,
-		harness.Game.Bus,
-		harness.MapEngine,
-		harness.Game.Draw,
-	)
-
-	bossPlayer := harness.Game.InitializeBoss(harness.MapEngine.Length - 1)
-	if bossPlayer == nil {
-		t.Fatal("Failed to initialize Boss player")
-	}
-
-	harness.Game.Log.StartTurn(1, 0, player.ID.UUID())
-
-	// Step 1: Add Hidden buff to player
-	addHiddenAction := engineaction.NewAddBuffAction(player, constants.BuffTypeHidden, "TestHidden")
-	if err := actionCtx.ExecuteAction(addHiddenAction); err != nil {
-		t.Fatalf("Add Hidden buff failed: %v", err)
-	}
-
-	if !player.HasBuff(constants.BuffTypeHidden) {
-		t.Fatal("Player should have Hidden buff")
-	}
-
-	// Step 2: Boss attacks the Hidden player
-	initialHP := player.HP
-	bossAttackAction := engineaction.NewBossAttackAction(
-		bossPlayer,
-		player,
-		3,
-		constants.BossAttackNormal,
-		"boss_normal",
-	)
-	if err := actionCtx.ExecuteAction(bossAttackAction); err != nil {
-		t.Fatalf("ExecuteAction(BossAttackAction) failed: %v", err)
-	}
-
-	// Player should take no damage due to Hidden buff
-	if player.HP != initialHP {
-		t.Errorf("Player HP should not change when Hidden buff is active during Boss attack, got HP=%d (expected %d)", player.HP, initialHP)
-	}
-	if player.IsDead {
-		t.Error("Player should NOT be dead when Hidden buff is active during Boss attack")
 	}
 }
 

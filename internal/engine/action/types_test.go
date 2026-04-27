@@ -502,16 +502,31 @@ func TestFellDownAction(t *testing.T) {
 	ctx := NewActionContext(nil, nil, nil, nil)
 	action.Execute(ctx)
 
-	if player.HP != 9 {
-		t.Errorf("HP should be 9 after falling damage, got %d", player.HP)
+	// FellDownAction delegates damage to PiercingDamageAction
+	if ctx.ActionQueue.Len() != 1 {
+		t.Fatalf("Should have 1 derived action, got %d", ctx.ActionQueue.Len())
+	}
+	derived := ctx.ActionQueue.Pop()
+	piercing, ok := derived.(*DamageAction)
+	if !ok {
+		t.Fatalf("Derived action should be DamageAction, got %T", derived)
+	}
+	if !piercing.IsPiercing {
+		t.Error("Derived DamageAction should be piercing")
+	}
+	if piercing.Amount != 1 {
+		t.Errorf("PiercingDamageAction amount = %d, expected 1", piercing.Amount)
+	}
+	if piercing.Source() != "FragileCell" {
+		t.Errorf("PiercingDamageAction source = %s, expected FragileCell", piercing.Source())
 	}
 
 	entry := action.LogEntry()
 	if entry.ActionType != "fell_down" {
 		t.Errorf("Log ActionType should be fell_down, got %s", entry.ActionType)
 	}
-	if entry.Metadata.GetIntOrDefault("hp_change", 0) != -1 {
-		t.Errorf("Log delta should be -1, got %d", entry.Metadata.GetIntOrDefault("hp_change", 0))
+	if entry.Metadata.GetIntOrDefault("position", 0) != 30 {
+		t.Errorf("Log position should be 30, got %d", entry.Metadata.GetIntOrDefault("position", 0))
 	}
 }
 
@@ -1041,9 +1056,9 @@ func TestFellDownActionZeroDamage(t *testing.T) {
 	ctx := NewActionContext(nil, nil, nil, nil)
 	action.Execute(ctx)
 
-	// Zero damage should not change HP
-	if player.HP != 10 {
-		t.Errorf("HP should remain 10, got %d", player.HP)
+	// Zero damage should not push any derived action
+	if ctx.ActionQueue.Len() != 0 {
+		t.Errorf("Should have 0 derived actions with zero damage, got %d", ctx.ActionQueue.Len())
 	}
 }
 
@@ -2455,8 +2470,8 @@ func TestBossAttackActionInterfaceMethods(t *testing.T) {
 	if action.TargetPlayer() != player {
 		t.Error("TargetPlayer() should return target player")
 	}
-	if action.PreTriggerPhase() != constants.PhasePreDamage {
-		t.Errorf("PreTriggerPhase() = %s, expected PhasePreDamage", action.PreTriggerPhase())
+	if action.PreTriggerPhase() != constants.PhaseAnyTime {
+		t.Errorf("PreTriggerPhase() = %s, expected PhaseAnyTime", action.PreTriggerPhase())
 	}
 	if action.PostTriggerPhase() != constants.PhaseAnyTime {
 		t.Errorf("PostTriggerPhase() = %s, expected PhaseAnyTime", action.PostTriggerPhase())
@@ -2475,12 +2490,24 @@ func TestBossAttackActionExecute(t *testing.T) {
 	if err != nil {
 		t.Errorf("Execute should succeed, got: %v", err)
 	}
-	if player.HP != 3 {
-		t.Errorf("Player HP = %d, expected 3 (5-2)", player.HP)
+	// BossAttackAction delegates damage to DamageAction
+	if ctx.ActionQueue.Len() != 1 {
+		t.Fatalf("Should have 1 derived action, got %d", ctx.ActionQueue.Len())
+	}
+	derived := ctx.ActionQueue.Pop()
+	damageAction, ok := derived.(*DamageAction)
+	if !ok {
+		t.Fatalf("Derived action should be DamageAction, got %T", derived)
+	}
+	if damageAction.Amount != 2 {
+		t.Errorf("DamageAction amount = %d, expected 2", damageAction.Amount)
+	}
+	if damageAction.Source() != "boss_attack" {
+		t.Errorf("DamageAction source = %s, expected boss_attack", damageAction.Source())
 	}
 }
 
-func TestBossAttackActionKillsPlayer(t *testing.T) {
+func TestBossAttackActionLethalDamage(t *testing.T) {
 	boss := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.HP = 2
@@ -2493,12 +2520,18 @@ func TestBossAttackActionKillsPlayer(t *testing.T) {
 	if err != nil {
 		t.Errorf("Execute should succeed, got: %v", err)
 	}
-	if !player.IsDead {
-		t.Error("Player should be dead after lethal boss attack")
-	}
-	// Should push DeathAction as derived action
+	// BossAttackAction delegates damage to DamageAction even for lethal damage.
+	// DeathAction is derived by DamageAction.Execute (tested in DamageAction tests).
 	if ctx.ActionQueue.Len() != 1 {
-		t.Fatalf("Should have 1 derived DeathAction, got %d", ctx.ActionQueue.Len())
+		t.Fatalf("Should have 1 derived DamageAction, got %d", ctx.ActionQueue.Len())
+	}
+	derived := ctx.ActionQueue.Pop()
+	damageAction, ok := derived.(*DamageAction)
+	if !ok {
+		t.Fatalf("Derived action should be DamageAction, got %T", derived)
+	}
+	if damageAction.Amount != 2 {
+		t.Errorf("DamageAction amount = %d, expected 2 (lethal)", damageAction.Amount)
 	}
 }
 
@@ -2528,10 +2561,6 @@ func TestBossAttackActionLogEntry(t *testing.T) {
 	attackType := entry.Metadata.GetStringOrDefault("attack_type", "")
 	if attackType != string(constants.BossAttackCrit) {
 		t.Errorf("LogEntry attack_type = %s, expected %s", attackType, constants.BossAttackCrit)
-	}
-	damage := entry.Metadata.GetIntOrDefault("damage", 0)
-	if damage != 2 {
-		t.Errorf("LogEntry damage = %d, expected 2", damage)
 	}
 }
 
