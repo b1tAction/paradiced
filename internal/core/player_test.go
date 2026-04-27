@@ -168,23 +168,6 @@ func TestApplyDamageNegative(t *testing.T) {
 	}
 }
 
-func TestApplyDamageHiddenImmune(t *testing.T) {
-	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
-	player.AddBuff(NewBuff(constants.BuffTypeHidden, 3))
-
-	err := player.ApplyDamage(5)
-	if err != nil {
-		t.Fatalf("ApplyDamage failed: %v", err)
-	}
-	if player.IsDead {
-		t.Error("player with Hidden buff should be immune to damage")
-	}
-	// HP should remain initial value
-	if player.HP != DefaultPlayerConfig.InitHP {
-		t.Errorf("player.HP = %d, expected %d (immune)", player.HP, DefaultPlayerConfig.InitHP)
-	}
-}
-
 func TestHeal(t *testing.T) {
 	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
 	player.HP = 5

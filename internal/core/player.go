@@ -113,11 +113,6 @@ func (p *Player) ApplyDamage(amount int) error {
 		return pkgerrors.NewValidationError("damage_amount", amount, "must be non-negative")
 	}
 
-	// Hidden隐匿 buff grants damage immunity
-	if p.HasBuff(constants.BuffTypeHidden) {
-		return nil
-	}
-
 	p.HP -= amount
 
 	if p.HP <= 0 {
