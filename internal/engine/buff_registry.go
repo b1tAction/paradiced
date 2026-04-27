@@ -271,7 +271,7 @@ func registerAllBuffs() {
 		Handler:     handlePoisonBadEvent,
 	})
 
-	// Hidden: Immunity to damage/events for 3 turns
+	// Hidden: Immunity to events/buffs for 3 turns (does NOT block damage).
 	GlobalBuffRegistry.RegisterBuff(&core.BuffDefinition{
 		Type:        constants.BuffTypeHidden,
 		Eval:        constants.EvaluationNeutral,

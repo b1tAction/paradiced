@@ -78,7 +78,7 @@ const (
 
     // ========== Action发布的Phase（动作时机） ==========
     // 这些Phase由ActionContext.ExecuteAction()发布
-    PhasePreDamage       Phase = "pre_damage"       // DamageAction/BossDamageAction/BossAttackAction - 伤害应用前（隐匿拦截、反刺反伤）
+    PhasePreDamage       Phase = "pre_damage"       // DamageAction/BossDamageAction - 伤害应用前（反刺反伤）
     PhasePreEvent        Phase = "pre_event"        // DrawEventAction.Execute() - 事件触发前（辟邪、玄武）
     PhasePreMove         Phase = "pre_move"         // MoveAction.Execute() - 移动前（迷途反向）
     PhasePreRespawn      Phase = "pre_respawn"      // RespawnAction - 重生前（可拦截）
@@ -336,7 +336,7 @@ func handleZhuQueFire(phase constants.Phase, ctx *event.Context) {
 | 毒瘴 | [BeforeTurn] | 30 | false | 每回合恶性事件 |
 | 离火 | [BeforeTurn] | 10 | false | 每4回合LP+1（定制处理器） |
 | 死亡标记 | [PreAction] | 999 | false | 死亡后阻拦后续Action（豁免Respawn/移除自身） |
-| 反刺 | [PreDamage] | 50 | false | Boss自身反刺：30%反伤为衍生BossAttackAction（隐匿可拦截反伤） |
+| 反刺 | [PreDamage] | 50 | false | Boss自身反刺：30%反伤为衍生BossAttackAction（BossAttackAction再衍生DamageAction） |
 
 | Item | Phase | Priority | NeedConfirm | 说明 |
 |------|-------|----------|-------------|------|

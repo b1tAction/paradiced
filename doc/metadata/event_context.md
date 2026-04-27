@@ -59,7 +59,7 @@ func ExecuteHPChange(ctx *ActionContext, target *Player) {
 - Thorns Handler 在 PhasePreDamage（BossPlayer上）触发
 - 从 `current_action` 获取 BossDamageAction，计算30%反伤（math.Round）
 - 推送衍生 BossAttackAction（Boss→攻击玩家，SourceThornsReflect）
-- 衍生 BossAttackAction 走 PhasePreDamage → 隐匿可拦截反伤
+- BossAttackAction 衍生 DamageAction 执行伤害（PreTriggerPhase=PhaseAnyTime，不走 PhasePreDamage）
 
 **骰子拦截机制 (PhasePreDiceRoll)**：
 - RollDiceAction 在构造时计算 Steps（遵循 DamageAction 模式：Amount 构造时设定）

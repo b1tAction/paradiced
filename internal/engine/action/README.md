@@ -181,12 +181,14 @@ type RespawnAction struct {
 type FellDownAction struct {
     targetPlayer *core.Player   // 私有字段
     Position     int            // 坔落位置
-    Damage       int            // 坔落伤害
+    Damage       int            // 坔落伤害（传递给衍生 PiercingDamageAction）
     SourceID     string         // "FragileCell"
 }
 ```
 
 - Fragile块坠落时使用
+- `Execute()` 不直接扣 HP，而是衍生 `PiercingDamageAction`（不可拦截）来执行伤害
+- `LogEntry()` 只记录语义信息（position），hp_change 由 DamageAction LogEntry 承担
 
 ### DeathAction
 
@@ -231,7 +233,9 @@ type BossAttackAction struct {
 ```
 
 - `CanModify() = false` - Boss attack cannot be modified
-- `PreTriggerPhase() = PhasePreDamage` - Can be intercepted by 隐匿 Buff
+- `PreTriggerPhase() = PhaseAnyTime` - No handler intercepts BossAttackAction at PhasePreDamage
+- `Execute()` 不直接扣 HP，而是衍生 `DamageAction` 来执行伤害
+- `LogEntry()` 只记录语义信息（attack_type, target），hp_change 由 DamageAction LogEntry 承担
 - `TargetPlayer()` returns `targetPlayer` (target player)
 - Used in Boss counter-attack (normal/crit attacks on players)
 

@@ -207,7 +207,7 @@ type decisionStateResetter interface {
 | AfterTurn | HSM | TurnEnd.Enter() |
 | PreMove | HSM | TurnMoving.Enter() |
 | PreEvent | Action | DrawEventAction.Execute() |
-| PreDamage | Action | DamageAction / BossDamageAction / BossAttackAction |
+| PreDamage | Action | DamageAction / BossDamageAction |
 | ItemUsed | Game | Game.UseItem() / MainAction.OnUseItem() |
 
 ## 毒瘴(Poison)恶性事件处理

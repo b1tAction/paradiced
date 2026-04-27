@@ -329,14 +329,14 @@ Git Commit信息必须使用英文提交
 | 神眷 (Divine) | PostBuffApplied, PreBuffRemoved | LP+1 on application, LP-1 on removal |
 | 诅咒 (Curse) | PostBuffApplied, PreBuffRemoved | LP-1 on application, LP+1 on removal |
 | 迷途 (Lost) | PreMove (HSM发布) | Reverse movement direction (Steps → -Steps, anti double-flip) |
-| 隐匿 (Hidden) | PreBuffApplied | Immunity to damage/events; blocks non-positive, non-Boss buffs (IsBoss/IsPositive bypass) |
+| 隐匿 (Hidden) | PreBuffApplied | Immunity to events/buffs; blocks non-positive, non-Boss buffs (IsBoss/IsPositive bypass). Does NOT block damage. |
 | 甘霖 (Rain) | AfterTurn | HP+1 every 2 turns |
 | 腐化 (Corrupt) | AfterTurn | HP-1 every 2 turns |
 | 辟邪 (Exorcism) | PreEvent | Immune to poison |
 | 毒瘴 (Poison) | BeforeTurn | Bad event each turn |
 | 离火 (Fire) | BeforeTurn | ZhuQue passive, LP+1 every 4 turns |
 | 死亡标记 (DeathMark) | PreAction (Hidden) | Block all actions for dead players (exempt: RespawnAction, RemoveBuffAction(DeathMark)) |
-| 反刺 (Thorns) | PreDamage (Boss self) | Boss reflect: 30% damage back as BossAttackAction (Hidden can block reflect) |
+| 反刺 (Thorns) | PreDamage (Boss self) | Boss reflect: 30% damage back as derived BossAttackAction (BossAttackAction derives DamageAction) |
 
 ## Item System
 

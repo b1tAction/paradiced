@@ -128,7 +128,8 @@ for (const entry of turnSync.entries) {
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
 | `position` | int | 是 | 落坑位置 | 落坑动画位置 |
-| `hp_change` | int | 是 | 坠落伤害（负数） | 显示坠落伤害 |
+
+> 注：坠落伤害由衍生的 `damage` 类型 LogEntry 承担（包含 `hp_change`），fell_down 类型仅记录语义信号。
 
 ### respawn 类型
 
@@ -148,9 +149,10 @@ for (const entry of turnSync.entries) {
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
-| `attack_type` | string | 是 | 攻击类型（"normal"/"crit"） | 攻击类型动画 |
-| `damage` | int | 是 | 伤害值 | 显示伤害数值动画 |
+| `attack_type` | string | 是 | 攻击类型（"normal"/"crit"/"skill"） | 攻击类型动画 |
 | `target` | string | 是 | 目标玩家ID | 目标标识 |
+
+> 注：Boss攻击伤害由衍生的 `damage` 类型 LogEntry 承担（包含 `hp_change`），boss_attack 类型仅记录语义信号。
 
 ### boss_skill 类型（Boss使用技能）
 
@@ -218,7 +220,7 @@ interface LogEntry {
     source?: string;
     metadata?: {
         // 语义明确的数值字段（替代旧的 delta）
-        hp_change?: number;    // damage/heal/fell_down: HP变化
+        hp_change?: number;    // damage/heal: HP变化
         lp_change?: number;    // modify_lp: LP变化
         duration?: number;     // add_buff: Buff持续时间
         steps?: number;        // move: 移动步数
@@ -295,7 +297,7 @@ interface LogEntry {
 | ModifyLPAction | `lp_change: amount` | `lp_change: 1` |
 | MoveAction | `steps: steps`, `start_pos`, `end_pos`, `path` | `steps: 5` |
 | AddBuffAction | `buff_type`, `duration: duration` | `duration: 3` |
-| FellDownAction | `position`, `hp_change: -damage` | `hp_change: -10` |
+| FellDownAction | `position` | `position: 15` |
 | DeathAction | `position`, `death_source` | `death_source: "Buff_Corrupt"` |
 | DrawBuffAction | `buff_type`（抽取成功时） | `buff_type: "divine"` |
 | DiceUpgradeAction | `from_dice`, `to_dice` | `from_dice: "silver", to_dice: "gold"` |

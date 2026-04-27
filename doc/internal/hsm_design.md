@@ -397,7 +397,7 @@ S_TURN_MOVING (移动结算)
 │   │   ├── 迷途反向移动: Steps < 0, direction=-1
 │   ├── FellDown 处理（HSM 层）
 │   │   ├── MoveAction 到坠落位置
-│   │   ├── FellDownAction → 坠落伤害
+│   │   ├── FellDownAction → 衍生 PiercingDamageAction（坠落伤害）
 │   │   └── 强制转移 S_TURN_END
 │   ├── CheckPoint 拆分（仅 Steps > 0 正向移动）
 │   │   ├── 经过 CheckPoint → 拆分为两个移动段
@@ -521,10 +521,10 @@ S_TURN_MOVING
 ├── 计算路径 → PathResult.FellDown == true
 ├── FellDownAction（通过Action系统执行）
 │   ├── actionCtx.ExecuteAction(NewFellDownAction(player, pos, 1, "FragileCell"))
-│   ├── 自动记录到 GameLog
-│   │   ├── ActionType: "fell_down"
-│   │   ├── Delta: -1
-│   │   ├── Metadata: {"position": pos}
+│   ├── FellDownAction → 衍生 PiercingDamageAction → 扣HP
+│   ├── GameLog 记录两条 Entry
+│   │   ├── ActionType: "fell_down", Metadata: {"position": pos}
+│   │   ├── ActionType: "damage", Metadata: {"hp_change": -1}
 ├── 强制转移 → S_TURN_END (跳过 Landed/Event)
 └── 状态标记 → player.Metadata.Set("fell_down", true)
 ```
@@ -556,7 +556,7 @@ S_TURN_BOSS_BATTLE (Boss战斗)
 ├── Boss反击分支（Boss回合）
 │   ├── Boss格玩家 → Boss攻击（normal/crit/skill）
 │   ├── Boss格无玩家 → Boss回合空转
-│   ├── BossAttackAction → 对玩家造成伤害（可被隐匿拦截）
+│   ├── BossAttackAction → 衍生 DamageAction（Boss对玩家伤害）
 │   ├── BossSkillAction → 从技能池随机抽取
 │   ├── 玩家死亡 → RespawnAction → 复活至检查点
 ├── 转移
@@ -801,11 +801,11 @@ func (s *StateTurnEvent) Enter(ctx *StateContext) {
 | AddBuffAction | "add_buff" | Metadata(buff_type, duration) |
 | RemoveBuffAction | "remove_buff" | Metadata(buff_type) |
 | RespawnAction | "respawn" | Metadata(checkpoint_pos) |
-| FellDownAction | "fell_down" | Delta=-Damage, Metadata(position) |
+| FellDownAction | "fell_down" | Metadata(position) |
 | TeleportAction | "teleport" | Metadata(target_pos) |
 | StealBuffAction | "steal_buff" | Metadata(stolen_buff_type) |
 | BossDamageAction | "boss_damage" | Metadata(damage, is_crit, boss_remaining_hp) |
-| BossAttackAction | "boss_attack" | Metadata(attack_type, damage, target) |
+| BossAttackAction | "boss_attack" | Metadata(attack_type, target) |
 | BossSkillAction | "boss_skill" | Metadata(skill_type, targets) |
 
 ### Client 回放支持
