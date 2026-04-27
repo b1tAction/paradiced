@@ -33,7 +33,8 @@ session:
 
 # Runtime configuration (Go plugins)
 runtime:
-  path: "/nakama/modules" 
+  path: "/nakama/modules"
+  http_key: "defaultkey" 
 
 # Match configuration
 match:

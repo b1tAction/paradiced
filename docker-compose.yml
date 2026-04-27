@@ -78,11 +78,8 @@ services:
         sleep 60 &&
         while true; do
           echo "Running cleanup_stale_accounts RPC...";
-          result=$$(curl -sf -X POST \
-            "http://nakama:7350/v2/rpc/cleanup_stale_accounts" \
-            -u "defaultkey:" \
-            -H "Content-Type: application/json" \
-            -d '{}') && \
+          result=$$(curl -sf \
+            "http://nakama:7350/v2/rpc/cleanup_stale_accounts?http_key=defaultkey&payload=%7B%7D") && \
           echo "Cleanup result: $$result" || \
           echo "Cleanup failed, will retry in 24 hours.";
           sleep 86400;
