@@ -60,6 +60,34 @@ services:
       timeout: 5s
       retries: 5
 
+  # Automated cron job for cleaning up stale device-authenticated accounts.
+  # Runs cleanup_stale_accounts RPC every 24 hours via Nakama HTTP API.
+  cron-cleanup:
+    image: alpine:3.19
+    restart: unless-stopped
+    depends_on:
+      nakama:
+        condition: service_healthy
+    entrypoint:
+      - "/bin/sh"
+      - "-c"
+      - |
+        apk add --no-cache curl &&
+        echo "Stale account cleanup cron started (every 24 hours)..." &&
+        # Wait 60s for Nakama to be fully ready on first start
+        sleep 60 &&
+        while true; do
+          echo "Running cleanup_stale_accounts RPC...";
+          result=$$(curl -sf -X POST \
+            "http://nakama:7350/v2/rpc/cleanup_stale_accounts" \
+            -u "defaultkey:" \
+            -H "Content-Type: application/json" \
+            -d '{}') && \
+          echo "Cleanup result: $$result" || \
+          echo "Cleanup failed, will retry in 24 hours.";
+          sleep 86400;
+        done
+
 volumes:
   cockroach_data:
   nakama_data:

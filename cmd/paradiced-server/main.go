@@ -6,11 +6,19 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
+	"time"
 
 	"github.com/b1tAction/paradiced/internal/nakama"
 	"github.com/heroiclabs/nakama-common/runtime"
 )
+
+// Device ID prefix used by ParaDiced web client for username-based auth.
+const deviceIDPrefix = "paradiced_"
+
+// Stale account threshold: accounts inactive for more than 7 days will be cleaned up.
+const staleThresholdDays = 7
 
 // InitModule is the entry point called by Nakama when the module is loaded.
 // This function registers all match handlers and hooks.
@@ -49,6 +57,93 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		return err
 	}
 
+	// Register RPC for cleaning up stale device-authenticated accounts.
+	// This can be called via HTTP API or scheduled with external cron.
+	// Payload (optional JSON): { "threshold_days": 7 }
+	err = initializer.RegisterRpc("cleanup_stale_accounts", func(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+		thresholdDays := staleThresholdDays
+
+		// Parse optional threshold override from payload
+		if payload != "" {
+			var params struct {
+				ThresholdDays int `json:"threshold_days"`
+			}
+			if err := json.Unmarshal([]byte(payload), &params); err == nil && params.ThresholdDays > 0 {
+				thresholdDays = params.ThresholdDays
+			}
+		}
+
+		logger.Info("Starting stale account cleanup, threshold_days=%d", thresholdDays)
+
+		thresholdTime := time.Now().UTC().AddDate(0, 0, -thresholdDays)
+
+		// Query user IDs of device-authenticated accounts with paradiced_ prefix
+		// that have not been updated since the threshold time.
+		// Nakama stores device links in the user_account_device table.
+		query := `
+			SELECT DISTINCT u.id
+			FROM user_account u
+			INNER JOIN user_account_device d ON u.id = d.user_id
+			WHERE d.id LIKE $1
+			AND u.update_time < $2
+		`
+
+		rows, err := db.QueryContext(ctx, query, deviceIDPrefix+"%", thresholdTime)
+		if err != nil {
+			logger.Error("Failed to query stale accounts: %v", err)
+			return "", fmt.Errorf("query failed: %w", err)
+		}
+		defer rows.Close()
+
+		var staleUserIDs []string
+		for rows.Next() {
+			var userID string
+			if err := rows.Scan(&userID); err != nil {
+				logger.Error("Failed to scan stale account row: %v", err)
+				continue
+			}
+			staleUserIDs = append(staleUserIDs, userID)
+		}
+
+		if len(staleUserIDs) == 0 {
+			logger.Info("No stale accounts found")
+			result := map[string]interface{}{
+				"deleted_count": 0,
+				"threshold_days": thresholdDays,
+			}
+			response, _ := json.Marshal(result)
+			return string(response), nil
+		}
+
+		logger.Info("Found %d stale accounts to delete", len(staleUserIDs))
+
+		// Delete each stale account using Nakama API
+		deletedCount := 0
+		for _, userID := range staleUserIDs {
+			if err := nk.AccountDeleteId(ctx, userID, false); err != nil {
+				logger.Error("Failed to delete stale account %s: %v", userID, err)
+				continue
+			}
+			deletedCount++
+			logger.Debug("Deleted stale account: %s", userID)
+		}
+
+		logger.Info("Stale account cleanup completed: deleted=%d, total=%d", deletedCount, len(staleUserIDs))
+
+		result := map[string]interface{}{
+			"deleted_count":  deletedCount,
+			"total_stale":    len(staleUserIDs),
+			"threshold_days": thresholdDays,
+		}
+		response, _ := json.Marshal(result)
+		return string(response), nil
+	})
+
+	if err != nil {
+		logger.Error("Failed to register cleanup_stale_accounts RPC: %v", err)
+		return err
+	}
+
 	// Register matchmaker matched callback to create authoritative matches
 	err = initializer.RegisterMatchmakerMatched(func(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, entries []runtime.MatchmakerEntry) (string, error) {
 		// Create authoritative match with matched players
@@ -83,7 +178,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 	}
 
 	logger.Info("Paradiced match handler registered successfully")
-	log.Printf("[Paradiced] Module initialized - RPC, match handler and matchmaker callback registered")
+	log.Printf("[Paradiced] Module initialized - RPC, match handler, matchmaker callback, and cleanup RPC registered")
 
 	return nil
 }
