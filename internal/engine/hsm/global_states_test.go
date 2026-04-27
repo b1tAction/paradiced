@@ -855,3 +855,32 @@ func TestGameOverStateExit(t *testing.T) {
 		t.Error("GameOverState.Exit should clear winner")
 	}
 }
+
+// ========== GameOverState.Enter Stops HSM Tests ==========
+
+func TestGameOverStateEnterStopsHSM(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 0)
+	winnerPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(winnerPlayer)
+
+	hsmInst := NewHSM(game)
+	RegisterGlobalStates(hsmInst)
+
+	// Start HSM so it's running
+	ctx := NewStateContext().WithHSM(hsmInst)
+	hsmInst.Start(StateMatchInit, ctx)
+
+	if !hsmInst.IsRunning() {
+		t.Fatal("HSM should be running before GameOver")
+	}
+
+	// Transition to GameOver
+	gameOverCtx := NewStateContext().WithHSM(hsmInst)
+	gameOverCtx.SetString(KeyWinner, winnerPlayer.ID.UUID())
+	hsmInst.TransitionTo(StateGameOver, gameOverCtx)
+
+	// After GameOverState.Enter(), HSM should be stopped
+	if hsmInst.IsRunning() {
+		t.Error("HSM should not be running after GameOverState.Enter() stops it")
+	}
+}

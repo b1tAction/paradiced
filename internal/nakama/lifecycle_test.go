@@ -2,12 +2,15 @@
 package nakama
 
 import (
+	"context"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
+	"github.com/heroiclabs/nakama-common/runtime"
 )
 
 func TestMatchInit(t *testing.T) {
@@ -419,5 +422,88 @@ func TestAssignFactionsAllFour(t *testing.T) {
 	}
 	if p4.GetFaction() != constants.FactionXuanWu {
 		t.Errorf("p4 faction = %v, want XuanWu", p4.GetFaction())
+	}
+}
+
+// ========== cleanupPlayerStorage Tests ==========
+
+// mockStorageDeleter tracks StorageDelete calls for testing.
+type mockStorageDeleter struct {
+	mu     sync.Mutex
+	calls  [][]*runtime.StorageDelete
+	errors map[int]error // call index -> error to return
+}
+
+func (m *mockStorageDeleter) StorageDelete(ctx context.Context, deletes []*runtime.StorageDelete) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	idx := len(m.calls)
+	m.calls = append(m.calls, deletes)
+	if m.errors != nil && m.errors[idx] != nil {
+		return m.errors[idx]
+	}
+	return nil
+}
+
+func (m *mockStorageDeleter) getCalls() [][]*runtime.StorageDelete {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	result := make([][]*runtime.StorageDelete, len(m.calls))
+	copy(result, m.calls)
+	return result
+}
+
+func TestCleanupPlayerStorage(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
+	handler.addPlayer(id.TestUUID(2), constants.FactionZhuQue, id.TestUUID(2))
+
+	deleter := &mockStorageDeleter{}
+	logger := newMockLogger()
+
+	cleanupPlayerStorage(context.Background(), deleter, handler, logger)
+
+	calls := deleter.getCalls()
+	if len(calls) != 2 {
+		t.Fatalf("StorageDelete should be called for each player, got %d calls", len(calls))
+	}
+
+	// Each call should have 2 storage keys
+	for _, call := range calls {
+		if len(call) != 2 {
+			t.Errorf("Each StorageDelete call should have 2 keys, got %d", len(call))
+		}
+		// Verify collection and key names
+		for _, del := range call {
+			if del.Collection != "paradiced" {
+				t.Errorf("Collection = %s, want 'paradiced'", del.Collection)
+			}
+			if del.Key != "paradiced_match_result" && del.Key != "paradiced_stats" {
+				t.Errorf("Key = %s, want 'paradiced_match_result' or 'paradiced_stats'", del.Key)
+			}
+		}
+	}
+}
+
+func TestCleanupPlayerStorageNilDeleter(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
+
+	logger := newMockLogger()
+
+	// Should not panic with nil deleter
+	cleanupPlayerStorage(context.Background(), nil, handler, logger)
+}
+
+func TestCleanupPlayerStorageNoPlayers(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	deleter := &mockStorageDeleter{}
+	logger := newMockLogger()
+
+	cleanupPlayerStorage(context.Background(), deleter, handler, logger)
+
+	calls := deleter.getCalls()
+	if len(calls) != 0 {
+		t.Errorf("StorageDelete should not be called when no players, got %d calls", len(calls))
 	}
 }

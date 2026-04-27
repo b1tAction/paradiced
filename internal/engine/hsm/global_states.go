@@ -633,6 +633,11 @@ func (s *GameOverState) Enter(ctx *StateContext) {
 		}
 		ctx.Broadcast.BroadcastGameOver(over)
 	}
+
+	// Stop HSM after broadcasting GameOver.
+	// This sets hsm.running=false, causing MatchLoop to return nil on next tick,
+	// which triggers Nakama to call MatchTerminate → MatchStop → clear player data.
+	ctx.HSM.Stop(ctx)
 }
 
 func (s *GameOverState) Update(ctx *StateContext) StateID {

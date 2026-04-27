@@ -293,13 +293,46 @@ func (a *NakamaMatchHandlerAdapter) MatchLoop(ctx context.Context, logger runtim
 	return state
 }
 
+// storageDeleter is a minimal interface for deleting storage records.
+// Extracted from runtime.NakamaModule to enable testing without mocking the full interface.
+type storageDeleter interface {
+	StorageDelete(ctx context.Context, deletes []*runtime.StorageDelete) error
+}
+
 // MatchTerminate implements runtime.Match.MatchTerminate.
 // Called when match is shutting down.
+// Cleans up Paradiced-specific storage data for all players before stopping the match.
 func (a *NakamaMatchHandlerAdapter) MatchTerminate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, graceSeconds int) interface{} {
 	handler := state.(*NakamaMatchHandler)
 	logger.Info("Match terminating: match_id=%s, grace_seconds=%d", handler.matchID, graceSeconds)
+
+	// Clean up Paradiced-specific storage records for all players
+	cleanupPlayerStorage(ctx, nk, handler, logger)
+
 	handler.MatchStop()
 	return nil // Return nil to indicate match ended
+}
+
+// cleanupPlayerStorage deletes Paradiced-specific storage records for all players in the match.
+func cleanupPlayerStorage(ctx context.Context, deleter storageDeleter, handler *NakamaMatchHandler, logger runtime.Logger) {
+	if deleter == nil || len(handler.players) == 0 {
+		return
+	}
+
+	storageKeys := []string{"paradiced_match_result", "paradiced_stats"}
+	for userID := range handler.players {
+		deletes := make([]*runtime.StorageDelete, 0, len(storageKeys))
+		for _, key := range storageKeys {
+			deletes = append(deletes, &runtime.StorageDelete{
+				Collection: "paradiced",
+				Key:        key,
+				UserID:     userID,
+			})
+		}
+		if err := deleter.StorageDelete(ctx, deletes); err != nil {
+			logger.Error("Failed to delete storage for user: user_id=%s, error=%v", userID, err)
+		}
+	}
 }
 
 // MatchSignal implements runtime.Match.MatchSignal.
