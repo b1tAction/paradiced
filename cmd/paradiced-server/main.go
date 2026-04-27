@@ -79,11 +79,11 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 
 		// Query user IDs of device-authenticated accounts with paradiced_ prefix
 		// that have not been updated since the threshold time.
-		// Nakama stores device links in the user_account_device table.
+		// Nakama stores device links in the user_device table.
 		query := `
-			SELECT DISTINCT u.id
-			FROM user_account u
-			INNER JOIN user_account_device d ON u.id = d.user_id
+			SELECT DISTINCT u.id::TEXT
+			FROM users u
+			INNER JOIN user_device d ON u.id = d.user_id
 			WHERE d.id LIKE $1
 			AND u.update_time < $2
 		`
