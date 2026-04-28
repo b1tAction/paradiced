@@ -175,10 +175,12 @@ func (b *Builder) BuildAvailableForPlayer(player *core.Player) *pkgnet.Available
 	usableItems := make([]pkgnet.Item, 0)
 	for _, it := range player.Inventory {
 		if it.Usable {
+			handlerConfig := engine.GetItemHandlerConfig(it.Type)
 			usableItems = append(usableItems, pkgnet.Item{
-				ID:   it.ID.UUID(),
-				Type: string(it.Type),
-				Name: engine.GetItemName(it.Type),
+				ID:         it.ID.UUID(),
+				Type:       string(it.Type),
+				Name:       engine.GetItemName(it.Type),
+				Targetable: handlerConfig != nil && handlerConfig.NeedConfirm,
 			})
 		}
 	}

@@ -52,8 +52,9 @@ type RollDiceRequest struct {
 
 // UseItemRequest represents an item usage request from client.
 type UseItemRequest struct {
-	OpCode string `json:"op_code"`
-	ItemID string `json:"item_id"`
+	OpCode   string `json:"op_code"`
+	ItemID   string `json:"item_id"`
+	TargetID string `json:"target_id"` // Target player UUID (for targeted items like ReverseClock, AnyDoor)
 }
 
 // UseSkillRequest represents a faction skill usage request from client.
@@ -248,6 +249,12 @@ func (h *NakamaMatchHandler) handleUseItem(sender string, data []byte) error {
 		WithPlayer(player).
 		WithBroadcast(NewNakamaBroadcastAdapter(h)).
 		WithBuilder(builder)
+
+	// Propagate target_id to StateContext if provided (for targeted items like ReverseClock, AnyDoor)
+	if req.TargetID != "" {
+		ctx.SetString("use_item_target_id", req.TargetID)
+		h.logDebug("handleUseItem: target specified", "target_id", req.TargetID)
+	}
 
 	// Call HSM's OnUseItem method
 	h.logDebug("handleUseItem: calling OnUseItem")

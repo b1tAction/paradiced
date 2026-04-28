@@ -166,9 +166,9 @@ func registerAllItems() {
 		Name:        "反方向的钟",
 		Desc:        "给予指定玩家迷途Buff",
 	}, &ItemHandlerConfig{
-		Phase:       constants.PhaseAnyTime,
+		Phase:       constants.PhaseItemUsed,
 		Priority:    50,
-		NeedConfirm: true,
+		NeedConfirm: false,
 		Handler:     createGiveBuffHandler(constants.BuffTypeLost),
 	})
 
@@ -180,9 +180,9 @@ func registerAllItems() {
 		Name:        "任意门",
 		Desc:        "去到30格内指定玩家身边",
 	}, &ItemHandlerConfig{
-		Phase:       constants.PhaseOnLand,
+		Phase:       constants.PhaseItemUsed,
 		Priority:    60,
-		NeedConfirm: true,
+		NeedConfirm: false,
 		Handler:     handleTeleport,
 	})
 
@@ -196,7 +196,7 @@ func registerAllItems() {
 	}, &ItemHandlerConfig{
 		Phase:       constants.PhaseItemUsed,
 		Priority:    70,
-		NeedConfirm: true,
+		NeedConfirm: false,
 		Handler:     handleDiceUpgrade,
 	})
 }
@@ -212,6 +212,18 @@ func createGiveBuffHandler(buffType constants.BuffType) EffectHandler {
 			return fmt.Errorf("handler: player is nil in event context")
 		}
 
+		// Resolve target player: use target_player from context if set (targeted items like ReverseClock),
+		// otherwise fall back to the current player (self-targeted items)
+		var targetPlayer *core.Player
+		if val, ok := ctx.Get("target_player"); ok {
+			if p, ok2 := val.(*core.Player); ok2 && p != nil {
+				targetPlayer = p
+			}
+		}
+		if targetPlayer == nil {
+			targetPlayer = ctx.Player
+		}
+
 		// Check ActionContext exists
 		actionCtx, err := getActionCtxFromEventCtx(ctx)
 		if err != nil {
@@ -219,7 +231,7 @@ func createGiveBuffHandler(buffType constants.BuffType) EffectHandler {
 		}
 		_ = actionCtx // ActionContext used for derived action processing
 
-		ctx.AddDerivedAction(engineaction.NewAddBuffAction(ctx.Player, buffType, "Item_Effect"))
+		ctx.AddDerivedAction(engineaction.NewAddBuffAction(targetPlayer, buffType, "Item_Effect"))
 		return nil
 	}
 }

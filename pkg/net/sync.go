@@ -146,6 +146,10 @@ type Item struct {
 	// Name is the item Chinese display name for client UI.
 	// Values: "反方向的钟", "任意门", "骰子交换", "骰子升级卡"
 	Name string `json:"name"`
+
+	// Targetable indicates if this item requires a target player selection.
+	// True for ReverseClock (gives buff to target) and AnyDoor (teleport to target).
+	Targetable bool `json:"targetable,omitempty"`
 }
 
 // Available represents available actions for the current player.
