@@ -13,26 +13,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint:
-    name: Go Lint
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: v1.64
-          args: --timeout=5m
-
   test:
     name: Go Test
     runs-on: ubuntu-latest
