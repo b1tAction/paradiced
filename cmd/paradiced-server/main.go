@@ -29,8 +29,11 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		// Parse optional params from payload (JSON format)
 		params := make(map[string]interface{})
 		if payload != "" {
-			// Could parse max_players, map_length etc. from payload if needed
-			logger.Debug("Create room RPC payload: %s", payload)
+			if err := json.Unmarshal([]byte(payload), &params); err != nil {
+				logger.Error("Failed to parse create room payload: %v", err)
+			} else {
+				logger.Debug("Create room RPC payload: %s", payload)
+			}
 		}
 
 		// Server-side MatchCreate triggers MatchInit lifecycle

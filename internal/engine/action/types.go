@@ -437,6 +437,7 @@ func (a *RemoveBuffAction) LogEntry() gamelog.LogEntry {
 type TeleportAction struct {
 	targetPlayer *core.Player // Player teleporting
 	TargetPos    int          // Destination position
+	SourcePos    int          // Original position (captured before Execute)
 	SourceID     string       // Source identifier (e.g., "Item_AnyDoor")
 }
 
@@ -445,6 +446,7 @@ func NewTeleportAction(target *core.Player, targetPos int, sourceID string) *Tel
 	return &TeleportAction{
 		targetPlayer: target,
 		TargetPos:    targetPos,
+		SourcePos:    target.Position,
 		SourceID:     sourceID,
 	}
 }
@@ -473,7 +475,7 @@ func (a *TeleportAction) Execute(ctx *ActionContext) error {
 
 func (a *TeleportAction) LogEntry() gamelog.LogEntry {
 	metadata := util.NewMetadata()
-	metadata.SetInt("from_pos", a.targetPlayer.Position)
+	metadata.SetInt("from_pos", a.SourcePos)
 	metadata.SetInt("to_pos", a.TargetPos)
 
 	return gamelog.LogEntry{
