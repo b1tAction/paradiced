@@ -200,12 +200,14 @@ for (const entry of turnSync.entries) {
 | `dice_type` | string | 是 | 骰子类型 | 显示骰子类型 |
 | `dice_steps` | int | 是 | 骰子结果 | 显示骰子数值 |
 
-### state 类型
+### state 类型（仅内部，不发送给客户端）
 
-| 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
-|------|------|------|------|-----------|
-| `from` | string | 是 | 状态转换起点 | 内部日志 |
-| `to` | string | 是 | 状态转换终点 | 内部日志 |
+HSM 状态转换日志，仅供内部调试和 CLI playtest 使用。Builder 在 `filterClientEntries` 中过滤掉 `EntryTypeState` 类型，客户端不会收到 state entries。
+
+| 字段 | 类型 | 必填 | 用途 | 备注 |
+|------|------|------|------|------|
+| `from` | string | 是 | 状态转换起点 | 仅内部日志 |
+| `to` | string | 是 | 状态转换终点 | 仅内部日志 |
 
 ---
 
@@ -214,7 +216,7 @@ for (const entry of turnSync.entries) {
 ```typescript
 interface LogEntry {
     timestamp: string;
-    type: string;  // "action" | "state"
+    type: string;  // "action" | "mini_game" | "boss" | "decision"
     action_type?: string;
     target?: string;
     source?: string;
@@ -271,10 +273,6 @@ interface LogEntry {
         // boss_skill
         skill_type?: string;
         targets?: string;
-
-        // state
-        from?: string;
-        to?: string;
 
         // dice_roll
         dice_type?: string;    // dice type (gold/silver/copper/wood)

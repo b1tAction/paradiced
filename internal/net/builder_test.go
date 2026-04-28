@@ -576,3 +576,103 @@ func TestBuildMapInfoNoMapEngine(t *testing.T) {
 		t.Errorf("mapInfo.Length = %d, want 0 (empty MapInfo)", mapInfo.Length)
 	}
 }
+
+func TestFilterClientEntriesSkipsState(t *testing.T) {
+	player := newTestPlayer(constants.FactionQingLong)
+
+	entries := []gamelog.LogEntry{
+		gamelog.NewActionEntry("damage", player.ID.UUID(), "Test1"),
+		gamelog.NewStateEntry("TurnUpkeep", "MainAction", player.ID.UUID()),
+		gamelog.NewActionEntry("heal", player.ID.UUID(), "Test2"),
+		gamelog.NewStateEntry("MainAction", "TurnMoving", player.ID.UUID()),
+		gamelog.NewActionEntry("move", player.ID.UUID(), "Test3"),
+	}
+
+	filtered := filterClientEntries(entries)
+
+	if len(filtered) != 3 {
+		t.Errorf("len(filtered) = %d, want 3 (state entries filtered out)", len(filtered))
+	}
+	for _, e := range filtered {
+		if e.Type == constants.EntryTypeState {
+			t.Error("filtered entries should not contain state type")
+		}
+	}
+	// Verify order preserved: damage, heal, move
+	if filtered[0].ActionType != "damage" {
+		t.Errorf("filtered[0].ActionType = %s, want damage", filtered[0].ActionType)
+	}
+	if filtered[1].ActionType != "heal" {
+		t.Errorf("filtered[1].ActionType = %s, want heal", filtered[1].ActionType)
+	}
+	if filtered[2].ActionType != "move" {
+		t.Errorf("filtered[2].ActionType = %s, want move", filtered[2].ActionType)
+	}
+}
+
+func TestFilterClientEntriesEmpty(t *testing.T) {
+	filtered := filterClientEntries(nil)
+	if filtered != nil {
+		t.Errorf("filterClientEntries(nil) = %v, want nil", filtered)
+	}
+
+	empty := []gamelog.LogEntry{}
+	filtered = filterClientEntries(empty)
+	if len(filtered) != 0 {
+		t.Errorf("filterClientEntries([]) len = %d, want 0", len(filtered))
+	}
+}
+
+func TestBuildStateSyncFiltersStateEntries(t *testing.T) {
+	builder, game, hsmInstance := newTestBuilder()
+
+	player := newTestPlayer(constants.FactionQingLong)
+	game.AddPlayer(player)
+	hsmInstance.SetTurnPlayer(player)
+
+	game.Log.StartTurn(1, 0, player.ID.UUID())
+
+	// Add mixed entries: action + state
+	game.Log.AddEntry(gamelog.NewActionEntry("damage", player.ID.UUID(), "Test"))
+	game.Log.AddEntry(gamelog.NewStateEntry("TurnUpkeep", "MainAction", player.ID.UUID()))
+	game.Log.AddEntry(gamelog.NewActionEntry("heal", player.ID.UUID(), "Test2"))
+
+	stateSync := builder.BuildStateSync()
+	if len(stateSync.Entries) != 2 {
+		t.Errorf("len(stateSync.Entries) = %d, want 2 (state entry filtered)", len(stateSync.Entries))
+	}
+	if stateSync.Entries[0].ActionType != "damage" {
+		t.Errorf("Entries[0].ActionType = %s, want damage", stateSync.Entries[0].ActionType)
+	}
+	if stateSync.Entries[1].ActionType != "heal" {
+		t.Errorf("Entries[1].ActionType = %s, want heal", stateSync.Entries[1].ActionType)
+	}
+}
+
+func TestBuildFullSyncFiltersStateEntries(t *testing.T) {
+	builder, game, hsmInstance := newTestBuilder()
+
+	player := newTestPlayer(constants.FactionQingLong)
+	game.AddPlayer(player)
+	hsmInstance.SetTurnPlayer(player)
+
+	game.Log.StartTurn(1, 0, player.ID.UUID())
+
+	game.Log.AddEntry(gamelog.NewActionEntry("damage", player.ID.UUID(), "Test"))
+	game.Log.AddEntry(gamelog.NewStateEntry("MainAction", "TurnMoving", player.ID.UUID()))
+	game.Log.AddEntry(gamelog.NewActionEntry("move", player.ID.UUID(), "Test2"))
+
+	// MarkBroadcasted first so incremental won't return
+	builder.BuildStateSync()
+
+	fullSync := builder.BuildFullSyncStateSync()
+	if len(fullSync.Entries) != 2 {
+		t.Errorf("len(fullSync.Entries) = %d, want 2 (state entry filtered)", len(fullSync.Entries))
+	}
+	if fullSync.Entries[0].ActionType != "damage" {
+		t.Errorf("Entries[0].ActionType = %s, want damage", fullSync.Entries[0].ActionType)
+	}
+	if fullSync.Entries[1].ActionType != "move" {
+		t.Errorf("Entries[1].ActionType = %s, want move", fullSync.Entries[1].ActionType)
+	}
+}

@@ -275,6 +275,7 @@ func (b *Builder) BuildMapInfo() *pkgnet.MapInfo {
 }
 
 // getNewEntries returns incremental entries since last broadcast and marks them as broadcasted.
+// State entries (HSM transitions) are filtered out - they are internal debug info not needed by client.
 func (b *Builder) getNewEntries() []gamelog.LogEntry {
 	game := b.hsm.GetGame()
 	if game == nil || game.Log == nil {
@@ -282,15 +283,33 @@ func (b *Builder) getNewEntries() []gamelog.LogEntry {
 	}
 	entries := game.Log.GetNewEntries()
 	game.Log.MarkBroadcasted()
-	return entries
+	return filterClientEntries(entries)
 }
 
 // getAllCurrentEntries returns all current turn entries for FullSync.
 // Does not call MarkBroadcasted - reconnecting players need full data without affecting incremental tracking.
+// State entries are filtered out - they are internal debug info not needed by client.
 func (b *Builder) getAllCurrentEntries() []gamelog.LogEntry {
 	game := b.hsm.GetGame()
 	if game == nil || game.Log == nil {
 		return nil
 	}
-	return game.Log.GetAllCurrentEntries()
+	entries := game.Log.GetAllCurrentEntries()
+	return filterClientEntries(entries)
+}
+
+// filterClientEntries removes entries that should not be sent to clients.
+// State entries (HSM transitions) are internal debug info and not needed for client rendering.
+func filterClientEntries(entries []gamelog.LogEntry) []gamelog.LogEntry {
+	if len(entries) == 0 {
+		return entries
+	}
+	result := make([]gamelog.LogEntry, 0, len(entries))
+	for _, e := range entries {
+		if e.Type == constants.EntryTypeState {
+			continue
+		}
+		result = append(result, e)
+	}
+	return result
 }
