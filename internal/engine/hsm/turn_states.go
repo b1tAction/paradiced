@@ -696,8 +696,20 @@ func (s *TurnCheckpointState) Enter(ctx *StateContext) {
 	drawItemAction := engineaction.NewDrawItemAction(player, "CheckpointTreasure")
 	s.actionCtx.ExecuteAction(drawItemAction)
 
-	// No TurnSync broadcast here, LogEntry recorded to GameLog
-	// TurnSync will be broadcast at turn end (TurnEndState)
+	// Broadcast StateSync after checkpoint effects (DrawItem)
+	s.broadcastStateSync(ctx)
+}
+
+// broadcastStateSync broadcasts current game state after checkpoint effects.
+func (s *TurnCheckpointState) broadcastStateSync(ctx *StateContext) {
+	game := ctx.GetGame()
+	if ctx.Broadcast == nil || game == nil {
+		return
+	}
+	if ctx.Builder != nil {
+		stateSync := ctx.Builder.BuildStateSync()
+		ctx.Broadcast.BroadcastStateSync(stateSync)
+	}
 }
 
 func (s *TurnCheckpointState) Update(ctx *StateContext) StateID {

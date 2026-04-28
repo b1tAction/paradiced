@@ -9,6 +9,7 @@ import (
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/internal/gamemap"
+	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/b1tAction/paradiced/pkg/rng"
@@ -1045,4 +1046,61 @@ func TestTurnCheckpointStateExitNilActionCtx(t *testing.T) {
 	state := NewTurnCheckpointState()
 	// actionCtx is nil by default - Exit should not panic
 	state.Exit(nil)
+}
+
+func TestTurnCheckpointState_Enter_BroadcastStateSync(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 42)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.Position = 25
+	player.HP = 5
+	game.AddPlayer(player)
+
+	// Setup ItemPool for DrawItemAction
+	game.ItemPool = []*rng.EvaluatedItem{
+		{Type: "healing_potion", Eval: constants.EvaluationGood},
+	}
+
+	hsmInst := NewHSM(game)
+	mockBroadcast := pkgnet.NewMockBroadcastAdapter()
+
+	state := NewTurnCheckpointState()
+	ctx := NewStateContext().
+		WithHSM(hsmInst).
+		WithPlayer(player).
+		WithBroadcast(mockBroadcast).
+		WithBuilder(&builderAdapter{hsmInst: hsmInst})
+
+	state.Enter(ctx)
+
+	if ctx.Error != nil {
+		t.Errorf("Enter should succeed, got error: %v", ctx.Error)
+	}
+	if len(mockBroadcast.StateSyncs) != 1 {
+		t.Errorf("broadcastStateSync should be called once, got %d calls", len(mockBroadcast.StateSyncs))
+	}
+}
+
+func TestTurnCheckpointState_Enter_NoBroadcastOrBuilder(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 42)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.Position = 25
+	player.HP = 5
+	game.AddPlayer(player)
+
+	// Setup ItemPool for DrawItemAction
+	game.ItemPool = []*rng.EvaluatedItem{
+		{Type: "healing_potion", Eval: constants.EvaluationGood},
+	}
+
+	state := NewTurnCheckpointState()
+	ctx := NewStateContext().
+		WithHSM(NewHSM(game)).
+		WithPlayer(player)
+	// Broadcast and Builder are nil - should not panic
+
+	state.Enter(ctx)
+
+	if ctx.Error != nil {
+		t.Errorf("Enter should succeed without Broadcast/Builder, got error: %v", ctx.Error)
+	}
 }

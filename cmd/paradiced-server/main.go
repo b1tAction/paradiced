@@ -108,7 +108,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		if len(staleUserIDs) == 0 {
 			logger.Info("No stale accounts found")
 			result := map[string]interface{}{
-				"deleted_count": 0,
+				"deleted_count":  0,
 				"threshold_days": thresholdDays,
 			}
 			response, _ := json.Marshal(result)
