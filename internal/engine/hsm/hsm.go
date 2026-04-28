@@ -523,10 +523,24 @@ func (hsm *HSM) Update(ctx *StateContext) (StateID, error) {
 		if nextID != StateNone && nextID != hsm.turnStateID {
 			return nextID, hsm.TransitionTo(nextID, ctx)
 		}
+
+		// If the state returned StateNone but produced pending decisions,
+		// push interrupt so the HSM enters WaitDecision state and sends
+		// the decision request to the client.
+		if ctx != nil && len(ctx.Decisions) > 0 && !hsm.paused {
+			return StateNone, hsm.PushInterrupt(hsm.turnState, ctx)
+		}
 	} else if hsm.globalState != nil {
 		nextID := hsm.globalState.Update(ctx)
 		if nextID != StateNone && nextID != hsm.globalStateID {
 			return nextID, hsm.TransitionTo(nextID, ctx)
+		}
+
+		// If the state returned StateNone but produced pending decisions,
+		// push interrupt so the HSM enters WaitDecision state and sends
+		// the decision request to the client.
+		if ctx != nil && len(ctx.Decisions) > 0 && !hsm.paused {
+			return StateNone, hsm.PushInterrupt(hsm.globalState, ctx)
 		}
 	}
 

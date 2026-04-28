@@ -789,6 +789,97 @@ func TestHSMOnUseItemNotInMainAction(t *testing.T) {
 
 // ========== StateStack Depth Tests ==========
 
+// ========== Decision Push Interrupt Tests ==========
+
+func TestHSMUpdateDecisionPushInterruptOnStateNone(t *testing.T) {
+	// When a turn state's Update() returns StateNone but ctx.Decisions is non-empty,
+	// HSM.Update() should push an interrupt (enter WaitDecision) so the decision
+	// request is sent to the client. This fixes the bug where TurnLanded.Update()
+	// returned StateNone with pending decisions, causing the HSM to get stuck.
+	game := engine.NewGame(id.NewGameID(), 0)
+	hsm := NewHSM(game)
+
+	// Register required states
+	hsm.RegisterState(&mockState{id: StateTurnLoop})
+	hsm.RegisterState(&mockState{id: StateTurnUpkeep})
+	hsm.RegisterState(&mockState{id: StateWaitDecision})
+
+	hsm.Start(StateTurnLoop, nil)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+	hsm.SetTurnPlayer(player)
+
+	// Transition to a turn state
+	hsm.TransitionTo(StateTurnUpkeep, nil)
+
+	// Create ctx with pending decisions
+	ctx := NewStateContext().WithPlayer(player)
+	decision := event.NewDecision("test_decision", []event.Option{
+		{ID: "opt1", Label: "Option 1", Action: nil},
+	})
+	ctx.Decisions = []*event.Decision{decision}
+
+	// Update with ctx containing decisions — state returns StateNone but
+	// HSM should push interrupt to WaitDecision
+	nextID, err := hsm.Update(ctx)
+	if err != nil {
+		t.Errorf("Update should not error, got: %v", err)
+	}
+	if nextID != StateNone {
+		t.Errorf("Update should return StateNone (interrupt pushed internally), got %s", nextID.String())
+	}
+
+	// HSM should now be in WaitDecision state (paused, waiting for user choice)
+	if !hsm.IsPaused() {
+		t.Error("HSM should be paused (in WaitDecision) after pushing interrupt for pending decisions")
+	}
+	if hsm.GetCurrentStateID() != StateWaitDecision {
+		t.Errorf("HSM should be in WaitDecision state, got %s", hsm.GetCurrentStateID().String())
+	}
+}
+
+func TestHSMUpdateNoDecisionsNoPushInterrupt(t *testing.T) {
+	// When ctx has no decisions, HSM.Update() should NOT push interrupt.
+	game := engine.NewGame(id.NewGameID(), 0)
+	hsm := NewHSM(game)
+
+	hsm.RegisterState(&mockState{id: StateMatchInit})
+	hsm.Start(StateMatchInit, nil)
+
+	// Update with empty ctx — no decisions, no interrupt
+	ctx := NewStateContext()
+	nextID, err := hsm.Update(ctx)
+	if err != nil {
+		t.Errorf("Update should not error, got: %v", err)
+	}
+	if nextID != StateNone {
+		t.Errorf("Update should return StateNone, got %s", nextID.String())
+	}
+	if hsm.IsPaused() {
+		t.Error("HSM should NOT be paused when no decisions pending")
+	}
+}
+
+func TestHSMUpdateNilCtxNoPushInterrupt(t *testing.T) {
+	// When ctx is nil, HSM.Update() should NOT crash or push interrupt.
+	game := engine.NewGame(id.NewGameID(), 0)
+	hsm := NewHSM(game)
+
+	hsm.RegisterState(&mockState{id: StateMatchInit})
+	hsm.Start(StateMatchInit, nil)
+
+	nextID, err := hsm.Update(nil)
+	if err != nil {
+		t.Errorf("Update with nil ctx should not error, got: %v", err)
+	}
+	if nextID != StateNone {
+		t.Errorf("Update should return StateNone, got %s", nextID.String())
+	}
+	if hsm.IsPaused() {
+		t.Error("HSM should NOT be paused when ctx is nil")
+	}
+}
+
 func TestStateStackDepth(t *testing.T) {
 	stack := NewStateStack()
 
