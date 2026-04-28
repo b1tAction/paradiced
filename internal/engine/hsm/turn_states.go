@@ -432,6 +432,11 @@ func (s *MainActionState) OnUseItem(ctx *StateContext, itemID string) {
 			return
 		}
 	}
+
+	// Broadcast updated state and resend available actions so the client can continue
+	// (no state transition occurs after item use in MainAction, so we must explicitly notify)
+	s.broadcastStateSync(ctx)
+	s.sendAvailable(ctx)
 }
 
 // isOnBossCell checks if a player is on the Boss cell.
