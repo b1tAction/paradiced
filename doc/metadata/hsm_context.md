@@ -98,6 +98,7 @@ func (ctx *StateContext) GetDiceSteps() int {
 | `dice_{playerID}` | int | RoundPrep | 玩家骰子类型（rng.DiceType） |
 | `decision_choice` | int | WaitDecision | 用户选择的选项索引 |
 | `decision_processed` | bool | WaitDecision | 决策已处理标记 |
+| `use_item_target_id` | string | handleUseItem (Nakama) | 目标玩家UUID（用于定向道具如反方向的钟、任意门） |
 
 ---
 

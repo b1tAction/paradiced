@@ -20,10 +20,16 @@ type Buff struct {
     Type         constants.BuffType `json:"type"`
     ID           id.BuffID          `json:"id"`
     Duration     int                `json:"duration"`
-    tickEligible bool               // 内部状态
+    tickEligible bool               // 内部状态：由 TurnUpkeep 的 MarkAllBuffsTickEligible 标记
     *util.Metadata `json:"metadata"` // Per-buff状态存储
 }
 ```
+
+**tickEligible 机制**：
+- `NewBuff` 默认 `tickEligible=false`
+- `TurnUpkeepState.Enter()` 在回合开始时调用 `player.MarkAllBuffsTickEligible()`，将所有已有buff标记为eligible
+- 回合中途添加的buff（如另一玩家使用道具定向添加）默认 `tickEligible=false`，不会被当回合的TurnEnd扣减，到下一回合的TurnUpkeep才被标记
+- `TickDuration()` 仅在 `tickEligible=true` 时扣减Duration
 
 **初始化**：`NewBuff` 和 `NewBuffWithID` 自动初始化 `Metadata: util.NewMetadata()`。
 

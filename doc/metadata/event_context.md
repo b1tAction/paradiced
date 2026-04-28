@@ -89,6 +89,8 @@ Event Handler 现通过 `ctx.AddDerivedAction()` 推送具体 Action，而非设
 | 字段 | 类型 | 来源Item | 用途 | 目标 |
 |------|------|----------|------|------|
 | `target_id` | string | Item Handler | 目标玩家ID | Decision/Action |
+| `target_player` | *core.Player | HSM (OnUseItem) | 目标玩家实例（已解析） | createGiveBuffHandler |
+| `target_position` | int | HSM (OnUseItem) | 目标玩家位置 | handleTeleport |
 | `teleport_target` | string | Item_AnyDoor（任意门） | 传送目标玩家 | TeleportAction |
 | `current_dice_type` | string | HSM (OnUseItem) → Item Handler | 当前骰子类型 | DiceUpgradeAction |
 
