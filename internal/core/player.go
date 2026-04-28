@@ -243,6 +243,16 @@ func (p *Player) TickBuffs() []*Buff {
 	return expired
 }
 
+// MarkAllBuffsTickEligible marks all active buffs as tick-eligible.
+// Called at the start of each turn (TurnUpkeep) so that buffs added mid-turn
+// (e.g., by another player's item targeting this player) are properly decremented
+// at this turn's TurnEnd, instead of getting an extra free turn.
+func (p *Player) MarkAllBuffsTickEligible() {
+	for i := range p.ActiveBuffs {
+		p.ActiveBuffs[i].tickEligible = true
+	}
+}
+
 // ClearNegativeBuffs clears all negative buffs.
 func (p *Player) ClearNegativeBuffs() int {
 	count := 0

@@ -7,8 +7,8 @@ import (
 	"github.com/b1tAction/paradiced/pkg/id"
 )
 
-func TestTickDurationFirstCallMarksEligible(t *testing.T) {
-	// First TickDuration call on new buff: should NOT decrement, but mark tickEligible
+func TestTickDurationNotEligibleNoDecrement(t *testing.T) {
+	// Buff with tickEligible=false: TickDuration should NOT decrement
 	buff := NewBuff(constants.BuffTypeCurse, 3)
 
 	active := buff.TickDuration()
@@ -16,27 +16,21 @@ func TestTickDurationFirstCallMarksEligible(t *testing.T) {
 		t.Error("buff should still be active")
 	}
 	if buff.Duration != 3 {
-		t.Errorf("Duration = %d, expected 3 (not decremented on first call)", buff.Duration)
-	}
-	if !buff.tickEligible {
-		t.Error("buff should be tickEligible=true after first TickDuration call")
+		t.Errorf("Duration = %d, expected 3 (not decremented when not eligible)", buff.Duration)
 	}
 }
 
-func TestTickDurationSecondCallDecrements(t *testing.T) {
-	// Second TickDuration call: should decrement now
+func TestTickDurationEligibleDecrements(t *testing.T) {
+	// Buff with tickEligible=true: TickDuration should decrement
 	buff := NewBuff(constants.BuffTypeCurse, 3)
+	buff.tickEligible = true
 
-	// First call: marks eligible, no decrement
-	buff.TickDuration()
-
-	// Second call: decrements
 	active := buff.TickDuration()
 	if !active {
-		t.Error("buff should still be active after second tick")
+		t.Error("buff should still be active after tick")
 	}
 	if buff.Duration != 2 {
-		t.Errorf("Duration = %d, expected 2 (decremented on second call)", buff.Duration)
+		t.Errorf("Duration = %d, expected 2 (decremented when eligible)", buff.Duration)
 	}
 }
 
@@ -53,20 +47,14 @@ func TestTickDurationPermanentNotAffected(t *testing.T) {
 	}
 }
 
-func TestTickDurationExpiryAfterTwoCalls(t *testing.T) {
-	// Duration=1: first call marks eligible, second call decrements to 0 → expires
+func TestTickDurationExpiryWhenEligible(t *testing.T) {
+	// Duration=1 with tickEligible=true: TickDuration decrements to 0 → expires
 	buff := NewBuff(constants.BuffTypeLost, 1)
+	buff.tickEligible = true
 
-	// First call: marks eligible, Duration stays 1
 	active := buff.TickDuration()
-	if !active {
-		t.Error("buff should still be active after first call")
-	}
-
-	// Second call: Duration 1→0, expires
-	active = buff.TickDuration()
 	if active {
-		t.Error("buff with Duration=1 should expire after second tick")
+		t.Error("buff with Duration=1 should expire after tick when eligible")
 	}
 	if buff.Duration != 0 {
 		t.Errorf("Duration = %d, expected 0", buff.Duration)

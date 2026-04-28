@@ -45,16 +45,12 @@ func (b *Buff) IsActive() bool {
 	return b.Duration > 0 || b.Duration == -1
 }
 
-// TickDuration decrements duration if tick-eligible, and returns whether buff is still active.
-// First call marks the buff as tick-eligible (without decrementing), so buffs acquired
-// mid-turn survive their first turn-end tick. Duration is only decremented on subsequent calls.
+// TickDuration decrements duration and returns whether buff is still active.
+// Buffs are marked tick-eligible at TurnUpkeep (BeforeTurn), so this always
+// decrements when called at TurnEnd. Duration=-1 buffs (permanent) are never decremented.
 func (b *Buff) TickDuration() bool {
-	if b.Duration > 0 {
-		if b.tickEligible {
-			b.Duration--
-		} else {
-			b.tickEligible = true
-		}
+	if b.Duration > 0 && b.tickEligible {
+		b.Duration--
 	}
 	return b.IsActive()
 }

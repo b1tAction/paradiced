@@ -91,7 +91,13 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 		return
 	}
 
-	// Step 1: Check SkipTurn flag
+	// Step 1: Mark all buffs as tick-eligible at the start of the turn.
+	// This ensures buffs added mid-turn (e.g., by another player's item) will be
+	// properly decremented at this turn's TurnEnd, rather than getting an extra
+	// free turn from the "first TickDuration only marks eligible" behavior.
+	player.MarkAllBuffsTickEligible()
+
+	// Step 2: Check SkipTurn flag
 	if player.SkipTurn {
 		player.SkipTurn = false // Clear flag
 		s.skipTurn = true
@@ -101,7 +107,7 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 		return // Skip all BeforeTurn effects
 	}
 
-	// Step 2: Trigger PhaseBeforeTurn
+	// Step 3: Trigger PhaseBeforeTurn
 	// HSM publishes this phase - Buff handlers respond and may return Actions
 	triggerCtx := event.NewContext(player)
 	triggerCtx.Set("action_context", s.actionCtx)
@@ -117,14 +123,14 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 		return
 	}
 
-	// Step 4: Bridge and execute derived Actions from handlers
+	// Step 5: Bridge and execute derived Actions from handlers
 	if err := runDerived(triggerCtx); err != nil {
 		ctx.Error = errors.WrapHSMError(
 			err, "TurnUpkeep", 2, "Enter", "derived action execution failed")
 		return
 	}
 
-	// Step 5: Handle Poison buff's "draw_bad_event" flag
+	// Step 6: Handle Poison buff's "draw_bad_event" flag
 	// Poison buff handler sets this flag to force a bad event draw
 	if triggerCtx.GetBoolOrDefault("draw_bad_event", false) {
 		drawAction := engineaction.NewDrawEventAction(player, "Poison_BadEvent")
@@ -145,7 +151,7 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 		}
 	}
 
-	// Step 6: Check if any decisions need user input
+	// Step 7: Check if any decisions need user input
 	if len(s.decisions) > 0 {
 		// Will be handled in Update - push WaitDecision if needed
 		ctx.Decisions = s.decisions
@@ -392,6 +398,22 @@ func (s *MainActionState) OnUseItem(ctx *StateContext, itemID string) {
 	triggerCtx.Set("item_id", itemID)
 	triggerCtx.Set("action_context", s.actionCtx)
 	triggerCtx.Set("current_dice_type", ctx.GetDiceType(player.ID.UUID()).String())
+
+	// Propagate target info to event context (for targeted items like ReverseClock, AnyDoor)
+	targetID := ctx.GetStringOrDefault("use_item_target_id", "")
+	if targetID != "" {
+		triggerCtx.Set("target_id", targetID)
+		game := ctx.GetGame()
+		if game != nil {
+			for _, p := range game.Players {
+				if p.ID.UUID() == targetID {
+					triggerCtx.Set("target_player", p)
+					triggerCtx.SetInt("target_position", p.Position)
+					break
+				}
+			}
+		}
+	}
 
 	decisions := ctx.GetBus().Publish(constants.PhaseItemUsed, player.ID.UUID(), triggerCtx)
 	for _, decision := range decisions {

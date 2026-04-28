@@ -43,9 +43,9 @@ func TestItemHandlerConfigFields(t *testing.T) {
 		priority    int
 		needConfirm bool
 	}{
-		{constants.ItemTypeReverseClock, constants.PhaseAnyTime, 50, true},
-		{constants.ItemTypeAnyDoor, constants.PhaseOnLand, 60, true},
-		{constants.ItemTypeDiceUpgrade, constants.PhaseItemUsed, 70, true},
+		{constants.ItemTypeReverseClock, constants.PhaseItemUsed, 50, false},
+		{constants.ItemTypeAnyDoor, constants.PhaseItemUsed, 60, false},
+		{constants.ItemTypeDiceUpgrade, constants.PhaseItemUsed, 70, false},
 	}
 
 	for _, tt := range tests {

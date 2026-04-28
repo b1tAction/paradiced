@@ -425,12 +425,12 @@ func TestGameCreateItemDecision(t *testing.T) {
 	if decision.Prompt != def.Desc {
 		t.Errorf("Decision Prompt = %s, expected %s", decision.Prompt, def.Desc)
 	}
-	// 道具默认需要确认
-	if !decision.NeedConfirm {
-		t.Error("Item Decision should need confirm by default")
+	// Items use NeedConfirm=false (auto-decision), triggered by OpUseItem
+	if decision.NeedConfirm {
+		t.Error("Item Decision should NOT need confirm (auto-decision)")
 	}
-	if len(decision.Options) != 2 {
-		t.Errorf("Item Decision should have 2 options (use/skip), got %d", len(decision.Options))
+	if len(decision.Options) != 1 {
+		t.Errorf("Auto-decision Item should have 1 option (auto execute), got %d", len(decision.Options))
 	}
 }
 
@@ -579,7 +579,7 @@ func TestRemoveItemFromPlayer(t *testing.T) {
 }
 
 func TestApplyItemToPlayerWithSubscription(t *testing.T) {
-	// AnyDoor subscribes to PhaseOnLand which needs subscription
+	// AnyDoor now subscribes to PhaseItemUsed (triggered by OnUseItem)
 	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	game.AddPlayer(player)
@@ -596,8 +596,8 @@ func TestApplyItemToPlayerWithSubscription(t *testing.T) {
 		t.Errorf("Player should have 1 item, got %d", len(player.Inventory))
 	}
 
-	// AnyDoor subscribes to PhaseOnLand
-	subscriptions := game.Bus.GetSubscriptions(constants.PhaseOnLand)
+	// AnyDoor subscribes to PhaseItemUsed
+	subscriptions := game.Bus.GetSubscriptions(constants.PhaseItemUsed)
 	hasItemSub := false
 	for _, sub := range subscriptions {
 		if sub.SourceID == item.ID.UUID() {
@@ -606,12 +606,12 @@ func TestApplyItemToPlayerWithSubscription(t *testing.T) {
 		}
 	}
 	if !hasItemSub {
-		t.Error("AnyDoor item should be subscribed to PhaseOnLand after ApplyItemToPlayer")
+		t.Error("AnyDoor item should be subscribed to PhaseItemUsed after ApplyItemToPlayer")
 	}
 
 	// Remove item and verify subscription removed
 	game.RemoveItemFromPlayer(player, item)
-	subscriptions = game.Bus.GetSubscriptions(constants.PhaseOnLand)
+	subscriptions = game.Bus.GetSubscriptions(constants.PhaseItemUsed)
 	for _, sub := range subscriptions {
 		if sub.SourceID == item.ID.UUID() {
 			t.Error("AnyDoor subscription should be removed after RemoveItemFromPlayer")
