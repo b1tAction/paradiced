@@ -31,8 +31,9 @@ build-plugin:
 		-lc 'CGO_ENABLED=1 /usr/local/go/bin/go build --trimpath --buildmode=plugin -o $(PLUGIN_OUT) ./cmd/paradiced-server'
 
 # Build for development (verify compilation without plugin mode)
+# Exclude cmd/paradiced-server (Nakama plugin, no main() function)
 build-dev:
-	GOMODCACHE=$(GOMODCACHE) go build ./...
+	GOMODCACHE=$(GOMODCACHE) go build $$(GOMODCACHE=$(GOMODCACHE) go list ./... | grep -v '/cmd/paradiced-server')
 
 # Build CLI tool (pdcli) to build/ directory
 build-cli:
@@ -108,6 +109,10 @@ rebuild: build-plugin
 status:
 	docker compose ps
 
+# Run golangci-lint
+lint:
+	GOMODCACHE=$(GOMODCACHE) golangci-lint run ./...
+
 # Default target
-.PHONY: build-plugin build-dev build-cli build-cli-verbose test test-coverage prepare-modules docker-up docker-down docker-clean docker-logs docker-logs-db docker-logs-all cockroach-admin db-init dev dev-init dev-logs rebuild status
+.PHONY: build-plugin build-dev build-cli build-cli-verbose test test-coverage lint prepare-modules docker-up docker-down docker-clean docker-logs docker-logs-db docker-logs-all cockroach-admin db-init dev dev-init dev-logs rebuild status
 .DEFAULT_GOAL := build-dev

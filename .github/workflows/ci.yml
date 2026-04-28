@@ -13,6 +13,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lint:
+    name: Go Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64
+          args: --timeout=5m
+
   test:
     name: Go Test
     runs-on: ubuntu-latest
@@ -32,3 +52,38 @@ jobs:
 
       - name: Run tests
         run: go test ./...
+
+  build-dev:
+    name: Build Dev
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build (standard compilation)
+        # Exclude cmd/paradiced-server (Nakama plugin, no main() function)
+        run: go build $(go list ./... | grep -v '/cmd/paradiced-server')
+
+  build-cli:
+    name: Build CLI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build pdcli
+        run: go build -o ./build/pdcli ./cmd/pdcli

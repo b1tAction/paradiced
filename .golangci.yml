@@ -1,0 +1,17 @@
+run:
+  timeout: 5m
+  skip-dirs:
+    - .gomodcache
+
+linters:
+  enable:
+    - gofmt
+    - govet
+    - errcheck
+    - revive
+    - ineffassign
+    - unused
+
+linters-settings:
+  gofmt:
+    simplify: false
