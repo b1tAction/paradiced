@@ -18,13 +18,15 @@ const (
 	MiniGameTypeDiceRace     MiniGameType = "dice_race"     // Dice race - rank by score (dice sum) descending
 	MiniGameTypeCoinFlip     MiniGameType = "coin_flip"     // Coin flip - rank by success count descending (未实现，暂不可用)
 	MiniGameTypeCountSeconds MiniGameType = "count_seconds" // Count seconds - rank by deviation from 5.0 ascending
+	MiniGameTypeMathCalc     MiniGameType = "math_calc"     // Math calculation - rank by accuracy descending, then time_ms ascending
+	MiniGameTypeRainbowMemory MiniGameType = "rainbow_memory" // Rainbow memory - rank by accuracy descending, then time_ms ascending
 )
 
 // IsValid checks if MiniGameType is valid and currently available.
 // Unimplemented types (e.g. coin_flip) return false.
 func (mt MiniGameType) IsValid() bool {
 	switch mt {
-	case MiniGameTypeDiceRace, MiniGameTypeCountSeconds:
+	case MiniGameTypeDiceRace, MiniGameTypeCountSeconds, MiniGameTypeMathCalc, MiniGameTypeRainbowMemory:
 		return true
 	default:
 		return false
@@ -34,6 +36,6 @@ func (mt MiniGameType) IsValid() bool {
 // AllMiniGameTypes is the pool of currently available mini-game types for random selection.
 // Only implemented types are included.
 var AllMiniGameTypes = []MiniGameType{
-	MiniGameTypeDiceRace,
-	MiniGameTypeCountSeconds,
+	// MiniGameTypeMathCalc,
+	MiniGameTypeRainbowMemory,
 }

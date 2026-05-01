@@ -23,9 +23,8 @@ func NewDefaultRankCalculator() *DefaultRankCalculator {
 }
 
 // Calculate ranks players based on game_type-specific scoring rules.
-// - dice_race: sort by "score" descending (higher dice sum = better rank)
-// - coin_flip: sort by "score" descending (higher score = better rank)
 // - count_seconds: sort by deviation |elapsed - 5.0| ascending (closer to 5s = better rank)
+// - math_calc, rainbow_memory: sort by accuracy descending, then time_ms ascending
 // - default: sort by "score" descending
 func (c *DefaultRankCalculator) Calculate(gameType constants.MiniGameType, submissions map[string]map[string]interface{}) map[string]int {
 	if len(submissions) == 0 {
@@ -35,12 +34,19 @@ func (c *DefaultRankCalculator) Calculate(gameType constants.MiniGameType, submi
 	// Build sortable player list
 	type entry struct {
 		playerID string
-		keyValue float64
+		accuracy float64 // for math_calc
+		timeMs   float64 // for math_calc
+		keyValue float64 // for others
 	}
 
 	entries := make([]entry, 0, len(submissions))
 	for playerID, data := range submissions {
-		if gameType == constants.MiniGameTypeCountSeconds {
+		if gameType == constants.MiniGameTypeMathCalc || gameType == constants.MiniGameTypeRainbowMemory {
+			// multi-key: accuracy descending, then timeMs ascending
+			acc := getFloatValue(data, "accuracy")
+			t := getFloatValue(data, "time_ms")
+			entries = append(entries, entry{playerID: playerID, accuracy: acc, timeMs: t})
+		} else if gameType == constants.MiniGameTypeCountSeconds {
 			// count_seconds: compute deviation from 5.0 seconds
 			elapsed := getFloatValue(data, "elapsed")
 			deviation := abs(elapsed - 5.0)
@@ -54,6 +60,14 @@ func (c *DefaultRankCalculator) Calculate(gameType constants.MiniGameType, submi
 
 	// Sort based on game_type
 	switch gameType {
+	case constants.MiniGameTypeMathCalc, constants.MiniGameTypeRainbowMemory:
+		// Accuracy descending, then timeMs ascending
+		sort.SliceStable(entries, func(i, j int) bool {
+			if entries[i].accuracy != entries[j].accuracy {
+				return entries[i].accuracy > entries[j].accuracy
+			}
+			return entries[i].timeMs < entries[j].timeMs
+		})
 	case constants.MiniGameTypeCountSeconds:
 		// Lower deviation = better rank (ascending): closer to 5.0s is better
 		sort.SliceStable(entries, func(i, j int) bool {
