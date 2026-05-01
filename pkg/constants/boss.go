@@ -46,20 +46,21 @@ func ParseBossSkillType(s string) BossSkillType {
 	return BossSkillType(s)
 }
 
-// BossAttackType defines boss attack type.
+// BossAttackType defines boss physical attack type (normal or critical).
+// Skill effects are handled by BossSkillAction + derived DamageAction/AddBuffAction,
+// not by BossAttackAction.
 type BossAttackType string
 
 // BossAttackType constants.
 const (
 	BossAttackNormal BossAttackType = "normal" // 1 damage to random player
 	BossAttackCrit   BossAttackType = "crit"   // 2 damage to random player
-	BossAttackSkill  BossAttackType = "skill"  // Random skill from skill pool
 )
 
 // IsValid checks if BossAttackType is valid.
 func (bat BossAttackType) IsValid() bool {
 	switch bat {
-	case BossAttackNormal, BossAttackCrit, BossAttackSkill:
+	case BossAttackNormal, BossAttackCrit:
 		return true
 	default:
 		return false

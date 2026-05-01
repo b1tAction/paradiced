@@ -46,8 +46,8 @@ func ExecuteHPChange(ctx *ActionContext, target *Player) {
 
 | 字段 | 类型 | 来源Buff | 用途 | 目标 |
 |------|------|----------|------|------|
-| `blocked_by` | string | Buff_Hidden（隐匿） | 阻挡来源标识 | LogEntry.Metadata |
-| `action_blocked` | bool | Buff_Hidden / Buff_DeathMark | 动作被阻挡标志 | ActionContext |
+| `blocked_by` | string | buff_hidden（隐匿） | 阻挡来源标识 | LogEntry.Metadata |
+| `action_blocked` | bool | buff_hidden / Buff_DeathMark | 动作被阻挡标志 | ActionContext |
 | `reverse_movement` | bool | Buff_Lost（迷途） | 反向移动标志（仅日志/调试） | LogEntry.Metadata |
 | `current_state` | StepsModifier | HSM (TurnMoving) | 当前移动状态实例（迷途修改Steps） | 迷途handler |
 | `draw_bad_event` | bool | Buff_Poison（毒瘴） | 抽取坏事件标志 | DrawEventAction |
@@ -115,7 +115,7 @@ Item Handler 同样使用 DerivedAction 模式：
 func hiddenHandler(phase constants.Phase, ctx *event.Context) {
     // 阻挡所有伤害和事件
     ctx.SetBool("action_blocked", true)
-    ctx.SetString("blocked_by", "Buff_Hidden")
+    ctx.SetString("blocked_by", string(constants.SourceBuffHidden))
     
     // 隐匿自身不会收到伤害，但消耗隐匿状态
     // Handler 返回后，Action 检查 action_blocked 决定是否继续执行

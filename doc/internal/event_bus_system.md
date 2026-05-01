@@ -228,22 +228,22 @@ Event/Item Handler 通过 `ctx.AddDerivedAction()` 推送具体 Action 作为派
 // 遗物(Relic) Event Handler - 抽取道具
 func handleDrawItem(phase constants.Phase, ctx *event.Context) error {
     // 直接推送 DrawItemAction，而非 ctx.SetBool("draw_item", true)
-    ctx.AddDerivedAction(engineaction.NewDrawItemAction(ctx.Player, "Event_Relic"))
+    ctx.AddDerivedAction(engineaction.NewDrawItemAction(ctx.Player, string(constants.SourceEventRelic)))
     return nil
 }
 
 // 交换(Exchange) Event Handler - 位置交换
 func handleSwapPosition(phase constants.Phase, ctx *event.Context) error {
     // 推送两个 TeleportAction 实现位置交换
-    ctx.AddDerivedAction(engineaction.NewTeleportAction(ctx.Player, targetPos, "Event_Exchange"))
-    ctx.AddDerivedAction(engineaction.NewTeleportAction(targetPlayer, playerPos, "Event_Exchange"))
+    ctx.AddDerivedAction(engineaction.NewTeleportAction(ctx.Player, targetPos, string(constants.SourceEventExchange)))
+    ctx.AddDerivedAction(engineaction.NewTeleportAction(targetPlayer, playerPos, string(constants.SourceEventExchange)))
     return nil
 }
 
 // 骰子升级(DiceUpgrade) Item Handler
 func handleDiceUpgrade(phase constants.Phase, ctx *event.Context) error {
     fromDice := rng.DiceTypeFromString(currentDice)
-    ctx.AddDerivedAction(engineaction.NewDiceUpgradeAction(ctx.Player, "Item_DiceUpgrade", fromDice))
+    ctx.AddDerivedAction(engineaction.NewDiceUpgradeAction(ctx.Player, string(constants.SourceItemDiceUpgrade), fromDice))
     return nil
 }
 ```
@@ -273,7 +273,7 @@ func handleHiddenImmune(phase constants.Phase, ctx *event.Context) {
             }
         }
         ctx.SetBool("action_blocked", true)
-        ctx.SetString("blocked_by", "Buff_Hidden")
+        ctx.SetString("blocked_by", string(constants.SourceBuffHidden))
     }
 }
 
@@ -281,10 +281,10 @@ func handleHiddenImmune(phase constants.Phase, ctx *event.Context) {
 func handleDivineEffect(phase constants.Phase, ctx *event.Context) error {
     if phase == constants.PhasePostBuffApplied {
         // 入场效果：LP+1
-        ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, "Buff_Divine"))
+        ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, string(constants.SourceBuffDivine)))
     } else if phase == constants.PhasePreBuffRemoved {
         // 亡语效果：LP-1
-        ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, -1, "Buff_Divine"))
+        ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, -1, string(constants.SourceBuffDivineRemoval)))
     }
     return nil
 }
@@ -293,10 +293,10 @@ func handleDivineEffect(phase constants.Phase, ctx *event.Context) error {
 func handleCurseEffect(phase constants.Phase, ctx *event.Context) error {
     if phase == constants.PhasePostBuffApplied {
         // 入场效果：LP-1
-        ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, -1, "Buff_Curse"))
+        ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, -1, string(constants.SourceBuffCurse)))
     } else if phase == constants.PhasePreBuffRemoved {
         // 亡语效果：LP+1
-        ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, "Buff_Curse"))
+        ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, string(constants.SourceBuffCurseRemoval)))
     }
     return nil
 }
@@ -477,7 +477,7 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
       "turn": 0,
       "player_id": "player1",
       "entries": [
-        {"type": "action", "action_type": "modify_lp", "delta": 1, "source": "Buff_Divine"},
+        {"type": "action", "action_type": "modify_lp", "delta": 1, "source": "buff_divine"},
         {"type": "action", "action_type": "move", "target": "player1", "delta": 5},
         {"type": "action", "action_type": "fell_down", "target": "player1", "delta": -1},
         {"type": "state", "metadata": {"from": "TurnMoving", "to": "TurnEnd"}}

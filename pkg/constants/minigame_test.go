@@ -11,6 +11,9 @@ func TestMiniGameTypeIsValid(t *testing.T) {
 		{"dice_race is valid", MiniGameTypeDiceRace, true},
 		{"coin_flip is not yet implemented", MiniGameTypeCoinFlip, false},
 		{"count_seconds is valid", MiniGameTypeCountSeconds, true},
+		{"math_calc is valid", MiniGameTypeMathCalc, true},
+		{"rainbow_memory is valid", MiniGameTypeRainbowMemory, true},
+		{"vernier is valid", MiniGameTypeVernier, true},
 		{"invalid type", MiniGameType("invalid"), false},
 		{"empty type", MiniGameType(""), false},
 	}
