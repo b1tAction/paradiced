@@ -24,6 +24,7 @@ func NewDefaultRankCalculator() *DefaultRankCalculator {
 
 // Calculate ranks players based on game_type-specific scoring rules.
 // - count_seconds: sort by deviation |elapsed - 5.0| ascending (closer to 5s = better rank)
+// - vernier: sort by deviation ascending (closer to 0 = better rank)
 // - math_calc, rainbow_memory: sort by accuracy descending, then time_ms ascending
 // - default: sort by "score" descending
 func (c *DefaultRankCalculator) Calculate(gameType constants.MiniGameType, submissions map[string]map[string]interface{}) map[string]int {
@@ -68,8 +69,8 @@ func (c *DefaultRankCalculator) Calculate(gameType constants.MiniGameType, submi
 			}
 			return entries[i].timeMs < entries[j].timeMs
 		})
-	case constants.MiniGameTypeCountSeconds:
-		// Lower deviation = better rank (ascending): closer to 5.0s is better
+	case constants.MiniGameTypeCountSeconds, constants.MiniGameTypeVernier:
+		// Lower deviation = better rank (ascending): closer to target is better
 		sort.SliceStable(entries, func(i, j int) bool {
 			return entries[i].keyValue < entries[j].keyValue
 		})
