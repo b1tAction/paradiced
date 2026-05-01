@@ -234,6 +234,10 @@ type GameOver struct {
 	// Matches core.Player.ID.UUID() format.
 	WinnerID string `json:"winner_id"`
 
+	// WinnerDisplayName is the winning player's display name for client UI.
+	// Falls back to WinnerID (UUID) if not provided.
+	WinnerDisplayName string `json:"winner_display_name"`
+
 	// Stats contains end-game statistics for all players.
 	Stats []PlayerStats `json:"stats"`
 }
@@ -243,6 +247,10 @@ type PlayerStats struct {
 	// PlayerID is the player's game internal ID.
 	// Matches core.Player.ID.UUID() format.
 	PlayerID string `json:"player_id"`
+
+	// DisplayName is the user-provided display name for client UI.
+	// Falls back to PlayerID (UUID) if not provided.
+	DisplayName string `json:"display_name"`
 
 	// RoundsWon is the number of rounds won (mini-game ranking 1).
 	RoundsWon int `json:"rounds_won"`

@@ -117,13 +117,15 @@ type RankingEntry struct {
 
 // GameOver represents game end notification.
 type GameOver struct {
-	WinnerID string        `json:"winner_id"`
-	Stats    []PlayerStats `json:"stats"`
+	WinnerID          string        `json:"winner_id"`
+	WinnerDisplayName string        `json:"winner_display_name"`
+	Stats             []PlayerStats `json:"stats"`
 }
 
 // PlayerStats represents a player's end-game statistics.
 type PlayerStats struct {
 	PlayerID    string `json:"player_id"`
+	DisplayName string `json:"display_name"`
 	RoundsWon   int    `json:"rounds_won"`
 	EventsDrawn int    `json:"events_drawn"`
 	ItemsUsed   int    `json:"items_used"`

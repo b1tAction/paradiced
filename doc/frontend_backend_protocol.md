@@ -283,17 +283,22 @@ interface RankingEntry {
 
 ```typescript
 interface GameOver {
-    winner_id: string;     // 胜利玩家 ID
-    stats: PlayerStats[];  // 统计数据
+    winner_id: string;            // 胜利玩家 ID（UUID，保持不变）
+    winner_display_name: string;  // 胜利玩家显示名称（用于 UI 展示）
+    stats: PlayerStats[];         // 统计数据
 }
 
 interface PlayerStats {
-    player_id: string;    // 玩家 ID
+    player_id: string;    // 玩家 ID（UUID，保持不变）
+    display_name: string; // 玩家显示名称（用于 UI 展示）
     rounds_won: number;   // 小游戏第一名次数
     events_drawn: number; // 抽取事件次数
     items_used: number;   // 使用道具次数
 }
 ```
+
+> **重要**：`winner_id` 和 `player_id` 始终保持 UUID 格式，不会被 display_name 覆盖。
+> 客户端应使用 `winner_display_name` / `display_name` 展示玩家名称。
 
 ---
 
@@ -1167,11 +1172,13 @@ interface RankingEntry {
 
 interface GameOver {
     winner_id: string;
+    winner_display_name: string;
     stats: PlayerStats[];
 }
 
 interface PlayerStats {
     player_id: string;
+    display_name: string;
     rounds_won: number;
     events_drawn: number;
     items_used: number;
