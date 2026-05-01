@@ -93,6 +93,16 @@ func TestNakamaMatchHandlerAddPlayer(t *testing.T) {
 	if handler.playerList[0] != id.TestUUID(1) {
 		t.Error("playerList should contain user-001")
 	}
+
+	if handler.hostUserID != id.TestUUID(1) {
+		t.Errorf("hostUserID = %s, want user-001", handler.hostUserID)
+	}
+
+	// Add a second player; host should remain the first player.
+	handler.addPlayer(id.TestUUID(2), constants.FactionZhuQue, id.TestUUID(2))
+	if handler.hostUserID != id.TestUUID(1) {
+		t.Errorf("hostUserID changed to %s, want user-001", handler.hostUserID)
+	}
 }
 
 func TestNakamaMatchHandlerGetPlayer(t *testing.T) {

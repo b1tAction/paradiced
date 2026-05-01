@@ -318,6 +318,12 @@ func (h *NakamaMatchHandler) addPlayer(userID string, faction constants.Faction,
 	player.Metadata.SetString("display_name", displayName)
 
 	// Store player
+	if h.hostUserID == "" && len(h.playerList) == 0 {
+		h.hostUserID = userID
+		if h.logger != nil {
+			h.logger.Info("Host set", "user_id", userID)
+		}
+	}
 	h.players[userID] = player
 	h.playerList = append(h.playerList, userID)
 
