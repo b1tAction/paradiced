@@ -473,12 +473,28 @@ func TestEntryTypeIsValid(t *testing.T) {
 
 func TestActionSourceIsValid(t *testing.T) {
 	validSources := []ActionSource{
-		SourceBuffDivine, SourceBuffCurse, SourceBuffRain, SourceBuffCorrupt,
-		SourceItemReverseClock, SourceItemAnyDoor,
-		SourceEventTrap, SourceEventHerb,
+		SourceBuffDivine, SourceBuffDivineRemoval,
+		SourceBuffCurse, SourceBuffCurseRemoval,
+		SourceBuffRain, SourceBuffCorrupt, SourceBuffFire, SourceBuffUndying,
+		SourceBuffExpiry, SourceBuffHidden, SourceBuffPoison,
+		SourceBuffThornsReflect,
+		SourceItemReverseClock, SourceItemReverseClockBuff, SourceItemAnyDoor,
+		SourceItemHealingPotion, SourceItemDiceUpgrade, SourceItemConsumed,
+		SourceEventTrap, SourceEventHerb, SourceEventThunder, SourceEventMilkTea,
+		SourceEventMosquito, SourceEventGhostHit, SourceEventDogPoop,
+		SourceEventRelic, SourceEventExchange, SourceEventTasteTest,
+		SourceEventThief, SourceEventDivineBless, SourceEventCurseBuddha,
+		SourceEventHiddenBuff, SourceEventLostWay,
 		SourceFactionBaiHu, SourceFactionQingLong,
-		SourceSystemDice, SourceSystemRespawn,
+		SourceSystemDice, SourceSystemDiceRoll, SourceSystemDiceRollFellDown,
+		SourceSystemDiceRollCheckpoint, SourceSystemRespawn, SourceSystemFell,
+		SourceSystemCellDraw, SourceSystemCheckpointTreasure,
+		SourceSystemPoisonBadEvent, SourceSystemBossAttackRespawn,
+		SourceSystemBossSkillRespawn, SourceSystemTurnEndRespawn,
 		SourceDeathRespawn, SourceFragileCell,
+		SourceBossNormal, SourceBossCrit, SourceBossDamage,
+		SourceBossSkillThunder, SourceBossSkillCurse, SourceBossSkillLost,
+		SourceBossSkillRest, SourceBossSkillThorns,
 	}
 	for _, as := range validSources {
 		if !as.IsValid() {
@@ -496,8 +512,11 @@ func TestActionSourceIsValid(t *testing.T) {
 
 func TestActionSourceIsBuff(t *testing.T) {
 	buffSources := []ActionSource{
-		SourceBuffDivine, SourceBuffCurse, SourceBuffRain, SourceBuffCorrupt,
-		SourceBuffFire, SourceBuffUndying,
+		SourceBuffDivine, SourceBuffDivineRemoval,
+		SourceBuffCurse, SourceBuffCurseRemoval,
+		SourceBuffRain, SourceBuffCorrupt, SourceBuffFire, SourceBuffUndying,
+		SourceBuffExpiry, SourceBuffHidden, SourceBuffPoison,
+		SourceBuffThornsReflect,
 	}
 	for _, as := range buffSources {
 		if !as.IsBuff() {
@@ -518,7 +537,8 @@ func TestActionSourceIsBuff(t *testing.T) {
 
 func TestActionSourceIsItem(t *testing.T) {
 	itemSources := []ActionSource{
-		SourceItemReverseClock, SourceItemAnyDoor, SourceItemHealingPotion,
+		SourceItemReverseClock, SourceItemReverseClockBuff, SourceItemAnyDoor,
+		SourceItemHealingPotion, SourceItemDiceUpgrade, SourceItemConsumed,
 	}
 	for _, as := range itemSources {
 		if !as.IsItem() {
@@ -539,6 +559,10 @@ func TestActionSourceIsItem(t *testing.T) {
 func TestActionSourceIsEvent(t *testing.T) {
 	eventSources := []ActionSource{
 		SourceEventTrap, SourceEventHerb, SourceEventThunder, SourceEventMilkTea,
+		SourceEventMosquito, SourceEventGhostHit, SourceEventDogPoop,
+		SourceEventRelic, SourceEventExchange, SourceEventTasteTest,
+		SourceEventThief, SourceEventDivineBless, SourceEventCurseBuddha,
+		SourceEventHiddenBuff, SourceEventLostWay,
 	}
 	for _, as := range eventSources {
 		if !as.IsEvent() {
@@ -589,8 +613,8 @@ func TestActionSourceIsBoss(t *testing.T) {
 	}
 
 	nonBossSources := []ActionSource{
-		SourceBuffDivine, SourceItemReverseClock, SourceEventTrap,
-		SourceFactionBaiHu, SourceSystemDice, SourceThornsReflect,
+		SourceBuffDivine, SourceBuffThornsReflect, SourceItemReverseClock, SourceEventTrap,
+		SourceFactionBaiHu, SourceSystemDice,
 	}
 	for _, as := range nonBossSources {
 		if as.IsBoss() {
@@ -653,14 +677,14 @@ func TestParseBossSkillType(t *testing.T) {
 }
 
 func TestBossAttackTypeIsValid(t *testing.T) {
-	validTypes := []BossAttackType{BossAttackNormal, BossAttackCrit, BossAttackSkill}
+	validTypes := []BossAttackType{BossAttackNormal, BossAttackCrit}
 	for _, bat := range validTypes {
 		if !bat.IsValid() {
 			t.Errorf("BossAttackType(%s).IsValid() should be true", bat)
 		}
 	}
 
-	invalidTypes := []BossAttackType{"invalid", ""}
+	invalidTypes := []BossAttackType{"invalid", "", "skill"}
 	for _, bat := range invalidTypes {
 		if bat.IsValid() {
 			t.Errorf("BossAttackType(%s).IsValid() should be false", bat)
@@ -708,7 +732,11 @@ func TestParseDrawType(t *testing.T) {
 }
 func TestActionSourceIsSystem(t *testing.T) {
 	systemSources := []ActionSource{
-		SourceSystemDice, SourceSystemRespawn, SourceSystemFell,
+		SourceSystemDice, SourceSystemDiceRoll, SourceSystemDiceRollFellDown,
+		SourceSystemDiceRollCheckpoint, SourceSystemRespawn, SourceSystemFell,
+		SourceSystemCellDraw, SourceSystemCheckpointTreasure,
+		SourceSystemPoisonBadEvent, SourceSystemBossAttackRespawn,
+		SourceSystemBossSkillRespawn, SourceSystemTurnEndRespawn,
 		SourceDeathRespawn, SourceFragileCell,
 	}
 	for _, as := range systemSources {
