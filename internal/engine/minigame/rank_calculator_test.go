@@ -9,7 +9,7 @@ import (
 func TestDefaultRankCalculator_DiceRace(t *testing.T) {
 	calc := NewDefaultRankCalculator()
 
-	submissions := map[string]map[string]interface{}{
+	submissions := map[string]map[string]any{
 		"p1": {"dice1": 3, "dice2": 4, "score": 7},
 		"p2": {"dice1": 5, "dice2": 6, "score": 11},
 		"p3": {"dice1": 2, "dice2": 1, "score": 3},
@@ -33,7 +33,7 @@ func TestDefaultRankCalculator_DiceRace(t *testing.T) {
 func TestDefaultRankCalculator_CoinFlip(t *testing.T) {
 	calc := NewDefaultRankCalculator()
 
-	submissions := map[string]map[string]interface{}{
+	submissions := map[string]map[string]any{
 		"p1": {"score": 50},
 		"p2": {"score": 100},
 		"p3": {"score": 25},
@@ -57,7 +57,7 @@ func TestDefaultRankCalculator_CoinFlip(t *testing.T) {
 func TestDefaultRankCalculator_EmptySubmissions(t *testing.T) {
 	calc := NewDefaultRankCalculator()
 
-	ranks := calc.Calculate(constants.MiniGameTypeDiceRace, map[string]map[string]interface{}{})
+	ranks := calc.Calculate(constants.MiniGameTypeDiceRace, map[string]map[string]any{})
 	if len(ranks) != 0 {
 		t.Errorf("Expected empty ranks for empty submissions, got %d entries", len(ranks))
 	}
@@ -67,7 +67,7 @@ func TestDefaultRankCalculator_MissingSortKey(t *testing.T) {
 	calc := NewDefaultRankCalculator()
 
 	// Submission missing "score" key for dice_race
-	submissions := map[string]map[string]interface{}{
+	submissions := map[string]map[string]any{
 		"p1": {"dice1": 3, "dice2": 4}, // no "score" key → value defaults to 0
 		"p2": {"dice1": 5, "dice2": 6, "score": 11},
 	}
@@ -88,9 +88,9 @@ func TestDefaultRankCalculator_IntValues(t *testing.T) {
 	calc := NewDefaultRankCalculator()
 
 	// Test that int values are handled correctly
-	submissions := map[string]map[string]interface{}{
-		"p1": {"score": 42},     // int
-		"p2": {"score": 100.0},  // float64
+	submissions := map[string]map[string]any{
+		"p1": {"score": 42},    // int
+		"p2": {"score": 100.0}, // float64
 	}
 
 	ranks := calc.Calculate(constants.MiniGameTypeCoinFlip, submissions)
@@ -106,10 +106,10 @@ func TestDefaultRankCalculator_IntValues(t *testing.T) {
 func TestDefaultRankCalculator_CountSeconds(t *testing.T) {
 	calc := NewDefaultRankCalculator()
 
-	submissions := map[string]map[string]interface{}{
-		"p1": {"elapsed": 5.0},  // deviation = 0.0 (perfect)
-		"p2": {"elapsed": 4.5},  // deviation = 0.5
-		"p3": {"elapsed": 6.2},  // deviation = 1.2
+	submissions := map[string]map[string]any{
+		"p1": {"elapsed": 5.0}, // deviation = 0.0 (perfect)
+		"p2": {"elapsed": 4.5}, // deviation = 0.5
+		"p3": {"elapsed": 6.2}, // deviation = 1.2
 	}
 
 	ranks := calc.Calculate(constants.MiniGameTypeCountSeconds, submissions)
@@ -131,7 +131,7 @@ func TestDefaultRankCalculator_CountSeconds_OverestimateVsUnderestimate(t *testi
 	calc := NewDefaultRankCalculator()
 
 	// Same deviation from both sides of 5.0
-	submissions := map[string]map[string]interface{}{
+	submissions := map[string]map[string]any{
 		"p1": {"elapsed": 4.0}, // deviation = 1.0 (underestimated)
 		"p2": {"elapsed": 6.0}, // deviation = 1.0 (overestimated)
 		"p3": {"elapsed": 3.0}, // deviation = 2.0
@@ -155,7 +155,7 @@ func TestDefaultRankCalculator_CountSeconds_MissingElapsed(t *testing.T) {
 	calc := NewDefaultRankCalculator()
 
 	// Submission missing "elapsed" key
-	submissions := map[string]map[string]interface{}{
+	submissions := map[string]map[string]any{
 		"p1": {"elapsed": 5.3}, // deviation = 0.3
 		"p2": {"score": 100},   // no "elapsed" → defaults to 0, deviation = 5.0
 	}
@@ -175,7 +175,7 @@ func TestDefaultRankCalculator_StableSort(t *testing.T) {
 	calc := NewDefaultRankCalculator()
 
 	// Same score values - stable sort should preserve insertion order
-	submissions := map[string]map[string]interface{}{
+	submissions := map[string]map[string]any{
 		"p1": {"score": 50.0},
 		"p2": {"score": 50.0},
 		"p3": {"score": 50.0},
@@ -196,17 +196,17 @@ func TestDefaultRankCalculator_StableSort(t *testing.T) {
 func TestGetFloatValueAllTypes(t *testing.T) {
 	tests := []struct {
 		name     string
-		data     map[string]interface{}
+		data     map[string]any
 		key      string
 		expected float64
 	}{
-		{"missing key", map[string]interface{}{"other": 1}, "score", 0},
-		{"float64", map[string]interface{}{"score": 42.5}, "score", 42.5},
-		{"float32", map[string]interface{}{"score": float32(3.14)}, "score", float64(float32(3.14))},
-		{"int", map[string]interface{}{"score": 7}, "score", 7.0},
-		{"int64", map[string]interface{}{"score": int64(100)}, "score", 100.0},
-		{"int32", map[string]interface{}{"score": int32(9)}, "score", 9.0},
-		{"unsupported type", map[string]interface{}{"score": "hello"}, "score", 0},
+		{"missing key", map[string]any{"other": 1}, "score", 0},
+		{"float64", map[string]any{"score": 42.5}, "score", 42.5},
+		{"float32", map[string]any{"score": float32(3.14)}, "score", float64(float32(3.14))},
+		{"int", map[string]any{"score": 7}, "score", 7.0},
+		{"int64", map[string]any{"score": int64(100)}, "score", 100.0},
+		{"int32", map[string]any{"score": int32(9)}, "score", 9.0},
+		{"unsupported type", map[string]any{"score": "hello"}, "score", 0},
 	}
 
 	for _, tt := range tests {
@@ -220,10 +220,10 @@ func TestGetFloatValueAllTypes(t *testing.T) {
 func TestDefaultRankCalculator_Vernier(t *testing.T) {
 	calc := NewDefaultRankCalculator()
 
-	submissions := map[string]map[string]interface{}{
-		"p1": {"deviation": 1.0},  // closest to center
+	submissions := map[string]map[string]any{
+		"p1": {"deviation": 1.0}, // closest to center
 		"p2": {"deviation": 3.5},
-		"p3": {"deviation": 8.2},  // farthest from center
+		"p3": {"deviation": 8.2}, // farthest from center
 	}
 
 	ranks := calc.Calculate(constants.MiniGameTypeVernier, submissions)
@@ -245,7 +245,7 @@ func TestDefaultRankCalculator_Vernier_MissingDeviation(t *testing.T) {
 	calc := NewDefaultRankCalculator()
 
 	// Submission missing "deviation" key
-	submissions := map[string]map[string]interface{}{
+	submissions := map[string]map[string]any{
 		"p1": {"deviation": 2.0},
 		"p2": {"score": 100}, // no "deviation" → defaults to 0, best rank
 	}
@@ -264,11 +264,11 @@ func TestDefaultRankCalculator_Vernier_MissingDeviation(t *testing.T) {
 func TestDefaultRankCalculator_MathCalc(t *testing.T) {
 	calc := NewDefaultRankCalculator()
 
-	submissions := map[string]map[string]interface{}{
-		"p1": {"accuracy": 1.0, "time_ms": 2000.0},  // 100% accuracy, fastest
-		"p2": {"accuracy": 0.8, "time_ms": 3000.0},   // 80% accuracy
-		"p3": {"accuracy": 0.8, "time_ms": 5000.0},   // 80% accuracy, slower
-		"p4": {"accuracy": 0.5, "time_ms": 1000.0},   // 50% accuracy, fastest but lower accuracy
+	submissions := map[string]map[string]any{
+		"p1": {"accuracy": 1.0, "time_ms": 2000.0}, // 100% accuracy, fastest
+		"p2": {"accuracy": 0.8, "time_ms": 3000.0}, // 80% accuracy
+		"p3": {"accuracy": 0.8, "time_ms": 5000.0}, // 80% accuracy, slower
+		"p4": {"accuracy": 0.5, "time_ms": 1000.0}, // 50% accuracy, fastest but lower accuracy
 	}
 
 	ranks := calc.Calculate(constants.MiniGameTypeMathCalc, submissions)
@@ -292,10 +292,10 @@ func TestDefaultRankCalculator_MathCalc(t *testing.T) {
 func TestDefaultRankCalculator_RainbowMemory(t *testing.T) {
 	calc := NewDefaultRankCalculator()
 
-	submissions := map[string]map[string]interface{}{
-		"p1": {"accuracy": 1, "time_ms": 1500.0},   // correct, fastest
-		"p2": {"accuracy": 0, "time_ms": 800.0},     // wrong (accuracy=0)
-		"p3": {"accuracy": 1, "time_ms": 3000.0},    // correct, slower
+	submissions := map[string]map[string]any{
+		"p1": {"accuracy": 1, "time_ms": 1500.0}, // correct, fastest
+		"p2": {"accuracy": 0, "time_ms": 800.0},  // wrong (accuracy=0)
+		"p3": {"accuracy": 1, "time_ms": 3000.0}, // correct, slower
 	}
 
 	ranks := calc.Calculate(constants.MiniGameTypeRainbowMemory, submissions)
