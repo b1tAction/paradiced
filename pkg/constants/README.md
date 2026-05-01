@@ -161,6 +161,9 @@ pkg/constants/
 | `MiniGameTypeDiceRace` | `dice_race` | 骰子赛跑：按分数（骰子总和）降序排名 |
 | `MiniGameTypeCoinFlip` | `coin_flip` | 翻硬币：按成功次数降序排名（未实现，暂不可用） |
 | `MiniGameTypeCountSeconds` | `count_seconds` | 数秒：按偏差升序排名（偏差 = |提交秒数 - 5.0|） |
+| `MiniGameTypeMathCalc` | `math_calc` | 数算挑战：按正确率降序，用时升序排名 |
+| `MiniGameTypeRainbowMemory` | `rainbow_memory` | 彩虹记忆：按正确率降序，用时升序排名 |
+| `MiniGameTypeVernier` | `vernier` | 游标卡尺：按偏差升序排名 |
 
 ### MiniGameMode - 小游戏执行模式
 
@@ -191,7 +194,6 @@ pkg/constants/
 |------|-----|------|
 | `BossAttackNormal` | `normal` | 普通攻击：1点伤害 |
 | `BossAttackCrit` | `crit` | 暴击攻击：2点伤害 |
-| `BossAttackSkill` | `skill` | 技能攻击：随机Boss技能 |
 
 ### BossPlayerUUID - Boss 固定UUID
 
@@ -270,7 +272,7 @@ pkg/constants/
 - `item_*` - Item 来源
 - `event_*` - Event 来源
 - `faction_*` - Faction 来源
-- `boss_*` - Boss 来源（包括 `boss_skill_thorns`、`thorns_reflect`）
+- `boss_*` - Boss 来源（包括 `boss_skill_thorns`、`buff_thorns`）
 - `system_*` + 特殊值 - System 来源
 
 ### Evaluation - 评分系统

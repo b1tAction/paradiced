@@ -177,7 +177,7 @@ func registerAllEvents() {
 		Desc:        "在路边发现了草药，恢复了体力",
 	}, &EventHandlerConfig{
 		Priority: 60,
-		Handler:  createEventModifyHPHandler(1),
+		Handler:  createEventModifyHPHandler(1, constants.SourceEventHerb),
 	})
 
 	// MilkTea: LP+1
@@ -189,7 +189,7 @@ func registerAllEvents() {
 		Desc:        "捡到了一杯奶茶，一口就吃到了猪猪欸",
 	}, &EventHandlerConfig{
 		Priority: 70,
-		Handler:  createEventModifyLPHandler(1),
+		Handler:  createEventModifyLPHandler(1, constants.SourceEventMilkTea),
 	})
 
 	// Relic: Draw item
@@ -213,7 +213,7 @@ func registerAllEvents() {
 		Desc:        "天使的祝福降临，获得神眷Buff",
 	}, &EventHandlerConfig{
 		Priority: 80,
-		Handler:  createEventGiveBuffHandler(constants.BuffTypeDivine),
+		Handler:  createEventGiveBuffHandler(constants.BuffTypeDivine, constants.SourceEventDivineBless),
 	})
 
 	// Neutral Events (Evaluation 41-65)
@@ -239,7 +239,7 @@ func registerAllEvents() {
 		Desc:        "身体麻木，获得隐匿Buff",
 	}, &EventHandlerConfig{
 		Priority: 60,
-		Handler:  createEventGiveBuffHandler(constants.BuffTypeHidden),
+		Handler:  createEventGiveBuffHandler(constants.BuffTypeHidden, constants.SourceEventHiddenBuff),
 	})
 
 	// TasteTest: Random buff effect
@@ -265,7 +265,7 @@ func registerAllEvents() {
 		Desc:        "丛林中的蚊虫叮咬了你",
 	}, &EventHandlerConfig{
 		Priority: 40,
-		Handler:  createEventModifyHPHandler(-1),
+		Handler:  createEventModifyHPHandler(-1, constants.SourceEventMosquito),
 	})
 
 	// GhostHit: HP-1
@@ -277,7 +277,7 @@ func registerAllEvents() {
 		Desc:        "被野鬼打了一闷棍",
 	}, &EventHandlerConfig{
 		Priority: 40,
-		Handler:  createEventModifyHPHandler(-1),
+		Handler:  createEventModifyHPHandler(-1, constants.SourceEventGhostHit),
 	})
 
 	// DogPoop: LP-1
@@ -289,7 +289,7 @@ func registerAllEvents() {
 		Desc:        "运气糟糕的一天",
 	}, &EventHandlerConfig{
 		Priority: 40,
-		Handler:  createEventModifyLPHandler(-1),
+		Handler:  createEventModifyLPHandler(-1, constants.SourceEventDogPoop),
 	})
 
 	// Thief: Lose random item
@@ -313,7 +313,7 @@ func registerAllEvents() {
 		Desc:        "拜路边的野佛，获得诅咒Buff",
 	}, &EventHandlerConfig{
 		Priority: 30,
-		Handler:  createEventGiveBuffHandler(constants.BuffTypeCurse),
+		Handler:  createEventGiveBuffHandler(constants.BuffTypeCurse, constants.SourceEventCurseBuddha),
 	})
 
 	// LostWay: Give Lost buff
@@ -325,7 +325,7 @@ func registerAllEvents() {
 		Desc:        "迷失方向，获得迷途Buff",
 	}, &EventHandlerConfig{
 		Priority: 40,
-		Handler:  createEventGiveBuffHandler(constants.BuffTypeLost),
+		Handler:  createEventGiveBuffHandler(constants.BuffTypeLost, constants.SourceEventLostWay),
 	})
 
 	// Thunder: HP to 0 (death)
@@ -344,7 +344,7 @@ func registerAllEvents() {
 // ========== Event Handler Helpers ==========
 
 // createEventModifyHPHandler creates a handler that modifies HP through Action system.
-func createEventModifyHPHandler(amount int) EffectHandler {
+func createEventModifyHPHandler(amount int, source constants.ActionSource) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) error {
 		if ctx == nil {
 			return fmt.Errorf("handler: event context is nil")
@@ -363,19 +363,17 @@ func createEventModifyHPHandler(amount int) EffectHandler {
 		}
 		_ = actionCtx // ActionContext used for derived action processing
 
-		source := "Event_Effect"
-
 		if amount > 0 {
-			ctx.AddDerivedAction(engineaction.NewHealAction(ctx.Player, amount, source))
+			ctx.AddDerivedAction(engineaction.NewHealAction(ctx.Player, amount, string(source)))
 		} else {
-			ctx.AddDerivedAction(engineaction.NewDamageAction(ctx.Player, -amount, source))
+			ctx.AddDerivedAction(engineaction.NewDamageAction(ctx.Player, -amount, string(source)))
 		}
 		return nil
 	}
 }
 
 // createEventModifyLPHandler creates a handler that modifies LP through Action system.
-func createEventModifyLPHandler(amount int) EffectHandler {
+func createEventModifyLPHandler(amount int, source constants.ActionSource) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) error {
 		if ctx == nil {
 			return fmt.Errorf("handler: event context is nil")
@@ -391,14 +389,13 @@ func createEventModifyLPHandler(amount int) EffectHandler {
 		}
 		_ = actionCtx // ActionContext used for derived action processing
 
-		source := "Event_Effect"
-		ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, amount, source))
+		ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, amount, string(source)))
 		return nil
 	}
 }
 
 // createEventGiveBuffHandler creates a handler that gives a Buff through Action system.
-func createEventGiveBuffHandler(buffType constants.BuffType) EffectHandler {
+func createEventGiveBuffHandler(buffType constants.BuffType, source constants.ActionSource) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) error {
 		if ctx == nil {
 			return fmt.Errorf("handler: event context is nil")
@@ -414,7 +411,7 @@ func createEventGiveBuffHandler(buffType constants.BuffType) EffectHandler {
 		}
 		_ = actionCtx // ActionContext used for derived action processing
 
-		ctx.AddDerivedAction(engineaction.NewAddBuffAction(ctx.Player, buffType, "Event_Effect"))
+		ctx.AddDerivedAction(engineaction.NewAddBuffAction(ctx.Player, buffType, string(source)))
 		return nil
 	}
 }
@@ -432,7 +429,7 @@ func handleDrawItem(phase constants.Phase, ctx *event.Context) error {
 	_ = actionCtx // ActionContext used for derived action processing
 
 	// Produce DrawItemAction as DerivedAction
-	ctx.AddDerivedAction(engineaction.NewDrawItemAction(ctx.Player, "Event_Relic"))
+	ctx.AddDerivedAction(engineaction.NewDrawItemAction(ctx.Player, string(constants.SourceEventRelic)))
 	return nil
 }
 
@@ -478,8 +475,8 @@ func handleSwapPosition(phase constants.Phase, ctx *event.Context) error {
 	targetPos := targetPlayer.Position
 
 	// Produce two TeleportActions for the swap
-	ctx.AddDerivedAction(engineaction.NewTeleportAction(ctx.Player, targetPos, "Event_Exchange"))
-	ctx.AddDerivedAction(engineaction.NewTeleportAction(targetPlayer, playerPos, "Event_Exchange"))
+	ctx.AddDerivedAction(engineaction.NewTeleportAction(ctx.Player, targetPos, string(constants.SourceEventExchange)))
+	ctx.AddDerivedAction(engineaction.NewTeleportAction(targetPlayer, playerPos, string(constants.SourceEventExchange)))
 	return nil
 }
 
@@ -496,7 +493,7 @@ func handleRandomBuff(phase constants.Phase, ctx *event.Context) error {
 	_ = actionCtx // ActionContext used for derived action processing
 
 	// Produce DrawBuffAction as DerivedAction
-	ctx.AddDerivedAction(engineaction.NewDrawBuffAction(ctx.Player, "Event_TasteTest"))
+	ctx.AddDerivedAction(engineaction.NewDrawBuffAction(ctx.Player, string(constants.SourceEventTasteTest)))
 	return nil
 }
 
@@ -520,7 +517,7 @@ func handleLoseItem(phase constants.Phase, ctx *event.Context) error {
 	// Take the first item from inventory as the lost item
 	// (In production, this would use RNG for random selection)
 	lostItem := ctx.Player.Inventory[0]
-	ctx.AddDerivedAction(engineaction.NewRemoveItemAction(ctx.Player, lostItem.Type, "Event_Thief"))
+	ctx.AddDerivedAction(engineaction.NewRemoveItemAction(ctx.Player, lostItem.Type, string(constants.SourceEventThief)))
 	return nil
 }
 
@@ -529,7 +526,7 @@ func handleThunderDeath(phase constants.Phase, ctx *event.Context) error {
 		return nil
 	}
 
-	source := "Event_Thunder"
+	source := string(constants.SourceEventThunder)
 
 	// Deal massive damage to set HP to 0
 	// Use player's current HP as damage amount

@@ -8,34 +8,63 @@ type ActionSource string
 // ActionSource constants - snake_case values for JSON serialization.
 const (
 	// Buff sources
-	SourceBuffDivine   ActionSource = "buff_divine"
-	SourceBuffCurse    ActionSource = "buff_curse"
-	SourceBuffRain     ActionSource = "buff_rain"
-	SourceBuffCorrupt  ActionSource = "buff_corrupt"
-	SourceBuffFire     ActionSource = "buff_fire"
-	SourceBuffUndying  ActionSource = "buff_undying"
+	SourceBuffDivine         ActionSource = "buff_divine"
+	SourceBuffDivineRemoval  ActionSource = "buff_divine_removal"
+	SourceBuffCurse          ActionSource = "buff_curse"
+	SourceBuffCurseRemoval   ActionSource = "buff_curse_removal"
+	SourceBuffRain           ActionSource = "buff_rain"
+	SourceBuffCorrupt        ActionSource = "buff_corrupt"
+	SourceBuffFire           ActionSource = "buff_fire"
+	SourceBuffUndying        ActionSource = "buff_undying"
+	SourceBuffExpiry         ActionSource = "buff_expiry"
+	SourceBuffHidden         ActionSource = "buff_hidden"
+	SourceBuffPoison         ActionSource = "buff_poison"
+	SourceBuffThornsReflect  ActionSource = "buff_thorns"
 
 	// Item sources
-	SourceItemReverseClock ActionSource = "item_reverse_clock"
-	SourceItemAnyDoor      ActionSource = "item_any_door"
-	SourceItemHealingPotion ActionSource = "item_healing_potion"
+	SourceItemReverseClock     ActionSource = "item_reverse_clock"
+	SourceItemReverseClockBuff ActionSource = "item_reverse_clock_buff"
+	SourceItemAnyDoor          ActionSource = "item_any_door"
+	SourceItemHealingPotion    ActionSource = "item_healing_potion"
+	SourceItemDiceUpgrade      ActionSource = "item_dice_upgrade"
+	SourceItemConsumed         ActionSource = "item_consumed"
 
 	// Event sources
-	SourceEventTrap     ActionSource = "event_trap"
-	SourceEventHerb     ActionSource = "event_herb"
-	SourceEventThunder  ActionSource = "event_thunder"
-	SourceEventMilkTea  ActionSource = "event_milk_tea"
+	SourceEventTrap        ActionSource = "event_trap"
+	SourceEventHerb        ActionSource = "event_herb"
+	SourceEventThunder     ActionSource = "event_thunder"
+	SourceEventMilkTea     ActionSource = "event_milk_tea"
+	SourceEventMosquito    ActionSource = "event_mosquito"
+	SourceEventGhostHit    ActionSource = "event_ghost_hit"
+	SourceEventDogPoop     ActionSource = "event_dog_poop"
+	SourceEventRelic       ActionSource = "event_relic"
+	SourceEventExchange    ActionSource = "event_exchange"
+	SourceEventTasteTest   ActionSource = "event_taste_test"
+	SourceEventThief       ActionSource = "event_thief"
+	SourceEventDivineBless ActionSource = "event_divine_bless"
+	SourceEventCurseBuddha ActionSource = "event_curse_buddha"
+	SourceEventHiddenBuff  ActionSource = "event_hidden_buff"
+	SourceEventLostWay     ActionSource = "event_lost_way"
 
 	// Faction sources
 	SourceFactionBaiHu  ActionSource = "faction_bai_hu"  // 劫运
 	SourceFactionQingLong ActionSource = "faction_qing_long" // 行迹
 
 	// System sources
-	SourceSystemDice    ActionSource = "system_dice"
-	SourceSystemRespawn ActionSource = "system_respawn"
-	SourceSystemFell    ActionSource = "system_fell"
-	SourceDeathRespawn  ActionSource = "death_respawn"
-	SourceFragileCell   ActionSource = "fragile_cell"
+	SourceSystemDice                ActionSource = "system_dice"
+	SourceSystemDiceRoll            ActionSource = "system_dice_roll"
+	SourceSystemDiceRollFellDown    ActionSource = "system_dice_roll_fell_down"
+	SourceSystemDiceRollCheckpoint  ActionSource = "system_dice_roll_checkpoint"
+	SourceSystemRespawn             ActionSource = "system_respawn"
+	SourceSystemFell                ActionSource = "system_fell"
+	SourceSystemCellDraw            ActionSource = "system_cell_draw"
+	SourceSystemCheckpointTreasure  ActionSource = "system_checkpoint_treasure"
+	SourceSystemPoisonBadEvent      ActionSource = "system_poison_bad_event"
+	SourceSystemBossAttackRespawn   ActionSource = "system_boss_attack_respawn"
+	SourceSystemBossSkillRespawn    ActionSource = "system_boss_skill_respawn"
+	SourceSystemTurnEndRespawn      ActionSource = "system_turn_end_respawn"
+	SourceDeathRespawn              ActionSource = "death_respawn"
+	SourceFragileCell               ActionSource = "fragile_cell"
 
 	// Boss sources
 	SourceBossNormal       ActionSource = "boss_normal"       // Boss normal attack
@@ -46,7 +75,6 @@ const (
 	SourceBossSkillLost    ActionSource = "boss_skill_lost"   // Boss lost skill
 	SourceBossSkillRest    ActionSource = "boss_skill_rest"   // Boss rest skill
 	SourceBossSkillThorns  ActionSource = "boss_skill_thorns" // Boss thorns skill
-	SourceThornsReflect    ActionSource = "thorns_reflect"    // Thorns reflect damage
 )
 
 // IsValid checks if ActionSource is valid.

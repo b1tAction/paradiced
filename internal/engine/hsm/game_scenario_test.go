@@ -493,7 +493,7 @@ func TestScenarioDeath_DamageActionDerivesDeathAction(t *testing.T) {
 	harness.Game.Log.StartTurn(1, 0, player.ID.UUID())
 
 	// Execute DamageAction that kills the player
-	damageAction := engineaction.NewDamageAction(player, 10, "Buff_Corrupt")
+	damageAction := engineaction.NewDamageAction(player, 10, string(constants.SourceBuffCorrupt))
 	err := actionCtx.ExecuteAction(damageAction)
 	if err != nil {
 		t.Fatalf("ExecuteAction(DamageAction) failed: %v", err)
@@ -520,7 +520,7 @@ func TestScenarioDeath_DamageActionDerivesDeathAction(t *testing.T) {
 			hasDeath = true
 			// Check death_source in metadata
 			source := entry.Metadata.GetStringOrDefault("death_source", "")
-			if source != "Buff_Corrupt" {
+			if source != string(constants.SourceBuffCorrupt) {
 				t.Errorf("Death source should be 'Buff_Corrupt', got '%s'", source)
 			}
 			position := entry.Metadata.GetIntOrDefault("position", -1)
@@ -539,7 +539,7 @@ func TestScenarioDeath_DamageActionDerivesDeathAction(t *testing.T) {
 
 // TestScenarioDeath_FellDownActionDerivesDeathAction verifies that when
 // FellDownAction kills a player, it derives a DeathAction with source
-// "FragileCell".
+// "fragile_cell".
 func TestScenarioDeath_FellDownActionDerivesDeathAction(t *testing.T) {
 	harness := NewGameTestHarness(&HarnessConfig{
 		Seed:        42,
@@ -563,7 +563,7 @@ func TestScenarioDeath_FellDownActionDerivesDeathAction(t *testing.T) {
 	harness.Game.Log.StartTurn(1, 0, player.ID.UUID())
 
 	// Execute FellDownAction that kills the player (damage=1, HP=1 → 0)
-	fellDownAction := engineaction.NewFellDownAction(player, 15, 1, "FragileCell")
+	fellDownAction := engineaction.NewFellDownAction(player, 15, 1, string(constants.SourceFragileCell))
 	err := actionCtx.ExecuteAction(fellDownAction)
 	if err != nil {
 		t.Fatalf("ExecuteAction(FellDownAction) failed: %v", err)
@@ -586,7 +586,7 @@ func TestScenarioDeath_FellDownActionDerivesDeathAction(t *testing.T) {
 		if entry.ActionType == "death" {
 			hasDeath = true
 			source := entry.Metadata.GetStringOrDefault("death_source", "")
-			if source != "FragileCell" {
+			if source != string(constants.SourceFragileCell) {
 				t.Errorf("Death source should be 'FragileCell', got '%s'", source)
 			}
 		}
@@ -697,7 +697,7 @@ func TestScenarioDeath_RespawnRemovesDeathMark(t *testing.T) {
 
 	// Step 3: Respawn at checkpoint (PhasePreAction no longer blocks since DeathMark removed)
 	checkpoint := harness.MapEngine.GetLastCheckpoint(player.Position)
-	respawnAction := engineaction.NewRespawnAction(player, checkpoint, "TurnEndRespawn")
+	respawnAction := engineaction.NewRespawnAction(player, checkpoint, string(constants.SourceSystemTurnEndRespawn))
 	err := actionCtx.ExecuteAction(respawnAction)
 	if err != nil {
 		t.Fatalf("ExecuteAction(RespawnAction) failed: %v", err)
@@ -844,7 +844,7 @@ func TestScenarioDeath_DeathActionLogEntryMetadata(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 6})
 	player.Position = 25
 
-	action := engineaction.NewDeathAction(player, "Buff_Corrupt", 25)
+	action := engineaction.NewDeathAction(player, string(constants.SourceBuffCorrupt), 25)
 
 	// Verify Type
 	if action.Type() != constants.ActionDeath {
@@ -856,7 +856,7 @@ func TestScenarioDeath_DeathActionLogEntryMetadata(t *testing.T) {
 	if entry.ActionType != "death" {
 		t.Errorf("LogEntry ActionType should be 'death', got '%s'", entry.ActionType)
 	}
-	if entry.Source != "Buff_Corrupt" {
+	if entry.Source != string(constants.SourceBuffCorrupt) {
 		t.Errorf("LogEntry Source should be 'Buff_Corrupt', got '%s'", entry.Source)
 	}
 
@@ -866,7 +866,7 @@ func TestScenarioDeath_DeathActionLogEntryMetadata(t *testing.T) {
 		t.Errorf("Metadata position should be 25, got %d", position)
 	}
 	deathSource := entry.Metadata.GetStringOrDefault("death_source", "")
-	if deathSource != "Buff_Corrupt" {
+	if deathSource != string(constants.SourceBuffCorrupt) {
 		t.Errorf("Metadata death_source should be 'Buff_Corrupt', got '%s'", deathSource)
 	}
 }
@@ -929,7 +929,7 @@ func TestScenarioDeath_RespawnWithDeathMarkPresent(t *testing.T) {
 	// Step 2: Attempt RespawnAction immediately (as BossBattleState would do)
 	// This must succeed even though DeathMark is still present.
 	checkpoint := harness.MapEngine.GetLastCheckpoint(player.Position)
-	respawnAction := engineaction.NewRespawnAction(player, checkpoint, "BossAttackRespawn")
+	respawnAction := engineaction.NewRespawnAction(player, checkpoint, string(constants.SourceSystemBossAttackRespawn))
 	err = actionCtx.ExecuteAction(respawnAction)
 	if err != nil {
 		t.Fatalf("ExecuteAction(RespawnAction) should succeed with DeathMark present, got: %v", err)
@@ -1035,7 +1035,7 @@ func TestScenarioDeath_DeathMarkBlockRemoveOtherBuff(t *testing.T) {
 	}
 
 	// Step 3: Try to remove Divine buff — should be blocked by DeathMark
-	removeDivineAction := engineaction.NewRemoveBuffAction(player, constants.BuffTypeDivine, "Buff_Expiry")
+	removeDivineAction := engineaction.NewRemoveBuffAction(player, constants.BuffTypeDivine, string(constants.SourceBuffExpiry))
 	if err := actionCtx.ExecuteAction(removeDivineAction); err != nil {
 		t.Fatalf("ExecuteAction should not return error for blocked action: %v", err)
 	}
@@ -1082,7 +1082,7 @@ func TestScenarioStealBuff_BaiHuStealsBuff(t *testing.T) {
 	}
 
 	// Step 2: StealBuffAction — BaiHu steals from QingLong
-	stealAction := engineaction.NewStealBuffAction(target, stealer, "Faction_BaiHu")
+	stealAction := engineaction.NewStealBuffAction(target, stealer, string(constants.SourceFactionBaiHu))
 	if err := actionCtx.ExecuteAction(stealAction); err != nil {
 		t.Fatalf("StealBuffAction failed: %v", err)
 	}

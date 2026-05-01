@@ -133,7 +133,7 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 	// Step 6: Handle Poison buff's "draw_bad_event" flag
 	// Poison buff handler sets this flag to force a bad event draw
 	if triggerCtx.GetBoolOrDefault("draw_bad_event", false) {
-		drawAction := engineaction.NewDrawEventAction(player, "Poison_BadEvent")
+		drawAction := engineaction.NewDrawEventAction(player, string(constants.SourceSystemPoisonBadEvent))
 		// Force 100% bad event probability
 		s.actionCtx.SetCellDraw(0, 0, 1.0)
 		if err := s.actionCtx.ExecuteAction(drawAction); err != nil {
@@ -345,7 +345,7 @@ func (s *MainActionState) Exit(ctx *StateContext) {
 // Creates and executes a RollDiceAction which calculates steps via RNG.
 // After execution, reads the result from ActionContext metadata.
 func (s *MainActionState) OnRollDice(ctx *StateContext) {
-	s.onRollDiceInternal(ctx, "DiceRoll")
+	s.onRollDiceInternal(ctx, string(constants.SourceSystemDice))
 }
 
 // onRollDiceInternal is the shared implementation for player-initiated and timeout auto-roll.
@@ -447,7 +447,7 @@ func (s *MainActionState) OnUseItem(ctx *StateContext, itemID string) {
 	itemUUID := id.MustParseItemID(itemID)
 	item := player.GetItem(itemUUID)
 	if item != nil {
-		removeAction := engineaction.NewRemoveItemAction(player, item.Type, "Item_Consumed")
+		removeAction := engineaction.NewRemoveItemAction(player, item.Type, string(constants.SourceItemConsumed))
 		if err := s.actionCtx.ExecuteAction(removeAction); err != nil {
 			ctx.Error = errors.WrapHSMError(
 				err, "MainAction", 2, "OnUseItem", "item consumption failed")
@@ -579,9 +579,9 @@ func (s *TurnMovingState) Enter(ctx *StateContext) {
 		// Write path data to actionCtx.Metadata for MoveAction to read
 		s.actionCtx.SetInt("target_pos", pathResult.TargetIndex)
 		s.actionCtx.Set("path", pathResult.Path)
-		moveAction := engineaction.NewMoveAction(player, pathResult.TargetIndex-startPos, "DiceRollFellDown")
+		moveAction := engineaction.NewMoveAction(player, pathResult.TargetIndex-startPos, string(constants.SourceSystemDiceRollFellDown))
 		s.actionCtx.ExecuteAction(moveAction)
-		fellDownAction := engineaction.NewFellDownAction(player, pathResult.TargetIndex, 1, "FragileCell")
+		fellDownAction := engineaction.NewFellDownAction(player, pathResult.TargetIndex, 1, string(constants.SourceFragileCell))
 		s.actionCtx.ExecuteAction(fellDownAction)
 		// FellDown -> TurnEnd, no further processing
 		return
@@ -607,7 +607,7 @@ func (s *TurnMovingState) Enter(ctx *StateContext) {
 			s.actionCtx.SetInt("target_pos", checkpointPos)
 			s.actionCtx.Set("path", firstSegPathResult.Path)
 
-			moveAction := engineaction.NewMoveAction(player, firstSegSteps, "DiceRollCheckpoint")
+			moveAction := engineaction.NewMoveAction(player, firstSegSteps, string(constants.SourceSystemDiceRollCheckpoint))
 			s.actionCtx.ExecuteAction(moveAction)
 
 			s.hasCheckpoint = true
@@ -623,7 +623,7 @@ func (s *TurnMovingState) Enter(ctx *StateContext) {
 	s.actionCtx.SetInt("target_pos", pathResult.TargetIndex)
 	s.actionCtx.Set("path", pathResult.Path)
 
-	moveAction := engineaction.NewMoveAction(player, s.Steps, "DiceRoll")
+	moveAction := engineaction.NewMoveAction(player, s.Steps, string(constants.SourceSystemDiceRoll))
 	s.actionCtx.ExecuteAction(moveAction)
 
 	s.reachedEnd = pathResult.ReachedEnd
@@ -720,7 +720,7 @@ func (s *TurnCheckpointState) Enter(ctx *StateContext) {
 	)
 
 	// Execute DrawItemAction at CheckPoint (auto draw, no interception)
-	drawItemAction := engineaction.NewDrawItemAction(player, "CheckpointTreasure")
+	drawItemAction := engineaction.NewDrawItemAction(player, string(constants.SourceSystemCheckpointTreasure))
 	s.actionCtx.ExecuteAction(drawItemAction)
 
 	// Broadcast StateSync after checkpoint effects (DrawItem)
@@ -1080,7 +1080,7 @@ func (s *TurnDrawState) Enter(ctx *StateContext) {
 	switch s.drawType {
 	case constants.DrawTypeEvent:
 		// Draw event (PreTriggerPhase = PhasePreEvent for immunity checks)
-		drawAction := engineaction.NewDrawEventAction(player, "CellDraw")
+		drawAction := engineaction.NewDrawEventAction(player, string(constants.SourceSystemCellDraw))
 		if err := s.actionCtx.ExecuteAction(drawAction); err != nil {
 			ctx.Error = errors.WrapHSMError(
 				err, "TurnDraw", 2, "Enter", "draw event action failed")
@@ -1096,7 +1096,7 @@ func (s *TurnDrawState) Enter(ctx *StateContext) {
 		}
 	case constants.DrawTypeItem:
 		// Draw item (no interception)
-		drawAction := engineaction.NewDrawItemAction(player, "CellDraw")
+		drawAction := engineaction.NewDrawItemAction(player, string(constants.SourceSystemCellDraw))
 		if err := s.actionCtx.ExecuteAction(drawAction); err != nil {
 			ctx.Error = errors.WrapHSMError(
 				err, "TurnDraw", 2, "Enter", "draw item action failed")
@@ -1301,7 +1301,7 @@ func (s *TurnBossBattleState) enterBossBranch(ctx *StateContext, bossPlayer *cor
 		// Check if target player died -> respawn at checkpoint
 		if targetPlayer.IsDead && mapEngine != nil {
 			checkpoint := mapEngine.GetLastCheckpoint(targetPlayer.Position)
-			respawnAction := engineaction.NewRespawnAction(targetPlayer, checkpoint, "BossAttackRespawn")
+			respawnAction := engineaction.NewRespawnAction(targetPlayer, checkpoint, string(constants.SourceSystemBossAttackRespawn))
 			if err := s.actionCtx.ExecuteAction(respawnAction); err != nil {
 				ctx.Error = errors.WrapHSMError(
 					err, "TurnBossBattle", 2, "Enter", "respawn action failed")
@@ -1353,7 +1353,7 @@ func (s *TurnBossBattleState) enterBossBranch(ctx *StateContext, bossPlayer *cor
 		for _, target := range bossCellPlayers {
 			if target.IsDead && mapEngine != nil {
 				checkpoint := mapEngine.GetLastCheckpoint(target.Position)
-				respawnAction := engineaction.NewRespawnAction(target, checkpoint, "BossSkillRespawn")
+				respawnAction := engineaction.NewRespawnAction(target, checkpoint, string(constants.SourceSystemBossSkillRespawn))
 				if err := s.actionCtx.ExecuteAction(respawnAction); err != nil {
 					ctx.Error = errors.WrapHSMError(
 						err, "TurnBossBattle", 2, "Enter", "respawn action failed")
@@ -1463,7 +1463,7 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 		// Tick Boss Buffs (duration countdown, remove expired)
 		expiredBuffs := player.TickBuffs()
 		for _, expired := range expiredBuffs {
-			removeAction := engineaction.NewRemoveBuffAction(player, expired.Type, "Buff_Expiry")
+			removeAction := engineaction.NewRemoveBuffAction(player, expired.Type, string(constants.SourceBuffExpiry))
 			if err := s.actionCtx.ExecuteAction(removeAction); err != nil {
 				ctx.Error = errors.WrapHSMError(err, "TurnEnd", 2, "Enter", "boss expired buff removal failed")
 				return
@@ -1529,7 +1529,7 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 	// Remove expired buffs through Action system (RemoveBuffAction)
 	// This ensures PhasePreBuffRemoved is published for handler matching
 	for _, expired := range expiredBuffs {
-		removeAction := engineaction.NewRemoveBuffAction(player, expired.Type, "Buff_Expiry")
+		removeAction := engineaction.NewRemoveBuffAction(player, expired.Type, string(constants.SourceBuffExpiry))
 		if err := s.actionCtx.ExecuteAction(removeAction); err != nil {
 			ctx.Error = errors.WrapHSMError(
 				err, "TurnEnd", 2, "Enter", "expired buff removal action failed")
@@ -1542,7 +1542,7 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 		// Respawn at checkpoint
 		if mapEngine != nil {
 			checkpoint := mapEngine.GetLastCheckpoint(player.Position)
-			respawnAction := engineaction.NewRespawnAction(player, checkpoint, "TurnEndRespawn")
+			respawnAction := engineaction.NewRespawnAction(player, checkpoint, string(constants.SourceSystemTurnEndRespawn))
 			if err := s.actionCtx.ExecuteAction(respawnAction); err != nil {
 				ctx.Error = errors.WrapHSMError(
 					err, "TurnEnd", 2, "Enter", "respawn action failed")

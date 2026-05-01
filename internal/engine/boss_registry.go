@@ -113,16 +113,13 @@ func registerAllBossData() {
 	GlobalBossRegistry.RegisterBossSkill(&BossSkillHandlerConfig{
 		Type: constants.BossSkillThunder,
 		Handler: func(game *Game, actionCtx *engineaction.ActionContext, targets []*core.Player) error {
-			bossPlayer := game.GetBossPlayer()
 			for _, target := range targets {
-				attackAction := engineaction.NewBossAttackAction(
-					bossPlayer,
+				damageAction := engineaction.NewDamageAction(
 					target,
 					3,
-					constants.BossAttackSkill,
 					string(constants.SourceBossSkillThunder),
 				)
-				actionCtx.PushDerivedAction(attackAction)
+				actionCtx.PushDerivedAction(damageAction)
 			}
 			return nil
 		},

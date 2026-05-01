@@ -216,3 +216,99 @@ func TestGetFloatValueAllTypes(t *testing.T) {
 		}
 	}
 }
+
+func TestDefaultRankCalculator_Vernier(t *testing.T) {
+	calc := NewDefaultRankCalculator()
+
+	submissions := map[string]map[string]interface{}{
+		"p1": {"deviation": 1.0},  // closest to center
+		"p2": {"deviation": 3.5},
+		"p3": {"deviation": 8.2},  // farthest from center
+	}
+
+	ranks := calc.Calculate(constants.MiniGameTypeVernier, submissions)
+
+	// vernier: lower deviation = better rank (ascending)
+	// p1 (dev=1.0) → rank 1, p2 (dev=3.5) → rank 2, p3 (dev=8.2) → rank 3
+	if ranks["p1"] != 1 {
+		t.Errorf("p1 rank = %d, want 1 (deviation=1.0)", ranks["p1"])
+	}
+	if ranks["p2"] != 2 {
+		t.Errorf("p2 rank = %d, want 2 (deviation=3.5)", ranks["p2"])
+	}
+	if ranks["p3"] != 3 {
+		t.Errorf("p3 rank = %d, want 3 (deviation=8.2)", ranks["p3"])
+	}
+}
+
+func TestDefaultRankCalculator_Vernier_MissingDeviation(t *testing.T) {
+	calc := NewDefaultRankCalculator()
+
+	// Submission missing "deviation" key
+	submissions := map[string]map[string]interface{}{
+		"p1": {"deviation": 2.0},
+		"p2": {"score": 100}, // no "deviation" → defaults to 0, best rank
+	}
+
+	ranks := calc.Calculate(constants.MiniGameTypeVernier, submissions)
+
+	// p2 (dev defaults to 0) → rank 1, p1 (dev=2.0) → rank 2
+	if ranks["p2"] != 1 {
+		t.Errorf("p2 rank = %d, want 1 (deviation defaults to 0)", ranks["p2"])
+	}
+	if ranks["p1"] != 2 {
+		t.Errorf("p1 rank = %d, want 2 (deviation=2.0)", ranks["p1"])
+	}
+}
+
+func TestDefaultRankCalculator_MathCalc(t *testing.T) {
+	calc := NewDefaultRankCalculator()
+
+	submissions := map[string]map[string]interface{}{
+		"p1": {"accuracy": 1.0, "time_ms": 2000.0},  // 100% accuracy, fastest
+		"p2": {"accuracy": 0.8, "time_ms": 3000.0},   // 80% accuracy
+		"p3": {"accuracy": 0.8, "time_ms": 5000.0},   // 80% accuracy, slower
+		"p4": {"accuracy": 0.5, "time_ms": 1000.0},   // 50% accuracy, fastest but lower accuracy
+	}
+
+	ranks := calc.Calculate(constants.MiniGameTypeMathCalc, submissions)
+
+	// math_calc: accuracy descending, then time_ms ascending
+	// p1 (1.0/2s) → rank 1, p2 (0.8/3s) → rank 2, p3 (0.8/5s) → rank 3, p4 (0.5/1s) → rank 4
+	if ranks["p1"] != 1 {
+		t.Errorf("p1 rank = %d, want 1 (accuracy=1.0, fastest)", ranks["p1"])
+	}
+	if ranks["p2"] != 2 {
+		t.Errorf("p2 rank = %d, want 2 (accuracy=0.8, faster than p3)", ranks["p2"])
+	}
+	if ranks["p3"] != 3 {
+		t.Errorf("p3 rank = %d, want 3 (accuracy=0.8, slower than p2)", ranks["p3"])
+	}
+	if ranks["p4"] != 4 {
+		t.Errorf("p4 rank = %d, want 4 (accuracy=0.5, lowest)", ranks["p4"])
+	}
+}
+
+func TestDefaultRankCalculator_RainbowMemory(t *testing.T) {
+	calc := NewDefaultRankCalculator()
+
+	submissions := map[string]map[string]interface{}{
+		"p1": {"accuracy": 1, "time_ms": 1500.0},   // correct, fastest
+		"p2": {"accuracy": 0, "time_ms": 800.0},     // wrong (accuracy=0)
+		"p3": {"accuracy": 1, "time_ms": 3000.0},    // correct, slower
+	}
+
+	ranks := calc.Calculate(constants.MiniGameTypeRainbowMemory, submissions)
+
+	// rainbow_memory: same rules as math_calc (accuracy descending, time_ms ascending)
+	// p1 (1/1.5s) → rank 1, p3 (1/3s) → rank 2, p2 (0/0.8s) → rank 3
+	if ranks["p1"] != 1 {
+		t.Errorf("p1 rank = %d, want 1 (accuracy=1, fastest)", ranks["p1"])
+	}
+	if ranks["p3"] != 2 {
+		t.Errorf("p3 rank = %d, want 2 (accuracy=1, slower)", ranks["p3"])
+	}
+	if ranks["p2"] != 3 {
+		t.Errorf("p2 rank = %d, want 3 (accuracy=0)", ranks["p2"])
+	}
+}

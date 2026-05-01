@@ -24,6 +24,7 @@ build-plugin:
 		-e GOCACHE=/workspace/.gocache \
 		-e GOMODCACHE=/workspace/.gomodcache \
 		-e GOPATH=/workspace/.gopath \
+		-e GOPROXY=https://goproxy.cn,direct \
 		-e HOME=/tmp \
 		-v "$$(pwd):/workspace" \
 		-w /workspace \
