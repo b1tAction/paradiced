@@ -141,6 +141,8 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 				err, "TurnUpkeep", 2, "Enter", "poison bad event draw failed")
 			return
 		}
+		// Track events drawn stat
+		player.IncrementEventsDrawn()
 		// Run event effect for the drawn bad event
 		if drawAction.DrawnType.IsValid() {
 			if err := runEventEffect(drawAction.DrawnType, player, s.actionCtx); err != nil {
@@ -453,6 +455,8 @@ func (s *MainActionState) OnUseItem(ctx *StateContext, itemID string) {
 				err, "MainAction", 2, "OnUseItem", "item consumption failed")
 			return
 		}
+		// Track items used stat
+		player.IncrementItemsUsed()
 	}
 
 	// Broadcast updated state and resend available actions so the client can continue
@@ -953,6 +957,8 @@ func (s *TurnLandedState) Enter(ctx *StateContext) {
 						err, "TurnLanded", 2, "Enter", "bound event action failed")
 					return
 				}
+				// Track events drawn stat
+				player.IncrementEventsDrawn()
 				// Execute the bound event's effect via EventRegistry handler
 				if err := runEventEffect(drawnType, player, s.actionCtx); err != nil {
 					ctx.Error = errors.WrapHSMError(
@@ -1086,6 +1092,8 @@ func (s *TurnDrawState) Enter(ctx *StateContext) {
 				err, "TurnDraw", 2, "Enter", "draw event action failed")
 			return
 		}
+		// Track events drawn stat
+		player.IncrementEventsDrawn()
 		// Execute the drawn event's effect via EventRegistry handler
 		if drawAction.DrawnType.IsValid() {
 			if err := runEventEffect(drawAction.DrawnType, player, s.actionCtx); err != nil {
