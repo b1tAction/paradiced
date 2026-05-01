@@ -1,19 +1,80 @@
+version: "2"
+
 run:
   timeout: 5m
+  relative-path-mode: gomod
+  modules-download-mode: readonly
+  tests: true
 
 issues:
-  exclude-dirs:
-    - .gomodcache
+  # The repository has pre-existing findings after enabling golangci-lint v2.
+  # Keep lint actionable for local development by failing new issues only.
+  new: true
+  max-same-issues: 50
 
 linters:
+  default: standard
+  enable:
+    - bodyclose
+    - copyloopvar
+    - durationcheck
+    - errname
+    - errorlint
+    - gocheckcompilerdirectives
+    - gosec
+    - loggercheck
+    - makezero
+    - nilerr
+    - nilnesserr
+    - noctx
+    - predeclared
+    # Minimum practical Go version: 1.21+.
+    # modernize suggestions rely on newer stdlib APIs, so keep it on only while the module stays at Go 1.21 or newer.
+    - modernize
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - unconvert
+    - wastedassign
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+    gosec:
+      severity: medium
+      confidence: medium
+    govet:
+      enable:
+        - shadow
+  exclusions:
+    generated: strict
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - .gomodcache
+      - .gocache
+      - .gopath
+      - build
+      - modules
+
+formatters:
   enable:
     - gofmt
-    - govet
-    - errcheck
-    - revive
-    - ineffassign
-    - unused
-
-linters-settings:
-  gofmt:
-    simplify: false
+    - goimports
+  settings:
+    gofmt:
+      simplify: false
+    goimports:
+      local-prefixes:
+        - github.com/b1tAction/paradiced
+  exclusions:
+    generated: strict
+    paths:
+      - .gomodcache
+      - .gocache
+      - .gopath
+      - build
+      - modules
