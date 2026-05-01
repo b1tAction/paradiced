@@ -176,7 +176,7 @@ type Item struct {
 type Decision struct {
     ID      string   `json:"id"`       // 决策ID
     Prompt  string   `json:"prompt"`   // 提示文本
-    Context string   `json:"context"`  // 来源标识："Item_AnyDoor", "Buff_Divine"
+    Context string   `json:"context"`  // 来源标识："item_any_door", "buff_divine"
     Options []Option `json:"options"`  // 选项列表
     Timeout int      `json:"timeout"`  // 超时秒数
     Default int      `json:"default"`  // 默认选项索引

@@ -51,7 +51,7 @@ for (const entry of turnSync.entries) {
 
 | 字段 | 类型 | 使用类型 | 用途 | 示例值 |
 |------|------|----------|------|--------|
-| `source` | string | 多类型 | 效果来源标识 | `"Buff_Divine"`, `"Cell_Fragile"` |
+| `source` | string | 多类型 | 效果来源标识 | `"buff_divine"`, `"fragile_cell"` |
 
 ### damage 类型
 
@@ -145,14 +145,16 @@ for (const entry of turnSync.entries) {
 | `is_crit` | bool | 是 | 是否暴击 | 暴击特效标识 |
 | `boss_remaining_hp` | int | 是 | Boss剩余HP | Boss血条更新 |
 
-### boss_attack 类型（Boss攻击玩家）
+### boss_attack 类型（Boss物理攻击玩家）
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
-| `attack_type` | string | 是 | 攻击类型（"normal"/"crit"/"skill"） | 攻击类型动画 |
+| `attack_type` | string | 是 | 攻击类型（"normal"/"crit"） | 攻击类型动画 |
 | `target` | string | 是 | 目标玩家ID | 目标标识 |
 
-> 注：Boss攻击伤害由衍生的 `damage` 类型 LogEntry 承担（包含 `hp_change`），boss_attack 类型仅记录语义信号。
+> 注1：Boss攻击伤害由衍生的 `damage` 类型 LogEntry 承担（包含 `hp_change`），boss_attack 类型仅记录语义信号。
+> 注2：BossAttackAction 仅用于 Boss 普通攻击/暴击。技能效果（Thunder等）通过 `boss_skill` + 衍生 `damage` LogEntry 表达，不产生 `boss_attack` LogEntry。
+> 注3：Thorns反刺buff的反射伤害不产生 boss_attack LogEntry，直接产生 `damage` 类型 LogEntry（source=`buff_thorns`）。
 
 ### boss_skill 类型（Boss使用技能）
 
@@ -191,7 +193,7 @@ for (const entry of turnSync.entries) {
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
 | `position` | int | 是 | 死亡发生位置 | 死亡动画位置 |
-| `death_source` | string | 是 | 死亡来源标识 | 显示死亡原因（如"Buff_Corrupt"、"FragileCell"） |
+| `death_source` | string | 是 | 死亡来源标识 | 显示死亡原因（如"buff_corrupt"、"fragile_cell"） |
 
 ### dice_roll 类型
 
@@ -296,7 +298,7 @@ interface LogEntry {
 | MoveAction | `steps: steps`, `start_pos`, `end_pos`, `path` | `steps: 5` |
 | AddBuffAction | `buff_type`, `duration: duration` | `duration: 3` |
 | FellDownAction | `position` | `position: 15` |
-| DeathAction | `position`, `death_source` | `death_source: "Buff_Corrupt"` |
+| DeathAction | `position`, `death_source` | `death_source: "buff_corrupt"` |
 | DrawBuffAction | `buff_type`（抽取成功时） | `buff_type: "divine"` |
 | DiceUpgradeAction | `from_dice`, `to_dice` | `from_dice: "silver", to_dice: "gold"` |
 | AddItemAction | `item_type` | `item_type: "reverse_clock"` |

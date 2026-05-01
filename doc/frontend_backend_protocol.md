@@ -609,14 +609,13 @@ interface LogEntry {
 
 | 值 | 含义 |
 |----|------|
-| `Buff_Divine` | 神眷 Buff |
-| `Buff_Curse` | 诅咒 Buff |
-| `Buff_Fire` | 离火 Buff |
-| `Cell_Fragile` | 易碎格子 |
-| `Cell_Fog` | 迷雾格子 |
-| `Item_AnyDoor` | 任意门道具 |
-| `Faction_BaiHu` | 白虎阵营技能 |
-| `DiceRoll` | 骰子投掷 |
+| `buff_divine` | 神眷 Buff |
+| `buff_curse` | 诅咒 Buff |
+| `buff_fire` | 离火 Buff |
+| `fragile_cell` | 易碎格子 |
+| `item_any_door` | 任意门道具 |
+| `faction_bai_hu` | 白虎阵营技能 |
+| `system_dice_roll` | 骰子投掷 |
 
 ---
 

@@ -191,7 +191,6 @@ pkg/constants/
 |------|-----|------|
 | `BossAttackNormal` | `normal` | 普通攻击：1点伤害 |
 | `BossAttackCrit` | `crit` | 暴击攻击：2点伤害 |
-| `BossAttackSkill` | `skill` | 技能攻击：随机Boss技能 |
 
 ### BossPlayerUUID - Boss 固定UUID
 
@@ -270,7 +269,7 @@ pkg/constants/
 - `item_*` - Item 来源
 - `event_*` - Event 来源
 - `faction_*` - Faction 来源
-- `boss_*` - Boss 来源（包括 `boss_skill_thorns`、`thorns_reflect`）
+- `boss_*` - Boss 来源（包括 `boss_skill_thorns`、`buff_thorns`）
 - `system_*` + 特殊值 - System 来源
 
 ### Evaluation - 评分系统

@@ -146,7 +146,7 @@ func someHandler(phase constants.Phase, ctx *event.Context) error {
     }
 
     // 添加派生Action
-    ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, "Buff_Divine"))
+    ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, string(constants.SourceBuffDivine)))
 }
 ```
 

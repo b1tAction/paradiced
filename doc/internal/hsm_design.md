@@ -821,7 +821,7 @@ Client 可通过 GameLog JSON 播放完整游戏动画：
       "player_id": "player1",
       "entries": [
         {"type": "state", "metadata": {"from": "MatchInit", "to": "TurnLoop"}},
-        {"type": "action", "action_type": "modify_lp", "delta": 1, "source": "Buff_Divine"},
+        {"type": "action", "action_type": "modify_lp", "delta": 1, "source": "buff_divine"},
         {"type": "action", "action_type": "respawn", "target": "player1", "metadata": {"checkpoint_pos": 50}},
         {"type": "action", "action_type": "move", "delta": 5, "metadata": {"path": [0,1,2,3,4,5]}},
         {"type": "action", "action_type": "fell_down", "delta": -1, "metadata": {"position": 5}},
