@@ -174,7 +174,11 @@ func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
 		// Create handler closure - executes config.Handler
 		action := func(ctx *event.Context) error {
 			if config.Handler != nil {
-				return config.Handler(phase, ctx)
+				err := config.Handler(phase, ctx)
+				if err == nil {
+					buff.MarkTickEligible()
+				}
+				return err
 			}
 			return nil
 		}

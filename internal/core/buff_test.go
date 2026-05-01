@@ -23,7 +23,7 @@ func TestTickDurationNotEligibleNoDecrement(t *testing.T) {
 func TestTickDurationEligibleDecrements(t *testing.T) {
 	// Buff with tickEligible=true: TickDuration should decrement
 	buff := NewBuff(constants.BuffTypeCurse, 3)
-	buff.tickEligible = true
+	buff.MarkTickEligible()
 
 	active := buff.TickDuration()
 	if !active {
@@ -50,7 +50,7 @@ func TestTickDurationPermanentNotAffected(t *testing.T) {
 func TestTickDurationExpiryWhenEligible(t *testing.T) {
 	// Duration=1 with tickEligible=true: TickDuration decrements to 0 → expires
 	buff := NewBuff(constants.BuffTypeLost, 1)
-	buff.tickEligible = true
+	buff.MarkTickEligible()
 
 	active := buff.TickDuration()
 	if active {
@@ -63,15 +63,26 @@ func TestTickDurationExpiryWhenEligible(t *testing.T) {
 
 func TestNewBuffDefaultNotTickEligible(t *testing.T) {
 	buff := NewBuff(constants.BuffTypeDivine, 3)
-	if buff.tickEligible {
+	if buff.TickEligible() {
 		t.Error("new buff should have tickEligible=false by default")
 	}
 }
 
 func TestNewBuffWithIDDefaultNotTickEligible(t *testing.T) {
 	buff := NewBuffWithID(constants.BuffTypeDivine, id.NewBuffID(), 3)
-	if buff.tickEligible {
+	if buff.TickEligible() {
 		t.Error("new buff with ID should have tickEligible=false by default")
+	}
+}
+
+func TestMarkTickEligible(t *testing.T) {
+	buff := NewBuff(constants.BuffTypeCurse, 3)
+	if buff.TickEligible() {
+		t.Error("new buff should not be tickEligible by default")
+	}
+	buff.MarkTickEligible()
+	if !buff.TickEligible() {
+		t.Error("buff should be tickEligible after MarkTickEligible()")
 	}
 }
 

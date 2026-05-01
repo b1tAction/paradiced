@@ -45,6 +45,19 @@ func (b *Buff) IsActive() bool {
 	return b.Duration > 0 || b.Duration == -1
 }
 
+// MarkTickEligible marks the buff as eligible for duration ticking at TurnEnd.
+// Called automatically by buff handler closures when handler executes successfully,
+// ensuring mid-turn buff effects (e.g., Curse/Divine at PhasePostBuffApplied) are
+// also decremented at this turn's end rather than getting an extra free turn.
+func (b *Buff) MarkTickEligible() {
+	b.tickEligible = true
+}
+
+// TickEligible returns whether the buff is eligible for duration ticking.
+func (b *Buff) TickEligible() bool {
+	return b.tickEligible
+}
+
 // TickDuration decrements duration and returns whether buff is still active.
 // Buffs are marked tick-eligible at TurnUpkeep (BeforeTurn), so this always
 // decrements when called at TurnEnd. Duration=-1 buffs (permanent) are never decremented.

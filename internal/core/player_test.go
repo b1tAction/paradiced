@@ -413,7 +413,7 @@ func TestTickBuffsMixedEligibility(t *testing.T) {
 	// Mix of eligible and not-eligible buffs: only eligible ones are decremented
 	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
 	existingBuff := NewBuff(constants.BuffTypeCurse, 2)
-	existingBuff.tickEligible = true // Already marked eligible
+	existingBuff.MarkTickEligible() // Already marked eligible
 	newBuff := NewBuff(constants.BuffTypeDivine, 3) // Not yet eligible
 
 	player.AddBuff(existingBuff)

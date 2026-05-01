@@ -245,6 +245,41 @@ func TestGameUnsubscribeBuff(t *testing.T) {
 	}
 }
 
+// Regression test: buff handler execution automatically marks the source buff as tickEligible.
+// This ensures mid-turn buffs (e.g., Curse/Divine at PhasePostBuffApplied) are decremented
+// at this turn's TurnEnd rather than getting an extra free turn.
+func TestBuffHandlerAutoMarkTickEligible(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	// Add Curse buff (subscribes to PostBuffApplied + PreBuffRemoved)
+	buff := core.NewBuff(constants.BuffTypeCurse, 3)
+	game.ApplyBuffToPlayer(player, buff)
+
+	// Initially, buff should NOT be tickEligible
+	if buff.TickEligible() {
+		t.Error("newly applied buff should not be tickEligible before handler execution")
+	}
+
+	// Publish PhasePostBuffApplied (triggered by AddBuffAction PostTrigger)
+	triggerCtx := event.NewContext(player)
+	triggerCtx.Set("applied_buff_type", string(constants.BuffTypeCurse))
+	triggerCtx.Set("action_context", engineaction.NewActionContext(game, game.Bus, nil, game.Draw))
+
+	decisions := game.Bus.Publish(constants.PhasePostBuffApplied, player.ID.UUID(), triggerCtx)
+	for _, decision := range decisions {
+		if decision != nil {
+			_ = decision.Execute(0, triggerCtx)
+		}
+	}
+
+	// After handler executes, buff should be tickEligible
+	if !buff.TickEligible() {
+		t.Error("buff should be tickEligible after handler execution at PhasePostBuffApplied")
+	}
+}
+
 func TestGameSubscribeBuffByPlayerAdd(t *testing.T) {
 	game := NewGame(id.NewGameID(), 0)
 	playerID := id.NewPlayerID()
