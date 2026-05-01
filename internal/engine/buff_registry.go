@@ -253,7 +253,7 @@ func registerAllBuffs() {
 		Phases:      []constants.Phase{constants.PhaseAfterTurn},
 		Priority:    50,
 		NeedConfirm: false,
-		Handler:     createEveryNTurnsHandler(2, constants.BuffTypeCorrupt, createModifyHPHandler(-1)),
+		Handler:     createEveryNTurnsHandler(2, constants.BuffTypeCorrupt, createModifyHPHandler(-1, constants.SourceBuffCorrupt)),
 	})
 
 	// Poison: Bad event each turn for 3 turns
@@ -313,7 +313,7 @@ func registerAllBuffs() {
 		Phases:      []constants.Phase{constants.PhaseAfterTurn},
 		Priority:    50,
 		NeedConfirm: false,
-		Handler:     createEveryNTurnsHandler(2, constants.BuffTypeRain, createModifyHPHandler(1)),
+		Handler:     createEveryNTurnsHandler(2, constants.BuffTypeRain, createModifyHPHandler(1, constants.SourceBuffRain)),
 	})
 
 	// Exorcism: Immune to poison buff for 5 turns
@@ -349,7 +349,7 @@ func registerAllBuffs() {
 	// Thorns: Boss skill buff — reflect 30% damage back to attacking player.
 	// Not drawn from lottery pools (IsBoss=true). Buff is on BossPlayer.
 	// Reflect is handled via EventBus (PhasePreDamage) — BuffThorns handler
-	// subscribes to PhasePreDamage on BossPlayer, pushes derived BossAttackAction.
+	// subscribes to PhasePreDamage on BossPlayer, pushes derived PiercingDamageAction.
 	GlobalBuffRegistry.RegisterBuff(&core.BuffDefinition{
 		Type:        constants.BuffTypeThorns,
 		Eval:        constants.EvaluationNeutral,
@@ -383,7 +383,7 @@ func registerAllBuffs() {
 
 // ========== Buff Handler Helpers ==========
 
-func createModifyLPHandler(amount int) EffectHandler {
+func createModifyLPHandler(amount int, source constants.ActionSource) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) error {
 		if ctx == nil {
 			return fmt.Errorf("handler: event context is nil")
@@ -399,12 +399,12 @@ func createModifyLPHandler(amount int) EffectHandler {
 		}
 		_ = actionCtx // ActionContext used for derived action processing
 
-		ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, amount, "Buff_Effect"))
+		ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, amount, string(source)))
 		return nil
 	}
 }
 
-func createModifyHPHandler(amount int) EffectHandler {
+func createModifyHPHandler(amount int, source constants.ActionSource) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) error {
 		if ctx == nil {
 			return fmt.Errorf("handler: event context is nil")
@@ -424,9 +424,9 @@ func createModifyHPHandler(amount int) EffectHandler {
 		_ = actionCtx // ActionContext used for derived action processing
 
 		if amount > 0 {
-			ctx.AddDerivedAction(engineaction.NewHealAction(ctx.Player, amount, "Buff_Effect"))
+			ctx.AddDerivedAction(engineaction.NewHealAction(ctx.Player, amount, string(source)))
 		} else {
-			ctx.AddDerivedAction(engineaction.NewDamageAction(ctx.Player, -amount, "Buff_Effect"))
+			ctx.AddDerivedAction(engineaction.NewDamageAction(ctx.Player, -amount, string(source)))
 		}
 		return nil
 	}
@@ -482,7 +482,7 @@ func handleZhuQueFire(phase constants.Phase, ctx *event.Context) error {
 		}
 		_ = actionCtx // ActionContext used for derived action processing
 
-		ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, "Buff_Fire"))
+		ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, string(constants.SourceBuffFire)))
 		ctx.Player.SetFireCounter(0)
 	}
 	return nil
@@ -535,7 +535,7 @@ func handleHiddenImmune(phase constants.Phase, ctx *event.Context) error {
 	}
 
 	ctx.SetBool("action_blocked", true)
-	ctx.SetString("blocked_by", "Buff_Hidden")
+	ctx.SetString("blocked_by", string(constants.SourceBuffHidden))
 	return nil
 }
 
@@ -618,14 +618,14 @@ func handleDivineEffect(phase constants.Phase, ctx *event.Context) error {
 		// Only react when Divine buff is applied → LP+1
 		if raw, ok := ctx.Get("applied_buff_type"); ok {
 			if constants.BuffType(raw.(string)) == constants.BuffTypeDivine {
-				ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, "Buff_Divine"))
+				ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, string(constants.SourceBuffDivine)))
 			}
 		}
 	case constants.PhasePreBuffRemoved:
 		// Only react when Divine buff is removed → LP-1 revert
 		if raw, ok := ctx.Get("removed_buff_type"); ok {
 			if constants.BuffType(raw.(string)) == constants.BuffTypeDivine {
-				ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, -1, "Buff_Divine_Removal"))
+				ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, -1, string(constants.SourceBuffDivineRemoval)))
 			}
 		}
 	}
@@ -650,14 +650,14 @@ func handleCurseEffect(phase constants.Phase, ctx *event.Context) error {
 		// Only react when Curse buff is applied → LP-1
 		if raw, ok := ctx.Get("applied_buff_type"); ok {
 			if constants.BuffType(raw.(string)) == constants.BuffTypeCurse {
-				ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, -1, "Buff_Curse"))
+				ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, -1, string(constants.SourceBuffCurse)))
 			}
 		}
 	case constants.PhasePreBuffRemoved:
 		// Only react when Curse buff is removed → LP+1 revert
 		if raw, ok := ctx.Get("removed_buff_type"); ok {
 			if constants.BuffType(raw.(string)) == constants.BuffTypeCurse {
-				ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, "Buff_Curse_Removal"))
+				ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, string(constants.SourceBuffCurseRemoval)))
 			}
 		}
 	}
@@ -695,14 +695,15 @@ func handleThornsReflect(phase constants.Phase, ctx *event.Context) error {
 		return nil
 	}
 
-	// Push derived BossAttackAction (Boss→attacking player, reflect damage)
-	// This goes through PhasePreDamage → Hidden on attacking player can block reflect
-	reflectAction := engineaction.NewBossAttackAction(
-		ctx.Player,                    // BossPlayer (source of reflect)
+	// Push derived PiercingDamageAction (buff reflect → attacking player).
+	// Thorns reflect is a buff passive effect, not a Boss active attack,
+	// so it derives DamageAction (not BossAttackAction). Piercing ensures
+	// reflect bypasses PhasePreDamage interception (consistent with previous
+	// BossAttackAction behavior which also skipped PreDamage interception).
+	reflectAction := engineaction.NewPiercingDamageAction(
 		bossDamageAction.SourcePlayer, // attacking player (target of reflect)
 		reflectDamage,
-		constants.BossAttackSkill,
-		string(constants.SourceThornsReflect),
+		string(constants.SourceBuffThornsReflect),
 	)
 	ctx.AddDerivedAction(reflectAction)
 	return nil
