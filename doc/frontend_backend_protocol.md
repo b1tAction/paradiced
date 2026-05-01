@@ -251,6 +251,9 @@ interface MiniGameConn {
 |----|------|----------------|----------|
 | `dice_race` | 投骰比大小 | `{ dice1: number, dice2: number, score: dice1+dice2 }` | score 降序（越大越好） |
 | `count_seconds` | 计秒小游戏 | `{ elapsed: number, deviation: \|elapsed-5.0\| }` | deviation 升序（越接近5秒越好） |
+| `math_calc` | 数算挑战 | `{ accuracy: number (0-1), time_ms: number }` | accuracy 降序，time_ms 升序 |
+| `rainbow_memory` | 彩虹记忆 | `{ accuracy: number (0-1), time_ms: number }` | accuracy 降序，time_ms 升序 |
+| `vernier` | 游标卡尺 | `{ deviation: number }` | deviation 升序（越接近0越好） |
 | `coin_flip` | 翻硬币 | 未实现，暂不可用 | - |
 
 **connection 说明**：
