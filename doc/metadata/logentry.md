@@ -160,7 +160,7 @@ for (const entry of turnSync.entries) {
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
-| `skill_type` | string | 是 | 技能类型（"thunder"/"curse"/"lost"/"rest"） | 技能动画类型 |
+| `skill_type` | string | 是 | 技能类型（当前已注册："thunder"/"curse"/"rest"/"thorns"） | 技能动画类型 |
 | `targets` | string | 是 | 目标玩家ID列表（逗号分隔） | 目标标识 |
 
 ### draw_buff 类型

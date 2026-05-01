@@ -180,11 +180,11 @@ pkg/constants/
 
 | 常量 | 值 | 说明 |
 |------|-----|------|
-| `BossSkillThunder` | `thunder` | 天雷：AOE伤害2点 |
+| `BossSkillThunder` | `thunder` | 天雷：AOE伤害3点 |
 | `BossSkillCurse` | `curse` | 诅咒：所有Boss格玩家获得诅咒Buff |
-| `BossSkillLost` | `lost` | 迷雾：所有Boss格玩家获得迷途Buff |
+| `BossSkillLost` | `lost` | 迷雾：常量保留，当前 Boss registry 未注册，不会从当前 Boss 技能池抽取 |
 | `BossSkillThorns` | `thorns` | 反刺：Boss自身获得反刺Buff（2回合，30%反伤） |
-| `BossSkillRest` | `rest` | 息：Boss恢复5HP |
+| `BossSkillRest` | `rest` | 息：Boss恢复20HP |
 
 ### BossAttackType - Boss 攻击类型标识
 
