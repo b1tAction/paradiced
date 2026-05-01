@@ -52,6 +52,10 @@ func (c *DefaultRankCalculator) Calculate(gameType constants.MiniGameType, submi
 			elapsed := getFloatValue(data, "elapsed")
 			deviation := abs(elapsed - 5.0)
 			entries = append(entries, entry{playerID: playerID, keyValue: deviation})
+		} else if gameType == constants.MiniGameTypeVernier {
+			// vernier: deviation from center (submitted as "deviation" key)
+			dev := getFloatValue(data, "deviation")
+			entries = append(entries, entry{playerID: playerID, keyValue: dev})
 		} else {
 			sortKey := getSortKey(gameType)
 			val := getFloatValue(data, sortKey)
