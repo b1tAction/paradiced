@@ -229,7 +229,7 @@ func TestBlockedDamageAction(t *testing.T) {
 
 	action := NewDamageAction(player, 20, "Event_Trap")
 	action.Amount = 0 // Blocked by interceptor
-	action.BlockedBy = "Buff_Hidden"
+	action.BlockedBy = string(constants.SourceBuffHidden)
 
 	ctx := NewActionContext(nil, nil, nil, nil)
 	action.Execute(ctx)
@@ -274,7 +274,7 @@ func TestModifyLPAction(t *testing.T) {
 	player.LP = 5
 
 	// LP+1
-	actionPlus := NewModifyLPAction(player, 1, "Buff_Divine")
+	actionPlus := NewModifyLPAction(player, 1, string(constants.SourceBuffDivine))
 	if actionPlus.CanModify() {
 		t.Error("ModifyLPAction should not be modifiable")
 	}
@@ -287,7 +287,7 @@ func TestModifyLPAction(t *testing.T) {
 	}
 
 	// LP-1
-	actionMinus := NewModifyLPAction(player, -1, "Buff_Curse")
+	actionMinus := NewModifyLPAction(player, -1, string(constants.SourceBuffCurse))
 	actionMinus.Execute(ctx)
 
 	if player.LP != 5 {
@@ -400,7 +400,7 @@ func TestStealBuffAction(t *testing.T) {
 	target.AddBuff(core.NewBuff(constants.BuffTypeCurse, 2))
 	target.AddBuff(core.NewBuff(constants.BuffTypeDivine, 3))
 
-	action := NewStealBuffAction(target, source, "Faction_BaiHu")
+	action := NewStealBuffAction(target, source, string(constants.SourceFactionBaiHu))
 
 	if action.Type() != constants.ActionStealBuff {
 		t.Errorf("Type should be ActionStealBuff, got %s", action.Type())
@@ -432,7 +432,7 @@ func TestStealBuffActionNoBuffs(t *testing.T) {
 	target := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	source := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 
-	action := NewStealBuffAction(target, source, "Faction_BaiHu")
+	action := NewStealBuffAction(target, source, string(constants.SourceFactionBaiHu))
 
 	ctx := NewActionContext(nil, nil, nil, nil)
 	action.Execute(ctx)
@@ -453,7 +453,7 @@ func TestRespawnAction(t *testing.T) {
 	player.IsDead = true
 	player.Position = 100
 
-	action := NewRespawnAction(player, 50, "DeathRespawn")
+	action := NewRespawnAction(player, 50, string(constants.SourceDeathRespawn))
 
 	if action.Type() != constants.ActionRespawn {
 		t.Errorf("Type should be ActionRespawn, got %s", action.Type())
@@ -488,7 +488,7 @@ func TestFellDownAction(t *testing.T) {
 	player.HP = 10
 	player.Position = 30
 
-	action := NewFellDownAction(player, 30, 1, "FragileCell")
+	action := NewFellDownAction(player, 30, 1, string(constants.SourceFragileCell))
 
 	if action.Type() != constants.ActionFellDown {
 		t.Errorf("Type should be ActionFellDown, got %s", action.Type())
@@ -518,8 +518,8 @@ func TestFellDownAction(t *testing.T) {
 	if piercing.Amount != 1 {
 		t.Errorf("PiercingDamageAction amount = %d, expected 1", piercing.Amount)
 	}
-	if piercing.Source() != "FragileCell" {
-		t.Errorf("PiercingDamageAction source = %s, expected FragileCell", piercing.Source())
+	if piercing.Source() != string(constants.SourceFragileCell) {
+		t.Errorf("PiercingDamageAction source = %s, expected %s", piercing.Source(), string(constants.SourceFragileCell))
 	}
 
 	entry := action.LogEntry()
@@ -684,7 +684,7 @@ func TestContextDerivedActions(t *testing.T) {
 
 func TestRespawnActionPreTriggerPhase(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
-	action := NewRespawnAction(player, 50, "DeathRespawn")
+	action := NewRespawnAction(player, 50, string(constants.SourceDeathRespawn))
 
 	// RespawnAction now has PhasePreRespawn for interception
 	if action.PreTriggerPhase() != constants.PhasePreRespawn {
@@ -698,14 +698,14 @@ func TestModifyLPActionFull(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.LP = 5
 
-	action := NewModifyLPAction(player, 1, "Buff_Divine")
+	action := NewModifyLPAction(player, 1, string(constants.SourceBuffDivine))
 
 	// Test all methods
 	if action.Type() != constants.ActionModifyLP {
 		t.Errorf("Type should be ActionModifyLP, got %s", action.Type())
 	}
-	if action.Source() != "Buff_Divine" {
-		t.Errorf("Source should be Buff_Divine, got %s", action.Source())
+	if action.Source() != string(constants.SourceBuffDivine) {
+		t.Errorf("Source should be %s, got %s", string(constants.SourceBuffDivine), action.Source())
 	}
 	if action.Target() != player.ID.UUID() {
 		t.Errorf("Target mismatch")
@@ -980,14 +980,14 @@ func TestStealBuffActionFull(t *testing.T) {
 	source := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	target.AddBuff(core.NewBuff(constants.BuffTypeDivine, 3))
 
-	action := NewStealBuffAction(target, source, "Faction_BaiHu")
+	action := NewStealBuffAction(target, source, string(constants.SourceFactionBaiHu))
 
 	// Test all methods
 	if action.Type() != constants.ActionStealBuff {
 		t.Errorf("Type should be ActionStealBuff, got %s", action.Type())
 	}
-	if action.Source() != "Faction_BaiHu" {
-		t.Errorf("Source should be Faction_BaiHu, got %s", action.Source())
+	if action.Source() != string(constants.SourceFactionBaiHu) {
+		t.Errorf("Source should be %s, got %s", string(constants.SourceFactionBaiHu), action.Source())
 	}
 	if action.Target() != target.ID.UUID() {
 		t.Errorf("Target mismatch")
@@ -1051,14 +1051,14 @@ func TestFellDownActionFull(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.HP = 10
 
-	action := NewFellDownAction(player, 30, 1, "FragileCell")
+	action := NewFellDownAction(player, 30, 1, string(constants.SourceFragileCell))
 
 	// Test all methods
 	if action.Type() != constants.ActionFellDown {
 		t.Errorf("Type should be ActionFellDown, got %s", action.Type())
 	}
-	if action.Source() != "FragileCell" {
-		t.Errorf("Source should be FragileCell, got %s", action.Source())
+	if action.Source() != string(constants.SourceFragileCell) {
+		t.Errorf("Source should be %s, got %s", string(constants.SourceFragileCell), action.Source())
 	}
 	if action.Target() != player.ID.UUID() {
 		t.Errorf("Target mismatch")
@@ -1083,7 +1083,7 @@ func TestFellDownActionZeroDamage(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.HP = 10
 
-	action := NewFellDownAction(player, 30, 0, "FragileCell")
+	action := NewFellDownAction(player, 30, 0, string(constants.SourceFragileCell))
 
 	ctx := NewActionContext(nil, nil, nil, nil)
 	action.Execute(ctx)
@@ -1100,14 +1100,14 @@ func TestRespawnActionFull(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.IsDead = true
 
-	action := NewRespawnAction(player, 50, "DeathRespawn")
+	action := NewRespawnAction(player, 50, string(constants.SourceDeathRespawn))
 
 	// Test all methods
 	if action.Type() != constants.ActionRespawn {
 		t.Errorf("Type should be ActionRespawn, got %s", action.Type())
 	}
-	if action.Source() != "DeathRespawn" {
-		t.Errorf("Source should be DeathRespawn, got %s", action.Source())
+	if action.Source() != string(constants.SourceDeathRespawn) {
+		t.Errorf("Source should be %s, got %s", string(constants.SourceDeathRespawn), action.Source())
 	}
 	if action.Target() != player.ID.UUID() {
 		t.Errorf("Target mismatch")
@@ -1488,7 +1488,7 @@ func TestRespawnActionExecute(t *testing.T) {
 	player.IsDead = true
 	player.Position = 100
 
-	action := NewRespawnAction(player, 50, "DeathRespawn")
+	action := NewRespawnAction(player, 50, string(constants.SourceDeathRespawn))
 
 	ctx := NewActionContext(nil, nil, nil, nil)
 	err := action.Execute(ctx)
@@ -2321,22 +2321,22 @@ func TestDeathActionExecute(t *testing.T) {
 
 func TestDeathActionLogEntry(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
-	action := NewDeathAction(player, "FragileCell", 25)
+	action := NewDeathAction(player, string(constants.SourceFragileCell), 25)
 
 	entry := action.LogEntry()
 	if entry.ActionType != string(constants.ActionDeath) {
 		t.Errorf("LogEntry ActionType = %s, expected death", entry.ActionType)
 	}
-	if entry.Source != "FragileCell" {
-		t.Errorf("LogEntry Source = %s, expected FragileCell", entry.Source)
+	if entry.Source != string(constants.SourceFragileCell) {
+		t.Errorf("LogEntry Source = %s, expected %s", entry.Source, string(constants.SourceFragileCell))
 	}
 	pos := entry.Metadata.GetIntOrDefault("position", -1)
 	if pos != 25 {
 		t.Errorf("LogEntry position = %d, expected 25", pos)
 	}
 	src := entry.Metadata.GetStringOrDefault("death_source", "")
-	if src != "FragileCell" {
-		t.Errorf("LogEntry death_source = %s, expected FragileCell", src)
+	if src != string(constants.SourceFragileCell) {
+		t.Errorf("LogEntry death_source = %s, expected %s", src, string(constants.SourceFragileCell))
 	}
 }
 
@@ -2732,7 +2732,7 @@ func TestTeleportActionInterfaceMethods(t *testing.T) {
 func TestStealBuffActionInterfaceMethods(t *testing.T) {
 	victim := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	stealer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
-	action := NewStealBuffAction(victim, stealer, "faction_bai_hu")
+	action := NewStealBuffAction(victim, stealer, string(constants.SourceFactionBaiHu))
 
 	if action.TargetPlayer() != victim {
 		t.Error("StealBuffAction TargetPlayer should return victim")
