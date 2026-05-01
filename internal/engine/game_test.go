@@ -6,6 +6,7 @@ import (
 
 	"github.com/b1tAction/paradiced/internal/core"
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
+	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
@@ -616,6 +617,55 @@ func TestApplyItemToPlayerWithSubscription(t *testing.T) {
 		if sub.SourceID == item.ID.UUID() {
 			t.Error("AnyDoor subscription should be removed after RemoveItemFromPlayer")
 		}
+	}
+}
+
+// Regression test: when a player has multiple PhaseItemUsed items, only the
+// actually-used item's handler should execute, not all items' handlers.
+func TestPublishItemUsedOnlyTriggersUsedItem(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	// Give player two PhaseItemUsed items: DiceUpgrade and AnyDoor
+	item1 := core.NewItem(constants.ItemTypeDiceUpgrade)
+	item2 := core.NewItem(constants.ItemTypeAnyDoor)
+	game.ApplyItemToPlayer(player, item1)
+	game.ApplyItemToPlayer(player, item2)
+
+	// Both items subscribe to PhaseItemUsed
+	subscriptions := game.Bus.GetSubscriptions(constants.PhaseItemUsed)
+	if len(subscriptions) != 2 {
+		t.Fatalf("Expected 2 PhaseItemUsed subscriptions, got %d", len(subscriptions))
+	}
+
+	// Publish PhaseItemUsed with item_id = item1 (DiceUpgrade)
+	triggerCtx := event.NewContext(player)
+	triggerCtx.Set("item_id", item1.ID.UUID())
+	triggerCtx.Set("action_context", engineaction.NewActionContext(game, game.Bus, nil, game.Draw))
+	triggerCtx.Set("current_dice_type", rng.DiceTypeCopper.String())
+
+	decisions := game.Bus.Publish(constants.PhaseItemUsed, player.ID.UUID(), triggerCtx)
+	for _, decision := range decisions {
+		if decision != nil {
+			_ = decision.Execute(0, triggerCtx)
+		}
+	}
+
+	// Only item1's handler should have produced a derived action (DiceUpgradeAction),
+	// not item2's handler (TeleportAction)
+	derivedActions := triggerCtx.GetDerivedActions()
+	if len(derivedActions) != 1 {
+		t.Fatalf("Expected exactly 1 derived action from the used item, got %d", len(derivedActions))
+	}
+
+	// Verify the derived action is DiceUpgradeAction (from item1), not TeleportAction (from item2)
+	action, ok := derivedActions[0].(engineaction.Action)
+	if !ok {
+		t.Fatalf("Derived action should implement Action interface")
+	}
+	if action.Type() != constants.ActionDiceUpgrade {
+		t.Errorf("Derived action type = %s, expected dice_upgrade (item1's effect), not teleport (item2's effect)", action.Type())
 	}
 }
 
