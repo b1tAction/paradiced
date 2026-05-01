@@ -300,6 +300,8 @@ type AddBuffAction struct {
 	targetPlayer *core.Player       // Player receiving Buff
 	BuffType     constants.BuffType // Type of Buff to add
 	SourceID     string             // Source identifier
+	// Internal field populated during Execute() (for LogEntry)
+	duration int
 }
 
 // NewAddBuffAction creates a new AddBuffAction.
@@ -337,6 +339,7 @@ func (a *AddBuffAction) Execute(ctx *ActionContext) error {
 	}
 
 	duration := ctx.GetBuffDuration(a.BuffType)
+	a.duration = duration
 
 	// Check if player already has this buff type (duration extend)
 	if a.targetPlayer.HasBuff(a.BuffType) {
@@ -361,6 +364,7 @@ func (a *AddBuffAction) Execute(ctx *ActionContext) error {
 func (a *AddBuffAction) LogEntry() gamelog.LogEntry {
 	metadata := util.NewMetadata()
 	metadata.SetString("buff_type", string(a.BuffType))
+	metadata.SetInt("duration", a.duration)
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),

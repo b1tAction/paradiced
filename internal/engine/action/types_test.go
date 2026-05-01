@@ -331,9 +331,10 @@ func TestAddBuffAction(t *testing.T) {
 	if entry.ActionType != "add_buff" {
 		t.Errorf("Log ActionType should be add_buff, got %s", entry.ActionType)
 	}
+	if entry.Metadata.GetIntOrDefault("duration", 0) != 3 {
+		t.Errorf("Log duration should be 3, got %d", entry.Metadata.GetIntOrDefault("duration", 0))
+	}
 }
-
-// ========== RemoveBuffAction Tests ==========
 
 func TestRemoveBuffAction(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
@@ -865,6 +866,37 @@ func TestAddBuffActionFull(t *testing.T) {
 	entry := action.LogEntry()
 	if entry.ActionType != "add_buff" {
 		t.Errorf("Log ActionType should be add_buff, got %s", entry.ActionType)
+	}
+	if entry.Metadata.GetIntOrDefault("duration", 0) != 3 {
+		t.Errorf("Log duration should be 3, got %d", entry.Metadata.GetIntOrDefault("duration", 0))
+	}
+}
+
+// ========== AddBuffAction Duration Tests ==========
+
+func TestAddBuffActionLogEntryPermanentDuration(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewAddBuffAction(player, constants.BuffTypeFire, "Faction_ZhuQue")
+
+	ctx := NewActionContext(nil, nil, nil, nil)
+	ctx.OnAddBuff = func(p *core.Player, b *core.Buff) { p.AddBuff(b) }
+	ctx.GetBuffDuration = func(bt constants.BuffType) int { return -1 } // permanent buff
+	action.Execute(ctx)
+
+	entry := action.LogEntry()
+	if entry.Metadata.GetIntOrDefault("duration", 0) != -1 {
+		t.Errorf("Log duration for permanent buff should be -1, got %d", entry.Metadata.GetIntOrDefault("duration", 0))
+	}
+}
+
+func TestAddBuffActionLogEntryDurationBeforeExecute(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewAddBuffAction(player, constants.BuffTypeCurse, "Event_Curse")
+
+	// LogEntry before Execute should have duration=0 (not yet populated)
+	entry := action.LogEntry()
+	if entry.Metadata.GetIntOrDefault("duration", 0) != 0 {
+		t.Errorf("Log duration before Execute should be 0, got %d", entry.Metadata.GetIntOrDefault("duration", 0))
 	}
 }
 
