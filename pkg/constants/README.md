@@ -76,7 +76,7 @@ pkg/constants/
 | Bad | `EventTypeMosquito` | `mosquito` | 蚊虫：HP-1 |
 | Bad | `EventTypeGhostHit` | `ghost_hit` | 野鬼：HP-1 |
 | Bad | `EventTypeDogPoop` | `dog_poop` | 狗屎：LP-1 |
-| Bad | `EventTypeThief` | `thief` | 盗贼：失道具 |
+| Bad | `EventTypeWindGust` | `wind_gust` | 一阵风：失道具 |
 | Bad | `EventTypeCurseBuddha` | `curse_buddha` | 野佛：诅咒Buff |
 | Bad | `EventTypeLostWay` | `lost_way` | 迷途：迷途Buff |
 | Bad | `EventTypeThunder` | `thunder` | 雷劫：HP=0 |

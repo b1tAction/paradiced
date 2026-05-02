@@ -23,7 +23,7 @@ const (
 	EventTypeMosquito    EventType = "mosquito"     // 蚊虫: HP-1
 	EventTypeGhostHit    EventType = "ghost_hit"    // 野鬼: HP-1
 	EventTypeDogPoop     EventType = "dog_poop"     // 狗屎: LP-1
-	EventTypeThief       EventType = "thief"        // 盗贼: lose item
+	EventTypeWindGust    EventType = "wind_gust"   // 一阵风: lose item
 	EventTypeCurseBuddha EventType = "curse_buddha" // 野佛: Curse buff
 	EventTypeLostWay     EventType = "lost_way"     // 迷途: Lost buff
 	EventTypeThunder     EventType = "thunder"      // 雷劫: HP=0
@@ -35,7 +35,7 @@ func (et EventType) IsValid() bool {
 	case EventTypeHerb, EventTypeMilkTea, EventTypeRelic, EventTypeDivineBless,
 		EventTypeExchange, EventTypeHiddenBuff, EventTypeTasteTest,
 		EventTypeMosquito, EventTypeGhostHit, EventTypeDogPoop,
-		EventTypeThief, EventTypeCurseBuddha, EventTypeLostWay, EventTypeThunder:
+		EventTypeWindGust, EventTypeCurseBuddha, EventTypeLostWay, EventTypeThunder:
 		return true
 	default:
 		return false
@@ -66,8 +66,8 @@ func ParseEventType(s string) EventType {
 		return EventTypeGhostHit
 	case "dog_poop":
 		return EventTypeDogPoop
-	case "thief":
-		return EventTypeThief
+	case "wind_gust":
+		return EventTypeWindGust
 	case "curse_buddha":
 		return EventTypeCurseBuddha
 	case "lost_way":

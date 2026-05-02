@@ -168,7 +168,7 @@ func TestLoadDefinitionsFromYAML(t *testing.T) {
 		constants.EventTypeHerb, constants.EventTypeMilkTea, constants.EventTypeRelic,
 		constants.EventTypeDivineBless, constants.EventTypeExchange, constants.EventTypeHiddenBuff,
 		constants.EventTypeTasteTest, constants.EventTypeMosquito, constants.EventTypeGhostHit,
-		constants.EventTypeDogPoop, constants.EventTypeThief, constants.EventTypeCurseBuddha,
+		constants.EventTypeDogPoop, constants.EventTypeWindGust, constants.EventTypeCurseBuddha,
 		constants.EventTypeLostWay, constants.EventTypeThunder,
 	}
 	if len(defs.Events) != len(expectedEvents) {
