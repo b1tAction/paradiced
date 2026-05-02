@@ -140,13 +140,17 @@ func TestAnyDoorHandlerBehavior(t *testing.T) {
 	player.Position = 10
 	game.AddPlayer(player)
 
+	// Create a target player at position 50
+	targetPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	targetPlayer.Position = 50
+	game.AddPlayer(targetPlayer)
+
 	handler := GetItemHandlerConfig(constants.ItemTypeAnyDoor).Handler
 
 	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
 	ctx.Set("action_context", actionCtx)
-	ctx.SetString("target_id", "target-player-123")
-	ctx.SetInt("target_position", 50)
+	ctx.Set("target_player", targetPlayer)
 
 	handler(constants.PhaseOnLand, ctx)
 
