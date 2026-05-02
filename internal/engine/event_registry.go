@@ -235,8 +235,8 @@ func registerAllEvents() {
 		Handler:  createEventModifyLPHandler(-1, constants.SourceEventDogPoop),
 	})
 
-	// Thief: Lose random item
-	GlobalEventRegistry.RegisterEvent(defs.Events[constants.EventTypeThief], &EventHandlerConfig{
+	// WindGust: Lose random item
+	GlobalEventRegistry.RegisterEvent(defs.Events[constants.EventTypeWindGust], &EventHandlerConfig{
 		Priority: 30,
 		Handler:  handleLoseItem,
 	})
@@ -436,7 +436,7 @@ func handleLoseItem(phase constants.Phase, ctx *event.Context) error {
 	// Take the first item from inventory as the lost item
 	// (In production, this would use RNG for random selection)
 	lostItem := ctx.Player.Inventory[0]
-	ctx.AddDerivedAction(engineaction.NewRemoveItemAction(ctx.Player, lostItem.Type, string(constants.SourceEventThief)))
+	ctx.AddDerivedAction(engineaction.NewRemoveItemAction(ctx.Player, lostItem.Type, string(constants.SourceEventWindGust)))
 	return nil
 }
 
