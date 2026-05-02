@@ -577,8 +577,6 @@ type DrawEventAction struct {
 	targetPlayer *core.Player        // Player drawing event
 	SourceID     string              // Source identifier
 	DrawnType    constants.EventType // Event type drawn (set after Execute)
-	DrawnName    string              // Event name (set after Execute)
-	DrawnDesc    string              // Event description for client rendering (set after Execute)
 }
 
 // NewDrawEventAction creates a new DrawEventAction.
@@ -610,11 +608,6 @@ func (a *DrawEventAction) Execute(ctx *ActionContext) error {
 
 	// If DrawnType is already set (e.g. bound event from CellTypeEvent), skip pool draw
 	if a.DrawnType != constants.EventTypeNone && a.DrawnType.IsValid() {
-		a.DrawnName = ""
-		a.DrawnDesc = ""
-		if ctx.GetEventDesc != nil {
-			a.DrawnDesc = ctx.GetEventDesc(a.DrawnType)
-		}
 		return nil
 	}
 
@@ -639,14 +632,6 @@ func (a *DrawEventAction) Execute(ctx *ActionContext) error {
 	} else {
 		a.DrawnType = constants.EventTypeNone
 	}
-	a.DrawnName = ""
-
-	// Populate description from EventDefinition
-	if a.DrawnType.IsValid() && a.DrawnType != constants.EventTypeNone {
-		if ctx.GetEventDesc != nil {
-			a.DrawnDesc = ctx.GetEventDesc(a.DrawnType)
-		}
-	}
 
 	return nil
 }
@@ -661,14 +646,9 @@ func (a *DrawEventAction) LogEntry() gamelog.LogEntry {
 		Metadata:   util.NewMetadata(),
 	}
 
-	// Add event type to metadata (client uses event_type to look up local definition table)
+	// Add event type to metadata (client uses event_type to look up definition from DefinitionsConfig)
 	if a.DrawnType.IsValid() {
 		entry.Metadata.SetString("event_type", string(a.DrawnType))
-	}
-
-	// Add description for client rendering
-	if a.DrawnDesc != "" {
-		entry.Metadata.SetString("desc", a.DrawnDesc)
 	}
 
 	return entry
@@ -682,7 +662,6 @@ type DrawItemAction struct {
 	targetPlayer *core.Player          // Player drawing item
 	SourceID     string                // Source identifier (e.g., "CheckpointTreasure")
 	DrawnType    constants.ItemType    // Item type drawn (set after Execute)
-	DrawnDesc    string                // Item description for client rendering (set after Execute)
 }
 
 // NewDrawItemAction creates a new DrawItemAction.
@@ -736,10 +715,6 @@ func (a *DrawItemAction) Execute(ctx *ActionContext) error {
 	// Push AddItemAction as DerivedAction for full item lifecycle (EventBus subscription)
 	if a.DrawnType != constants.ItemTypeNone && a.DrawnType.IsValid() {
 		ctx.PushDerivedAction(NewAddItemAction(a.targetPlayer, a.DrawnType, a.SourceID))
-		// Populate description from ItemDefinition
-		if ctx.GetItemDesc != nil {
-			a.DrawnDesc = ctx.GetItemDesc(a.DrawnType)
-		}
 	}
 
 	return nil
@@ -748,11 +723,6 @@ func (a *DrawItemAction) Execute(ctx *ActionContext) error {
 func (a *DrawItemAction) LogEntry() gamelog.LogEntry {
 	metadata := util.NewMetadata()
 	metadata.SetString("item_type", string(a.DrawnType))
-
-	// Add description for client rendering
-	if a.DrawnDesc != "" {
-		metadata.SetString("desc", a.DrawnDesc)
-	}
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
@@ -1351,8 +1321,6 @@ type DrawBuffAction struct {
 	targetPlayer *core.Player
 	SourceID     string               // Source identifier (e.g., "Event_TasteTest")
 	DrawnType    constants.BuffType   // Buff type drawn (set after Execute)
-	DrawnName    string               // Buff name (set after Execute)
-	DrawnDesc    string               // Buff description for client rendering (set after Execute)
 }
 
 // NewDrawBuffAction creates a new DrawBuffAction.
@@ -1401,14 +1369,6 @@ func (a *DrawBuffAction) Execute(ctx *ActionContext) error {
 	} else {
 		a.DrawnType = constants.BuffTypeNone
 	}
-	a.DrawnName = ""
-
-	// Populate description from BuffDefinition
-	if a.DrawnType.IsValid() && a.DrawnType != constants.BuffTypeNone {
-		if ctx.GetBuffDesc != nil {
-			a.DrawnDesc = ctx.GetBuffDesc(a.DrawnType)
-		}
-	}
 
 	// Push AddBuffAction as DerivedAction for full buff lifecycle
 	if a.DrawnType.IsValid() && a.DrawnType != constants.BuffTypeNone {
@@ -1428,14 +1388,9 @@ func (a *DrawBuffAction) LogEntry() gamelog.LogEntry {
 		Metadata:   util.NewMetadata(),
 	}
 
-	// Add buff type to metadata (client uses buff_type to look up local definition table)
+	// Add buff type to metadata (client uses buff_type to look up definition from DefinitionsConfig)
 	if a.DrawnType.IsValid() {
 		entry.Metadata.SetString("buff_type", string(a.DrawnType))
-	}
-
-	// Add description for client rendering
-	if a.DrawnDesc != "" {
-		entry.Metadata.SetString("desc", a.DrawnDesc)
 	}
 
 	return entry

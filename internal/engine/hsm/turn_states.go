@@ -803,27 +803,6 @@ func newActionContextWithPools(game *engine.Game, bus *event.EventBus, mapEngine
 		}
 		return 0
 	}
-	ctx.GetEventDesc = func(et constants.EventType) string {
-		def := engine.GetEventDefinition(et)
-		if def != nil {
-			return def.Desc
-		}
-		return ""
-	}
-	ctx.GetItemDesc = func(it constants.ItemType) string {
-		def := engine.GetItemDefinition(it)
-		if def != nil {
-			return def.Desc
-		}
-		return ""
-	}
-	ctx.GetBuffDesc = func(bt constants.BuffType) string {
-		def := engine.GetBuffDefinition(bt)
-		if def != nil {
-			return def.Desc
-		}
-		return ""
-	}
 	return ctx
 }
 
@@ -972,7 +951,6 @@ func (s *TurnLandedState) Enter(ctx *StateContext) {
 			if drawnType.IsValid() {
 				drawAction := engineaction.NewDrawEventAction(player, "CellEvent_"+s.cell.EventID)
 				drawAction.DrawnType = drawnType // Set directly from cell binding
-				drawAction.DrawnName = engine.GetEventName(drawnType)
 				if err := s.actionCtx.ExecuteAction(drawAction); err != nil {
 					ctx.Error = errors.WrapHSMError(
 						err, "TurnLanded", 2, "Enter", "bound event action failed")
