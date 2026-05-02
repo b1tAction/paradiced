@@ -38,7 +38,13 @@ pkg/constants/
 
 ### BuffType - Buff 类型标识
 
-提供 `IsValid()`、`IsPositive()`、`IsNegative()`、`IsBoss()`、`IsHidden()`、`IsDraw()` 方法。
+提供 `IsValid()`、`IsPositive()`、`IsNegative()`、`IsBoss()`、`IsHidden()`、`IsFaction()`、`IsDraw()` 方法。
+
+分类规则：
+- `IsBoss()`：Thorns（Boss自身）、DeathMark（Boss施加的死亡标记）
+- `IsHidden()`：DeathMark（同时是 Boss buff，隐藏行动）
+- `IsFaction()`：Fire（朱雀阵营被动技能，不进入抽签池）
+- `IsDraw()` = `!IsBoss() && !IsHidden() && !IsFaction()`：可进入随机抽签池的 Buff
 
 | 常量 | 值 | 分类 | 说明 |
 |------|-----|------|------|
@@ -46,7 +52,7 @@ pkg/constants/
 | `BuffTypeRain` | `rain` | Positive | 甘霖：HP+1/2回合 |
 | `BuffTypeExorcism` | `exorcism` | Positive | 辟邪：免疫毒瘴 |
 | `BuffTypeHidden` | `hidden` | Neutral | 隐匿：免疫伤害/事件；PreBuffApplied阻挡非Positive且非Boss buff |
-| `BuffTypeFire` | `fire` | Positive | 离火：朱雀被动 |
+| `BuffTypeFire` | `fire` | Positive (IsFaction) | 离火：朱雀被动（IsFaction=true，不进入抽签池） |
 | `BuffTypeCurse` | `curse` | Negative | 诅咒：LP-1/回合 |
 | `BuffTypeLost` | `lost` | Negative | 迷途：反向移动 |
 | `BuffTypeCorrupt` | `corrupt` | Negative | 腐化：HP-1/2回合 |
