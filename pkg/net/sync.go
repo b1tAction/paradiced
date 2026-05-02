@@ -95,6 +95,9 @@ type Player struct {
 	// LP is the player's current luck points (0-8).
 	LP int `json:"lp"`
 
+	// MaxHP is the player's maximum health points (for HP bar rendering).
+	MaxHP int `json:"max_hp"`
+
 	// Buffs contains the player's active buffs.
 	Buffs []Buff `json:"buffs"`
 

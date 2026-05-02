@@ -21,7 +21,7 @@ func TestStateSyncJSON(t *testing.T) {
 		Turn:          0,
 		Paused:        false,
 		Players: []Player{
-			{PlayerID: "player-abc123", Faction: "qing_long", Position: 10, HP: 6, LP: 5},
+			{PlayerID: "player-abc123", Faction: "qing_long", Position: 10, HP: 6, MaxHP: 8, LP: 5},
 		},
 	}
 
@@ -300,6 +300,7 @@ func TestPlayerWithBuffsAndItems(t *testing.T) {
 		Faction:     "zhu_que",
 		Position:    25,
 		HP:          6,
+		MaxHP:       8,
 		LP:          7,
 		Buffs:       []Buff{{Type: "fire", Name: "离火", Duration: -1}},
 		Items:       []Item{{ID: "item-001", Type: "any_door", Name: "任意门"}},
@@ -550,6 +551,7 @@ func TestPlayerIsBossField(t *testing.T) {
 		PlayerID: "player-001",
 		Faction:  "qing_long",
 		HP:       6,
+		MaxHP:    8,
 		LP:       5,
 		IsBoss:   false,
 	}
@@ -568,6 +570,7 @@ func TestPlayerIsBossField(t *testing.T) {
 		PlayerID:    "beeeeeef-beef-beef-beef-beeeeeeeeeef",
 		Faction:     "",
 		HP:          50,
+		MaxHP:       50,
 		LP:          0,
 		IsBoss:      true,
 		IsDead:      false,

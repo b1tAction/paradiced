@@ -118,6 +118,7 @@ func (b *Builder) BuildPlayer(p *core.Player) pkgnet.Player {
 		Position:    p.Position,
 		HP:          p.HP,
 		LP:          p.LP,
+		MaxHP:       p.MaxHP,
 		Buffs:       b.BuildBuffs(p.ActiveBuffs),
 		Items:       b.BuildItems(p.Inventory),
 		Charge:      p.GetChargeCount(),
