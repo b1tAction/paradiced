@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
-	"github.com/b1tAction/paradiced/internal/net"
+	internalnet "github.com/b1tAction/paradiced/internal/net"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 )
@@ -151,7 +151,7 @@ func (h *NakamaMatchHandler) handleRollDice(sender string) error {
 	}
 
 	// Create builder for context
-	builder := net.NewBuilder(h.hsm)
+	builder := internalnet.NewBuilder(h.hsm)
 
 	// Create state context for HSM
 	ctx := hsm.NewStateContext().
@@ -241,7 +241,7 @@ func (h *NakamaMatchHandler) handleUseItem(sender string, data []byte) error {
 	h.logDebug("handleUseItem: validation passed", "sender", sender, "item_id", req.ItemID)
 
 	// Create builder for context
-	builder := net.NewBuilder(h.hsm)
+	builder := internalnet.NewBuilder(h.hsm)
 
 	// Create state context for HSM
 	ctx := hsm.NewStateContext().
@@ -316,7 +316,7 @@ func (h *NakamaMatchHandler) handleUseSkill(sender string) error {
 	player.SetChargeCount(0)
 
 	// Broadcast state sync to reflect charge change
-	builder := net.NewBuilder(h.hsm)
+	builder := internalnet.NewBuilder(h.hsm)
 	ctx := hsm.NewStateContext().
 		WithHSM(h.hsm).
 		WithPlayer(player).
@@ -431,7 +431,7 @@ func (h *NakamaMatchHandler) handleMiniGameDataSubmit(sender string, data []byte
 	}
 
 	// Create builder for context
-	builder := net.NewBuilder(h.hsm)
+	builder := internalnet.NewBuilder(h.hsm)
 
 	// Create state context for HSM
 	ctx := hsm.NewStateContext().
@@ -491,7 +491,7 @@ func (h *NakamaMatchHandler) handleRoundReady(sender string) error {
 	}
 
 	// Create builder for context
-	builder := net.NewBuilder(h.hsm)
+	builder := internalnet.NewBuilder(h.hsm)
 
 	// Create state context for HSM
 	ctx := hsm.NewStateContext().
@@ -553,7 +553,11 @@ func (h *NakamaMatchHandler) handleStartGame(sender string) error {
 	// Broadcast StartGameAck to all players with map configuration
 	if h.mapConfig != nil {
 		broadcastAdapter := NewNakamaBroadcastAdapter(h)
-		ack := &pkgnet.StartGameAck{MapConfig: *h.mapConfig}
+		definitions := internalnet.BuildDefinitionsConfig()
+		ack := &pkgnet.StartGameAck{
+			MapConfig:    *h.mapConfig,
+			Definitions: definitions,
+		}
 		broadcastAdapter.BroadcastStartGameAck(ack)
 		h.logInfo("handleStartGame: StartGameAck broadcasted", "map_length", h.mapConfig.Length, "cells", len(h.mapConfig.Cells))
 	}

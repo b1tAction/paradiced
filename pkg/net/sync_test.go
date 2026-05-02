@@ -21,7 +21,7 @@ func TestStateSyncJSON(t *testing.T) {
 		Turn:          0,
 		Paused:        false,
 		Players: []Player{
-			{PlayerID: "player-abc123", Faction: "qing_long", Position: 10, HP: 6, LP: 5},
+			{PlayerID: "player-abc123", Faction: "qing_long", Position: 10, HP: 6, MaxHP: 8, LP: 5},
 		},
 	}
 
@@ -300,6 +300,7 @@ func TestPlayerWithBuffsAndItems(t *testing.T) {
 		Faction:     "zhu_que",
 		Position:    25,
 		HP:          6,
+		MaxHP:       8,
 		LP:          7,
 		Buffs:       []Buff{{Type: "fire", Name: "离火", Duration: -1}},
 		Items:       []Item{{ID: "item-001", Type: "any_door", Name: "任意门"}},
@@ -402,6 +403,36 @@ func TestMiniGameResult(t *testing.T) {
 
 func TestGameOver(t *testing.T) {
 	over := GameOver{
+		WinnerID:          "player-001",
+		WinnerDisplayName: "Alice",
+		Stats: []PlayerStats{
+			{PlayerID: "player-001", DisplayName: "Alice", RoundsWon: 3, EventsDrawn: 5, ItemsUsed: 2},
+		},
+	}
+
+	jsonBytes, err := json.Marshal(over)
+	if err != nil {
+		t.Fatalf("json.Marshal() error: %v", err)
+	}
+
+	var parsed GameOver
+	err = json.Unmarshal(jsonBytes, &parsed)
+	if err != nil {
+		t.Fatalf("json.Unmarshal() error: %v", err)
+	}
+	if parsed.WinnerID != "player-001" {
+		t.Errorf("parsed.WinnerID = %s, want player-001", parsed.WinnerID)
+	}
+	if parsed.WinnerDisplayName != "Alice" {
+		t.Errorf("parsed.WinnerDisplayName = %s, want Alice", parsed.WinnerDisplayName)
+	}
+	if parsed.Stats[0].DisplayName != "Alice" {
+		t.Errorf("parsed.Stats[0].DisplayName = %s, want Alice", parsed.Stats[0].DisplayName)
+	}
+}
+
+func TestGameOverWithEmptyDisplayName(t *testing.T) {
+	over := GameOver{
 		WinnerID: "player-001",
 		Stats: []PlayerStats{
 			{PlayerID: "player-001", RoundsWon: 3, EventsDrawn: 5, ItemsUsed: 2},
@@ -418,8 +449,55 @@ func TestGameOver(t *testing.T) {
 	if err != nil {
 		t.Fatalf("json.Unmarshal() error: %v", err)
 	}
+	// WinnerID should remain intact (not overwritten)
 	if parsed.WinnerID != "player-001" {
 		t.Errorf("parsed.WinnerID = %s, want player-001", parsed.WinnerID)
+	}
+	// DisplayName fields should be empty strings (default)
+	if parsed.WinnerDisplayName != "" {
+		t.Errorf("parsed.WinnerDisplayName = %s, want empty string", parsed.WinnerDisplayName)
+	}
+	if parsed.Stats[0].DisplayName != "" {
+		t.Errorf("parsed.Stats[0].DisplayName = %s, want empty string", parsed.Stats[0].DisplayName)
+	}
+	// PlayerID should remain intact
+	if parsed.Stats[0].PlayerID != "player-001" {
+		t.Errorf("parsed.Stats[0].PlayerID = %s, want player-001", parsed.Stats[0].PlayerID)
+	}
+}
+
+func TestGameOverJSONContainsDisplayNameFields(t *testing.T) {
+	over := GameOver{
+		WinnerID:          "player-001",
+		WinnerDisplayName: "Alice",
+		Stats: []PlayerStats{
+			{PlayerID: "player-001", DisplayName: "Alice", RoundsWon: 3, EventsDrawn: 5, ItemsUsed: 2},
+			{PlayerID: "player-002", DisplayName: "Bob", RoundsWon: 1, EventsDrawn: 4, ItemsUsed: 1},
+		},
+	}
+
+	jsonBytes, err := json.Marshal(over)
+	if err != nil {
+		t.Fatalf("json.Marshal() error: %v", err)
+	}
+
+	// Verify JSON contains both ID and DisplayName fields
+	jsonStr := string(jsonBytes)
+	if !strings.Contains(jsonStr, `"winner_id":"player-001"`) {
+		t.Error("JSON should contain winner_id field with UUID value")
+	}
+	if !strings.Contains(jsonStr, `"winner_display_name":"Alice"`) {
+		t.Error("JSON should contain winner_display_name field")
+	}
+	if !strings.Contains(jsonStr, `"player_id":"player-001"`) {
+		t.Error("JSON should contain player_id field with UUID value")
+	}
+	if !strings.Contains(jsonStr, `"display_name":"Alice"`) {
+		t.Error("JSON should contain display_name field in PlayerStats")
+	}
+	// Verify PlayerID is NOT replaced with DisplayName
+	if strings.Contains(jsonStr, `"player_id":"Alice"`) {
+		t.Error("JSON should NOT have display_name as player_id value (UUID must be preserved)")
 	}
 }
 
@@ -473,6 +551,7 @@ func TestPlayerIsBossField(t *testing.T) {
 		PlayerID: "player-001",
 		Faction:  "qing_long",
 		HP:       6,
+		MaxHP:    8,
 		LP:       5,
 		IsBoss:   false,
 	}
@@ -491,6 +570,7 @@ func TestPlayerIsBossField(t *testing.T) {
 		PlayerID:    "beeeeeef-beef-beef-beef-beeeeeeeeeef",
 		Faction:     "",
 		HP:          50,
+		MaxHP:       50,
 		LP:          0,
 		IsBoss:      true,
 		IsDead:      false,

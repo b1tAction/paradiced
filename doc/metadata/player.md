@@ -32,6 +32,9 @@ func (p *Player) SetChargeCount(count int) {
 | `display_name` | string | 通用 | 用户显示名称，fallback 到 userID | 无（直接通过 Metadata 访问） |
 | `charge_count` | int | 青龙/玄武 | 阵营技能充能数 | `GetChargeCount/SetChargeCount/IncrementChargeCount` |
 | `fire_counter` | int | 朱雀 | 离火计数器（每4回合LP+1） | `GetFireCounter/SetFireCounter/IncrementFireCounter` |
+| `events_drawn` | int | 通用 | 累计抽取Event次数 | `GetEventsDrawn/IncrementEventsDrawn` |
+| `items_used` | int | 通用 | 累计消耗Item次数 | `GetItemsUsed/IncrementItemsUsed` |
+| `rounds_won` | int | 通用 | 累计MiniGame排名第1次数 | `GetRoundsWon/IncrementRoundsWon` |
 
 ### display_name 说明
 

@@ -63,10 +63,15 @@ func (bt BuffType) IsBoss() bool {
 	return bt == BuffTypeThorns || bt == BuffTypeDeathMark
 }
 
+// IsFaction checks if the Buff is a faction passive skill (not drawn from lottery pool).
+func (bt BuffType) IsFaction() bool {
+	return bt == BuffTypeFire
+}
+
 // IsDraw checks if the Buff should participate in lottery pool draws.
-// Returns false for Boss buffs and hidden buffs (they are not drawn from pools).
+// Returns false for Boss buffs, hidden buffs, and faction passive buffs.
 func (bt BuffType) IsDraw() bool {
-	return !bt.IsBoss() && !bt.IsHidden()
+	return !bt.IsBoss() && !bt.IsHidden() && !bt.IsFaction()
 }
 
 // ParseBuffType converts a string to BuffType.
@@ -98,4 +103,27 @@ func ParseBuffType(s string) BuffType {
 	default:
 		return BuffTypeNone
 	}
+}
+
+// ========== Buff Definition (Static Metadata) ==========
+
+// BuffDefinition contains static metadata for Buff display and classification.
+// Effect logic is managed by engine layer's BuffHandlerConfig.
+type BuffDefinition struct {
+	Type        BuffType   `json:"type"`
+	Eval        Evaluation `json:"evaluation"`    // Evaluation score for random draw
+	EnglishName string     `json:"english_name"`  // English identifier (snake_case)
+	Name        string     `json:"name"`          // Chinese display name
+	Desc        string     `json:"desc"`          // Description text
+	Duration    int        `json:"duration"`      // Default duration (-1 for permanent)
+}
+
+// IsPositive checks if the buff is beneficial.
+func (d *BuffDefinition) IsPositive() bool {
+	return d.Eval.IsGood()
+}
+
+// IsNegative checks if the buff is harmful.
+func (d *BuffDefinition) IsNegative() bool {
+	return d.Eval.IsBad()
 }

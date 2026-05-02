@@ -183,6 +183,14 @@ func TestAddPlayer(t *testing.T) {
 		t.Errorf("player HP = %d, want 6", player1.HP)
 	}
 
+	if player1.MaxHP != 8 {
+		t.Errorf("player MaxHP = %d, want 8", player1.MaxHP)
+	}
+
+	if player1.InitHP != 6 {
+		t.Errorf("player InitHP = %d, want 6", player1.InitHP)
+	}
+
 	if player1.LP != 4 {
 		t.Errorf("player LP = %d, want 4", player1.LP)
 	}

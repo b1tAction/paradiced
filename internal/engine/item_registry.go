@@ -7,6 +7,7 @@ import (
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/resource"
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
@@ -20,7 +21,7 @@ type ItemHandlerConfig struct {
 
 // ItemRegistry is the registry for Item definitions and handler configs.
 type ItemRegistry struct {
-	defs    map[constants.ItemType]*core.ItemDefinition
+	defs    map[constants.ItemType]*constants.ItemDefinition
 	configs map[constants.ItemType]*ItemHandlerConfig
 	names   map[constants.ItemType]string
 
@@ -40,7 +41,7 @@ func init() {
 // NewItemRegistry creates a new Item registry.
 func NewItemRegistry() *ItemRegistry {
 	return &ItemRegistry{
-		defs:         make(map[constants.ItemType]*core.ItemDefinition),
+		defs:         make(map[constants.ItemType]*constants.ItemDefinition),
 		configs:      make(map[constants.ItemType]*ItemHandlerConfig),
 		names:        make(map[constants.ItemType]string),
 		goodItems:    make([]constants.ItemType, 0),
@@ -50,7 +51,7 @@ func NewItemRegistry() *ItemRegistry {
 }
 
 // RegisterItem registers an Item definition with handler config.
-func (r *ItemRegistry) RegisterItem(def *core.ItemDefinition, config *ItemHandlerConfig) {
+func (r *ItemRegistry) RegisterItem(def *constants.ItemDefinition, config *ItemHandlerConfig) {
 	if def == nil || def.Type == constants.ItemTypeNone {
 		return
 	}
@@ -72,11 +73,11 @@ func (r *ItemRegistry) RegisterItem(def *core.ItemDefinition, config *ItemHandle
 }
 
 // GetItemDefinition returns the Item definition by type.
-func GetItemDefinition(it constants.ItemType) *core.ItemDefinition {
+func GetItemDefinition(it constants.ItemType) *constants.ItemDefinition {
 	return GlobalItemRegistry.GetItemDefinition(it)
 }
 
-func (r *ItemRegistry) GetItemDefinition(it constants.ItemType) *core.ItemDefinition {
+func (r *ItemRegistry) GetItemDefinition(it constants.ItemType) *constants.ItemDefinition {
 	if def, ok := r.defs[it]; ok {
 		return def
 	}
@@ -158,28 +159,18 @@ func (r *ItemRegistry) buildItemPool() []*rng.EvaluatedItem {
 // ========== Item Handler Registration ==========
 
 func registerAllItems() {
+	defs := resource.GlobalDefinitionSet
+
 	// ReverseClock: Give Lost buff to target player
-	GlobalItemRegistry.RegisterItem(&core.ItemDefinition{
-		Type:        constants.ItemTypeReverseClock,
-		Eval:        constants.EvaluationGood,
-		EnglishName: "ReverseClock",
-		Name:        "反方向的钟",
-		Desc:        "给予指定玩家迷途Buff",
-	}, &ItemHandlerConfig{
+	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeReverseClock], &ItemHandlerConfig{
 		Phase:       constants.PhaseItemUsed,
 		Priority:    50,
 		NeedConfirm: false,
 		Handler:     createGiveBuffHandler(constants.BuffTypeLost, constants.SourceItemReverseClockBuff),
 	})
 
-	// AnyDoor: Teleport to target player within 30 range
-	GlobalItemRegistry.RegisterItem(&core.ItemDefinition{
-		Type:        constants.ItemTypeAnyDoor,
-		Eval:        constants.EvaluationNeutral,
-		EnglishName: "AnyDoor",
-		Name:        "任意门",
-		Desc:        "去到30格内指定玩家身边",
-	}, &ItemHandlerConfig{
+	// AnyDoor: Teleport to target player's position
+	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeAnyDoor], &ItemHandlerConfig{
 		Phase:       constants.PhaseItemUsed,
 		Priority:    60,
 		NeedConfirm: false,
@@ -187,13 +178,7 @@ func registerAllItems() {
 	})
 
 	// DiceUpgrade: Upgrade current dice level
-	GlobalItemRegistry.RegisterItem(&core.ItemDefinition{
-		Type:        constants.ItemTypeDiceUpgrade,
-		Eval:        constants.EvaluationGood,
-		EnglishName: "DiceUpgrade",
-		Name:        "骰子升级卡",
-		Desc:        "将当前骰子升级为更高等级",
-	}, &ItemHandlerConfig{
+	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeDiceUpgrade], &ItemHandlerConfig{
 		Phase:       constants.PhaseItemUsed,
 		Priority:    70,
 		NeedConfirm: false,
@@ -244,23 +229,20 @@ func handleTeleport(phase constants.Phase, ctx *event.Context) error {
 		return fmt.Errorf("handler: player is nil in event context")
 	}
 
-	// Check ActionContext exists
-	actionCtx, err := getActionCtxFromEventCtx(ctx)
-	if err != nil {
-		return err
+	// Resolve target player: use target_player from context if set (AnyDoor targets a player)
+	var targetPlayer *core.Player
+	if val, ok := ctx.Get("target_player"); ok {
+		if p, ok2 := val.(*core.Player); ok2 && p != nil {
+			targetPlayer = p
+		}
 	}
-	_ = actionCtx // ActionContext used for derived action processing
-
-	targetID, _ := ctx.GetString("target_id")
-	if targetID == "" {
+	if targetPlayer == nil {
+		// No target player specified, cannot teleport
 		return nil
 	}
 
-	// Get target player position from game context
-	// For now, use stored target position
-	targetPos := ctx.GetIntOrDefault("target_position", 0)
-
-	ctx.AddDerivedAction(engineaction.NewTeleportAction(ctx.Player, targetPos, string(constants.SourceItemAnyDoor)))
+	// Teleport to the target player's position
+	ctx.AddDerivedAction(engineaction.NewTeleportAction(ctx.Player, targetPlayer.Position, string(constants.SourceItemAnyDoor)))
 	return nil
 }
 

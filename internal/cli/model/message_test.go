@@ -551,10 +551,11 @@ func TestRankingEntryJSON(t *testing.T) {
 
 func TestGameOverJSON(t *testing.T) {
 	gameOver := GameOver{
-		WinnerID: "player-001",
+		WinnerID:          "player-001",
+		WinnerDisplayName: "Alice",
 		Stats: []PlayerStats{
-			{PlayerID: "player-001", RoundsWon: 3, EventsDrawn: 5, ItemsUsed: 2},
-			{PlayerID: "player-002", RoundsWon: 1, EventsDrawn: 4, ItemsUsed: 1},
+			{PlayerID: "player-001", DisplayName: "Alice", RoundsWon: 3, EventsDrawn: 5, ItemsUsed: 2},
+			{PlayerID: "player-002", DisplayName: "Bob", RoundsWon: 1, EventsDrawn: 4, ItemsUsed: 1},
 		},
 	}
 
@@ -572,8 +573,17 @@ func TestGameOverJSON(t *testing.T) {
 	if parsed.WinnerID != gameOver.WinnerID {
 		t.Errorf("WinnerID = %s, expected %s", parsed.WinnerID, gameOver.WinnerID)
 	}
+	if parsed.WinnerDisplayName != "Alice" {
+		t.Errorf("WinnerDisplayName = %s, expected Alice", parsed.WinnerDisplayName)
+	}
 	if len(parsed.Stats) != 2 {
 		t.Errorf("Stats count = %d, expected 2", len(parsed.Stats))
+	}
+	if parsed.Stats[0].DisplayName != "Alice" {
+		t.Errorf("Stats[0].DisplayName = %s, expected Alice", parsed.Stats[0].DisplayName)
+	}
+	if parsed.Stats[0].PlayerID != "player-001" {
+		t.Errorf("Stats[0].PlayerID = %s, expected player-001 (UUID preserved)", parsed.Stats[0].PlayerID)
 	}
 }
 

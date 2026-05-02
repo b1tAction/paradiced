@@ -1,0 +1,166 @@
+# Paradiced - Game Definitions
+# Event/Item/Buff static metadata loaded at startup via go:embed.
+# Handler logic (EventHandlerConfig, BuffHandlerConfig, ItemHandlerConfig) stays in Go.
+
+# ========== Event Definitions ==========
+
+events:
+  herb:
+    evaluation: mild_good    # Supports named constants (mild_good=70) and raw numbers
+    english_name: Herb
+    name: 采集到草药
+    desc: 在路边发现了草药，恢复了体力
+  milk_tea:
+    evaluation: good
+    english_name: MilkTea
+    name: 捡到奶茶
+    desc: 捡到了一杯奶茶，一口就吃到了猪猪欸
+  relic:
+    evaluation: very_good
+    english_name: Relic
+    name: 捡到勇士的圣遗物
+    desc: 发现了古老圣遗物，获得一次道具抽奖机会
+  divine_bless:
+    evaluation: excellent
+    english_name: DivineBless
+    name: 受到天使眷顾
+    desc: 天使的祝福降临，获得神眷Buff
+  exchange:
+    evaluation: neutral
+    english_name: Exchange
+    name: 交换
+    desc: 命运之手将你与另一位玩家交换位置
+  hidden_buff:
+    evaluation: good
+    english_name: HiddenBuff
+    name: 麻了
+    desc: 身体麻木，获得隐匿Buff
+  taste_test:
+    evaluation: mixed
+    english_name: TasteTest
+    name: 这是什么？尝一口
+    desc: 发现神秘物质，尝试后获得随机效果
+  mosquito:
+    evaluation: mild_bad
+    english_name: Mosquito
+    name: 被蚊虫叮咬
+    desc: 丛林中的蚊虫叮咬了你
+  ghost_hit:
+    evaluation: mild_bad
+    english_name: GhostHit
+    name: 偶遇孤魂野鬼
+    desc: 被野鬼打了一闷棍
+  dog_poop:
+    evaluation: mild_bad
+    english_name: DogPoop
+    name: 踩到了狗屎
+    desc: 运气糟糕的一天
+  thief:
+    evaluation: bad
+    english_name: Thief
+    name: 啊？！贼
+    desc: 遭遇盗贼，随机丢失一个道具
+  curse_buddha:
+    evaluation: bad
+    english_name: CurseBuddha
+    name: 虔诚拜三拜
+    desc: 拜路边的野佛，获得诅咒Buff
+  lost_way:
+    evaluation: mild_bad
+    english_name: LostWay
+    name: 迷途
+    desc: 迷失方向，获得迷途Buff
+  thunder:
+    evaluation: very_bad
+    english_name: Thunder
+    name: 雷劫
+    desc: 天雷降临，HP归零
+
+# ========== Buff Definitions ==========
+
+buffs:
+  curse:
+    evaluation: bad
+    english_name: Curse
+    name: 诅咒
+    desc: 接下来3回合保持LP-1状态
+    duration: 3
+  lost:
+    evaluation: mild_bad
+    english_name: Lost
+    name: 迷途
+    desc: 下1回合朝反方向移动
+    duration: 1
+  corrupt:
+    evaluation: bad
+    english_name: Corrupt
+    name: 腐化
+    desc: 接下来4回合每2回合HP-1
+    duration: 4
+  poison:
+    evaluation: very_bad
+    english_name: Poison
+    name: 毒瘴
+    desc: 接下来3回合每回合受一次恶性随机事件影响
+    duration: 3
+  hidden:
+    evaluation: neutral
+    english_name: Hidden
+    name: 隐匿
+    desc: 接下来3回合免疫任意事件、BUFF或道具的影响
+    duration: 3
+  thorns:
+    evaluation: neutral
+    english_name: Thorns
+    name: 反刺
+    desc: Boss给自己施加反刺，玩家攻击Boss时受到30%反伤
+    duration: 2
+  divine:
+    evaluation: very_good
+    english_name: Divine
+    name: 神眷
+    desc: 接下来3回合保持LP+1状态
+    duration: 3
+  rain:
+    evaluation: good
+    english_name: Rain
+    name: 甘霖
+    desc: 接下来4回合每2回合HP+1
+    duration: 4
+  exorcism:
+    evaluation: mild_good
+    english_name: Exorcism
+    name: 辟邪
+    desc: 接下来5回合无视毒瘴buff
+    duration: 5
+  fire:
+    evaluation: good
+    english_name: Fire
+    name: 离火
+    desc: 朱雀阵营增益，每4回合LP+1
+    duration: -1    # Permanent
+  death_mark:
+    evaluation: very_bad
+    english_name: DeathMark
+    name: 死亡标记
+    desc: 死亡后阻止后续行动
+    duration: 1
+
+# ========== Item Definitions ==========
+
+items:
+  reverse_clock:
+    evaluation: good
+    english_name: ReverseClock
+    name: 反方向的钟
+    desc: 给予指定玩家迷途Buff
+  any_door:
+    evaluation: neutral
+    english_name: AnyDoor
+    name: 任意门
+    desc: 前往指定玩家身边
+  dice_upgrade:
+    evaluation: good
+    english_name: DiceUpgrade
+    name: 骰子升级卡
+    desc: 将当前骰子升级为更高等级

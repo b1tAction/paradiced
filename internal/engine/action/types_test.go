@@ -1628,9 +1628,6 @@ func TestDrawEventActionPresetDrawnType(t *testing.T) {
 	if action.DrawnType != constants.EventTypeHerb {
 		t.Errorf("DrawnType should be preserved as herb, got %s", action.DrawnType)
 	}
-	if action.DrawnName != "" {
-		t.Errorf("DrawnName should be empty (client uses event_type), got %s", action.DrawnName)
-	}
 }
 
 // ========== DrawItemAction Pool Execution Tests ==========

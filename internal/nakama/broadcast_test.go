@@ -318,6 +318,79 @@ func TestBroadcastGameOver(t *testing.T) {
 	}
 }
 
+func TestBroadcastGameOverWithDisplayName(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	mockDispatcher := NewMockDispatcherAdapter()
+	handler.WithDispatcher(mockDispatcher)
+
+	// Add players with display names
+	userID1 := "00000000-0000-0000-0000-000000000001"
+	userID2 := "00000000-0000-0000-0000-000000000002"
+	p1 := handler.addPlayer(userID1, constants.FactionQingLong, "Alice")
+	p2 := handler.addPlayer(userID2, constants.FactionZhuQue, "Bob")
+
+	broadcastAdapter := NewNakamaBroadcastAdapter(handler)
+
+	// Set stats on players to verify they're populated correctly
+	p1.IncrementRoundsWon()
+	p1.IncrementEventsDrawn()
+	p1.IncrementEventsDrawn()
+	p1.IncrementItemsUsed()
+
+	p2.IncrementEventsDrawn()
+
+	over := &net.GameOver{
+		WinnerID: p1.ID.UUID(),
+		WinnerDisplayName: "",
+		Stats: []net.PlayerStats{
+			{PlayerID: p1.ID.UUID(), DisplayName: "", RoundsWon: p1.GetRoundsWon(), EventsDrawn: p1.GetEventsDrawn(), ItemsUsed: p1.GetItemsUsed()},
+			{PlayerID: p2.ID.UUID(), DisplayName: "", RoundsWon: p2.GetRoundsWon(), EventsDrawn: p2.GetEventsDrawn(), ItemsUsed: p2.GetItemsUsed()},
+		},
+	}
+
+	err := broadcastAdapter.BroadcastGameOver(over)
+	if err != nil {
+		t.Fatalf("BroadcastGameOver error: %v", err)
+	}
+
+	// Verify DisplayName injection into dedicated fields (NOT overwriting UUIDs)
+	if over.WinnerID != p1.ID.UUID() {
+		t.Errorf("WinnerID should remain UUID, got %s", over.WinnerID)
+	}
+	if over.WinnerDisplayName != "Alice" {
+		t.Errorf("WinnerDisplayName should be 'Alice', got %s", over.WinnerDisplayName)
+	}
+	if over.Stats[0].PlayerID != p1.ID.UUID() {
+		t.Errorf("Stats[0].PlayerID should remain UUID, got %s", over.Stats[0].PlayerID)
+	}
+	if over.Stats[0].DisplayName != "Alice" {
+		t.Errorf("Stats[0].DisplayName should be 'Alice', got %s", over.Stats[0].DisplayName)
+	}
+	if over.Stats[1].PlayerID != p2.ID.UUID() {
+		t.Errorf("Stats[1].PlayerID should remain UUID, got %s", over.Stats[1].PlayerID)
+	}
+	if over.Stats[1].DisplayName != "Bob" {
+		t.Errorf("Stats[1].DisplayName should be 'Bob', got %s", over.Stats[1].DisplayName)
+	}
+
+	// Verify stats are populated correctly
+	if over.Stats[0].RoundsWon != 1 {
+		t.Errorf("Stats[0].RoundsWon = %d, want 1", over.Stats[0].RoundsWon)
+	}
+	if over.Stats[0].EventsDrawn != 2 {
+		t.Errorf("Stats[0].EventsDrawn = %d, want 2", over.Stats[0].EventsDrawn)
+	}
+	if over.Stats[0].ItemsUsed != 1 {
+		t.Errorf("Stats[0].ItemsUsed = %d, want 1", over.Stats[0].ItemsUsed)
+	}
+	if over.Stats[1].RoundsWon != 0 {
+		t.Errorf("Stats[1].RoundsWon = %d, want 0", over.Stats[1].RoundsWon)
+	}
+	if over.Stats[1].EventsDrawn != 1 {
+		t.Errorf("Stats[1].EventsDrawn = %d, want 1", over.Stats[1].EventsDrawn)
+	}
+}
+
 func TestSendFullSync(t *testing.T) {
 	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
 	mockDispatcher := NewMockDispatcherAdapter()

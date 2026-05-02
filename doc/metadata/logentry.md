@@ -101,13 +101,13 @@ for (const entry of turnSync.entries) {
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
-| `event_type` | string | 是 | 事件类型标识（客户端查找本地定义表） | 事件卡片类型 |
+| `event_type` | string | 是 | 事件类型标识（客户端从 DefinitionsConfig 查表获取 name/desc） | 事件卡片类型 |
 
 ### draw_item 类型
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
-| `item_type` | string | 是 | 道具类型标识 | 显示道具获取动画 |
+| `item_type` | string | 是 | 道具类型标识（客户端从 DefinitionsConfig 查表获取 name/desc） | 显示道具获取动画 |
 
 ### teleport 类型
 
@@ -167,7 +167,7 @@ for (const entry of turnSync.entries) {
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
-| `buff_type` | string | 是（抽取成功时） | Buff类型标识 | 显示Buff获取动画 |
+| `buff_type` | string | 是（抽取成功时） | Buff类型标识（客户端从 DefinitionsConfig 查表获取 name/desc） | 显示Buff获取动画 |
 
 ### dice_upgrade 类型
 

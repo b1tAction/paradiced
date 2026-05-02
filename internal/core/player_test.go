@@ -73,6 +73,12 @@ func TestNewPlayer(t *testing.T) {
 	if player.LP != 4 {
 		t.Errorf("player.LP = %d, expected 4 (InitLP default)", player.LP)
 	}
+	if player.MaxHP != 10 {
+		t.Errorf("player.MaxHP = %d, expected 10", player.MaxHP)
+	}
+	if player.InitHP != 6 {
+		t.Errorf("player.InitHP = %d, expected 6 (InitHP default)", player.InitHP)
+	}
 	if player.Position != 0 {
 		t.Errorf("player.Position = %d, expected 0", player.Position)
 	}
@@ -108,6 +114,12 @@ func TestNewPlayerDefaultConfig(t *testing.T) {
 	player := NewPlayer(config)
 	if player.HP != DefaultPlayerConfig.InitHP {
 		t.Errorf("player.HP = %d, expected default %d", player.HP, DefaultPlayerConfig.InitHP)
+	}
+	if player.MaxHP != DefaultPlayerConfig.MaxHP {
+		t.Errorf("player.MaxHP = %d, expected default %d", player.MaxHP, DefaultPlayerConfig.MaxHP)
+	}
+	if player.InitHP != DefaultPlayerConfig.InitHP {
+		t.Errorf("player.InitHP = %d, expected default %d", player.InitHP, DefaultPlayerConfig.InitHP)
 	}
 	if player.LP != DefaultPlayerConfig.InitLP {
 		t.Errorf("player.LP = %d, expected default %d", player.LP, DefaultPlayerConfig.InitLP)
@@ -245,7 +257,7 @@ func TestMove(t *testing.T) {
 }
 
 func TestRespawn(t *testing.T) {
-	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID(), InitHP: 6, MaxHP: 10})
 	player.HP = 0
 	player.IsDead = true
 	player.Position = 50
@@ -254,8 +266,8 @@ func TestRespawn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Respawn failed: %v", err)
 	}
-	if player.HP != 10 {
-		t.Errorf("player.HP = %d, expected %d (p.MaxHP)", player.HP, 10)
+	if player.HP != 6 {
+		t.Errorf("player.HP = %d, expected %d (p.InitHP)", player.HP, 6)
 	}
 	if player.IsDead {
 		t.Error("player should not be dead after respawn")
@@ -733,6 +745,110 @@ func TestPlayerMetadataDirectUsage(t *testing.T) {
 	player.SetInt("chain1", 1).SetString("chain2", "test").SetBool("chain3", true)
 	if !player.HasKey("chain1") || !player.HasKey("chain2") || !player.HasKey("chain3") {
 		t.Error("chained keys should all exist")
+	}
+}
+
+// ========== Game Stats Tests ==========
+
+func TestPlayerEventsDrawn(t *testing.T) {
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
+
+	// Initial events drawn is 0
+	if player.GetEventsDrawn() != 0 {
+		t.Errorf("initial events_drawn = %d, expected 0", player.GetEventsDrawn())
+	}
+
+	// Increment events drawn
+	result := player.IncrementEventsDrawn()
+	if result != 1 {
+		t.Errorf("increment result = %d, expected 1", result)
+	}
+	if player.GetEventsDrawn() != 1 {
+		t.Errorf("events_drawn after increment = %d, expected 1", player.GetEventsDrawn())
+	}
+
+	// Increment multiple times
+	player.IncrementEventsDrawn()
+	player.IncrementEventsDrawn()
+	if player.GetEventsDrawn() != 3 {
+		t.Errorf("events_drawn after 3 increments = %d, expected 3", player.GetEventsDrawn())
+	}
+}
+
+func TestPlayerItemsUsed(t *testing.T) {
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
+
+	// Initial items used is 0
+	if player.GetItemsUsed() != 0 {
+		t.Errorf("initial items_used = %d, expected 0", player.GetItemsUsed())
+	}
+
+	// Increment items used
+	result := player.IncrementItemsUsed()
+	if result != 1 {
+		t.Errorf("increment result = %d, expected 1", result)
+	}
+	if player.GetItemsUsed() != 1 {
+		t.Errorf("items_used after increment = %d, expected 1", player.GetItemsUsed())
+	}
+
+	// Increment multiple times
+	player.IncrementItemsUsed()
+	player.IncrementItemsUsed()
+	if player.GetItemsUsed() != 3 {
+		t.Errorf("items_used after 3 increments = %d, expected 3", player.GetItemsUsed())
+	}
+}
+
+func TestPlayerRoundsWon(t *testing.T) {
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
+
+	// Initial rounds won is 0
+	if player.GetRoundsWon() != 0 {
+		t.Errorf("initial rounds_won = %d, expected 0", player.GetRoundsWon())
+	}
+
+	// Increment rounds won
+	result := player.IncrementRoundsWon()
+	if result != 1 {
+		t.Errorf("increment result = %d, expected 1", result)
+	}
+	if player.GetRoundsWon() != 1 {
+		t.Errorf("rounds_won after increment = %d, expected 1", player.GetRoundsWon())
+	}
+
+	// Increment multiple times
+	player.IncrementRoundsWon()
+	player.IncrementRoundsWon()
+	if player.GetRoundsWon() != 3 {
+		t.Errorf("rounds_won after 3 increments = %d, expected 3", player.GetRoundsWon())
+	}
+}
+
+func TestPlayerCloneWithGameStats(t *testing.T) {
+	original := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
+	original.IncrementEventsDrawn()
+	original.IncrementEventsDrawn()
+	original.IncrementItemsUsed()
+	original.IncrementRoundsWon()
+
+	cloned := original.Clone()
+
+	// Cloned should have same stats values
+	if cloned.GetEventsDrawn() != 2 {
+		t.Errorf("cloned events_drawn = %d, expected 2", cloned.GetEventsDrawn())
+	}
+	if cloned.GetItemsUsed() != 1 {
+		t.Errorf("cloned items_used = %d, expected 1", cloned.GetItemsUsed())
+	}
+	if cloned.GetRoundsWon() != 1 {
+		t.Errorf("cloned rounds_won = %d, expected 1", cloned.GetRoundsWon())
+	}
+
+	// Modify cloned stats should not affect original
+	cloned.IncrementEventsDrawn()
+	if original.GetEventsDrawn() != 2 {
+		t.Errorf("original events_drawn should remain 2 after cloned increment, got %d", original.GetEventsDrawn())
 	}
 }
 

@@ -221,9 +221,22 @@ func (s *RoundMiniGameState) Update(ctx *StateContext) StateID {
 }
 
 func (s *RoundMiniGameState) Exit(ctx *StateContext) {
+	// Track rounds won stat for rank 1 players
+	game := ctx.GetGame()
+	if game != nil {
+		for _, p := range game.Players {
+			if p.ID.IsBoss() {
+				continue
+			}
+			rank := ctx.GetMiniGameRank(p.ID.UUID())
+			if rank == 1 {
+				p.IncrementRoundsWon()
+			}
+		}
+	}
+
 	// Broadcast final mini-game rankings before leaving mini-game phase.
 	if ctx.Broadcast != nil {
-		game := ctx.GetGame()
 		if game != nil {
 			rankings := make([]pkgnet.RankingEntry, 0, len(game.Players))
 
@@ -622,14 +635,22 @@ func (s *GameOverState) Enter(ctx *StateContext) {
 		for i, p := range game.Players {
 			stats[i] = pkgnet.PlayerStats{
 				PlayerID:    p.ID.UUID(),
-				RoundsWon:   0, // TODO: track rounds won
-				EventsDrawn: 0, // TODO: track events drawn
-				ItemsUsed:   0, // TODO: track items used
+				DisplayName: p.Metadata.GetStringOrDefault("display_name", p.ID.UUID()),
+				RoundsWon:   p.GetRoundsWon(),
+				EventsDrawn: p.GetEventsDrawn(),
+				ItemsUsed:   p.GetItemsUsed(),
 			}
 		}
+
+		winnerDisplayName := winnerID
+		if s.winner != nil {
+			winnerDisplayName = s.winner.Metadata.GetStringOrDefault("display_name", winnerID)
+		}
+
 		over := &pkgnet.GameOver{
-			WinnerID: winnerID,
-			Stats:    stats,
+			WinnerID:          winnerID,
+			WinnerDisplayName: winnerDisplayName,
+			Stats:             stats,
 		}
 		ctx.Broadcast.BroadcastGameOver(over)
 	}

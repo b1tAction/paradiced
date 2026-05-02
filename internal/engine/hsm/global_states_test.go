@@ -544,7 +544,9 @@ func TestRoundMiniGameState_GameTypeDeterministic(t *testing.T) {
 func TestRoundMiniGameState_OnMiniGameDataSubmit(t *testing.T) {
 	state := NewRoundMiniGameState()
 
-	game := engine.NewGame(id.NewGameID(), 0)
+	// Use seed 42 which deterministically selects dice_race game type,
+	// so "score" key sorting works as expected
+	game := engine.NewGame(id.NewGameID(), 42)
 	p1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	p2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	game.AddPlayer(p1)

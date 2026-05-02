@@ -130,7 +130,7 @@ func (g *Game) subscribePlayerEffects(player *core.Player) {
 }
 
 // createBuffDecision creates a Decision for Buff using handler config.
-func (g *Game) createBuffDecision(buff *core.Buff, def *core.BuffDefinition, config *BuffHandlerConfig) *event.Decision {
+func (g *Game) createBuffDecision(buff *core.Buff, def *constants.BuffDefinition, config *BuffHandlerConfig) *event.Decision {
 	desc := def.Desc
 	if config.NeedConfirm {
 		return event.NewDecision(desc, []event.Option{
@@ -143,7 +143,7 @@ func (g *Game) createBuffDecision(buff *core.Buff, def *core.BuffDefinition, con
 }
 
 // createItemDecision creates a Decision for Item using handler config.
-func (g *Game) createItemDecision(item *core.Item, def *core.ItemDefinition, config *ItemHandlerConfig) *event.Decision {
+func (g *Game) createItemDecision(item *core.Item, def *constants.ItemDefinition, config *ItemHandlerConfig) *event.Decision {
 	desc := def.Desc
 	if config.NeedConfirm {
 		return event.NewDecision(desc, []event.Option{
@@ -192,7 +192,7 @@ func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
 }
 
 // createBuffDecisionWithAction creates a Buff Decision with Action using handler config.
-func (g *Game) createBuffDecisionWithAction(buff *core.Buff, def *core.BuffDefinition, config *BuffHandlerConfig, action func(ctx *event.Context) error) *event.Decision {
+func (g *Game) createBuffDecisionWithAction(buff *core.Buff, def *constants.BuffDefinition, config *BuffHandlerConfig, action func(ctx *event.Context) error) *event.Decision {
 	desc := def.Desc
 	if config.NeedConfirm {
 		return event.NewDecision(desc, []event.Option{
@@ -240,7 +240,7 @@ func (g *Game) SubscribeItem(player *core.Player, item *core.Item) {
 }
 
 // createItemDecisionWithAction creates an Item Decision with Action using handler config.
-func (g *Game) createItemDecisionWithAction(item *core.Item, def *core.ItemDefinition, config *ItemHandlerConfig, action func(ctx *event.Context) error) *event.Decision {
+func (g *Game) createItemDecisionWithAction(item *core.Item, def *constants.ItemDefinition, config *ItemHandlerConfig, action func(ctx *event.Context) error) *event.Decision {
 	desc := def.Desc
 	if config.NeedConfirm {
 		return event.NewDecision(desc, []event.Option{

@@ -95,6 +95,9 @@ type Player struct {
 	// LP is the player's current luck points (0-8).
 	LP int `json:"lp"`
 
+	// MaxHP is the player's maximum health points (for HP bar rendering).
+	MaxHP int `json:"max_hp"`
+
 	// Buffs contains the player's active buffs.
 	Buffs []Buff `json:"buffs"`
 
@@ -234,6 +237,10 @@ type GameOver struct {
 	// Matches core.Player.ID.UUID() format.
 	WinnerID string `json:"winner_id"`
 
+	// WinnerDisplayName is the winning player's display name for client UI.
+	// Falls back to WinnerID (UUID) if not provided.
+	WinnerDisplayName string `json:"winner_display_name"`
+
 	// Stats contains end-game statistics for all players.
 	Stats []PlayerStats `json:"stats"`
 }
@@ -243,6 +250,10 @@ type PlayerStats struct {
 	// PlayerID is the player's game internal ID.
 	// Matches core.Player.ID.UUID() format.
 	PlayerID string `json:"player_id"`
+
+	// DisplayName is the user-provided display name for client UI.
+	// Falls back to PlayerID (UUID) if not provided.
+	DisplayName string `json:"display_name"`
 
 	// RoundsWon is the number of rounds won (mini-game ranking 1).
 	RoundsWon int `json:"rounds_won"`
@@ -366,10 +377,66 @@ type MapCellConfig struct {
 }
 
 // StartGameAck represents the acknowledgment sent to all players when the host starts the game.
-// Contains the full map configuration so clients can render the map before StateSync arrives.
+// Contains the full map configuration and definition catalog so clients can render
+// map and look up event/buff/item names/descriptions before StateSync arrives.
 type StartGameAck struct {
 	// MapConfig is the complete map configuration for this game session.
 	MapConfig MapConfig `json:"map_config"`
+
+	// Definitions is the complete definition catalog for client rendering.
+	// Client uses this to look up name/desc for events, buffs, and items
+	// instead of relying on hardcoded strings or LogEntry desc fields.
+	Definitions DefinitionsConfig `json:"definitions"`
+}
+
+// DefinitionsConfig contains the full definition catalog for client rendering.
+// Sent as part of StartGameAck at game start, alongside MapConfig.
+type DefinitionsConfig struct {
+	// Events maps event type keys to their definition configs.
+	Events map[string]EventDefinitionConfig `json:"events"`
+
+	// Buffs maps buff type keys to their definition configs.
+	Buffs map[string]BuffDefinitionConfig `json:"buffs"`
+
+	// Items maps item type keys to their definition configs.
+	Items map[string]ItemDefinitionConfig `json:"items"`
+}
+
+// EventDefinitionConfig represents an event definition for client rendering.
+type EventDefinitionConfig struct {
+	Type        string `json:"type"`
+	Evaluation  int    `json:"evaluation"`
+	Category    string `json:"category"`     // "good"/"neutral"/"bad" (computed from Evaluation)
+	EnglishName string `json:"english_name"`
+	Name        string `json:"name"`         // Chinese display name
+	Desc        string `json:"desc"`         // Chinese description
+}
+
+// BuffDefinitionConfig represents a buff definition for client rendering.
+type BuffDefinitionConfig struct {
+	Type        string `json:"type"`
+	Evaluation  int    `json:"evaluation"`
+	Category    string `json:"category"`     // "good"/"neutral"/"bad" (computed from Evaluation)
+	EnglishName string `json:"english_name"`
+	Name        string `json:"name"`         // Chinese display name
+	Desc        string `json:"desc"`         // Chinese description
+	Duration    int    `json:"duration"`
+	IsPositive  bool   `json:"is_positive"`  // Computed from Evaluation
+	IsNegative  bool   `json:"is_negative"`  // Computed from Evaluation
+	IsHidden    bool   `json:"is_hidden"`    // Computed from BuffType
+	IsBoss      bool   `json:"is_boss"`      // Computed from BuffType
+	IsFaction   bool   `json:"is_faction"`   // Computed from BuffType (faction passive skill)
+	IsDraw      bool   `json:"is_draw"`      // Computed from BuffType
+}
+
+// ItemDefinitionConfig represents an item definition for client rendering.
+type ItemDefinitionConfig struct {
+	Type        string `json:"type"`
+	Evaluation  int    `json:"evaluation"`
+	Category    string `json:"category"`     // "good"/"neutral"/"bad" (computed from Evaluation)
+	EnglishName string `json:"english_name"`
+	Name        string `json:"name"`         // Chinese display name
+	Desc        string `json:"desc"`         // Chinese description
 }
 
 // NewLogEntry creates a simple log entry for protocol testing.

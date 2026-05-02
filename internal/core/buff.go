@@ -67,26 +67,3 @@ func (b *Buff) TickDuration() bool {
 	}
 	return b.IsActive()
 }
-
-// ========== Buff Definition (Static Metadata) ==========
-
-// BuffDefinition contains static metadata for Buff display and classification.
-// Effect logic is managed by engine layer's BuffHandlerConfig.
-type BuffDefinition struct {
-	Type        constants.BuffType   `json:"type"`
-	Eval        constants.Evaluation `json:"evaluation"`    // Evaluation score for random draw
-	EnglishName string               `json:"english_name"`  // English identifier (snake_case)
-	Name        string               `json:"name"`          // Chinese display name
-	Desc        string               `json:"desc"`          // Description text
-	Duration    int                  `json:"duration"`      // Default duration (-1 for permanent)
-}
-
-// IsPositive checks if the buff is beneficial.
-func (d *BuffDefinition) IsPositive() bool {
-	return d.Eval.IsGood()
-}
-
-// IsNegative checks if the buff is harmful.
-func (d *BuffDefinition) IsNegative() bool {
-	return d.Eval.IsBad()
-}

@@ -577,7 +577,6 @@ type DrawEventAction struct {
 	targetPlayer *core.Player        // Player drawing event
 	SourceID     string              // Source identifier
 	DrawnType    constants.EventType // Event type drawn (set after Execute)
-	DrawnName    string              // Event name (set after Execute)
 }
 
 // NewDrawEventAction creates a new DrawEventAction.
@@ -609,7 +608,6 @@ func (a *DrawEventAction) Execute(ctx *ActionContext) error {
 
 	// If DrawnType is already set (e.g. bound event from CellTypeEvent), skip pool draw
 	if a.DrawnType != constants.EventTypeNone && a.DrawnType.IsValid() {
-		a.DrawnName = ""
 		return nil
 	}
 
@@ -634,7 +632,6 @@ func (a *DrawEventAction) Execute(ctx *ActionContext) error {
 	} else {
 		a.DrawnType = constants.EventTypeNone
 	}
-	a.DrawnName = ""
 
 	return nil
 }
@@ -649,7 +646,7 @@ func (a *DrawEventAction) LogEntry() gamelog.LogEntry {
 		Metadata:   util.NewMetadata(),
 	}
 
-	// Add event type to metadata (client uses event_type to look up local definition table)
+	// Add event type to metadata (client uses event_type to look up definition from DefinitionsConfig)
 	if a.DrawnType.IsValid() {
 		entry.Metadata.SetString("event_type", string(a.DrawnType))
 	}
@@ -1324,7 +1321,6 @@ type DrawBuffAction struct {
 	targetPlayer *core.Player
 	SourceID     string               // Source identifier (e.g., "Event_TasteTest")
 	DrawnType    constants.BuffType   // Buff type drawn (set after Execute)
-	DrawnName    string               // Buff name (set after Execute)
 }
 
 // NewDrawBuffAction creates a new DrawBuffAction.
@@ -1373,7 +1369,6 @@ func (a *DrawBuffAction) Execute(ctx *ActionContext) error {
 	} else {
 		a.DrawnType = constants.BuffTypeNone
 	}
-	a.DrawnName = ""
 
 	// Push AddBuffAction as DerivedAction for full buff lifecycle
 	if a.DrawnType.IsValid() && a.DrawnType != constants.BuffTypeNone {
@@ -1393,7 +1388,7 @@ func (a *DrawBuffAction) LogEntry() gamelog.LogEntry {
 		Metadata:   util.NewMetadata(),
 	}
 
-	// Add buff type to metadata (client uses buff_type to look up local definition table)
+	// Add buff type to metadata (client uses buff_type to look up definition from DefinitionsConfig)
 	if a.DrawnType.IsValid() {
 		entry.Metadata.SetString("buff_type", string(a.DrawnType))
 	}
