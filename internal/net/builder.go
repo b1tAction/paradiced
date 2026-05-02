@@ -10,6 +10,7 @@ import (
 	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/gamelog"
+	"github.com/b1tAction/paradiced/pkg/resource"
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
@@ -313,4 +314,59 @@ func filterClientEntries(entries []gamelog.LogEntry) []gamelog.LogEntry {
 		result = append(result, e)
 	}
 	return result
+}
+
+// BuildDefinitionsConfig builds the definition catalog for client rendering.
+// Converts YAML-loaded definitions into protocol format with computed classification fields.
+func BuildDefinitionsConfig() pkgnet.DefinitionsConfig {
+	defs := resource.GlobalDefinitionSet
+
+	events := make(map[string]pkgnet.EventDefinitionConfig, len(defs.Events))
+	for key, def := range defs.Events {
+		events[string(key)] = pkgnet.EventDefinitionConfig{
+			Type:        string(def.Type),
+			Evaluation:  int(def.Eval),
+			Category:    def.Eval.GetCategory(),
+			EnglishName: def.EnglishName,
+			Name:        def.Name,
+			Desc:        def.Desc,
+		}
+	}
+
+	buffs := make(map[string]pkgnet.BuffDefinitionConfig, len(defs.Buffs))
+	for key, def := range defs.Buffs {
+		buffs[string(key)] = pkgnet.BuffDefinitionConfig{
+			Type:        string(def.Type),
+			Evaluation:  int(def.Eval),
+			Category:    def.Eval.GetCategory(),
+			EnglishName: def.EnglishName,
+			Name:        def.Name,
+			Desc:        def.Desc,
+			Duration:    def.Duration,
+			IsPositive:  def.Type.IsPositive(),
+			IsNegative:  def.Type.IsNegative(),
+			IsHidden:    def.Type.IsHidden(),
+			IsBoss:      def.Type.IsBoss(),
+			IsFaction:   def.Type.IsFaction(),
+			IsDraw:      def.Type.IsDraw(),
+		}
+	}
+
+	items := make(map[string]pkgnet.ItemDefinitionConfig, len(defs.Items))
+	for key, def := range defs.Items {
+		items[string(key)] = pkgnet.ItemDefinitionConfig{
+			Type:        string(def.Type),
+			Evaluation:  int(def.Eval),
+			Category:    def.Eval.GetCategory(),
+			EnglishName: def.EnglishName,
+			Name:        def.Name,
+			Desc:        def.Desc,
+		}
+	}
+
+	return pkgnet.DefinitionsConfig{
+		Events: events,
+		Buffs:  buffs,
+		Items:  items,
+	}
 }

@@ -188,9 +188,54 @@ type WaitingPlayer struct {
 	IsHost      bool   `json:"is_host"`
 }
 
-// StartGameAck represents game start acknowledgment with full map configuration.
+// StartGameAck represents game start acknowledgment with full map configuration and definitions.
 type StartGameAck struct {
-	MapConfig MapConfig `json:"map_config"`
+	MapConfig    MapConfig         `json:"map_config"`
+	Definitions  DefinitionsConfig `json:"definitions"`
+}
+
+// DefinitionsConfig contains the full definition catalog for client rendering.
+type DefinitionsConfig struct {
+	Events map[string]EventDefinitionConfig `json:"events"`
+	Buffs  map[string]BuffDefinitionConfig  `json:"buffs"`
+	Items  map[string]ItemDefinitionConfig  `json:"items"`
+}
+
+// EventDefinitionConfig represents an event definition for client rendering.
+type EventDefinitionConfig struct {
+	Type        string `json:"type"`
+	Evaluation  int    `json:"evaluation"`
+	Category    string `json:"category"`
+	EnglishName string `json:"english_name"`
+	Name        string `json:"name"`
+	Desc        string `json:"desc"`
+}
+
+// BuffDefinitionConfig represents a buff definition for client rendering.
+type BuffDefinitionConfig struct {
+	Type        string `json:"type"`
+	Evaluation  int    `json:"evaluation"`
+	Category    string `json:"category"`
+	EnglishName string `json:"english_name"`
+	Name        string `json:"name"`
+	Desc        string `json:"desc"`
+	Duration    int    `json:"duration"`
+	IsPositive  bool   `json:"is_positive"`
+	IsNegative  bool   `json:"is_negative"`
+	IsHidden    bool   `json:"is_hidden"`
+	IsBoss      bool   `json:"is_boss"`
+	IsFaction   bool   `json:"is_faction"`
+	IsDraw      bool   `json:"is_draw"`
+}
+
+// ItemDefinitionConfig represents an item definition for client rendering.
+type ItemDefinitionConfig struct {
+	Type        string `json:"type"`
+	Evaluation  int    `json:"evaluation"`
+	Category    string `json:"category"`
+	EnglishName string `json:"english_name"`
+	Name        string `json:"name"`
+	Desc        string `json:"desc"`
 }
 
 // MapConfig represents the complete map configuration for game initialization.
