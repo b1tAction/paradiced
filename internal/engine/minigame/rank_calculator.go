@@ -84,7 +84,13 @@ func (c *DefaultRankCalculator) Calculate(gameType constants.MiniGameType, submi
 	// Assign ranks 1..N
 	ranks := make(map[string]int, len(entries))
 	for i, e := range entries {
-		ranks[e.playerID] = i + 1
+		// Special logic for Rainbow Memory: only correct answers (accuracy=1) get ranks 1-3.
+		// Wrong answers (accuracy=0) are always Rank 4 (Wood dice), regardless of their sort position.
+		if gameType == constants.MiniGameTypeRainbowMemory && e.accuracy < 1.0 {
+			ranks[e.playerID] = 4
+		} else {
+			ranks[e.playerID] = i + 1
+		}
 	}
 
 	return ranks

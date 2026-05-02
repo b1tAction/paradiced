@@ -41,5 +41,5 @@ var AllMiniGameTypes = []MiniGameType{
 	MiniGameTypeCountSeconds,
 	MiniGameTypeMathCalc,
 	MiniGameTypeRainbowMemory,
-	MiniGameTypeVernier
+	MiniGameTypeVernier,
 }
