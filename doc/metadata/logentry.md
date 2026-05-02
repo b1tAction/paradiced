@@ -102,12 +102,14 @@ for (const entry of turnSync.entries) {
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
 | `event_type` | string | 是 | 事件类型标识（客户端查找本地定义表） | 事件卡片类型 |
+| `desc` | string | 否 | 事件描述文本 | 显示事件内容描述 |
 
 ### draw_item 类型
 
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
 | `item_type` | string | 是 | 道具类型标识 | 显示道具获取动画 |
+| `desc` | string | 否 | 道具描述文本 | 显示道具内容描述 |
 
 ### teleport 类型
 
@@ -168,6 +170,7 @@ for (const entry of turnSync.entries) {
 | 字段 | 类型 | 必填 | 用途 | 客户端渲染 |
 |------|------|------|------|-----------|
 | `buff_type` | string | 是（抽取成功时） | Buff类型标识 | 显示Buff获取动画 |
+| `desc` | string | 否 | Buff描述文本 | 显示Buff内容描述 |
 
 ### dice_upgrade 类型
 
@@ -243,6 +246,7 @@ interface LogEntry {
 
         // draw_event
         event_type?: string;
+        desc?: string;  // draw_event/draw_item/draw_buff: 描述文本
 
         // dice_upgrade
         from_dice?: string;
