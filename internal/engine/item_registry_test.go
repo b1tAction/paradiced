@@ -308,39 +308,92 @@ func TestGiveBuffHandlerNilActionContext(t *testing.T) {
 }
 
 func TestTeleportHandlerNilActionContext(t *testing.T) {
-	// handleTeleport requires ActionContext
+	// handleTeleport reads target_player, not ActionContext for teleport logic
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	ctx := event.NewContext(player)
-	ctx.SetString("target_id", "test-target")
-	ctx.SetInt("target_position", 50)
-	// No action_context set
+	// No target_player set
 
 	handler := GetItemHandlerConfig(constants.ItemTypeAnyDoor).Handler
 	handler(constants.PhaseOnLand, ctx)
 
-	// Should not produce derived actions without ActionContext
+	// Should not produce derived actions without target_player
 	if len(ctx.GetDerivedActions()) > 0 {
-		t.Error("AnyDoor handler should not produce actions without ActionContext")
+		t.Error("AnyDoor handler should not produce actions without target_player")
 	}
 }
 
-func TestTeleportHandlerNoTargetID(t *testing.T) {
-	// handleTeleport requires target_id
+func TestTeleportHandlerNoTargetPlayer(t *testing.T) {
+	// handleTeleport requires target_player to produce TeleportAction
 	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.Position = 10
 	game.AddPlayer(player)
 
 	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
 	ctx.Set("action_context", actionCtx)
-	// No target_id set
+	// No target_player set
 
 	handler := GetItemHandlerConfig(constants.ItemTypeAnyDoor).Handler
 	handler(constants.PhaseOnLand, ctx)
 
-	// Should not produce derived actions without target_id
+	// Should not produce derived actions without target_player
 	if len(ctx.GetDerivedActions()) > 0 {
-		t.Error("AnyDoor handler should not produce actions without target_id")
+		t.Error("AnyDoor handler should not produce actions without target_player")
+	}
+}
+
+func TestTeleportHandlerNilTargetPlayer(t *testing.T) {
+	// handleTeleport gracefully handles nil target_player
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.Position = 10
+	game.AddPlayer(player)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("target_player", nil) // nil target_player
+
+	handler := GetItemHandlerConfig(constants.ItemTypeAnyDoor).Handler
+	handler(constants.PhaseOnLand, ctx)
+
+	// Should not produce derived actions with nil target_player
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("AnyDoor handler should not produce actions with nil target_player")
+	}
+}
+
+func TestTeleportHandlerSourceAnyDoor(t *testing.T) {
+	// TeleportAction from AnyDoor should have source = item_any_door
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.Position = 10
+	game.AddPlayer(player)
+
+	targetPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	targetPlayer.Position = 50
+	game.AddPlayer(targetPlayer)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("target_player", targetPlayer)
+
+	handler := GetItemHandlerConfig(constants.ItemTypeAnyDoor).Handler
+	handler(constants.PhaseOnLand, ctx)
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
+	}
+
+	teleportAction, ok := derived[0].(*engineaction.TeleportAction)
+	if !ok {
+		t.Fatal("expected TeleportAction")
+	}
+	if teleportAction.SourceID != string(constants.SourceItemAnyDoor) {
+		t.Errorf("SourceID = %s, expected %s", teleportAction.SourceID, constants.SourceItemAnyDoor)
 	}
 }
 
