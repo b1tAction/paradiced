@@ -336,7 +336,7 @@ func handleZhuQueFire(phase constants.Phase, ctx *event.Context) {
 | 毒瘴 | [BeforeTurn] | 30 | false | 每回合恶性事件 |
 | 离火 | [BeforeTurn] | 10 | false | 每4回合LP+1（定制处理器） |
 | 死亡标记 | [PreAction] | 999 | false | 死亡后阻拦后续Action（豁免Respawn/移除自身） |
-| 反刺 | [PreDamage] | 50 | false | Boss自身反刺：30%反伤为衍生BossAttackAction（BossAttackAction再衍生DamageAction） |
+| 反刺 | [PreDamage] | 50 | false | Boss自身反刺：30%反伤为衍生 `PiercingDamageAction`（source=`buff_thorns`，绕过 PhasePreDamage 再拦截） |
 
 | Item | Phase | Priority | NeedConfirm | 说明 |
 |------|-------|----------|-------------|------|

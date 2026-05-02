@@ -195,7 +195,7 @@ BUFF
   - 暴击/技能概率 = `0.25 + 0.05 × (8 - avgLP) + 0.30 × (maxHP - currentHP) / maxHP`（avgLP=8, bossHP=50→25%, avgLP=4, bossHP=25→60%, avgLP=0, bossHP=0→95%）
   - 30%概率暴击，70%概率技能（当暴击/技能触发时）
 - Boss攻击目标：LP加权选择，LP越低越容易被攻击
-- Boss攻击（普通1点/暴击2点）可被隐匿Buff拦截（PhasePreDamage）
+- Boss攻击（普通1点/暴击2点）通过衍生 `DamageAction` 扣血；当前隐匿Buff不拦截伤害。
 
 **Boss技能池**（随机抽取，等权重）：
 | 技能 | 类型 | 效果 |

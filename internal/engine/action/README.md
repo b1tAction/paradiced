@@ -244,7 +244,7 @@ type BossAttackAction struct {
 ```go
 type BossSkillAction struct {
     SourcePlayer *core.Player         // Boss player
-    SkillType    constants.BossSkillType // "thunder"/"curse"/"lost"/"rest"
+    SkillType    constants.BossSkillType // current registered: "thunder"/"curse"/"rest"/"thorns"
     TargetIDs    []string             // Target player IDs
     SourceID     string               // "boss_skill_thunder" etc.
     Targets      []*core.Player       // Target players
