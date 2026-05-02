@@ -6,6 +6,7 @@ import (
 
 	"github.com/b1tAction/paradiced/internal/core"
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
+	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
@@ -241,6 +242,41 @@ func TestGameUnsubscribeBuff(t *testing.T) {
 
 	if game.Bus.GetSubscriptionCount() != initialCount-2 {
 		t.Errorf("Subscription count should decrease by 2 after unsubscribe, got %d expected %d", game.Bus.GetSubscriptionCount(), initialCount-2)
+	}
+}
+
+// Regression test: buff handler execution automatically marks the source buff as tickEligible.
+// This ensures mid-turn buffs (e.g., Curse/Divine at PhasePostBuffApplied) are decremented
+// at this turn's TurnEnd rather than getting an extra free turn.
+func TestBuffHandlerAutoMarkTickEligible(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	// Add Curse buff (subscribes to PostBuffApplied + PreBuffRemoved)
+	buff := core.NewBuff(constants.BuffTypeCurse, 3)
+	game.ApplyBuffToPlayer(player, buff)
+
+	// Initially, buff should NOT be tickEligible
+	if buff.TickEligible() {
+		t.Error("newly applied buff should not be tickEligible before handler execution")
+	}
+
+	// Publish PhasePostBuffApplied (triggered by AddBuffAction PostTrigger)
+	triggerCtx := event.NewContext(player)
+	triggerCtx.Set("applied_buff_type", string(constants.BuffTypeCurse))
+	triggerCtx.Set("action_context", engineaction.NewActionContext(game, game.Bus, nil, game.Draw))
+
+	decisions := game.Bus.Publish(constants.PhasePostBuffApplied, player.ID.UUID(), triggerCtx)
+	for _, decision := range decisions {
+		if decision != nil {
+			_ = decision.Execute(0, triggerCtx)
+		}
+	}
+
+	// After handler executes, buff should be tickEligible
+	if !buff.TickEligible() {
+		t.Error("buff should be tickEligible after handler execution at PhasePostBuffApplied")
 	}
 }
 
@@ -616,6 +652,55 @@ func TestApplyItemToPlayerWithSubscription(t *testing.T) {
 		if sub.SourceID == item.ID.UUID() {
 			t.Error("AnyDoor subscription should be removed after RemoveItemFromPlayer")
 		}
+	}
+}
+
+// Regression test: when a player has multiple PhaseItemUsed items, only the
+// actually-used item's handler should execute, not all items' handlers.
+func TestPublishItemUsedOnlyTriggersUsedItem(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	// Give player two PhaseItemUsed items: DiceUpgrade and AnyDoor
+	item1 := core.NewItem(constants.ItemTypeDiceUpgrade)
+	item2 := core.NewItem(constants.ItemTypeAnyDoor)
+	game.ApplyItemToPlayer(player, item1)
+	game.ApplyItemToPlayer(player, item2)
+
+	// Both items subscribe to PhaseItemUsed
+	subscriptions := game.Bus.GetSubscriptions(constants.PhaseItemUsed)
+	if len(subscriptions) != 2 {
+		t.Fatalf("Expected 2 PhaseItemUsed subscriptions, got %d", len(subscriptions))
+	}
+
+	// Publish PhaseItemUsed with item_id = item1 (DiceUpgrade)
+	triggerCtx := event.NewContext(player)
+	triggerCtx.Set("item_id", item1.ID.UUID())
+	triggerCtx.Set("action_context", engineaction.NewActionContext(game, game.Bus, nil, game.Draw))
+	triggerCtx.Set("current_dice_type", rng.DiceTypeCopper.String())
+
+	decisions := game.Bus.Publish(constants.PhaseItemUsed, player.ID.UUID(), triggerCtx)
+	for _, decision := range decisions {
+		if decision != nil {
+			_ = decision.Execute(0, triggerCtx)
+		}
+	}
+
+	// Only item1's handler should have produced a derived action (DiceUpgradeAction),
+	// not item2's handler (TeleportAction)
+	derivedActions := triggerCtx.GetDerivedActions()
+	if len(derivedActions) != 1 {
+		t.Fatalf("Expected exactly 1 derived action from the used item, got %d", len(derivedActions))
+	}
+
+	// Verify the derived action is DiceUpgradeAction (from item1), not TeleportAction (from item2)
+	action, ok := derivedActions[0].(engineaction.Action)
+	if !ok {
+		t.Fatalf("Derived action should implement Action interface")
+	}
+	if action.Type() != constants.ActionDiceUpgrade {
+		t.Errorf("Derived action type = %s, expected dice_upgrade (item1's effect), not teleport (item2's effect)", action.Type())
 	}
 }
 

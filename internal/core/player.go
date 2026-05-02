@@ -344,6 +344,38 @@ func (p *Player) IncrementFireCounter() int {
 	return p.IncrementInt("fire_counter", 1)
 }
 
+// ========== Game Stats Methods (using Metadata) ==========
+
+// GetEventsDrawn returns the number of random events drawn by this player.
+func (p *Player) GetEventsDrawn() int {
+	return p.GetIntOrDefault("events_drawn", 0)
+}
+
+// IncrementEventsDrawn increments the events drawn counter, returns new value.
+func (p *Player) IncrementEventsDrawn() int {
+	return p.IncrementInt("events_drawn", 1)
+}
+
+// GetItemsUsed returns the number of items consumed by this player.
+func (p *Player) GetItemsUsed() int {
+	return p.GetIntOrDefault("items_used", 0)
+}
+
+// IncrementItemsUsed increments the items used counter, returns new value.
+func (p *Player) IncrementItemsUsed() int {
+	return p.IncrementInt("items_used", 1)
+}
+
+// GetRoundsWon returns the number of mini-game rounds won (rank 1) by this player.
+func (p *Player) GetRoundsWon() int {
+	return p.GetIntOrDefault("rounds_won", 0)
+}
+
+// IncrementRoundsWon increments the rounds won counter, returns new value.
+func (p *Player) IncrementRoundsWon() int {
+	return p.IncrementInt("rounds_won", 1)
+}
+
 // ========== Helper Methods ==========
 
 // Clone clones the player (used for testing).

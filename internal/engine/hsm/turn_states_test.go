@@ -290,7 +290,7 @@ func TestMainActionState_RollDiceAction_StepsRange(t *testing.T) {
 
 	diceTypes := []rng.DiceType{rng.DiceTypeGold, rng.DiceTypeSilver, rng.DiceTypeCopper, rng.DiceTypeWood, rng.DiceTypeNormal}
 	for _, diceType := range diceTypes {
-		action := engineaction.NewRollDiceAction(player, diceType, game.RNG, "DiceRoll")
+		action := engineaction.NewRollDiceAction(player, diceType, game.RNG, string(constants.SourceSystemDice))
 		if action.Steps < 1 || action.Steps > 6 {
 			t.Errorf("RollDiceAction Steps for %s should be 1-6, got %d", diceType.String(), action.Steps)
 		}

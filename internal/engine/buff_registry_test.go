@@ -373,8 +373,8 @@ func TestHiddenBuffHandlerBehavior(t *testing.T) {
 	if err != nil {
 		t.Error("blocked_by should be set")
 	}
-	if blockedBy != "Buff_Hidden" {
-		t.Errorf("blocked_by = %s, expected Buff_Hidden", blockedBy)
+	if blockedBy != string(constants.SourceBuffHidden) {
+		t.Errorf("blocked_by = %s, expected %s", blockedBy, string(constants.SourceBuffHidden))
 	}
 }
 
@@ -832,23 +832,26 @@ func TestThornsReflectHandler(t *testing.T) {
 	handler := GetBuffHandlerConfig(constants.BuffTypeThorns).Handler
 	handler(constants.PhasePreDamage, ctx)
 
-	// Should produce one derived BossAttackAction (reflect 4*30%=1.2→rounded=1)
+	// Should produce one derived DamageAction (reflect 4*30%=1.2→rounded=1)
 	derivedActions := ctx.GetDerivedActions()
 	if len(derivedActions) != 1 {
 		t.Fatalf("Expected 1 derived action, got %d", len(derivedActions))
 	}
 
-	reflectAction, ok := derivedActions[0].(*engineaction.BossAttackAction)
+	reflectAction, ok := derivedActions[0].(*engineaction.DamageAction)
 	if !ok {
-		t.Fatalf("Derived action should be BossAttackAction, got %T", derivedActions[0])
+		t.Fatalf("Derived action should be DamageAction, got %T", derivedActions[0])
 	}
 
-	if reflectAction.Damage != 1 {
-		t.Errorf("Reflect damage = %d, expected 1 (4*0.3 rounded)", reflectAction.Damage)
+	if reflectAction.Amount != 1 {
+		t.Errorf("Reflect damage = %d, expected 1 (4*0.3 rounded)", reflectAction.Amount)
+	}
+	if !reflectAction.IsPiercing {
+		t.Error("Thorns reflect DamageAction should be piercing (bypasses PhasePreDamage interception)")
 	}
 
-	if reflectAction.SourceID != string(constants.SourceThornsReflect) {
-		t.Errorf("Reflect source = %s, expected %s", reflectAction.SourceID, string(constants.SourceThornsReflect))
+	if reflectAction.SourceID != string(constants.SourceBuffThornsReflect) {
+		t.Errorf("Reflect source = %s, expected %s", reflectAction.SourceID, string(constants.SourceBuffThornsReflect))
 	}
 }
 
@@ -899,12 +902,12 @@ func TestThornsReflectDamageCalculation(t *testing.T) {
 				if len(derivedActions) != 1 {
 					t.Fatalf("damage=%d: expected 1 derived action, got %d", tt.damage, len(derivedActions))
 				}
-				reflectAction, ok := derivedActions[0].(*engineaction.BossAttackAction)
+				reflectAction, ok := derivedActions[0].(*engineaction.DamageAction)
 				if !ok {
-					t.Fatalf("damage=%d: derived action should be BossAttackAction", tt.damage)
+					t.Fatalf("damage=%d: derived action should be DamageAction", tt.damage)
 				}
-				if reflectAction.Damage != tt.expectedReflect {
-					t.Errorf("damage=%d: reflect damage = %d, expected %d", tt.damage, reflectAction.Damage, tt.expectedReflect)
+				if reflectAction.Amount != tt.expectedReflect {
+					t.Errorf("damage=%d: reflect damage = %d, expected %d", tt.damage, reflectAction.Amount, tt.expectedReflect)
 				}
 			}
 
@@ -1101,7 +1104,7 @@ func TestHasEventHandler(t *testing.T) {
 // ========== createModifyLPHandler Tests ==========
 
 func TestCreateModifyLPHandlerNilContext(t *testing.T) {
-	handler := createModifyLPHandler(1)
+	handler := createModifyLPHandler(1, constants.SourceBuffDivine)
 	err := handler(constants.PhaseBeforeTurn, nil)
 	if err == nil {
 		t.Error("createModifyLPHandler should return error for nil context")
@@ -1109,7 +1112,7 @@ func TestCreateModifyLPHandlerNilContext(t *testing.T) {
 }
 
 func TestCreateModifyLPHandlerNilPlayer(t *testing.T) {
-	handler := createModifyLPHandler(1)
+	handler := createModifyLPHandler(1, constants.SourceBuffDivine)
 	ctx := event.NewContext(nil)
 	err := handler(constants.PhaseBeforeTurn, ctx)
 	if err == nil {
@@ -1119,7 +1122,7 @@ func TestCreateModifyLPHandlerNilPlayer(t *testing.T) {
 
 func TestCreateModifyLPHandlerWithActionContext(t *testing.T) {
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
-	handler := createModifyLPHandler(1)
+	handler := createModifyLPHandler(1, constants.SourceBuffDivine)
 	ctx := event.NewContext(player)
 
 	// Set action_context so getActionCtxFromEventCtx succeeds

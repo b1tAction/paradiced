@@ -251,6 +251,9 @@ interface MiniGameConn {
 |----|------|----------------|----------|
 | `dice_race` | 投骰比大小 | `{ dice1: number, dice2: number, score: dice1+dice2 }` | score 降序（越大越好） |
 | `count_seconds` | 计秒小游戏 | `{ elapsed: number, deviation: \|elapsed-5.0\| }` | deviation 升序（越接近5秒越好） |
+| `math_calc` | 数算挑战 | `{ accuracy: number (0-1), time_ms: number }` | accuracy 降序，time_ms 升序 |
+| `rainbow_memory` | 彩虹记忆 | `{ accuracy: number (0-1), time_ms: number }` | accuracy 降序，time_ms 升序 |
+| `vernier` | 游标卡尺 | `{ deviation: number }` | deviation 升序（越接近0越好） |
 | `coin_flip` | 翻硬币 | 未实现，暂不可用 | - |
 
 **connection 说明**：
@@ -280,17 +283,22 @@ interface RankingEntry {
 
 ```typescript
 interface GameOver {
-    winner_id: string;     // 胜利玩家 ID
-    stats: PlayerStats[];  // 统计数据
+    winner_id: string;            // 胜利玩家 ID（UUID，保持不变）
+    winner_display_name: string;  // 胜利玩家显示名称（用于 UI 展示）
+    stats: PlayerStats[];         // 统计数据
 }
 
 interface PlayerStats {
-    player_id: string;    // 玩家 ID
+    player_id: string;    // 玩家 ID（UUID，保持不变）
+    display_name: string; // 玩家显示名称（用于 UI 展示）
     rounds_won: number;   // 小游戏第一名次数
     events_drawn: number; // 抽取事件次数
     items_used: number;   // 使用道具次数
 }
 ```
+
+> **重要**：`winner_id` 和 `player_id` 始终保持 UUID 格式，不会被 display_name 覆盖。
+> 客户端应使用 `winner_display_name` / `display_name` 展示玩家名称。
 
 ---
 
@@ -609,14 +617,13 @@ interface LogEntry {
 
 | 值 | 含义 |
 |----|------|
-| `Buff_Divine` | 神眷 Buff |
-| `Buff_Curse` | 诅咒 Buff |
-| `Buff_Fire` | 离火 Buff |
-| `Cell_Fragile` | 易碎格子 |
-| `Cell_Fog` | 迷雾格子 |
-| `Item_AnyDoor` | 任意门道具 |
-| `Faction_BaiHu` | 白虎阵营技能 |
-| `DiceRoll` | 骰子投掷 |
+| `buff_divine` | 神眷 Buff |
+| `buff_curse` | 诅咒 Buff |
+| `buff_fire` | 离火 Buff |
+| `fragile_cell` | 易碎格子 |
+| `item_any_door` | 任意门道具 |
+| `faction_bai_hu` | 白虎阵营技能 |
+| `system_dice_roll` | 骰子投掷 |
 
 ---
 
@@ -1165,11 +1172,13 @@ interface RankingEntry {
 
 interface GameOver {
     winner_id: string;
+    winner_display_name: string;
     stats: PlayerStats[];
 }
 
 interface PlayerStats {
     player_id: string;
+    display_name: string;
     rounds_won: number;
     events_drawn: number;
     items_used: number;

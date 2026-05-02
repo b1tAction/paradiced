@@ -126,7 +126,7 @@ func TestTurnFlow_Respawn_GameLog(t *testing.T) {
 
 	// Execute RespawnAction
 	checkpoint := mapEngine.GetLastCheckpoint(player.Position)
-	respawnAction := engineaction.NewRespawnAction(player, checkpoint, "DeathRespawn")
+	respawnAction := engineaction.NewRespawnAction(player, checkpoint, string(constants.SourceDeathRespawn))
 	actionCtx.ExecuteAction(respawnAction)
 
 	// Verify player respawned
@@ -158,7 +158,7 @@ func TestTurnFlow_Respawn_GameLog(t *testing.T) {
 		if respawnEntry.Target != player.ID.UUID() {
 			t.Errorf("Respawn target should be %s, got %s", player.ID.UUID(), respawnEntry.Target)
 		}
-		if respawnEntry.Source != "DeathRespawn" {
+		if respawnEntry.Source != string(constants.SourceDeathRespawn) {
 			t.Errorf("Respawn source should be DeathRespawn, got %s", respawnEntry.Source)
 		}
 		// Check metadata for checkpoint_pos
@@ -273,7 +273,7 @@ func TestTurnFlow_CompleteTurn(t *testing.T) {
 	result, _ := mapEngine.CalculatePath(player.Position, 5)
 	actionCtx.SetInt("target_pos", result.TargetIndex)
 	actionCtx.Set("path", result.Path)
-	moveAction := engineaction.NewMoveAction(player, 5, "DiceRoll")
+	moveAction := engineaction.NewMoveAction(player, 5, string(constants.SourceSystemDiceRoll))
 	actionCtx.ExecuteAction(moveAction)
 
 	// === Step 4: Simulate Trap Damage ===
@@ -346,7 +346,7 @@ func TestTurnFlow_CompleteTurn(t *testing.T) {
 		if moveEntry.Metadata.GetIntOrDefault("steps", 0) != 5 {
 			t.Errorf("Move steps should be 5, got %d", moveEntry.Metadata.GetIntOrDefault("steps", 0))
 		}
-		if moveEntry.Source != "DiceRoll" {
+		if moveEntry.Source != string(constants.SourceSystemDiceRoll) {
 			t.Errorf("Move source should be DiceRoll, got %s", moveEntry.Source)
 		}
 	}
@@ -424,7 +424,7 @@ func TestTurnFlow_Interrupt_Respawn(t *testing.T) {
 
 	// Execute RespawnAction (should be interceptable with PhasePreRespawn)
 	checkpoint := mapEngine.GetLastCheckpoint(player.Position)
-	respawnAction := engineaction.NewRespawnAction(player, checkpoint, "DeathRespawn")
+	respawnAction := engineaction.NewRespawnAction(player, checkpoint, string(constants.SourceDeathRespawn))
 
 	// Verify PreTriggerPhase is PhasePreRespawn
 	if respawnAction.PreTriggerPhase() != constants.PhasePreRespawn {
@@ -539,7 +539,7 @@ func TestGameLog_JSON_Output(t *testing.T) {
 
 	// Add various entries
 	game.Log.AddEntry(gamelog.NewActionEntry("modify_lp", player.ID.UUID(), "Buff_Divine"))
-	game.Log.AddEntry(gamelog.NewActionEntry("move", player.ID.UUID(), "DiceRoll"))
+	game.Log.AddEntry(gamelog.NewActionEntry("move", player.ID.UUID(), string(constants.SourceSystemDiceRoll)))
 	game.Log.AddEntry(gamelog.NewActionEntry("damage", player.ID.UUID(), "Event_Trap"))
 
 	game.Log.EndTurn()

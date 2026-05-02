@@ -169,7 +169,7 @@ func registerAllItems() {
 		Phase:       constants.PhaseItemUsed,
 		Priority:    50,
 		NeedConfirm: false,
-		Handler:     createGiveBuffHandler(constants.BuffTypeLost),
+		Handler:     createGiveBuffHandler(constants.BuffTypeLost, constants.SourceItemReverseClockBuff),
 	})
 
 	// AnyDoor: Teleport to target player within 30 range
@@ -203,7 +203,7 @@ func registerAllItems() {
 
 // ========== Item Handler Helpers ==========
 
-func createGiveBuffHandler(buffType constants.BuffType) EffectHandler {
+func createGiveBuffHandler(buffType constants.BuffType, source constants.ActionSource) EffectHandler {
 	return func(phase constants.Phase, ctx *event.Context) error {
 		if ctx == nil {
 			return fmt.Errorf("handler: event context is nil")
@@ -231,7 +231,7 @@ func createGiveBuffHandler(buffType constants.BuffType) EffectHandler {
 		}
 		_ = actionCtx // ActionContext used for derived action processing
 
-		ctx.AddDerivedAction(engineaction.NewAddBuffAction(targetPlayer, buffType, "Item_Effect"))
+		ctx.AddDerivedAction(engineaction.NewAddBuffAction(targetPlayer, buffType, string(source)))
 		return nil
 	}
 }
@@ -260,7 +260,7 @@ func handleTeleport(phase constants.Phase, ctx *event.Context) error {
 	// For now, use stored target position
 	targetPos := ctx.GetIntOrDefault("target_position", 0)
 
-	ctx.AddDerivedAction(engineaction.NewTeleportAction(ctx.Player, targetPos, "Item_AnyDoor"))
+	ctx.AddDerivedAction(engineaction.NewTeleportAction(ctx.Player, targetPos, string(constants.SourceItemAnyDoor)))
 	return nil
 }
 
@@ -281,6 +281,6 @@ func handleDiceUpgrade(phase constants.Phase, ctx *event.Context) error {
 	}
 
 	fromDice := rng.DiceTypeFromString(currentDice)
-	ctx.AddDerivedAction(engineaction.NewDiceUpgradeAction(ctx.Player, "Item_DiceUpgrade", fromDice))
+	ctx.AddDerivedAction(engineaction.NewDiceUpgradeAction(ctx.Player, string(constants.SourceItemDiceUpgrade), fromDice))
 	return nil
 }

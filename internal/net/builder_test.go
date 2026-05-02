@@ -69,12 +69,12 @@ func TestBuildStateSyncWithEntries(t *testing.T) {
 	// Add some log entries
 	meta1 := util.NewMetadata()
 	meta1.SetInt("lp_change", 1)
-	entry1 := gamelog.NewActionEntryWithMetadata("modify_lp", player.ID.UUID(), "Buff_Divine", meta1)
+	entry1 := gamelog.NewActionEntryWithMetadata("modify_lp", player.ID.UUID(), string(constants.SourceBuffDivine), meta1)
 	game.Log.AddEntry(entry1)
 
 	meta := util.NewMetadata()
 	meta.Set("path", []int{10, 11, 12, 13, 14, 15})
-	entry2 := gamelog.NewActionEntryWithMetadata("move", player.ID.UUID(), "DiceRoll", meta)
+	entry2 := gamelog.NewActionEntryWithMetadata("move", player.ID.UUID(), string(constants.SourceSystemDiceRoll), meta)
 	game.Log.AddEntry(entry2)
 
 	stateSync := builder.BuildStateSync()
@@ -154,7 +154,7 @@ func TestBuildStateSyncEntriesWithMetadata(t *testing.T) {
 	meta.SetInt("dice_steps", 3)
 	meta.SetString("dice_type", "silver")
 
-	entry := gamelog.NewActionEntryWithMetadata("move", player.ID.UUID(), "DiceRoll", meta)
+	entry := gamelog.NewActionEntryWithMetadata("move", player.ID.UUID(), string(constants.SourceSystemDiceRoll), meta)
 	game.Log.AddEntry(entry)
 
 	stateSync := builder.BuildStateSync()
@@ -322,7 +322,7 @@ func TestBuildDecision(t *testing.T) {
 		{ID: "skip", Label: "跳过"},
 	}
 
-	decision := builder.BuildDecision("dec-001", "是否应用效果？", "Buff_Divine", options, 30, 0)
+	decision := builder.BuildDecision("dec-001", "是否应用效果？", string(constants.SourceBuffDivine), options, 30, 0)
 
 	if decision.ID != "dec-001" {
 		t.Errorf("decision.ID = %s, want dec-001", decision.ID)
@@ -330,8 +330,8 @@ func TestBuildDecision(t *testing.T) {
 	if decision.Prompt != "是否应用效果？" {
 		t.Errorf("decision.Prompt = %s, want 是否应用效果？", decision.Prompt)
 	}
-	if decision.Context != "Buff_Divine" {
-		t.Errorf("decision.Context = %s, want Buff_Divine", decision.Context)
+	if decision.Context != string(constants.SourceBuffDivine) {
+		t.Errorf("decision.Context = %s, want %s", decision.Context, string(constants.SourceBuffDivine))
 	}
 	if len(decision.Options) != 2 {
 		t.Errorf("len(decision.Options) = %d, want 2", len(decision.Options))
@@ -448,7 +448,7 @@ func TestBuildDecisionFromEvent(t *testing.T) {
 		{ID: "apply", Label: "应用"},
 		{ID: "skip", Label: "跳过"},
 	})
-	decision.WithSource("Buff_Divine", "buff")
+	decision.WithSource(string(constants.SourceBuffDivine), "buff")
 	decision.WithTimeout(30*time.Second, 0)
 
 	result := builder.BuildDecisionFromEvent(decision)
@@ -459,8 +459,8 @@ func TestBuildDecisionFromEvent(t *testing.T) {
 	if result.Prompt != "Choose action" {
 		t.Errorf("Prompt = %s, want 'Choose action'", result.Prompt)
 	}
-	if result.Context != "buff_Buff_Divine" {
-		t.Errorf("Context = %s, want 'buff_Buff_Divine'", result.Context)
+	if result.Context != "buff_buff_divine" {
+		t.Errorf("Context = %s, want 'buff_buff_divine'", result.Context)
 	}
 	if len(result.Options) != 2 {
 		t.Errorf("len(Options) = %d, want 2", len(result.Options))

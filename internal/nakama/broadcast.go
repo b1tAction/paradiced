@@ -166,13 +166,12 @@ func (a *NakamaBroadcastAdapter) BroadcastGameOver(over *net.GameOver) error {
 		return nil // No dispatcher set
 	}
 
-	// Inject DisplayName for UI rendering.
-	// PlayerID already equals Nakama userID, no need for conversion.
+	// Inject DisplayName for winner and stats without overwriting UUID identifiers.
 	if over != nil && a.handler != nil {
-		// Inject DisplayName for WinnerID
+		// Inject WinnerDisplayName from player metadata
 		for userID, player := range a.handler.players {
 			if player != nil && player.ID.UUID() == over.WinnerID {
-				over.WinnerID = player.Metadata.GetStringOrDefault("display_name", userID)
+				over.WinnerDisplayName = player.Metadata.GetStringOrDefault("display_name", userID)
 				break
 			}
 		}
@@ -181,7 +180,7 @@ func (a *NakamaBroadcastAdapter) BroadcastGameOver(over *net.GameOver) error {
 		for i := range over.Stats {
 			for userID, player := range a.handler.players {
 				if player != nil && player.ID.UUID() == over.Stats[i].PlayerID {
-					over.Stats[i].PlayerID = player.Metadata.GetStringOrDefault("display_name", userID)
+					over.Stats[i].DisplayName = player.Metadata.GetStringOrDefault("display_name", userID)
 					break
 				}
 			}

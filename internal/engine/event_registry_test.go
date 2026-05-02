@@ -168,8 +168,8 @@ func TestRelicEventHandler(t *testing.T) {
 	if !ok {
 		t.Fatal("expected DrawItemAction")
 	}
-	if drawItemAction.Source() != "Event_Relic" {
-		t.Errorf("Source = %s, expected Event_Relic", drawItemAction.Source())
+	if drawItemAction.Source() != string(constants.SourceEventRelic) {
+		t.Errorf("Source = %s, expected %s", drawItemAction.Source(), string(constants.SourceEventRelic))
 	}
 }
 
@@ -293,8 +293,8 @@ func TestTasteTestEventHandler(t *testing.T) {
 	if !ok {
 		t.Fatal("expected DrawBuffAction")
 	}
-	if drawBuffAction.Source() != "Event_TasteTest" {
-		t.Errorf("Source = %s, expected Event_TasteTest", drawBuffAction.Source())
+	if drawBuffAction.Source() != string(constants.SourceEventTasteTest) {
+		t.Errorf("Source = %s, expected %s", drawBuffAction.Source(), string(constants.SourceEventTasteTest))
 	}
 }
 

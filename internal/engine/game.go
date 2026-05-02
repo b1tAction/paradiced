@@ -174,7 +174,11 @@ func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
 		// Create handler closure - executes config.Handler
 		action := func(ctx *event.Context) error {
 			if config.Handler != nil {
-				return config.Handler(phase, ctx)
+				err := config.Handler(phase, ctx)
+				if err == nil {
+					buff.MarkTickEligible()
+				}
+				return err
 			}
 			return nil
 		}
@@ -208,6 +212,8 @@ func (g *Game) UnsubscribeBuff(buff *core.Buff) {
 
 // SubscribeItem subscribes when player gets a new Item.
 // Uses ItemHandlerConfig for Phase/Priority/NeedConfirm.
+// The handler closure checks that the triggering item_id matches this item's UUID,
+// so Publish(PhaseItemUsed, ...) only executes the handler of the actually-used item.
 func (g *Game) SubscribeItem(player *core.Player, item *core.Item) {
 	def := GetItemDefinition(item.Type)
 	config := GetItemHandlerConfig(item.Type)
@@ -215,8 +221,13 @@ func (g *Game) SubscribeItem(player *core.Player, item *core.Item) {
 		return
 	}
 	if config.Phase.NeedsSubscription() {
-		// Create handler closure - executes config.Handler
+		itemUUID := item.ID.UUID()
 		action := func(ctx *event.Context) error {
+			// Only execute if this item is the one being used
+			triggerItemID, _ := ctx.GetString("item_id")
+			if triggerItemID != itemUUID {
+				return nil
+			}
 			if config.Handler != nil {
 				return config.Handler(constants.PhaseItemUsed, ctx)
 			}

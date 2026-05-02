@@ -11,7 +11,7 @@ import (
 type RankCalculator interface {
 	// Calculate computes player rankings from submitted game_data.
 	// Returns: playerID -> rank (1 = best, N = worst)
-	Calculate(gameType constants.MiniGameType, submissions map[string]map[string]interface{}) map[string]int
+	Calculate(gameType constants.MiniGameType, submissions map[string]map[string]any) map[string]int
 }
 
 // DefaultRankCalculator sorts by game_type-specific key and assigns ranks.
@@ -27,7 +27,7 @@ func NewDefaultRankCalculator() *DefaultRankCalculator {
 // - vernier: sort by deviation ascending (closer to 0 = better rank)
 // - math_calc, rainbow_memory: sort by accuracy descending, then time_ms ascending
 // - default: sort by "score" descending
-func (c *DefaultRankCalculator) Calculate(gameType constants.MiniGameType, submissions map[string]map[string]interface{}) map[string]int {
+func (c *DefaultRankCalculator) Calculate(gameType constants.MiniGameType, submissions map[string]map[string]any) map[string]int {
 	if len(submissions) == 0 {
 		return map[string]int{}
 	}
@@ -42,17 +42,22 @@ func (c *DefaultRankCalculator) Calculate(gameType constants.MiniGameType, submi
 
 	entries := make([]entry, 0, len(submissions))
 	for playerID, data := range submissions {
-		if gameType == constants.MiniGameTypeMathCalc || gameType == constants.MiniGameTypeRainbowMemory {
+		switch gameType {
+		case constants.MiniGameTypeMathCalc, constants.MiniGameTypeRainbowMemory:
 			// multi-key: accuracy descending, then timeMs ascending
 			acc := getFloatValue(data, "accuracy")
 			t := getFloatValue(data, "time_ms")
 			entries = append(entries, entry{playerID: playerID, accuracy: acc, timeMs: t})
-		} else if gameType == constants.MiniGameTypeCountSeconds {
+		case constants.MiniGameTypeCountSeconds:
 			// count_seconds: compute deviation from 5.0 seconds
 			elapsed := getFloatValue(data, "elapsed")
 			deviation := abs(elapsed - 5.0)
 			entries = append(entries, entry{playerID: playerID, keyValue: deviation})
-		} else {
+		case constants.MiniGameTypeVernier:
+			// vernier: deviation from center (submitted as "deviation" key)
+			dev := getFloatValue(data, "deviation")
+			entries = append(entries, entry{playerID: playerID, keyValue: dev})
+		default:
 			sortKey := getSortKey(gameType)
 			val := getFloatValue(data, sortKey)
 			entries = append(entries, entry{playerID: playerID, keyValue: val})
@@ -112,7 +117,7 @@ func getSortKey(gameType constants.MiniGameType) string {
 
 // getFloatValue extracts a float64 value from game_data map.
 // Supports int, float64, and numeric values. Returns 0 if key not found.
-func getFloatValue(data map[string]interface{}, key string) float64 {
+func getFloatValue(data map[string]any, key string) float64 {
 	val, ok := data[key]
 	if !ok {
 		return 0

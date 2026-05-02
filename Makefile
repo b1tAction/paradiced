@@ -10,7 +10,8 @@ PLUGINBUILDER_IMAGE ?= heroiclabs/nakama-pluginbuilder:3.22.0
 
 # CLI build output
 CLI_NAME ?= pdcli
-CLI_OUT ?= ./build/$(CLI_NAME)
+GOEXE ?= $(shell go env GOEXE)
+CLI_OUT ?= ./build/$(CLI_NAME)$(GOEXE)
 
 # Docker compose file
 DOCKER_COMPOSE ?= docker-compose.yml

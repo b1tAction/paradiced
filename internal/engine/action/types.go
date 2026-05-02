@@ -300,6 +300,8 @@ type AddBuffAction struct {
 	targetPlayer *core.Player       // Player receiving Buff
 	BuffType     constants.BuffType // Type of Buff to add
 	SourceID     string             // Source identifier
+	// Internal field populated during Execute() (for LogEntry)
+	duration int
 }
 
 // NewAddBuffAction creates a new AddBuffAction.
@@ -337,6 +339,7 @@ func (a *AddBuffAction) Execute(ctx *ActionContext) error {
 	}
 
 	duration := ctx.GetBuffDuration(a.BuffType)
+	a.duration = duration
 
 	// Check if player already has this buff type (duration extend)
 	if a.targetPlayer.HasBuff(a.BuffType) {
@@ -361,6 +364,7 @@ func (a *AddBuffAction) Execute(ctx *ActionContext) error {
 func (a *AddBuffAction) LogEntry() gamelog.LogEntry {
 	metadata := util.NewMetadata()
 	metadata.SetString("buff_type", string(a.BuffType))
+	metadata.SetInt("duration", a.duration)
 
 	return gamelog.LogEntry{
 		Timestamp:  time.Now(),
@@ -495,7 +499,7 @@ func (a *TeleportAction) LogEntry() gamelog.LogEntry {
 type StealBuffAction struct {
 	targetPlayer *core.Player // Player being stolen from
 	SourcePlayer *core.Player // Player stealing (owner of 白虎 faction)
-	SourceID     string       // Source identifier (e.g., "Faction_BaiHu")
+	SourceID     string       // Source identifier (e.g., "faction_bai_hu")
 	StolenBuff   *core.Buff   // Buff that was stolen (set after execution)
 }
 
@@ -740,7 +744,7 @@ func (a *DrawItemAction) LogEntry() gamelog.LogEntry {
 type RespawnAction struct {
 	targetPlayer  *core.Player // Player respawning
 	CheckpointPos int          // Position to respawn at
-	SourceID      string       // Source identifier (e.g., "DeathRespawn", "FragileRespawn")
+	SourceID      string       // Source identifier (e.g., "death_respawn", "system_turn_end_respawn")
 }
 
 // NewRespawnAction creates a new RespawnAction.
@@ -994,13 +998,14 @@ func (a *BossDamageAction) LogEntry() gamelog.LogEntry {
 
 // ========== BossAttackAction ==========
 
-// BossAttackAction represents the Boss attacking a player (normal or critical).
-// Used in TurnBossBattleState when the Boss player's turn executes an attack.
+// BossAttackAction represents the Boss physically attacking a player (normal or critical).
+// Only used for Boss normal/crit attacks in TurnBossBattleState.
+// Skill effects (Thunder, etc.) use BossSkillAction + derived DamageAction instead.
 type BossAttackAction struct {
 	SourcePlayer *core.Player         // Boss player (attacker)
 	targetPlayer *core.Player         // Player receiving damage
 	Damage       int                  // Damage amount (1 for normal, 2 for crit)
-	AttackType   constants.BossAttackType // Attack type (normal/crit/skill)
+	AttackType   constants.BossAttackType // Attack type (normal/crit)
 	SourceID     string               // Source identifier
 }
 
