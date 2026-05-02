@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/b1tAction/paradiced/internal/core"
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/resource"
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
@@ -49,7 +49,7 @@ func (c *BuffHandlerConfig) HasPhase(phase constants.Phase) bool {
 
 // BuffRegistry is the registry for Buff definitions and handler configs.
 type BuffRegistry struct {
-	defs    map[constants.BuffType]*core.BuffDefinition
+	defs    map[constants.BuffType]*constants.BuffDefinition
 	configs map[constants.BuffType]*BuffHandlerConfig
 	names   map[constants.BuffType]string
 
@@ -69,7 +69,7 @@ func init() {
 // NewBuffRegistry creates a new Buff registry.
 func NewBuffRegistry() *BuffRegistry {
 	return &BuffRegistry{
-		defs:         make(map[constants.BuffType]*core.BuffDefinition),
+		defs:         make(map[constants.BuffType]*constants.BuffDefinition),
 		configs:      make(map[constants.BuffType]*BuffHandlerConfig),
 		names:        make(map[constants.BuffType]string),
 		goodBuffs:    make([]constants.BuffType, 0),
@@ -79,7 +79,7 @@ func NewBuffRegistry() *BuffRegistry {
 }
 
 // RegisterBuff registers a Buff definition with handler config.
-func (r *BuffRegistry) RegisterBuff(def *core.BuffDefinition, config *BuffHandlerConfig) {
+func (r *BuffRegistry) RegisterBuff(def *constants.BuffDefinition, config *BuffHandlerConfig) {
 	if def == nil || def.Type == constants.BuffTypeNone {
 		return
 	}
@@ -104,11 +104,11 @@ func (r *BuffRegistry) RegisterBuff(def *core.BuffDefinition, config *BuffHandle
 }
 
 // GetBuffDefinition returns the Buff definition by type.
-func GetBuffDefinition(bt constants.BuffType) *core.BuffDefinition {
+func GetBuffDefinition(bt constants.BuffType) *constants.BuffDefinition {
 	return GlobalBuffRegistry.GetBuffDefinition(bt)
 }
 
-func (r *BuffRegistry) GetBuffDefinition(bt constants.BuffType) *core.BuffDefinition {
+func (r *BuffRegistry) GetBuffDefinition(bt constants.BuffType) *constants.BuffDefinition {
 	if def, ok := r.defs[bt]; ok {
 		return def
 	}
@@ -211,15 +211,10 @@ func (r *BuffRegistry) GetBuffTypesByCategory(category string) []constants.BuffT
 // ========== Buff Handler Registration ==========
 
 func registerAllBuffs() {
+	defs := resource.GlobalDefinitionSet
+
 	// Curse: LP-1 when applied, LP+1 revert when removed
-	GlobalBuffRegistry.RegisterBuff(&core.BuffDefinition{
-		Type:        constants.BuffTypeCurse,
-		Eval:        constants.EvaluationBad,
-		EnglishName: "Curse",
-		Name:        "诅咒",
-		Desc:        "LP-1 until removed",
-		Duration:    3,
-	}, &BuffHandlerConfig{
+	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeCurse], &BuffHandlerConfig{
 		Phases:      []constants.Phase{constants.PhasePostBuffApplied, constants.PhasePreBuffRemoved},
 		Priority:    50,
 		NeedConfirm: false,
@@ -227,14 +222,7 @@ func registerAllBuffs() {
 	})
 
 	// Lost: Reverse movement direction for 1 turn
-	GlobalBuffRegistry.RegisterBuff(&core.BuffDefinition{
-		Type:        constants.BuffTypeLost,
-		Eval:        constants.EvaluationMildBad,
-		EnglishName: "Lost",
-		Name:        "迷途",
-		Desc:        "下1回合朝反方向移动",
-		Duration:    1,
-	}, &BuffHandlerConfig{
+	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeLost], &BuffHandlerConfig{
 		Phases:      []constants.Phase{constants.PhasePreMove},
 		Priority:    100,
 		NeedConfirm: false,
@@ -242,14 +230,7 @@ func registerAllBuffs() {
 	})
 
 	// Corrupt: HP-1 every 2 turns for 4 turns
-	GlobalBuffRegistry.RegisterBuff(&core.BuffDefinition{
-		Type:        constants.BuffTypeCorrupt,
-		Eval:        constants.EvaluationBad,
-		EnglishName: "Corrupt",
-		Name:        "腐化",
-		Desc:        "接下来4回合每2回合HP-1",
-		Duration:    4,
-	}, &BuffHandlerConfig{
+	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeCorrupt], &BuffHandlerConfig{
 		Phases:      []constants.Phase{constants.PhaseAfterTurn},
 		Priority:    50,
 		NeedConfirm: false,
@@ -257,14 +238,7 @@ func registerAllBuffs() {
 	})
 
 	// Poison: Bad event each turn for 3 turns
-	GlobalBuffRegistry.RegisterBuff(&core.BuffDefinition{
-		Type:        constants.BuffTypePoison,
-		Eval:        constants.EvaluationVeryBad,
-		EnglishName: "Poison",
-		Name:        "毒瘴",
-		Desc:        "接下来3回合每回合受一次恶性随机事件影响",
-		Duration:    3,
-	}, &BuffHandlerConfig{
+	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypePoison], &BuffHandlerConfig{
 		Phases:      []constants.Phase{constants.PhaseBeforeTurn},
 		Priority:    30,
 		NeedConfirm: false,
@@ -272,14 +246,7 @@ func registerAllBuffs() {
 	})
 
 	// Hidden: Immunity to events/buffs for 3 turns (does NOT block damage).
-	GlobalBuffRegistry.RegisterBuff(&core.BuffDefinition{
-		Type:        constants.BuffTypeHidden,
-		Eval:        constants.EvaluationNeutral,
-		EnglishName: "Hidden",
-		Name:        "隐匿",
-		Desc:        "接下来3回合免疫任意事件、BUFF或道具的影响",
-		Duration:    3,
-	}, &BuffHandlerConfig{
+	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeHidden], &BuffHandlerConfig{
 		Phases:      []constants.Phase{constants.PhasePreBuffApplied},
 		Priority:    100,
 		NeedConfirm: false,
@@ -287,14 +254,7 @@ func registerAllBuffs() {
 	})
 
 	// Divine: LP+1 when applied, LP-1 revert when removed
-	GlobalBuffRegistry.RegisterBuff(&core.BuffDefinition{
-		Type:        constants.BuffTypeDivine,
-		Eval:        constants.EvaluationVeryGood,
-		EnglishName: "Divine",
-		Name:        "神眷",
-		Desc:        "LP+1 until removed",
-		Duration:    3,
-	}, &BuffHandlerConfig{
+	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeDivine], &BuffHandlerConfig{
 		Phases:      []constants.Phase{constants.PhasePostBuffApplied, constants.PhasePreBuffRemoved},
 		Priority:    50,
 		NeedConfirm: false,
@@ -302,14 +262,7 @@ func registerAllBuffs() {
 	})
 
 	// Rain: HP+1 every 2 turns for 4 turns
-	GlobalBuffRegistry.RegisterBuff(&core.BuffDefinition{
-		Type:        constants.BuffTypeRain,
-		Eval:        constants.EvaluationGood,
-		EnglishName: "Rain",
-		Name:        "甘霖",
-		Desc:        "接下来4回合每2回合HP+1",
-		Duration:    4,
-	}, &BuffHandlerConfig{
+	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeRain], &BuffHandlerConfig{
 		Phases:      []constants.Phase{constants.PhaseAfterTurn},
 		Priority:    50,
 		NeedConfirm: false,
@@ -317,14 +270,7 @@ func registerAllBuffs() {
 	})
 
 	// Exorcism: Immune to poison buff for 5 turns
-	GlobalBuffRegistry.RegisterBuff(&core.BuffDefinition{
-		Type:        constants.BuffTypeExorcism,
-		Eval:        constants.EvaluationMildGood,
-		EnglishName: "Exorcism",
-		Name:        "辟邪",
-		Desc:        "接下来5回合无视毒瘴buff",
-		Duration:    5,
-	}, &BuffHandlerConfig{
+	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeExorcism], &BuffHandlerConfig{
 		Phases:      []constants.Phase{constants.PhasePreEvent},
 		Priority:    80,
 		NeedConfirm: false,
@@ -332,14 +278,7 @@ func registerAllBuffs() {
 	})
 
 	// Fire: ZhuQue passive, LP+1 every 4 turns (permanent)
-	GlobalBuffRegistry.RegisterBuff(&core.BuffDefinition{
-		Type:        constants.BuffTypeFire,
-		Eval:        constants.EvaluationGood,
-		EnglishName: "Fire",
-		Name:        "离火",
-		Desc:        "朱雀阵营增益，每4回合LP+1",
-		Duration:    -1,
-	}, &BuffHandlerConfig{
+	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeFire], &BuffHandlerConfig{
 		Phases:      []constants.Phase{constants.PhaseBeforeTurn},
 		Priority:    10,
 		NeedConfirm: false,
@@ -348,16 +287,7 @@ func registerAllBuffs() {
 
 	// Thorns: Boss skill buff — reflect 30% damage back to attacking player.
 	// Not drawn from lottery pools (IsBoss=true). Buff is on BossPlayer.
-	// Reflect is handled via EventBus (PhasePreDamage) — BuffThorns handler
-	// subscribes to PhasePreDamage on BossPlayer, pushes derived PiercingDamageAction.
-	GlobalBuffRegistry.RegisterBuff(&core.BuffDefinition{
-		Type:        constants.BuffTypeThorns,
-		Eval:        constants.EvaluationNeutral,
-		EnglishName: "Thorns",
-		Name:        "反刺",
-		Desc:        "Boss给自己施加反刺，玩家攻击Boss时受到30%反伤",
-		Duration:    2,
-	}, &BuffHandlerConfig{
+	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeThorns], &BuffHandlerConfig{
 		Phases:      []constants.Phase{constants.PhasePreDamage},
 		Priority:    50,
 		NeedConfirm: false,
@@ -366,14 +296,7 @@ func registerAllBuffs() {
 
 	// DeathMark: Hidden buff that blocks all subsequent actions after death.
 	// Not visible to client, not drawn in lottery pools.
-	GlobalBuffRegistry.RegisterBuff(&core.BuffDefinition{
-		Type:        constants.BuffTypeDeathMark,
-		Eval:        constants.EvaluationVeryBad,
-		EnglishName: "DeathMark",
-		Name:        "死亡标记",
-		Desc:        "死亡后阻止后续行动",
-		Duration:    1,
-	}, &BuffHandlerConfig{
+	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeDeathMark], &BuffHandlerConfig{
 		Phases:      []constants.Phase{constants.PhasePreAction},
 		Priority:    999,
 		NeedConfirm: false,

@@ -7,6 +7,7 @@ import (
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/resource"
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
@@ -18,7 +19,7 @@ type EventHandlerConfig struct {
 
 // EventRegistry is the registry for Event definitions and handler configs.
 type EventRegistry struct {
-	defs    map[constants.EventType]*core.EventDefinition
+	defs    map[constants.EventType]*constants.EventDefinition
 	configs map[constants.EventType]*EventHandlerConfig
 	names   map[constants.EventType]string
 
@@ -38,7 +39,7 @@ func init() {
 // NewEventRegistry creates a new Event registry.
 func NewEventRegistry() *EventRegistry {
 	return &EventRegistry{
-		defs:          make(map[constants.EventType]*core.EventDefinition),
+		defs:          make(map[constants.EventType]*constants.EventDefinition),
 		configs:       make(map[constants.EventType]*EventHandlerConfig),
 		names:         make(map[constants.EventType]string),
 		goodEvents:    make([]constants.EventType, 0),
@@ -48,7 +49,7 @@ func NewEventRegistry() *EventRegistry {
 }
 
 // RegisterEvent registers an Event definition with handler config.
-func (r *EventRegistry) RegisterEvent(def *core.EventDefinition, config *EventHandlerConfig) {
+func (r *EventRegistry) RegisterEvent(def *constants.EventDefinition, config *EventHandlerConfig) {
 	if def == nil || def.Type == constants.EventTypeNone {
 		return
 	}
@@ -70,11 +71,11 @@ func (r *EventRegistry) RegisterEvent(def *core.EventDefinition, config *EventHa
 }
 
 // GetEventDefinition returns the Event definition by type.
-func GetEventDefinition(et constants.EventType) *core.EventDefinition {
+func GetEventDefinition(et constants.EventType) *constants.EventDefinition {
 	return GlobalEventRegistry.GetEventDefinition(et)
 }
 
-func (r *EventRegistry) GetEventDefinition(et constants.EventType) *core.EventDefinition {
+func (r *EventRegistry) GetEventDefinition(et constants.EventType) *constants.EventDefinition {
 	if def, ok := r.defs[et]; ok {
 		return def
 	}
@@ -166,52 +167,30 @@ func (r *EventRegistry) buildEventPool() []*rng.EvaluatedItem {
 // ========== Event Handler Registration ==========
 
 func registerAllEvents() {
+	defs := resource.GlobalDefinitionSet
+
 	// Good Events (Evaluation > 65)
 
 	// Herb: HP+1
-	GlobalEventRegistry.RegisterEvent(&core.EventDefinition{
-		Type:        constants.EventTypeHerb,
-		Eval:        constants.EvaluationMildGood,
-		EnglishName: "Herb",
-		Name:        "采集到草药",
-		Desc:        "在路边发现了草药，恢复了体力",
-	}, &EventHandlerConfig{
+	GlobalEventRegistry.RegisterEvent(defs.Events[constants.EventTypeHerb], &EventHandlerConfig{
 		Priority: 60,
 		Handler:  createEventModifyHPHandler(1, constants.SourceEventHerb),
 	})
 
 	// MilkTea: LP+1
-	GlobalEventRegistry.RegisterEvent(&core.EventDefinition{
-		Type:        constants.EventTypeMilkTea,
-		Eval:        constants.EvaluationGood,
-		EnglishName: "MilkTea",
-		Name:        "捡到奶茶",
-		Desc:        "捡到了一杯奶茶，一口就吃到了猪猪欸",
-	}, &EventHandlerConfig{
+	GlobalEventRegistry.RegisterEvent(defs.Events[constants.EventTypeMilkTea], &EventHandlerConfig{
 		Priority: 70,
 		Handler:  createEventModifyLPHandler(1, constants.SourceEventMilkTea),
 	})
 
 	// Relic: Draw item
-	GlobalEventRegistry.RegisterEvent(&core.EventDefinition{
-		Type:        constants.EventTypeRelic,
-		Eval:        constants.EvaluationVeryGood,
-		EnglishName: "Relic",
-		Name:        "捡到勇士的圣遗物",
-		Desc:        "发现了古老圣遗物，获得一次道具抽奖机会",
-	}, &EventHandlerConfig{
+	GlobalEventRegistry.RegisterEvent(defs.Events[constants.EventTypeRelic], &EventHandlerConfig{
 		Priority: 80,
 		Handler:  handleDrawItem,
 	})
 
 	// DivineBless: Give Divine buff
-	GlobalEventRegistry.RegisterEvent(&core.EventDefinition{
-		Type:        constants.EventTypeDivineBless,
-		Eval:        constants.EvaluationExcellent,
-		EnglishName: "DivineBless",
-		Name:        "受到天使眷顾",
-		Desc:        "天使的祝福降临，获得神眷Buff",
-	}, &EventHandlerConfig{
+	GlobalEventRegistry.RegisterEvent(defs.Events[constants.EventTypeDivineBless], &EventHandlerConfig{
 		Priority: 80,
 		Handler:  createEventGiveBuffHandler(constants.BuffTypeDivine, constants.SourceEventDivineBless),
 	})
@@ -219,37 +198,19 @@ func registerAllEvents() {
 	// Neutral Events (Evaluation 41-65)
 
 	// Exchange: Swap position with another player
-	GlobalEventRegistry.RegisterEvent(&core.EventDefinition{
-		Type:        constants.EventTypeExchange,
-		Eval:        constants.EvaluationNeutral,
-		EnglishName: "Exchange",
-		Name:        "交换",
-		Desc:        "命运之手将你与另一位玩家交换位置",
-	}, &EventHandlerConfig{
+	GlobalEventRegistry.RegisterEvent(defs.Events[constants.EventTypeExchange], &EventHandlerConfig{
 		Priority: 50,
 		Handler:  handleSwapPosition,
 	})
 
 	// HiddenBuff: Give Hidden buff
-	GlobalEventRegistry.RegisterEvent(&core.EventDefinition{
-		Type:        constants.EventTypeHiddenBuff,
-		Eval:        constants.EvaluationGood,
-		EnglishName: "HiddenBuff",
-		Name:        "麻了",
-		Desc:        "身体麻木，获得隐匿Buff",
-	}, &EventHandlerConfig{
+	GlobalEventRegistry.RegisterEvent(defs.Events[constants.EventTypeHiddenBuff], &EventHandlerConfig{
 		Priority: 60,
 		Handler:  createEventGiveBuffHandler(constants.BuffTypeHidden, constants.SourceEventHiddenBuff),
 	})
 
 	// TasteTest: Random buff effect
-	GlobalEventRegistry.RegisterEvent(&core.EventDefinition{
-		Type:        constants.EventTypeTasteTest,
-		Eval:        constants.EvaluationMixed,
-		EnglishName: "TasteTest",
-		Name:        "这是什么？尝一口",
-		Desc:        "发现神秘物质，尝试后获得随机效果",
-	}, &EventHandlerConfig{
+	GlobalEventRegistry.RegisterEvent(defs.Events[constants.EventTypeTasteTest], &EventHandlerConfig{
 		Priority: 50,
 		Handler:  handleRandomBuff,
 	})
@@ -257,85 +218,43 @@ func registerAllEvents() {
 	// Bad Events (Evaluation <= 40)
 
 	// Mosquito: HP-1
-	GlobalEventRegistry.RegisterEvent(&core.EventDefinition{
-		Type:        constants.EventTypeMosquito,
-		Eval:        constants.EvaluationMildBad,
-		EnglishName: "Mosquito",
-		Name:        "被蚊虫叮咬",
-		Desc:        "丛林中的蚊虫叮咬了你",
-	}, &EventHandlerConfig{
+	GlobalEventRegistry.RegisterEvent(defs.Events[constants.EventTypeMosquito], &EventHandlerConfig{
 		Priority: 40,
 		Handler:  createEventModifyHPHandler(-1, constants.SourceEventMosquito),
 	})
 
 	// GhostHit: HP-1
-	GlobalEventRegistry.RegisterEvent(&core.EventDefinition{
-		Type:        constants.EventTypeGhostHit,
-		Eval:        constants.EvaluationMildBad,
-		EnglishName: "GhostHit",
-		Name:        "偶遇孤魂野鬼",
-		Desc:        "被野鬼打了一闷棍",
-	}, &EventHandlerConfig{
+	GlobalEventRegistry.RegisterEvent(defs.Events[constants.EventTypeGhostHit], &EventHandlerConfig{
 		Priority: 40,
 		Handler:  createEventModifyHPHandler(-1, constants.SourceEventGhostHit),
 	})
 
 	// DogPoop: LP-1
-	GlobalEventRegistry.RegisterEvent(&core.EventDefinition{
-		Type:        constants.EventTypeDogPoop,
-		Eval:        constants.EvaluationMildBad,
-		EnglishName: "DogPoop",
-		Name:        "踩到了狗屎",
-		Desc:        "运气糟糕的一天",
-	}, &EventHandlerConfig{
+	GlobalEventRegistry.RegisterEvent(defs.Events[constants.EventTypeDogPoop], &EventHandlerConfig{
 		Priority: 40,
 		Handler:  createEventModifyLPHandler(-1, constants.SourceEventDogPoop),
 	})
 
 	// Thief: Lose random item
-	GlobalEventRegistry.RegisterEvent(&core.EventDefinition{
-		Type:        constants.EventTypeThief,
-		Eval:        constants.EvaluationBad,
-		EnglishName: "Thief",
-		Name:        "啊？！贼",
-		Desc:        "遭遇盗贼，随机丢失一个道具",
-	}, &EventHandlerConfig{
+	GlobalEventRegistry.RegisterEvent(defs.Events[constants.EventTypeThief], &EventHandlerConfig{
 		Priority: 30,
 		Handler:  handleLoseItem,
 	})
 
 	// CurseBuddha: Give Curse buff
-	GlobalEventRegistry.RegisterEvent(&core.EventDefinition{
-		Type:        constants.EventTypeCurseBuddha,
-		Eval:        constants.EvaluationBad,
-		EnglishName: "CurseBuddha",
-		Name:        "虔诚拜三拜",
-		Desc:        "拜路边的野佛，获得诅咒Buff",
-	}, &EventHandlerConfig{
+	GlobalEventRegistry.RegisterEvent(defs.Events[constants.EventTypeCurseBuddha], &EventHandlerConfig{
 		Priority: 30,
 		Handler:  createEventGiveBuffHandler(constants.BuffTypeCurse, constants.SourceEventCurseBuddha),
 	})
 
 	// LostWay: Give Lost buff
-	GlobalEventRegistry.RegisterEvent(&core.EventDefinition{
-		Type:        constants.EventTypeLostWay,
-		Eval:        constants.EvaluationMildBad,
-		EnglishName: "LostWay",
-		Name:        "迷途",
-		Desc:        "迷失方向，获得迷途Buff",
-	}, &EventHandlerConfig{
+	GlobalEventRegistry.RegisterEvent(defs.Events[constants.EventTypeLostWay], &EventHandlerConfig{
 		Priority: 40,
 		Handler:  createEventGiveBuffHandler(constants.BuffTypeLost, constants.SourceEventLostWay),
 	})
 
 	// Thunder: HP to 0 (death)
-	GlobalEventRegistry.RegisterEvent(&core.EventDefinition{
-		Type:        constants.EventTypeThunder,
-		Eval:        constants.EvaluationVeryBad,
-		EnglishName: "Thunder",
-		Name:        "雷劫",
-		Desc:        "天雷降临，HP归零",
-	}, &EventHandlerConfig{
+	GlobalEventRegistry.RegisterEvent(defs.Events[constants.EventTypeThunder], &EventHandlerConfig{
 		Priority: 20,
 		Handler:  handleThunderDeath,
 	})
