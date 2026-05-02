@@ -649,6 +649,233 @@ func TestBuildStateSyncFiltersStateEntries(t *testing.T) {
 	}
 }
 
+func TestBuildDefinitionsConfigBuffClassification(t *testing.T) {
+	defs := BuildDefinitionsConfig()
+
+	// Test IsFaction: only Fire (朱雀离火) should be faction
+	if _, ok := defs.Buffs["fire"]; !ok {
+		t.Fatal("missing fire buff in DefinitionsConfig")
+	}
+	fire := defs.Buffs["fire"]
+	if !fire.IsFaction {
+		t.Error("fire.IsFaction should be true (朱雀 faction passive)")
+	}
+
+	// Test other buffs are not faction
+	for key, buff := range defs.Buffs {
+		if key == "fire" {
+			continue
+		}
+		if buff.IsFaction {
+			t.Errorf("%s.IsFaction should be false", key)
+		}
+	}
+
+	// Test IsDraw: Boss and Hidden buffs should NOT be drawable
+	nonDrawBuffs := []string{"death_mark", "thorns", "fire"}
+	for _, key := range nonDrawBuffs {
+		if _, ok := defs.Buffs[key]; !ok {
+			t.Fatalf("missing %s buff in DefinitionsConfig", key)
+		}
+		buff := defs.Buffs[key]
+		if buff.IsDraw {
+			t.Errorf("%s.IsDraw should be false (IsBoss/IsHidden/IsFaction)", key)
+		}
+	}
+
+	// Test regular buffs are drawable
+	drawBuffs := []string{"divine", "rain", "exorcism", "curse", "lost", "corrupt", "poison"}
+	for _, key := range drawBuffs {
+		if _, ok := defs.Buffs[key]; !ok {
+			t.Fatalf("missing %s buff in DefinitionsConfig", key)
+		}
+		buff := defs.Buffs[key]
+		if !buff.IsDraw {
+			t.Errorf("%s.IsDraw should be true", key)
+		}
+	}
+
+	// Test IsBoss: only Thorns and DeathMark are Boss buffs
+	bossBuffs := []string{"thorns", "death_mark"}
+	for _, key := range bossBuffs {
+		if _, ok := defs.Buffs[key]; !ok {
+			t.Fatalf("missing %s buff in DefinitionsConfig", key)
+		}
+		buff := defs.Buffs[key]
+		if !buff.IsBoss {
+			t.Errorf("%s.IsBoss should be true", key)
+		}
+	}
+
+	// Test IsHidden: only DeathMark is hidden
+	if _, ok := defs.Buffs["death_mark"]; !ok {
+		t.Fatal("missing death_mark buff in DefinitionsConfig")
+	}
+	deathMark := defs.Buffs["death_mark"]
+	if !deathMark.IsHidden {
+		t.Error("death_mark.IsHidden should be true")
+	}
+
+	// Verify hidden is false for other buffs
+	for key, buff := range defs.Buffs {
+		if key == "death_mark" {
+			continue
+		}
+		if buff.IsHidden {
+			t.Errorf("%s.IsHidden should be false", key)
+		}
+	}
+}
+
+func TestBuildDefinitionsConfigBuffCategory(t *testing.T) {
+	defs := BuildDefinitionsConfig()
+
+	// Good buffs: divine, rain, exorcism, fire
+	goodBuffs := []string{"divine", "rain", "exorcism", "fire"}
+	for _, key := range goodBuffs {
+		if _, ok := defs.Buffs[key]; !ok {
+			t.Fatalf("missing %s buff in DefinitionsConfig", key)
+		}
+		buff := defs.Buffs[key]
+		if buff.Category != "good" {
+			t.Errorf("%s.Category = %s, want good", key, buff.Category)
+		}
+	}
+
+	// Neutral buffs: hidden, thorns
+	neutralBuffs := []string{"hidden", "thorns"}
+	for _, key := range neutralBuffs {
+		if _, ok := defs.Buffs[key]; !ok {
+			t.Fatalf("missing %s buff in DefinitionsConfig", key)
+		}
+		buff := defs.Buffs[key]
+		if buff.Category != "neutral" {
+			t.Errorf("%s.Category = %s, want neutral", key, buff.Category)
+		}
+	}
+
+	// Bad buffs: curse, lost, corrupt, poison, death_mark
+	badBuffs := []string{"curse", "lost", "corrupt", "poison", "death_mark"}
+	for _, key := range badBuffs {
+		if _, ok := defs.Buffs[key]; !ok {
+			t.Fatalf("missing %s buff in DefinitionsConfig", key)
+		}
+		buff := defs.Buffs[key]
+		if buff.Category != "bad" {
+			t.Errorf("%s.Category = %s, want bad", key, buff.Category)
+		}
+	}
+}
+
+func TestBuildDefinitionsConfigEventCategory(t *testing.T) {
+	defs := BuildDefinitionsConfig()
+
+	goodEvents := []string{"herb", "milk_tea", "relic", "divine_bless", "hidden_buff"}
+	for _, key := range goodEvents {
+		if _, ok := defs.Events[key]; !ok {
+			t.Fatalf("missing %s event in DefinitionsConfig", key)
+		}
+		event := defs.Events[key]
+		if event.Category != "good" {
+			t.Errorf("%s.Category = %s, want good", key, event.Category)
+		}
+	}
+
+	neutralEvents := []string{"exchange", "taste_test"}
+	for _, key := range neutralEvents {
+		if _, ok := defs.Events[key]; !ok {
+			t.Fatalf("missing %s event in DefinitionsConfig", key)
+		}
+		event := defs.Events[key]
+		if event.Category != "neutral" {
+			t.Errorf("%s.Category = %s, want neutral", key, event.Category)
+		}
+	}
+
+	badEvents := []string{"mosquito", "ghost_hit", "dog_poop", "thief", "curse_buddha", "lost_way", "thunder"}
+	for _, key := range badEvents {
+		if _, ok := defs.Events[key]; !ok {
+			t.Fatalf("missing %s event in DefinitionsConfig", key)
+		}
+		event := defs.Events[key]
+		if event.Category != "bad" {
+			t.Errorf("%s.Category = %s, want bad", key, event.Category)
+		}
+	}
+}
+
+func TestBuildDefinitionsConfigCompleteness(t *testing.T) {
+	defs := BuildDefinitionsConfig()
+
+	// Verify all 14 events present
+	if len(defs.Events) != 14 {
+		t.Errorf("len(defs.Events) = %d, want 14", len(defs.Events))
+	}
+	// Verify all 11 buffs present
+	if len(defs.Buffs) != 11 {
+		t.Errorf("len(defs.Buffs) = %d, want 11", len(defs.Buffs))
+	}
+	// Verify all 3 items present
+	if len(defs.Items) != 3 {
+		t.Errorf("len(defs.Items) = %d, want 3", len(defs.Items))
+	}
+
+	// Verify all entries have required fields populated
+	for key, event := range defs.Events {
+		if event.Type == "" {
+			t.Errorf("event %s: Type is empty", key)
+		}
+		if event.Name == "" {
+			t.Errorf("event %s: Name is empty", key)
+		}
+		if event.Desc == "" {
+			t.Errorf("event %s: Desc is empty", key)
+		}
+		if event.EnglishName == "" {
+			t.Errorf("event %s: EnglishName is empty", key)
+		}
+		if event.Category == "" {
+			t.Errorf("event %s: Category is empty", key)
+		}
+	}
+
+	for key, buff := range defs.Buffs {
+		if buff.Type == "" {
+			t.Errorf("buff %s: Type is empty", key)
+		}
+		if buff.Name == "" {
+			t.Errorf("buff %s: Name is empty", key)
+		}
+		if buff.Desc == "" {
+			t.Errorf("buff %s: Desc is empty", key)
+		}
+		if buff.EnglishName == "" {
+			t.Errorf("buff %s: EnglishName is empty", key)
+		}
+		if buff.Category == "" {
+			t.Errorf("buff %s: Category is empty", key)
+		}
+	}
+
+	for key, item := range defs.Items {
+		if item.Type == "" {
+			t.Errorf("item %s: Type is empty", key)
+		}
+		if item.Name == "" {
+			t.Errorf("item %s: Name is empty", key)
+		}
+		if item.Desc == "" {
+			t.Errorf("item %s: Desc is empty", key)
+		}
+		if item.EnglishName == "" {
+			t.Errorf("item %s: EnglishName is empty", key)
+		}
+		if item.Category == "" {
+			t.Errorf("item %s: Category is empty", key)
+		}
+	}
+}
+
 func TestBuildFullSyncFiltersStateEntries(t *testing.T) {
 	builder, game, hsmInstance := newTestBuilder()
 
