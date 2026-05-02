@@ -803,6 +803,27 @@ func newActionContextWithPools(game *engine.Game, bus *event.EventBus, mapEngine
 		}
 		return 0
 	}
+	ctx.GetEventDesc = func(et constants.EventType) string {
+		def := engine.GetEventDefinition(et)
+		if def != nil {
+			return def.Desc
+		}
+		return ""
+	}
+	ctx.GetItemDesc = func(it constants.ItemType) string {
+		def := engine.GetItemDefinition(it)
+		if def != nil {
+			return def.Desc
+		}
+		return ""
+	}
+	ctx.GetBuffDesc = func(bt constants.BuffType) string {
+		def := engine.GetBuffDefinition(bt)
+		if def != nil {
+			return def.Desc
+		}
+		return ""
+	}
 	return ctx
 }
 

@@ -40,6 +40,12 @@ type ActionContext struct {
 	// look up duration from definition instead of hardcoding it.
 	GetBuffDuration func(buffType constants.BuffType) int
 
+	// Definition description callbacks - injected by engine layer for Draw actions.
+	// Used by DrawEventAction/DrawItemAction/DrawBuffAction to populate DrawnDesc.
+	GetEventDesc func(et constants.EventType) string  // Returns EventDefinition.Desc
+	GetItemDesc   func(it constants.ItemType) string   // Returns ItemDefinition.Desc
+	GetBuffDesc   func(bt constants.BuffType) string   // Returns BuffDefinition.Desc
+
 	// Item lifecycle callbacks - injected by HSM layer (engine.Game)
 	// These handle EventBus subscription/unsubscription for Item add/remove.
 	OnAddItem    func(player *core.Player, item *core.Item)                     // Called after AddItemAction.Execute

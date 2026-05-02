@@ -1633,6 +1633,85 @@ func TestDrawEventActionPresetDrawnType(t *testing.T) {
 	}
 }
 
+// ========== DrawEventAction Desc Tests ==========
+
+func TestDrawEventActionDescWithCallback(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.LP = 3
+
+	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
+	eventPool := []*rng.EvaluatedItem{
+		{Type: "herb", Eval: constants.EvaluationMildGood},
+	}
+
+	action := NewDrawEventAction(player, "CellEvent")
+	ctx := NewActionContext(nil, nil, nil, drawEngine)
+	ctx.EventPool = eventPool
+	ctx.GetEventDesc = func(et constants.EventType) string {
+		if et == constants.EventTypeHerb {
+			return "在路边发现了草药，恢复了体力"
+		}
+		return ""
+	}
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	if action.DrawnDesc != "在路边发现了草药，恢复了体力" {
+		t.Errorf("DrawnDesc = %s, expected event description", action.DrawnDesc)
+	}
+
+	// Verify LogEntry has desc metadata
+	entry := action.LogEntry()
+	if entry.Metadata.GetStringOrDefault("desc", "") != action.DrawnDesc {
+		t.Errorf("LogEntry desc = %s, expected %s", entry.Metadata.GetStringOrDefault("desc", ""), action.DrawnDesc)
+	}
+}
+
+func TestDrawEventActionDescPreset(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewDrawEventAction(player, "CellEvent_herb")
+	action.DrawnType = constants.EventTypeHerb
+
+	ctx := NewActionContext(nil, nil, nil, nil)
+	ctx.GetEventDesc = func(et constants.EventType) string {
+		if et == constants.EventTypeHerb {
+			return "在路边发现了草药，恢复了体力"
+		}
+		return ""
+	}
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Fatalf("Execute with preset DrawnType failed: %v", err)
+	}
+
+	if action.DrawnDesc != "在路边发现了草药，恢复了体力" {
+		t.Errorf("DrawnDesc = %s, expected event description", action.DrawnDesc)
+	}
+}
+
+func TestDrawEventActionDescWithoutCallback(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	action := NewDrawEventAction(player, "CellEvent_herb")
+	action.DrawnType = constants.EventTypeHerb
+
+	ctx := NewActionContext(nil, nil, nil, nil)
+	// No GetEventDesc callback
+
+	err := action.Execute(ctx)
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	// DrawnDesc should remain empty without callback
+	if action.DrawnDesc != "" {
+		t.Errorf("DrawnDesc should be empty without callback, got %s", action.DrawnDesc)
+	}
+}
+
 // ========== DrawItemAction Pool Execution Tests ==========
 
 func TestDrawItemActionExecuteWithPool(t *testing.T) {
