@@ -38,3 +38,15 @@ func ParseItemType(s string) ItemType {
 		return ItemTypeNone
 	}
 }
+
+// ========== Item Definition (Static Metadata) ==========
+
+// ItemDefinition contains static metadata for Item display and classification.
+// Effect logic is managed by engine layer's ItemHandlerConfig.
+type ItemDefinition struct {
+	Type        ItemType   `json:"type"`
+	Eval        Evaluation `json:"evaluation"`    // Evaluation score for random draw
+	EnglishName string     `json:"english_name"`  // English identifier (snake_case)
+	Name        string     `json:"name"`          // Chinese display name
+	Desc        string     `json:"desc"`          // Description text
+}

@@ -110,7 +110,7 @@ func TestBuffTypeIsDraw(t *testing.T) {
 	// IsDraw = true means participates in lottery pool draws
 	drawTypes := []BuffType{
 		BuffTypeCurse, BuffTypeLost, BuffTypeCorrupt, BuffTypePoison,
-		BuffTypeHidden, BuffTypeDivine, BuffTypeRain, BuffTypeExorcism, BuffTypeFire,
+		BuffTypeHidden, BuffTypeDivine, BuffTypeRain, BuffTypeExorcism,
 	}
 	for _, bt := range drawTypes {
 		if !bt.IsDraw() {
@@ -118,11 +118,31 @@ func TestBuffTypeIsDraw(t *testing.T) {
 		}
 	}
 
-	// IsDraw = false means excluded from lottery pools (IsBoss or IsHidden)
-	noDrawTypes := []BuffType{BuffTypeThorns, BuffTypeDeathMark}
+	// IsDraw = false means excluded from lottery pools (IsBoss, IsHidden, or IsFaction)
+	noDrawTypes := []BuffType{BuffTypeThorns, BuffTypeDeathMark, BuffTypeFire}
 	for _, bt := range noDrawTypes {
 		if bt.IsDraw() {
 			t.Errorf("BuffType(%s).IsDraw() should be false", bt)
+		}
+	}
+}
+
+func TestBuffTypeIsFaction(t *testing.T) {
+	factionTypes := []BuffType{BuffTypeFire}
+	for _, bt := range factionTypes {
+		if !bt.IsFaction() {
+			t.Errorf("BuffType(%s).IsFaction() should be true", bt)
+		}
+	}
+
+	nonFactionTypes := []BuffType{
+		BuffTypeCurse, BuffTypeLost, BuffTypeCorrupt, BuffTypePoison,
+		BuffTypeHidden, BuffTypeDivine, BuffTypeRain, BuffTypeExorcism,
+		BuffTypeThorns, BuffTypeDeathMark,
+	}
+	for _, bt := range nonFactionTypes {
+		if bt.IsFaction() {
+			t.Errorf("BuffType(%s).IsFaction() should be false", bt)
 		}
 	}
 }
@@ -1101,6 +1121,102 @@ func TestParseCellType(t *testing.T) {
 }
 
 // ========== ActionType Tests ==========
+
+// ========== Definition Tests ==========
+
+func TestEventDefinitionIsGood(t *testing.T) {
+	tests := []struct {
+		eval     Evaluation
+		expected bool
+	}{
+		{EvaluationGood, true},
+		{EvaluationVeryGood, true},
+		{EvaluationMildGood, true},
+		{EvaluationNeutral, false},
+		{EvaluationBad, false},
+	}
+	for _, tt := range tests {
+		def := &EventDefinition{Type: EventTypeHerb, Eval: tt.eval}
+		if def.IsGood() != tt.expected {
+			t.Errorf("EventDefinition.IsGood() with Eval=%d = %v, expected %v", tt.eval, def.IsGood(), tt.expected)
+		}
+	}
+}
+
+func TestEventDefinitionIsBad(t *testing.T) {
+	tests := []struct {
+		eval     Evaluation
+		expected bool
+	}{
+		{EvaluationBad, true},
+		{EvaluationVeryBad, true},
+		{EvaluationMildBad, true},
+		{EvaluationNeutral, false},
+		{EvaluationGood, false},
+	}
+	for _, tt := range tests {
+		def := &EventDefinition{Type: EventTypeMosquito, Eval: tt.eval}
+		if def.IsBad() != tt.expected {
+			t.Errorf("EventDefinition.IsBad() with Eval=%d = %v, expected %v", tt.eval, def.IsBad(), tt.expected)
+		}
+	}
+}
+
+func TestEventDefinitionIsNeutral(t *testing.T) {
+	tests := []struct {
+		eval     Evaluation
+		expected bool
+	}{
+		{EvaluationNeutral, true},
+		{EvaluationMixed, true},
+		{EvaluationGood, false},
+		{EvaluationBad, false},
+	}
+	for _, tt := range tests {
+		def := &EventDefinition{Type: EventTypeExchange, Eval: tt.eval}
+		if def.IsNeutral() != tt.expected {
+			t.Errorf("EventDefinition.IsNeutral() with Eval=%d = %v, expected %v", tt.eval, def.IsNeutral(), tt.expected)
+		}
+	}
+}
+
+func TestBuffDefinitionIsPositive(t *testing.T) {
+	tests := []struct {
+		eval     Evaluation
+		expected bool
+	}{
+		{EvaluationGood, true},
+		{EvaluationVeryGood, true},
+		{EvaluationMildGood, true},
+		{EvaluationNeutral, false},
+		{EvaluationBad, false},
+	}
+	for _, tt := range tests {
+		def := &BuffDefinition{Type: BuffTypeDivine, Eval: tt.eval}
+		if def.IsPositive() != tt.expected {
+			t.Errorf("BuffDefinition.IsPositive() with Eval=%d = %v, expected %v", tt.eval, def.IsPositive(), tt.expected)
+		}
+	}
+}
+
+func TestBuffDefinitionIsNegative(t *testing.T) {
+	tests := []struct {
+		eval     Evaluation
+		expected bool
+	}{
+		{EvaluationBad, true},
+		{EvaluationVeryBad, true},
+		{EvaluationMildBad, true},
+		{EvaluationNeutral, false},
+		{EvaluationGood, false},
+	}
+	for _, tt := range tests {
+		def := &BuffDefinition{Type: BuffTypeCurse, Eval: tt.eval}
+		if def.IsNegative() != tt.expected {
+			t.Errorf("BuffDefinition.IsNegative() with Eval=%d = %v, expected %v", tt.eval, def.IsNegative(), tt.expected)
+		}
+	}
+}
 
 func TestActionTypeIsValid(t *testing.T) {
 	validTypes := []ActionType{
