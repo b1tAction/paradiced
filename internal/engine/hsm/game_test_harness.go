@@ -168,13 +168,13 @@ func NewGameTestHarness(config *HarnessConfig) *GameTestHarness {
 	for i := 0; i < config.PlayerCount; i++ {
 		player := core.NewPlayer(core.PlayerConfig{
 			ID:      id.NewPlayerID(),
+			InitHP:  config.InitialHP,
+			InitLP:  config.InitialLP,
 			MaxHP:   config.MaxHP,
 			MaxLP:   config.MaxLP,
 			Faction: factions[i],
+			StartPos: config.InitialPosition,
 		})
-		player.HP = config.InitialHP
-		player.LP = config.InitialLP
-		player.Position = config.InitialPosition
 		players[i] = player
 		game.AddPlayer(player)
 	}

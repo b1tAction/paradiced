@@ -309,7 +309,8 @@ func (h *NakamaMatchHandler) addPlayer(userID string, faction constants.Faction,
 	playerID := id.MustParsePlayerID(userID)
 	player := core.NewPlayer(core.PlayerConfig{
 		ID:      playerID,
-		MaxHP:   6,
+		InitHP:  6,
+		MaxHP:   8,
 		MaxLP:   8,
 		Faction: faction,
 	})

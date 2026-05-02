@@ -73,6 +73,12 @@ func TestNewPlayer(t *testing.T) {
 	if player.LP != 4 {
 		t.Errorf("player.LP = %d, expected 4 (InitLP default)", player.LP)
 	}
+	if player.MaxHP != 10 {
+		t.Errorf("player.MaxHP = %d, expected 10", player.MaxHP)
+	}
+	if player.InitHP != 6 {
+		t.Errorf("player.InitHP = %d, expected 6 (InitHP default)", player.InitHP)
+	}
 	if player.Position != 0 {
 		t.Errorf("player.Position = %d, expected 0", player.Position)
 	}
@@ -108,6 +114,12 @@ func TestNewPlayerDefaultConfig(t *testing.T) {
 	player := NewPlayer(config)
 	if player.HP != DefaultPlayerConfig.InitHP {
 		t.Errorf("player.HP = %d, expected default %d", player.HP, DefaultPlayerConfig.InitHP)
+	}
+	if player.MaxHP != DefaultPlayerConfig.MaxHP {
+		t.Errorf("player.MaxHP = %d, expected default %d", player.MaxHP, DefaultPlayerConfig.MaxHP)
+	}
+	if player.InitHP != DefaultPlayerConfig.InitHP {
+		t.Errorf("player.InitHP = %d, expected default %d", player.InitHP, DefaultPlayerConfig.InitHP)
 	}
 	if player.LP != DefaultPlayerConfig.InitLP {
 		t.Errorf("player.LP = %d, expected default %d", player.LP, DefaultPlayerConfig.InitLP)
@@ -245,7 +257,7 @@ func TestMove(t *testing.T) {
 }
 
 func TestRespawn(t *testing.T) {
-	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID(), InitHP: 6, MaxHP: 10})
 	player.HP = 0
 	player.IsDead = true
 	player.Position = 50
@@ -254,8 +266,8 @@ func TestRespawn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Respawn failed: %v", err)
 	}
-	if player.HP != 10 {
-		t.Errorf("player.HP = %d, expected %d (p.MaxHP)", player.HP, 10)
+	if player.HP != 6 {
+		t.Errorf("player.HP = %d, expected %d (p.InitHP)", player.HP, 6)
 	}
 	if player.IsDead {
 		t.Error("player should not be dead after respawn")

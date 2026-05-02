@@ -442,6 +442,7 @@ func TestScenarioCustomConfig(t *testing.T) {
 		},
 		Factions:    []constants.Faction{constants.FactionBaiHu, constants.FactionXuanWu},
 		InitialHP:   10,
+		MaxHP:       10,
 		InitialLP:   5,
 	})
 
@@ -707,8 +708,8 @@ func TestScenarioDeath_RespawnRemovesDeathMark(t *testing.T) {
 	if player.IsDead {
 		t.Error("Player should NOT be dead after respawn")
 	}
-	if player.HP != 3 { // Respawn resets HP to MaxHP
-		t.Errorf("Player HP should be reset to MaxHP(3), got %d", player.HP)
+	if player.HP != 3 { // Respawn resets HP to InitHP
+		t.Errorf("Player HP should be reset to InitHP(3), got %d", player.HP)
 	}
 	if player.Position != checkpoint {
 		t.Errorf("Player position should be checkpoint(%d), got %d", checkpoint, player.Position)
@@ -940,7 +941,7 @@ func TestScenarioDeath_RespawnWithDeathMarkPresent(t *testing.T) {
 		t.Error("Player should NOT be dead after respawn")
 	}
 	if player.HP != 3 {
-		t.Errorf("Player HP should be reset to MaxHP(3), got %d", player.HP)
+		t.Errorf("Player HP should be reset to InitHP(3), got %d", player.HP)
 	}
 	if player.Position != checkpoint {
 		t.Errorf("Player position should be checkpoint(%d), got %d", checkpoint, player.Position)

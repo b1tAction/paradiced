@@ -19,6 +19,7 @@ type Player struct {
 	LP             int               `json:"lp"`           // Luck points (affects random events)
 	MaxHP		   int				 `json:"max_hp"`	   // Maximum health points
 	MaxLP		   int				 `json:"max_lp"`	   // Maximum luck points
+	InitHP		   int				 `json:"init_hp"`	   // Initial health points (used for respawn reset)
 	Inventory      []*Item           `json:"inventory"`    // Item inventory
 	ActiveBuffs    []*Buff           `json:"active_buffs"` // Active buffs
 	IsDead         bool              `json:"is_dead"`      // Whether player is dead
@@ -41,7 +42,7 @@ type PlayerConfig struct {
 var DefaultPlayerConfig = PlayerConfig{
 	InitHP:   6,
 	InitLP:   4,
-	MaxHP:    6,
+	MaxHP:    8,
 	MaxLP:    8, // Consistent with ModifyLP LP range limit
 	StartPos: 0,
 }
@@ -60,6 +61,10 @@ func NewPlayer(config PlayerConfig) *Player {
 	if config.InitLP <= 0 {
 		config.InitLP = DefaultPlayerConfig.InitLP
 	}
+	// Ensure InitHP does not exceed MaxHP
+	if config.InitHP > config.MaxHP {
+		config.InitHP = config.MaxHP
+	}
 
 	// Generate ID if not provided
 	if config.ID.IsZero() {
@@ -74,6 +79,7 @@ func NewPlayer(config PlayerConfig) *Player {
 		LP:          config.InitLP,
 		MaxHP: 		 config.MaxHP,
 		MaxLP: 		 config.MaxLP,
+		InitHP:      config.InitHP,
 		Inventory:   make([]*Item, 0),
 		ActiveBuffs: make([]*Buff, 0),
 		IsDead:      false,
@@ -166,7 +172,7 @@ func (p *Player) Respawn(respawnPos int) error {
 		return pkgerrors.NewValidationError("respawn_pos", respawnPos, "must be non-negative")
 	}
 	p.Position = respawnPos
-	p.HP = p.MaxHP // Reset HP to player's MaxHP (not DefaultPlayerConfig.MaxHP)
+	p.HP = p.InitHP // Reset HP to player's InitHP (not MaxHP)
 	p.IsDead = false
 	p.SkipTurn = false
 	return nil
@@ -408,6 +414,7 @@ func (p *Player) Clone() *Player {
 		LP:          p.LP,
 		MaxHP: 		 p.MaxHP,
 		MaxLP: 		 p.MaxLP,
+		InitHP:      p.InitHP,
 		Inventory:   inventory,
 		ActiveBuffs: buffs,
 		IsDead:      p.IsDead,
