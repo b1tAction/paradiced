@@ -279,7 +279,7 @@ type AddItemAction struct {
 type RemoveItemAction struct {
     targetPlayer *core.Player    // 私有字段
     ItemType     constants.ItemType
-    SourceID     string          // "Item_Consumed", "Event_Thief"
+    SourceID     string          // "Item_Consumed", "Event_WindGust"
 }
 ```
 

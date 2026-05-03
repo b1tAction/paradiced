@@ -153,3 +153,363 @@ func TestLoadMapFromJSONInvalid(t *testing.T) {
 		t.Error("LoadMapFromJSON with invalid JSON should return error")
 	}
 }
+
+// ========== Definition Loading Tests ==========
+
+func TestLoadDefinitionsFromYAML(t *testing.T) {
+	// Load definitions from the embedded paradiced.yml
+	defs, err := LoadDefinitions()
+	if err != nil {
+		t.Fatalf("LoadDefinitions failed: %v", err)
+	}
+
+	// Verify all expected events are loaded with typed keys
+	expectedEvents := []constants.EventType{
+		constants.EventTypeHerb, constants.EventTypeMilkTea, constants.EventTypeRelic,
+		constants.EventTypeDivineBless, constants.EventTypeExchange, constants.EventTypeHiddenBuff,
+		constants.EventTypeTasteTest, constants.EventTypeMosquito, constants.EventTypeGhostHit,
+		constants.EventTypeDogPoop, constants.EventTypeWindGust, constants.EventTypeCurseBuddha,
+		constants.EventTypeLostWay, constants.EventTypeThunder,
+	}
+	if len(defs.Events) != len(expectedEvents) {
+		t.Errorf("len(defs.Events) = %d, want %d", len(defs.Events), len(expectedEvents))
+	}
+	for _, et := range expectedEvents {
+		if _, ok := defs.Events[et]; !ok {
+			t.Errorf("missing event definition for %s", et)
+		}
+	}
+
+	// Verify all expected buffs are loaded with typed keys
+	expectedBuffs := []constants.BuffType{
+		constants.BuffTypeCurse, constants.BuffTypeLost, constants.BuffTypeCorrupt,
+		constants.BuffTypePoison, constants.BuffTypeHidden, constants.BuffTypeThorns,
+		constants.BuffTypeDivine, constants.BuffTypeRain, constants.BuffTypeExorcism,
+		constants.BuffTypeFire, constants.BuffTypeDeathMark,
+	}
+	if len(defs.Buffs) != len(expectedBuffs) {
+		t.Errorf("len(defs.Buffs) = %d, want %d", len(defs.Buffs), len(expectedBuffs))
+	}
+	for _, bt := range expectedBuffs {
+		if _, ok := defs.Buffs[bt]; !ok {
+			t.Errorf("missing buff definition for %s", bt)
+		}
+	}
+
+	// Verify all expected items are loaded with typed keys
+	expectedItems := []constants.ItemType{
+		constants.ItemTypeReverseClock, constants.ItemTypeAnyDoor, constants.ItemTypeDiceUpgrade,
+	}
+	if len(defs.Items) != len(expectedItems) {
+		t.Errorf("len(defs.Items) = %d, want %d", len(defs.Items), len(expectedItems))
+	}
+	for _, it := range expectedItems {
+		if _, ok := defs.Items[it]; !ok {
+			t.Errorf("missing item definition for %s", it)
+		}
+	}
+}
+
+func TestLoadDefinitionsEventFields(t *testing.T) {
+	defs, err := LoadDefinitions()
+	if err != nil {
+		t.Fatalf("LoadDefinitions failed: %v", err)
+	}
+
+	// Spot-check specific event fields
+	herb := defs.Events[constants.EventTypeHerb]
+	if herb == nil {
+		t.Fatal("missing herb event")
+	}
+	if herb.Eval != constants.EvaluationMildGood {
+		t.Errorf("herb.Eval = %d, want %d (mild_good=70)", herb.Eval, constants.EvaluationMildGood)
+	}
+	if herb.EnglishName != "Herb" {
+		t.Errorf("herb.EnglishName = %s, want Herb", herb.EnglishName)
+	}
+	if herb.Name != "采集到草药" {
+		t.Errorf("herb.Name = %s, want 采集到草药", herb.Name)
+	}
+	if herb.Type != constants.EventTypeHerb {
+		t.Errorf("herb.Type = %s, want %s", herb.Type, constants.EventTypeHerb)
+	}
+
+	thunder := defs.Events[constants.EventTypeThunder]
+	if thunder == nil {
+		t.Fatal("missing thunder event")
+	}
+	if thunder.Eval != constants.EvaluationVeryBad {
+		t.Errorf("thunder.Eval = %d, want %d (very_bad=10)", thunder.Eval, constants.EvaluationVeryBad)
+	}
+	if thunder.EnglishName != "Thunder" {
+		t.Errorf("thunder.EnglishName = %s, want Thunder", thunder.EnglishName)
+	}
+}
+
+func TestLoadDefinitionsBuffFields(t *testing.T) {
+	defs, err := LoadDefinitions()
+	if err != nil {
+		t.Fatalf("LoadDefinitions failed: %v", err)
+	}
+
+	// Spot-check specific buff fields
+	divine := defs.Buffs[constants.BuffTypeDivine]
+	if divine == nil {
+		t.Fatal("missing divine buff")
+	}
+	if divine.Eval != constants.EvaluationVeryGood {
+		t.Errorf("divine.Eval = %d, want %d (very_good=90)", divine.Eval, constants.EvaluationVeryGood)
+	}
+	if divine.Name != "神眷" {
+		t.Errorf("divine.Name = %s, want 神眷", divine.Name)
+	}
+	if divine.Duration != 3 {
+		t.Errorf("divine.Duration = %d, want 3", divine.Duration)
+	}
+	if divine.Type != constants.BuffTypeDivine {
+		t.Errorf("divine.Type = %s, want %s", divine.Type, constants.BuffTypeDivine)
+	}
+
+	fire := defs.Buffs[constants.BuffTypeFire]
+	if fire == nil {
+		t.Fatal("missing fire buff")
+	}
+	if fire.Duration != -1 {
+		t.Errorf("fire.Duration = %d, want -1 (permanent)", fire.Duration)
+	}
+
+	thorns := defs.Buffs[constants.BuffTypeThorns]
+	if thorns == nil {
+		t.Fatal("missing thorns buff")
+	}
+	if thorns.Eval != constants.EvaluationNeutral {
+		t.Errorf("thorns.Eval = %d, want %d (neutral=50)", thorns.Eval, constants.EvaluationNeutral)
+	}
+}
+
+func TestLoadDefinitionsItemFields(t *testing.T) {
+	defs, err := LoadDefinitions()
+	if err != nil {
+		t.Fatalf("LoadDefinitions failed: %v", err)
+	}
+
+	// Spot-check specific item fields
+	anyDoor := defs.Items[constants.ItemTypeAnyDoor]
+	if anyDoor == nil {
+		t.Fatal("missing any_door item")
+	}
+	if anyDoor.Eval != constants.EvaluationNeutral {
+		t.Errorf("anyDoor.Eval = %d, want %d (neutral=50)", anyDoor.Eval, constants.EvaluationNeutral)
+	}
+	if anyDoor.EnglishName != "AnyDoor" {
+		t.Errorf("anyDoor.EnglishName = %s, want AnyDoor", anyDoor.EnglishName)
+	}
+	if anyDoor.Name != "任意门" {
+		t.Errorf("anyDoor.Name = %s, want 任意门", anyDoor.Name)
+	}
+	if anyDoor.Desc != "前往指定玩家身边" {
+		t.Errorf("anyDoor.Desc = %s, want 前往指定玩家身边", anyDoor.Desc)
+	}
+	if anyDoor.Type != constants.ItemTypeAnyDoor {
+		t.Errorf("anyDoor.Type = %s, want %s", anyDoor.Type, constants.ItemTypeAnyDoor)
+	}
+}
+
+func TestLoadDefinitionsFromYAMLInvalidYAML(t *testing.T) {
+	_, err := LoadDefinitionsFromYAML([]byte("invalid: yaml: [["))
+	if err == nil {
+		t.Error("LoadDefinitionsFromYAML with invalid YAML should return error")
+	}
+}
+
+func TestLoadDefinitionsFromYAMLUnknownEventType(t *testing.T) {
+	yaml := []byte(`
+events:
+  unknown_event:
+    evaluation: good
+    english_name: Unknown
+    name: UnknownEvent
+    desc: Test
+buffs: {}
+items: {}
+`)
+	_, err := LoadDefinitionsFromYAML(yaml)
+	if err == nil {
+		t.Error("LoadDefinitionsFromYAML with unknown event type should return error")
+	}
+}
+
+func TestLoadDefinitionsFromYAMLUnknownBuffType(t *testing.T) {
+	yaml := []byte(`
+events: {}
+buffs:
+  unknown_buff:
+    evaluation: good
+    english_name: Unknown
+    name: UnknownBuff
+    desc: Test
+    duration: 3
+items: {}
+`)
+	_, err := LoadDefinitionsFromYAML(yaml)
+	if err == nil {
+		t.Error("LoadDefinitionsFromYAML with unknown buff type should return error")
+	}
+}
+
+func TestLoadDefinitionsFromYAMLUnknownItemType(t *testing.T) {
+	yaml := []byte(`
+events: {}
+buffs: {}
+items:
+  unknown_item:
+    evaluation: good
+    english_name: Unknown
+    name: UnknownItem
+    desc: Test
+`)
+	_, err := LoadDefinitionsFromYAML(yaml)
+	if err == nil {
+		t.Error("LoadDefinitionsFromYAML with unknown item type should return error")
+	}
+}
+
+func TestLoadDefinitionsFromYAMLInvalidEvaluation(t *testing.T) {
+	yaml := []byte(`
+events:
+  herb:
+    evaluation: not_a_real_evaluation
+    english_name: Herb
+    name: Test
+    desc: Test
+buffs: {}
+items: {}
+`)
+	_, err := LoadDefinitionsFromYAML(yaml)
+	if err == nil {
+		t.Error("LoadDefinitionsFromYAML with invalid evaluation should return error")
+	}
+}
+
+func TestLoadDefinitionsFromYAMLOutOfRangeEvaluation(t *testing.T) {
+	yaml := []byte(`
+events:
+  herb:
+    evaluation: "150"
+    english_name: Herb
+    name: Test
+    desc: Test
+buffs: {}
+items: {}
+`)
+	_, err := LoadDefinitionsFromYAML(yaml)
+	if err == nil {
+		t.Error("LoadDefinitionsFromYAML with out-of-range evaluation should return error")
+	}
+}
+
+func TestLoadDefinitionsFromYAMLNumericEvaluation(t *testing.T) {
+	yaml := []byte(`
+events:
+  herb:
+    evaluation: "65"
+    english_name: Herb
+    name: Test
+    desc: Test
+buffs: {}
+items: {}
+`)
+	defs, err := LoadDefinitionsFromYAML(yaml)
+	if err != nil {
+		t.Fatalf("LoadDefinitionsFromYAML with numeric evaluation: %v", err)
+	}
+	herb := defs.Events[constants.EventTypeHerb]
+	if herb.Eval != 65 {
+		t.Errorf("herb.Eval = %d, want 65", herb.Eval)
+	}
+}
+
+// ========== parseEvaluation Tests ==========
+
+func TestParseEvaluationNamedConstants(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected constants.Evaluation
+	}{
+		{"very_bad", constants.EvaluationVeryBad},
+		{"bad", constants.EvaluationBad},
+		{"mild_bad", constants.EvaluationMildBad},
+		{"neutral", constants.EvaluationNeutral},
+		{"mixed", constants.EvaluationMixed},
+		{"mild_good", constants.EvaluationMildGood},
+		{"good", constants.EvaluationGood},
+		{"very_good", constants.EvaluationVeryGood},
+		{"excellent", constants.EvaluationExcellent},
+	}
+
+	for _, tt := range tests {
+		eval, err := parseEvaluation(tt.input)
+		if err != nil {
+			t.Errorf("parseEvaluation(%s) unexpected error: %v", tt.input, err)
+			continue
+		}
+		if eval != tt.expected {
+			t.Errorf("parseEvaluation(%s) = %d, want %d", tt.input, eval, tt.expected)
+		}
+	}
+}
+
+func TestParseEvaluationNumeric(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected constants.Evaluation
+	}{
+		{"0", 0},
+		{"50", 50},
+		{"100", 100},
+		{"65", 65},
+	}
+
+	for _, tt := range tests {
+		eval, err := parseEvaluation(tt.input)
+		if err != nil {
+			t.Errorf("parseEvaluation(%s) unexpected error: %v", tt.input, err)
+			continue
+		}
+		if eval != tt.expected {
+			t.Errorf("parseEvaluation(%s) = %d, want %d", tt.input, eval, tt.expected)
+		}
+	}
+}
+
+func TestParseEvaluationInvalid(t *testing.T) {
+	tests := []string{
+		"not_real",
+		"150",   // out of range
+		"-10",   // out of range
+		"abcde", // not a number
+	}
+
+	for _, input := range tests {
+		_, err := parseEvaluation(input)
+		if err == nil {
+			t.Errorf("parseEvaluation(%s) should return error", input)
+		}
+	}
+}
+
+func TestGlobalDefinitionSetInitialized(t *testing.T) {
+	// GlobalDefinitionSet should be populated at init time
+	if GlobalDefinitionSet == nil {
+		t.Fatal("GlobalDefinitionSet should not be nil (initialized at init)")
+	}
+	if len(GlobalDefinitionSet.Events) == 0 {
+		t.Error("GlobalDefinitionSet.Events should not be empty")
+	}
+	if len(GlobalDefinitionSet.Buffs) == 0 {
+		t.Error("GlobalDefinitionSet.Buffs should not be empty")
+	}
+	if len(GlobalDefinitionSet.Items) == 0 {
+		t.Error("GlobalDefinitionSet.Items should not be empty")
+	}
+}

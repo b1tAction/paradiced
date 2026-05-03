@@ -154,7 +154,7 @@ func TestEventTypeIsValid(t *testing.T) {
 		EventTypeHerb, EventTypeMilkTea, EventTypeRelic, EventTypeDivineBless,
 		EventTypeExchange, EventTypeHiddenBuff, EventTypeTasteTest,
 		EventTypeMosquito, EventTypeGhostHit, EventTypeDogPoop,
-		EventTypeThief, EventTypeCurseBuddha, EventTypeLostWay, EventTypeThunder,
+		EventTypeWindGust, EventTypeCurseBuddha, EventTypeLostWay, EventTypeThunder,
 	}
 	for _, et := range validTypes {
 		if !et.IsValid() {
@@ -503,7 +503,7 @@ func TestActionSourceIsValid(t *testing.T) {
 		SourceEventTrap, SourceEventHerb, SourceEventThunder, SourceEventMilkTea,
 		SourceEventMosquito, SourceEventGhostHit, SourceEventDogPoop,
 		SourceEventRelic, SourceEventExchange, SourceEventTasteTest,
-		SourceEventThief, SourceEventDivineBless, SourceEventCurseBuddha,
+		SourceEventWindGust, SourceEventDivineBless, SourceEventCurseBuddha,
 		SourceEventHiddenBuff, SourceEventLostWay,
 		SourceFactionBaiHu, SourceFactionQingLong,
 		SourceSystemDice, SourceSystemDiceRoll, SourceSystemDiceRollFellDown,
@@ -581,7 +581,7 @@ func TestActionSourceIsEvent(t *testing.T) {
 		SourceEventTrap, SourceEventHerb, SourceEventThunder, SourceEventMilkTea,
 		SourceEventMosquito, SourceEventGhostHit, SourceEventDogPoop,
 		SourceEventRelic, SourceEventExchange, SourceEventTasteTest,
-		SourceEventThief, SourceEventDivineBless, SourceEventCurseBuddha,
+		SourceEventWindGust, SourceEventDivineBless, SourceEventCurseBuddha,
 		SourceEventHiddenBuff, SourceEventLostWay,
 	}
 	for _, as := range eventSources {
@@ -1060,7 +1060,7 @@ func TestParseEventType(t *testing.T) {
 		{"mosquito", EventTypeMosquito},
 		{"ghost_hit", EventTypeGhostHit},
 		{"dog_poop", EventTypeDogPoop},
-		{"thief", EventTypeThief},
+		{"wind_gust", EventTypeWindGust},
 		{"curse_buddha", EventTypeCurseBuddha},
 		{"lost_way", EventTypeLostWay},
 		{"thunder", EventTypeThunder},

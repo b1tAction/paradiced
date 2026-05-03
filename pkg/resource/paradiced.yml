@@ -55,11 +55,11 @@ events:
     english_name: DogPoop
     name: 踩到了狗屎
     desc: 运气糟糕的一天
-  thief:
+  wind_gust:
     evaluation: bad
-    english_name: Thief
-    name: 啊？！贼
-    desc: 遭遇盗贼，随机丢失一个道具
+    english_name: WindGust
+    name: 一阵风
+    desc: 一阵狂风卷走了你的道具
   curse_buddha:
     evaluation: bad
     english_name: CurseBuddha

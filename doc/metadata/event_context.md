@@ -75,7 +75,7 @@ Event Handler 现通过 `ctx.AddDerivedAction()` 推送具体 Action，而非设
 | 遗物(Relic) | `ctx.SetBool("draw_item", true)` | `ctx.AddDerivedAction(NewDrawItemAction(...))` |
 | 交换(Exchange) | `ctx.SetBool("swap_position", true)` | `ctx.AddDerivedAction(NewTeleportAction(...))` ×2 |
 | 尝一口(TasteTest) | `ctx.SetBool("random_buff", true)` | `ctx.AddDerivedAction(NewDrawBuffAction(...))` |
-| 盗贼(Thief) | `ctx.SetBool("lose_item", true)` | `ctx.AddDerivedAction(NewRemoveItemAction(...))` |
+| 一阵风(WindGust) | `ctx.SetBool("lose_item", true)` | `ctx.AddDerivedAction(NewRemoveItemAction(...))` |
 | 雷劫(Thunder) | 直接HP归零 | 仍直接执行（无flag，无DerivedAction） |
 
 **保留的旧字段**（仅在非 DerivedAction 场景使用）：

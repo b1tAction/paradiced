@@ -55,7 +55,7 @@ func TestEventDefinitionsFields(t *testing.T) {
 		{constants.EventTypeMosquito, constants.EvaluationMildBad, "Mosquito", "被蚊虫叮咬"},
 		{constants.EventTypeGhostHit, constants.EvaluationMildBad, "GhostHit", "偶遇孤魂野鬼"},
 		{constants.EventTypeDogPoop, constants.EvaluationMildBad, "DogPoop", "踩到了狗屎"},
-		{constants.EventTypeThief, constants.EvaluationBad, "Thief", "啊？！贼"},
+		{constants.EventTypeWindGust, constants.EvaluationBad, "WindGust", "一阵风"},
 		{constants.EventTypeCurseBuddha, constants.EvaluationBad, "CurseBuddha", "虔诚拜三拜"},
 		{constants.EventTypeLostWay, constants.EvaluationMildBad, "LostWay", "迷途"},
 		{constants.EventTypeThunder, constants.EvaluationVeryBad, "Thunder", "雷劫"},
@@ -387,14 +387,14 @@ func TestDogPoopEventHandler(t *testing.T) {
 	}
 }
 
-func TestThiefEventHandler(t *testing.T) {
-	// Test Thief produces RemoveItemAction when player has items
+func TestWindGustEventHandler(t *testing.T) {
+	// Test WindGust produces RemoveItemAction when player has items
 	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	game.AddPlayer(player)
 	player.AddItem(core.NewItem(constants.ItemTypeReverseClock))
 
-	handler := GetEventHandlerConfig(constants.EventTypeThief).Handler
+	handler := GetEventHandlerConfig(constants.EventTypeWindGust).Handler
 
 	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
@@ -675,10 +675,10 @@ func TestExchangeHandlerNilPlayer(t *testing.T) {
 	// Should not panic
 }
 
-func TestThiefHandlerNilPlayer(t *testing.T) {
-	// Thief handler signals item loss, requires player
+func TestWindGustHandlerNilPlayer(t *testing.T) {
+	// WindGust handler signals item loss, requires player
 	ctx := event.NewContext(nil)
-	handler := GetEventHandlerConfig(constants.EventTypeThief).Handler
+	handler := GetEventHandlerConfig(constants.EventTypeWindGust).Handler
 	handler(constants.PhaseOnLand, ctx)
 
 	// Should not panic

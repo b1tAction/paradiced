@@ -40,7 +40,7 @@ const (
 	SourceEventRelic       ActionSource = "event_relic"
 	SourceEventExchange    ActionSource = "event_exchange"
 	SourceEventTasteTest   ActionSource = "event_taste_test"
-	SourceEventThief       ActionSource = "event_thief"
+	SourceEventWindGust    ActionSource = "event_wind_gust"
 	SourceEventDivineBless ActionSource = "event_divine_bless"
 	SourceEventCurseBuddha ActionSource = "event_curse_buddha"
 	SourceEventHiddenBuff  ActionSource = "event_hidden_buff"

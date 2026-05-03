@@ -37,11 +37,12 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 │   ├── gamemap/        # Map system (Cell, MapEngine, PathResult)
 │   └── net/            # Sync data builder (Builder, test helper)
 ├── pkg/
-│   ├── constants/      # Unified enum types (BuffType, EventType, ItemType, Phase, etc.)
+│   ├── constants/      # Unified enum types (BuffType, EventType, ItemType, Phase, etc.) + Definition structs
 │   ├── gamelog/        # Unified game log system for client playback
 │   ├── id/             # Typed ID wrapper system (PlayerID, BuffID, ItemID, etc.)
 │   ├── net/            # Network protocol layer (OpCode, Message, StateSync, MatchHandler, Builder interface)
 │   ├── protocol/       # Public interfaces (Game, MapEngine) - for testing mocks
+│   ├── resource/       # YAML/JSON resource loading (DefinitionsSet, MapConfig, go:embed)
 │   ├── rng/            # Random number engine (WeightedPool, LuckModifier, DiceManager)
 │   └── util/           # Utilities (Metadata with JSON serialization)
 └── doc/
@@ -53,7 +54,7 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 ### Key Components
 
 #### Constants Layer (`pkg/constants`)
-- **BuffType**: Buff identifiers with IsPositive/IsNegative classification
+- **BuffType**: Buff identifiers with IsPositive/IsNegative/IsBoss/IsHidden/IsFaction/IsDraw classification
 - **EventType**: Event identifiers for random events
 - **ItemType**: Item identifiers for consumables
 - **Phase**: Trigger timing (HSM: BeforeTurn/OnLand/AfterTurn/PreMove; Action: PreDamage/PreEvent/PreRespawn/PostBuffApplied/PreBuffRemoved)
@@ -334,7 +335,7 @@ Git Commit信息必须使用英文提交
 | 腐化 (Corrupt) | AfterTurn | HP-1 every 2 turns |
 | 辟邪 (Exorcism) | PreEvent | Immune to poison |
 | 毒瘴 (Poison) | BeforeTurn | Bad event each turn |
-| 离火 (Fire) | BeforeTurn | ZhuQue passive, LP+1 every 4 turns |
+| 离火 (Fire) | BeforeTurn | ZhuQue passive, LP+1 every 4 turns (IsFaction=true, not in draw pool) |
 | 死亡标记 (DeathMark) | PreAction (Hidden) | Block all actions for dead players (exempt: RespawnAction, RemoveBuffAction(DeathMark)) |
 | 反刺 (Thorns) | PreDamage (Boss self) | Boss reflect: 30% damage back as derived PiercingDamageAction |
 
@@ -343,7 +344,7 @@ Git Commit信息必须使用英文提交
 | Item | Phase | Effect |
 |------|-------|--------|
 | 反方向的钟 (ReverseClock) | AnyTime | Give target player Lost buff |
-| 任意门 (AnyDoor) | OnLand | Teleport player to target position |
+| 任意门 (AnyDoor) | ItemUsed | Teleport to target player's position (NeedConfirm=false, frontend sends targetID) |
 | 骰子升级卡 (DiceUpgrade) | ItemUsed | Upgrade dice type (Wood→Copper→Silver→Gold) |
 
 **Item Lifecycle**: Items follow complete lifecycle through Action system:
@@ -383,6 +384,7 @@ Git Commit信息必须使用英文提交
 - [doc/background.md](doc/background.md) - Game design and rules (Chinese)
 - [doc/internal/event_bus_system.md](doc/internal/event_bus_system.md) - EventBus documentation (Chinese)
 - [doc/internal/core.md](doc/internal/core.md) - Core structures (Chinese)
+- [doc/internal/yaml_definitions.md](doc/internal/yaml_definitions.md) - YAML definition system (Chinese)
 - [doc/internal/rng_engine.md](doc/internal/rng_engine.md) - RNG engine (Chinese)
 - [doc/internal/metadata.md](doc/internal/metadata.md) - Metadata utility usage (Chinese)
 - [doc/metadata/README.md](doc/metadata/README.md) - Metadata contracts (Chinese)
