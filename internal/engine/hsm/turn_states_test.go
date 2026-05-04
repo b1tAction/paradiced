@@ -9,11 +9,66 @@ import (
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/internal/gamemap"
-	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
+	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
+
+type turnStateSyncTestBuilder struct {
+	hsmInst *HSM
+}
+
+func (b *turnStateSyncTestBuilder) BuildStateSync() *pkgnet.StateSync {
+	turnPlayer := b.hsmInst.GetTurnPlayer()
+	currentPlayerID := ""
+	if turnPlayer != nil {
+		currentPlayerID = turnPlayer.ID.UUID()
+	}
+
+	game := b.hsmInst.GetGame()
+	players := make([]pkgnet.Player, 0)
+	if game != nil {
+		for _, player := range game.GetPlayers() {
+			players = append(players, pkgnet.Player{
+				PlayerID: player.ID.UUID(),
+				Position: player.Position,
+				HP:       player.HP,
+				LP:       player.LP,
+				MaxHP:    player.MaxHP,
+				IsDead:   player.IsDead,
+				IsBoss:   player.ID.IsBoss(),
+			})
+		}
+	}
+	entries := b.hsmInst.GetGame().Log.GetNewEntries()
+	b.hsmInst.GetGame().Log.MarkBroadcasted()
+
+	return &pkgnet.StateSync{
+		GlobalState:     b.hsmInst.GetGlobalStateID().String(),
+		TurnState:       b.hsmInst.GetTurnStateID().String(),
+		CurrentPlayerID: currentPlayerID,
+		Round:           b.hsmInst.GetRound(),
+		Turn:            b.hsmInst.GetTurn(),
+		Paused:          b.hsmInst.IsPaused(),
+		Players:         players,
+		Entries:         entries,
+	}
+}
+
+func (b *turnStateSyncTestBuilder) BuildFullSyncStateSync() *pkgnet.StateSync {
+	return b.BuildStateSync()
+}
+
+func (b *turnStateSyncTestBuilder) BuildAvailable() *pkgnet.Available {
+	return &pkgnet.Available{}
+}
+
+func (b *turnStateSyncTestBuilder) BuildMapInfo() *pkgnet.MapInfo {
+	return &pkgnet.MapInfo{}
+}
+
+func (b *turnStateSyncTestBuilder) SetDiceType(string) {}
 
 // ========== TurnUpkeepState Tests ==========
 
@@ -195,6 +250,95 @@ func TestTurnUpkeepState_Update_NormalFlow(t *testing.T) {
 
 	if nextID != StateMainAction {
 		t.Errorf("Update should return StateMainAction, got %s", nextID.String())
+	}
+}
+
+func TestTurnUpkeepState_Update_BossEntersBossBattle(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.Position = 5
+	game.AddPlayer(player)
+	boss := game.InitializeBoss(19)
+
+	state := NewTurnUpkeepState()
+	ctx := NewStateContext().
+		WithHSM(NewHSM(game)).
+		WithPlayer(boss)
+
+	nextID := state.Update(ctx)
+
+	if nextID != StateTurnBossBattle {
+		t.Errorf("Boss turn should enter TurnBossBattle even when idle, got %s", nextID.String())
+	}
+}
+
+func TestTurnBossBattleState_Enter_BroadcastsBossActionEntries(t *testing.T) {
+	game := engine.NewGame(id.NewGameID(), 42)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.Position = 19
+	game.AddPlayer(player)
+	boss := game.InitializeBoss(19)
+	game.Log.StartTurn(1, 0, boss.ID.UUID())
+
+	hsmInst := NewHSM(game)
+	hsmInst.SetMapEngine(gamemap.NewMapEngine(20))
+	hsmInst.globalStateID = StateTurnLoop
+	hsmInst.turnStateID = StateTurnBossBattle
+	hsmInst.turnPlayer = boss
+	hsmInst.round = 1
+	hsmInst.turn = 0
+
+	mockBroadcast := pkgnet.NewMockBroadcastAdapter()
+	state := NewTurnBossBattleState()
+	ctx := NewStateContext().
+		WithHSM(hsmInst).
+		WithPlayer(boss).
+		WithBroadcast(mockBroadcast).
+		WithBuilder(&turnStateSyncTestBuilder{hsmInst: hsmInst})
+
+	state.Enter(ctx)
+
+	if ctx.Error != nil {
+		t.Fatalf("Enter should succeed, got error: %v", ctx.Error)
+	}
+	if len(mockBroadcast.StateSyncs) != 1 {
+		t.Fatalf("TurnBossBattle should broadcast one StateSync, got %d", len(mockBroadcast.StateSyncs))
+	}
+	sync := mockBroadcast.StateSyncs[0]
+	if sync.TurnState != StateTurnBossBattle.String() {
+		t.Errorf("StateSync.TurnState = %s, want %s", sync.TurnState, StateTurnBossBattle.String())
+	}
+	if sync.CurrentPlayerID != boss.ID.UUID() {
+		t.Errorf("StateSync.CurrentPlayerID = %s, want %s", sync.CurrentPlayerID, boss.ID.UUID())
+	}
+	if len(sync.Entries) == 0 {
+		t.Fatal("TurnBossBattle sync should include Boss action entries")
+	}
+
+	foundBossAction := false
+	for _, entry := range sync.Entries {
+		if entry.ActionType == string(constants.ActionBossAttack) || entry.ActionType == string(constants.ActionBossSkill) {
+			foundBossAction = true
+			if entry.Source != boss.ID.UUID() {
+				t.Errorf("Boss action Source = %s, want %s", entry.Source, boss.ID.UUID())
+			}
+		}
+	}
+	if !foundBossAction {
+		t.Fatalf("TurnBossBattle sync should include boss_attack or boss_skill, got entries: %#v", sync.Entries)
+	}
+	if len(game.Log.GetNewEntries()) != 0 {
+		t.Fatal("Boss action entries should be marked broadcasted after TurnBossBattle sync")
+	}
+
+	foundBoss := false
+	for _, playerSync := range sync.Players {
+		if playerSync.PlayerID == boss.ID.UUID() {
+			foundBoss = playerSync.IsBoss
+		}
+	}
+	if !foundBoss {
+		t.Fatal("StateSync players should include the Boss with is_boss=true")
 	}
 }
 

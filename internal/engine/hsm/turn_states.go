@@ -1192,6 +1192,24 @@ func (s *TurnBossBattleState) Enter(ctx *StateContext) {
 	} else {
 		s.enterBossBranch(ctx, player, game, mapEngine)
 	}
+	if ctx.Error != nil {
+		return
+	}
+
+	// Broadcast TurnBossBattle after executing actions so Boss action entries stay
+	// attached to the state where they actually occur.
+	s.broadcastStateSync(ctx)
+}
+
+func (s *TurnBossBattleState) broadcastStateSync(ctx *StateContext) {
+	game := ctx.GetGame()
+	if ctx.Broadcast == nil || game == nil {
+		return
+	}
+	if ctx.Builder != nil {
+		stateSync := ctx.Builder.BuildStateSync()
+		ctx.Broadcast.BroadcastStateSync(stateSync)
+	}
 }
 
 // enterPlayerBranch handles the player attacking Boss.
