@@ -30,7 +30,7 @@ build-plugin:
 		-v "$$(pwd):/workspace" \
 		-w /workspace \
 		$(PLUGINBUILDER_IMAGE) \
-		-lc 'CGO_ENABLED=1 /usr/local/go/bin/go build --trimpath --buildmode=plugin -o $(PLUGIN_OUT) ./cmd/paradiced-server'
+		-lc 'CGO_ENABLED=1 /usr/local/go/bin/go build -buildvcs=false --trimpath --buildmode=plugin -o $(PLUGIN_OUT) ./cmd/paradiced-server'
 
 # Build for development (verify compilation without plugin mode)
 # Exclude cmd/paradiced-server (Nakama plugin, no main() function)
