@@ -337,7 +337,7 @@ Git Commit信息必须使用英文提交
 | 毒瘴 (Poison) | BeforeTurn | Bad event each turn |
 | 离火 (Fire) | BeforeTurn | ZhuQue passive, LP+1 every 4 turns (IsFaction=true, not in draw pool) |
 | 死亡标记 (DeathMark) | PreAction (Hidden) | Block all actions for dead players (exempt: RespawnAction, RemoveBuffAction(DeathMark)) |
-| 反刺 (Thorns) | PreDamage (Boss self) | Boss reflect: 30% damage back as derived BossAttackAction (BossAttackAction derives DamageAction) |
+| 反刺 (Thorns) | PreDamage (Boss self) | Boss reflect: 30% damage back as derived PiercingDamageAction |
 
 ## Item System
 

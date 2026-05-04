@@ -770,7 +770,7 @@ func TestBuildDefinitionsConfigBuffCategory(t *testing.T) {
 func TestBuildDefinitionsConfigEventCategory(t *testing.T) {
 	defs := BuildDefinitionsConfig()
 
-	goodEvents := []string{"herb", "milk_tea", "relic", "divine_bless", "hidden_buff"}
+	goodEvents := []string{"herb", "lucky_bubble", "relic", "divine_bless", "hidden_buff"}
 	for _, key := range goodEvents {
 		if _, ok := defs.Events[key]; !ok {
 			t.Fatalf("missing %s event in DefinitionsConfig", key)

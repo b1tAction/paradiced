@@ -215,7 +215,7 @@ type BossDamageAction struct {
 ```
 
 - `CanModify() = false` - Boss damage cannot be intercepted
-- `PreTriggerPhase() = PhasePreDamage` - Thorns handler intercepts at PreDamage on BossPlayer (publishes PhasePreDamage to Boss, Thorns Buff handler pushes derived BossAttackAction for reflect)
+- `PreTriggerPhase() = PhasePreDamage` - Thorns handler intercepts at PreDamage on BossPlayer and pushes derived `PiercingDamageAction` for reflect
 - `PostTriggerPhase() = PhaseAnyTime` - No post-trigger for boss damage
 - `TargetPlayer()` returns `targetPlayer` (Boss player)
 - Used when player is on Boss cell and rolls dice
@@ -244,7 +244,7 @@ type BossAttackAction struct {
 ```go
 type BossSkillAction struct {
     SourcePlayer *core.Player         // Boss player
-    SkillType    constants.BossSkillType // "thunder"/"curse"/"lost"/"rest"
+    SkillType    constants.BossSkillType // current registered: "thunder"/"curse"/"rest"/"thorns"
     TargetIDs    []string             // Target player IDs
     SourceID     string               // "boss_skill_thunder" etc.
     Targets      []*core.Player       // Target players

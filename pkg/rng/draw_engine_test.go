@@ -142,7 +142,7 @@ func TestDrawFromPoolGood(t *testing.T) {
 		Items: []EvaluatedItem{
 			{Type: "event_divine_bless", Eval: constants.EvaluationExcellent},
 			{Type: "event_herb", Eval: constants.EvaluationMildGood},
-			{Type: "event_milk_tea", Eval: constants.EvaluationGood},
+			{Type: "event_lucky_bubble", Eval: constants.EvaluationGood},
 		},
 	}
 
@@ -234,7 +234,7 @@ func TestDrawFromPoolLPInfluence(t *testing.T) {
 		Items: []EvaluatedItem{
 			{Type: "event_divine_bless", Eval: constants.EvaluationExcellent},
 			{Type: "event_herb", Eval: constants.EvaluationMildGood},
-			{Type: "event_milk_tea", Eval: constants.EvaluationGood},
+			{Type: "event_lucky_bubble", Eval: constants.EvaluationGood},
 		},
 	}
 
@@ -403,7 +403,7 @@ func TestDrawWithProbEmptyItems(t *testing.T) {
 func TestDrawWithProbAllGood(t *testing.T) {
 	items := []*EvaluatedItem{
 		{Type: "herb", Eval: constants.EvaluationMildGood},
-		{Type: "milk_tea", Eval: constants.EvaluationGood},
+		{Type: "lucky_bubble", Eval: constants.EvaluationGood},
 		{Type: "divine_bless", Eval: constants.EvaluationExcellent},
 	}
 
@@ -497,7 +497,7 @@ func TestDrawWithProbPoolFallback(t *testing.T) {
 	// Only Good items in pool
 	items := []*EvaluatedItem{
 		{Type: "herb", Eval: constants.EvaluationMildGood},
-		{Type: "milk_tea", Eval: constants.EvaluationGood},
+		{Type: "lucky_bubble", Eval: constants.EvaluationGood},
 	}
 
 	// Request 100% Bad pool, but no Bad items exist - should fallback to all items
@@ -506,7 +506,7 @@ func TestDrawWithProbPoolFallback(t *testing.T) {
 		t.Fatal("DrawWithProb should fallback to all items when filtered pool is empty")
 	}
 	// Should still return one of the available items
-	if result.Item.Type != "herb" && result.Item.Type != "milk_tea" {
+	if result.Item.Type != "herb" && result.Item.Type != "lucky_bubble" {
 		t.Errorf("DrawWithProb fallback should return available item, got %s", result.Item.Type)
 	}
 }
@@ -566,7 +566,7 @@ func TestDrawWithProbLPInfluence(t *testing.T) {
 	items := []*EvaluatedItem{
 		{Type: "divine_bless", Eval: constants.EvaluationExcellent}, // 100
 		{Type: "herb", Eval: constants.EvaluationMildGood},          // 70
-		{Type: "milk_tea", Eval: constants.EvaluationGood},          // 80
+		{Type: "lucky_bubble", Eval: constants.EvaluationGood},          // 80
 	}
 
 	iterations := 5000
@@ -599,14 +599,14 @@ func TestDrawWithProbLPInfluence(t *testing.T) {
 		t.Errorf("LP=8 should favor high-Eval items more than LP=0: divine_bless rate LP=0=%.3f, LP=8=%.3f", rate0, rate8)
 	}
 
-	t.Logf("LP=0 distribution: divine_bless=%.3f, herb=%.3f, milk_tea=%.3f",
+	t.Logf("LP=0 distribution: divine_bless=%.3f, herb=%.3f, lucky_bubble=%.3f",
 		float64(stats0["divine_bless"])/float64(iterations),
 		float64(stats0["herb"])/float64(iterations),
-		float64(stats0["milk_tea"])/float64(iterations))
-	t.Logf("LP=8 distribution: divine_bless=%.3f, herb=%.3f, milk_tea=%.3f",
+		float64(stats0["lucky_bubble"])/float64(iterations))
+	t.Logf("LP=8 distribution: divine_bless=%.3f, herb=%.3f, lucky_bubble=%.3f",
 		float64(stats8["divine_bless"])/float64(iterations),
 		float64(stats8["herb"])/float64(iterations),
-		float64(stats8["milk_tea"])/float64(iterations))
+		float64(stats8["lucky_bubble"])/float64(iterations))
 }
 
 func TestDrawWithProbMixedProbabilities(t *testing.T) {

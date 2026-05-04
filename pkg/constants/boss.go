@@ -24,11 +24,11 @@ type BossSkillType string
 
 // BossSkillType constants.
 const (
-	BossSkillThunder BossSkillType = "thunder" // AOE damage 2 to all boss-cell players
+	BossSkillThunder BossSkillType = "thunder" // AOE damage 3 to all boss-cell players
 	BossSkillCurse   BossSkillType = "curse"   // Add curse buff to all boss-cell players
-	BossSkillLost    BossSkillType = "lost"    // Add lost buff to all boss-cell players
-	BossSkillRest    BossSkillType = "rest"    // Boss heals 5 HP
-	BossSkillThorns  BossSkillType = "thorns"  // Add thorns buff to all boss-cell players (reflect 30% damage)
+	BossSkillLost    BossSkillType = "lost"    // Reserved; not registered in the current Boss skill registry
+	BossSkillRest    BossSkillType = "rest"    // Boss heals 20 HP
+	BossSkillThorns  BossSkillType = "thorns"  // Add thorns buff to Boss (reflect 30% damage)
 )
 
 // IsValid checks if BossSkillType is valid.

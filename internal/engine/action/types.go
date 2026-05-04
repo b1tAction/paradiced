@@ -972,7 +972,7 @@ func (a *BossDamageAction) Execute(ctx *ActionContext) error {
 
 	// Thorns reflect is handled by BuffThorns handler via EventBus (PhasePreDamage).
 	// The PreTrigger publishes PhasePreDamage to BossPlayer, and Thorns handler
-	// pushes a derived BossAttackAction for reflect damage to the attacking player.
+	// pushes a derived PiercingDamageAction for reflect damage to the attacking player.
 
 	return nil
 }

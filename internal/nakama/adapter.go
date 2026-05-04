@@ -74,9 +74,11 @@ func (a *NakamaMatchHandlerAdapter) MatchInit(ctx context.Context, logger runtim
 	a.handler.WithLogger(logger)
 
 	// Build match label (JSON format for match queries)
-	label := map[string]interface{}{
-		"max_players": maxPlayers,
-		"game":        "paradiced",
+	label := matchLabel{
+		MaxPlayers:      maxPlayers,
+		Game:            "paradiced",
+		Status:          "waiting",
+		HostDisplayName: "",
 	}
 	labelJSON, _ := json.Marshal(label)
 
@@ -201,6 +203,9 @@ func (a *NakamaMatchHandlerAdapter) MatchJoin(ctx context.Context, logger runtim
 		}
 	}
 
+	// Update match label with current status and host display name
+	dispatcher.MatchLabelUpdate(a.buildCurrentLabel(handler))
+
 	return state
 }
 
@@ -284,6 +289,9 @@ func (a *NakamaMatchHandlerAdapter) MatchLoop(ctx context.Context, logger runtim
 	// Run match loop (delta time not used, tick rate controls timing)
 	handler.MatchLoop(0)
 
+	// Update match label to reflect current game status
+	dispatcher.MatchLabelUpdate(a.buildCurrentLabel(handler))
+
 	// If HSM stopped, return nil to end match
 	if handler.hsm != nil && !handler.hsm.IsRunning() {
 		logger.Info("Match ended: match_id=%s", handler.matchID)
@@ -358,9 +366,40 @@ func (a *NakamaMatchHandlerAdapter) MatchSignal(ctx context.Context, logger runt
 
 // matchLabel returns JSON label for match queries.
 type matchLabel struct {
-	MaxPlayers int    `json:"max_players"`
-	Game       string `json:"game"`
-	Status     string `json:"status"`
+	MaxPlayers      int    `json:"max_players"`
+	Game            string `json:"game"`
+	Status          string `json:"status"`
+	HostDisplayName string `json:"host_display_name"`
+}
+
+// buildCurrentLabel builds the current match label JSON from handler state.
+// Used for dynamic label updates via MatchDispatcher.MatchLabelUpdate.
+func (a *NakamaMatchHandlerAdapter) buildCurrentLabel(handler *NakamaMatchHandler) string {
+	status := "waiting"
+	if handler.hsm != nil && handler.hsm.IsRunning() {
+		switch handler.hsm.GetGlobalStateID() {
+		case hsm.StateWaitingForHost:
+			status = "waiting"
+		case hsm.StateGameOver:
+			status = "finished"
+		default:
+			status = "in_progress"
+		}
+	}
+
+	hostDN := ""
+	if h, ok := handler.players[handler.hostUserID]; ok && h.Metadata != nil {
+		hostDN = h.Metadata.GetStringOrDefault("display_name", handler.hostUserID)
+	}
+
+	l := matchLabel{
+		MaxPlayers:      handler.maxPlayers,
+		Game:            "paradiced",
+		Status:          status,
+		HostDisplayName: hostDN,
+	}
+	b, _ := json.Marshal(l)
+	return string(b)
 }
 
 // getFactionFromProperties extracts faction from matchmaker entry properties.

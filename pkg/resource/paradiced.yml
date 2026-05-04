@@ -10,11 +10,11 @@ events:
     english_name: Herb
     name: 采集到草药
     desc: 在路边发现了草药，恢复了体力
-  milk_tea:
+  lucky_bubble:
     evaluation: good
-    english_name: MilkTea
-    name: 捡到奶茶
-    desc: 捡到了一杯奶茶，一口就吃到了猪猪欸
+    english_name: LuckyBubble
+    name: 吹出幸运泡泡
+    desc: 梦幻泡泡飘到你面前，藏着好运
   relic:
     evaluation: very_good
     english_name: Relic

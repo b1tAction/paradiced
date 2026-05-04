@@ -151,7 +151,7 @@ func TestBuffTypeIsFaction(t *testing.T) {
 
 func TestEventTypeIsValid(t *testing.T) {
 	validTypes := []EventType{
-		EventTypeHerb, EventTypeMilkTea, EventTypeRelic, EventTypeDivineBless,
+		EventTypeHerb, EventTypeLuckyBubble, EventTypeRelic, EventTypeDivineBless,
 		EventTypeExchange, EventTypeHiddenBuff, EventTypeTasteTest,
 		EventTypeMosquito, EventTypeGhostHit, EventTypeDogPoop,
 		EventTypeWindGust, EventTypeCurseBuddha, EventTypeLostWay, EventTypeThunder,
@@ -500,7 +500,7 @@ func TestActionSourceIsValid(t *testing.T) {
 		SourceBuffThornsReflect,
 		SourceItemReverseClock, SourceItemReverseClockBuff, SourceItemAnyDoor,
 		SourceItemHealingPotion, SourceItemDiceUpgrade, SourceItemConsumed,
-		SourceEventTrap, SourceEventHerb, SourceEventThunder, SourceEventMilkTea,
+		SourceEventTrap, SourceEventHerb, SourceEventThunder, SourceEventLuckyBubble,
 		SourceEventMosquito, SourceEventGhostHit, SourceEventDogPoop,
 		SourceEventRelic, SourceEventExchange, SourceEventTasteTest,
 		SourceEventWindGust, SourceEventDivineBless, SourceEventCurseBuddha,
@@ -578,7 +578,7 @@ func TestActionSourceIsItem(t *testing.T) {
 
 func TestActionSourceIsEvent(t *testing.T) {
 	eventSources := []ActionSource{
-		SourceEventTrap, SourceEventHerb, SourceEventThunder, SourceEventMilkTea,
+		SourceEventTrap, SourceEventHerb, SourceEventThunder, SourceEventLuckyBubble,
 		SourceEventMosquito, SourceEventGhostHit, SourceEventDogPoop,
 		SourceEventRelic, SourceEventExchange, SourceEventTasteTest,
 		SourceEventWindGust, SourceEventDivineBless, SourceEventCurseBuddha,
@@ -1051,7 +1051,7 @@ func TestParseEventType(t *testing.T) {
 		expected EventType
 	}{
 		{"herb", EventTypeHerb},
-		{"milk_tea", EventTypeMilkTea},
+		{"lucky_bubble", EventTypeLuckyBubble},
 		{"relic", EventTypeRelic},
 		{"divine_bless", EventTypeDivineBless},
 		{"exchange", EventTypeExchange},

@@ -839,7 +839,7 @@ func TestTurnDrawState_Enter(t *testing.T) {
 	// Setup EventPool for DrawEventAction (Game.Draw already initialized by NewGame)
 	game.EventPool = []*rng.EvaluatedItem{
 		{Type: "herb", Eval: constants.EvaluationMildGood},
-		{Type: "milk_tea", Eval: constants.EvaluationGood},
+		{Type: "lucky_bubble", Eval: constants.EvaluationGood},
 	}
 
 	state := NewTurnDrawState()

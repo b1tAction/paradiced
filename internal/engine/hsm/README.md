@@ -168,7 +168,7 @@ TurnEnd
 - Boss回合排在所有玩家回合之后
 - 如果没有玩家在Boss格，Boss回合空转
 - Boss攻击类型基于Boss格存活玩家的平均LP
-- Boss攻击（普通1点/暴击2点）可被隐匿Buff拦截（PhasePreDamage）
+- Boss攻击（普通1点/暴击2点）通过衍生 `DamageAction` 扣血；当前隐匿Buff不拦截伤害。
 - Boss技能从技能池随机抽取（等权重）
 
 **Boss击败后流程**：

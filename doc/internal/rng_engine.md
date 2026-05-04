@@ -96,7 +96,7 @@ pkg/rng/
 
 | 分类 | Evaluation范围 | 示例 |
 |------|---------------|------|
-| Good | > 65 | DivineBless(100), MilkTea(80), Herb(70) |
+| Good | > 65 | DivineBless(100), LuckyBubble(80), Herb(70) |
 | Neutral | 41-65 | Exchange(50), HiddenBuff(55), TasteTest(55) |
 | Bad | ≤ 40 | Thunder(10), CurseBuddha(25), Mosquito(35) |
 
@@ -107,7 +107,7 @@ pkg/rng/
 | Event | Evaluation | LP=0权重 | LP=8权重 |
 |-------|------------|---------|---------|
 | DivineBless | 100 | 1.0 | 1.8 |
-| MilkTea | 80 | 0.8 | 1.44 |
+| LuckyBubble | 80 | 0.8 | 1.44 |
 | Herb | 70 | 0.7 | 1.26 |
 
 LP=8时，DivineBless（Evaluation=100）概率显著高于 Herb（Evaluation=70）。
