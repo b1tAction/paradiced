@@ -5,76 +5,76 @@
 # ========== Event Definitions ==========
 
 events:
-  herb:
-    evaluation: mild_good    # Supports named constants (mild_good=70) and raw numbers
-    english_name: Herb
-    name: 采集到草药
-    desc: 在路边发现了草药，恢复了体力
-  milk_tea:
+  # herb:
+  #   evaluation: mild_good    # Supports named constants (mild_good=70) and raw numbers
+  #   english_name: Herb
+  #   name: 采集到草药
+  #   desc: 在路边发现了草药，恢复了体力
+  lucky_bubble:
     evaluation: good
-    english_name: MilkTea
-    name: 捡到奶茶
-    desc: 捡到了一杯奶茶，一口就吃到了猪猪欸
-  relic:
-    evaluation: very_good
-    english_name: Relic
-    name: 捡到勇士的圣遗物
-    desc: 发现了古老圣遗物，获得一次道具抽奖机会
-  divine_bless:
-    evaluation: excellent
-    english_name: DivineBless
-    name: 受到天使眷顾
-    desc: 天使的祝福降临，获得神眷Buff
-  exchange:
-    evaluation: neutral
-    english_name: Exchange
-    name: 交换
-    desc: 命运之手将你与另一位玩家交换位置
-  hidden_buff:
-    evaluation: good
-    english_name: HiddenBuff
-    name: 麻了
-    desc: 身体麻木，获得隐匿Buff
-  taste_test:
-    evaluation: mixed
-    english_name: TasteTest
-    name: 这是什么？尝一口
-    desc: 发现神秘物质，尝试后获得随机效果
-  mosquito:
-    evaluation: mild_bad
-    english_name: Mosquito
-    name: 被蚊虫叮咬
-    desc: 丛林中的蚊虫叮咬了你
-  ghost_hit:
-    evaluation: mild_bad
-    english_name: GhostHit
-    name: 偶遇孤魂野鬼
-    desc: 被野鬼打了一闷棍
-  dog_poop:
-    evaluation: mild_bad
-    english_name: DogPoop
-    name: 踩到了狗屎
-    desc: 运气糟糕的一天
-  wind_gust:
-    evaluation: bad
-    english_name: WindGust
-    name: 一阵风
-    desc: 一阵狂风卷走了你的道具
-  curse_buddha:
-    evaluation: bad
-    english_name: CurseBuddha
-    name: 虔诚拜三拜
-    desc: 拜路边的野佛，获得诅咒Buff
-  lost_way:
-    evaluation: mild_bad
-    english_name: LostWay
-    name: 迷途
-    desc: 迷失方向，获得迷途Buff
-  thunder:
-    evaluation: very_bad
-    english_name: Thunder
-    name: 雷劫
-    desc: 天雷降临，HP归零
+    english_name: LuckyBubble
+    name: 吹出幸运泡泡
+    desc: 梦幻泡泡飘到你面前，藏着好运
+  # relic:
+  #   evaluation: very_good
+  #   english_name: Relic
+  #   name: 捡到勇士的圣遗物
+  #   desc: 发现了古老圣遗物，获得一次道具抽奖机会
+  # divine_bless:
+  #   evaluation: excellent
+  #   english_name: DivineBless
+  #   name: 受到天使眷顾
+  #   desc: 天使的祝福降临，获得神眷Buff
+  # exchange:
+  #   evaluation: neutral
+  #   english_name: Exchange
+  #   name: 交换
+  #   desc: 命运之手将你与另一位玩家交换位置
+  # hidden_buff:
+  #   evaluation: good
+  #   english_name: HiddenBuff
+  #   name: 麻了
+  #   desc: 身体麻木，获得隐匿Buff
+  # taste_test:
+  #   evaluation: mixed
+  #   english_name: TasteTest
+  #   name: 这是什么？尝一口
+  #   desc: 发现神秘物质，尝试后获得随机效果
+  # mosquito:
+  #   evaluation: mild_bad
+  #   english_name: Mosquito
+  #   name: 被蚊虫叮咬
+  #   desc: 丛林中的蚊虫叮咬了你
+  # ghost_hit:
+  #   evaluation: mild_bad
+  #   english_name: GhostHit
+  #   name: 偶遇孤魂野鬼
+  #   desc: 被野鬼打了一闷棍
+  # dog_poop:
+  #   evaluation: mild_bad
+  #   english_name: DogPoop
+  #   name: 踩到了狗屎
+  #   desc: 运气糟糕的一天
+  # wind_gust:
+  #   evaluation: bad
+  #   english_name: WindGust
+  #   name: 一阵风
+  #   desc: 一阵狂风卷走了你的道具
+  # curse_buddha:
+  #   evaluation: bad
+  #   english_name: CurseBuddha
+  #   name: 虔诚拜三拜
+  #   desc: 拜路边的野佛，获得诅咒Buff
+  # lost_way:
+  #   evaluation: mild_bad
+  #   english_name: LostWay
+  #   name: 迷途
+  #   desc: 迷失方向，获得迷途Buff
+  # thunder:
+  #   evaluation: very_bad
+  #   english_name: Thunder
+  #   name: 雷劫
+  #   desc: 天雷降临，HP归零
 
 # ========== Buff Definitions ==========
 

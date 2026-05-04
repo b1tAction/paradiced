@@ -33,7 +33,7 @@ const (
 	SourceEventTrap        ActionSource = "event_trap"
 	SourceEventHerb        ActionSource = "event_herb"
 	SourceEventThunder     ActionSource = "event_thunder"
-	SourceEventMilkTea     ActionSource = "event_milk_tea"
+	SourceEventLuckyBubble ActionSource = "event_lucky_bubble"
 	SourceEventMosquito    ActionSource = "event_mosquito"
 	SourceEventGhostHit    ActionSource = "event_ghost_hit"
 	SourceEventDogPoop     ActionSource = "event_dog_poop"

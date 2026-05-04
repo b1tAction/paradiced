@@ -44,7 +44,7 @@ func TestEventDefinitionsFields(t *testing.T) {
 	}{
 		// Good Events
 		{constants.EventTypeHerb, constants.EvaluationMildGood, "Herb", "采集到草药"},
-		{constants.EventTypeMilkTea, constants.EvaluationGood, "MilkTea", "捡到奶茶"},
+		{constants.EventTypeLuckyBubble, constants.EvaluationGood, "LuckyBubble", "吹出幸运泡泡"},
 		{constants.EventTypeRelic, constants.EvaluationVeryGood, "Relic", "捡到勇士的圣遗物"},
 		{constants.EventTypeDivineBless, constants.EvaluationExcellent, "DivineBless", "受到天使眷顾"},
 		// Neutral Events
@@ -115,15 +115,15 @@ func TestHerbEventHandler(t *testing.T) {
 	}
 }
 
-func TestMilkTeaEventHandler(t *testing.T) {
-	// Test MilkTea LP+1 through Action system
+func TestLuckyBubbleEventHandler(t *testing.T) {
+	// Test LuckyBubble LP+1 through Action system
 	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	player.LP = 5
 	game.AddPlayer(player)
 	game.Log.StartTurn(1, 0, player.ID.UUID())
 
-	handler := GetEventHandlerConfig(constants.EventTypeMilkTea).Handler
+	handler := GetEventHandlerConfig(constants.EventTypeLuckyBubble).Handler
 
 	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
@@ -520,7 +520,7 @@ func TestGetEventName(t *testing.T) {
 		expectedName string
 	}{
 		{constants.EventTypeHerb, "采集到草药"},
-		{constants.EventTypeMilkTea, "捡到奶茶"},
+		{constants.EventTypeLuckyBubble, "吹出幸运泡泡"},
 		{constants.EventTypeRelic, "捡到勇士的圣遗物"},
 		{constants.EventTypeDivineBless, "受到天使眷顾"},
 		{constants.EventTypeExchange, "交换"},
@@ -633,12 +633,12 @@ func TestEventModifyLPHandlerNilActionContext(t *testing.T) {
 	ctx := event.NewContext(player)
 	// No action_context set
 
-	handler := GetEventHandlerConfig(constants.EventTypeMilkTea).Handler
+	handler := GetEventHandlerConfig(constants.EventTypeLuckyBubble).Handler
 	handler(constants.PhaseOnLand, ctx)
 
 	// Should not produce derived actions without ActionContext
 	if len(ctx.GetDerivedActions()) > 0 {
-		t.Error("MilkTea handler should not produce actions without ActionContext")
+		t.Error("LuckyBubble handler should not produce actions without ActionContext")
 	}
 }
 

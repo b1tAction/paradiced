@@ -67,7 +67,7 @@ pkg/constants/
 | 分类 | 常量 | 值 | 说明 |
 |------|------|-----|------|
 | Good | `EventTypeHerb` | `herb` | 草药：HP+1 |
-| Good | `EventTypeMilkTea` | `milk_tea` | 奶茶：LP+1 |
+| Good | `EventTypeLuckyBubble` | `lucky_bubble` | 幸运泡泡：LP+1 |
 | Good | `EventTypeRelic` | `relic` | 圣遗物：抽道具 |
 | Good | `EventTypeDivineBless` | `divine_bless` | 天使眷顾：神眷Buff |
 | Neutral | `EventTypeExchange` | `exchange` | 交换：换位 |

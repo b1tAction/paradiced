@@ -177,10 +177,10 @@ func registerAllEvents() {
 		Handler:  createEventModifyHPHandler(1, constants.SourceEventHerb),
 	})
 
-	// MilkTea: LP+1
-	GlobalEventRegistry.RegisterEvent(defs.Events[constants.EventTypeMilkTea], &EventHandlerConfig{
+	// LuckyBubble: LP+1
+	GlobalEventRegistry.RegisterEvent(defs.Events[constants.EventTypeLuckyBubble], &EventHandlerConfig{
 		Priority: 70,
-		Handler:  createEventModifyLPHandler(1, constants.SourceEventMilkTea),
+		Handler:  createEventModifyLPHandler(1, constants.SourceEventLuckyBubble),
 	})
 
 	// Relic: Draw item

@@ -1536,7 +1536,7 @@ func TestDrawEventActionExecuteWithPool(t *testing.T) {
 	drawEngine := rng.NewDrawEngine(rand.New(rand.NewSource(42)))
 	eventPool := []*rng.EvaluatedItem{
 		{Type: "herb", Eval: constants.EvaluationMildGood},
-		{Type: "milk_tea", Eval: constants.EvaluationGood},
+		{Type: "lucky_bubble", Eval: constants.EvaluationGood},
 	}
 
 	action := NewDrawEventAction(player, "CellEvent")

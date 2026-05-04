@@ -10,7 +10,7 @@ const (
 
 	// Good Events
 	EventTypeHerb        EventType = "herb"         // 草药: HP+1
-	EventTypeMilkTea     EventType = "milk_tea"     // 奶茶: LP+1
+	EventTypeLuckyBubble EventType = "lucky_bubble" // 幸运泡泡: LP+1
 	EventTypeRelic       EventType = "relic"        // 圣遗物: draw item
 	EventTypeDivineBless EventType = "divine_bless" // 天使眷顾: Divine buff
 
@@ -32,7 +32,7 @@ const (
 // IsValid checks if EventType is valid.
 func (et EventType) IsValid() bool {
 	switch et {
-	case EventTypeHerb, EventTypeMilkTea, EventTypeRelic, EventTypeDivineBless,
+	case EventTypeHerb, EventTypeLuckyBubble, EventTypeRelic, EventTypeDivineBless,
 		EventTypeExchange, EventTypeHiddenBuff, EventTypeTasteTest,
 		EventTypeMosquito, EventTypeGhostHit, EventTypeDogPoop,
 		EventTypeWindGust, EventTypeCurseBuddha, EventTypeLostWay, EventTypeThunder:
@@ -48,8 +48,8 @@ func ParseEventType(s string) EventType {
 	switch s {
 	case "herb":
 		return EventTypeHerb
-	case "milk_tea":
-		return EventTypeMilkTea
+	case "lucky_bubble":
+		return EventTypeLuckyBubble
 	case "relic":
 		return EventTypeRelic
 	case "divine_bless":

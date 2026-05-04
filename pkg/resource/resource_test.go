@@ -165,7 +165,7 @@ func TestLoadDefinitionsFromYAML(t *testing.T) {
 
 	// Verify all expected events are loaded with typed keys
 	expectedEvents := []constants.EventType{
-		constants.EventTypeHerb, constants.EventTypeMilkTea, constants.EventTypeRelic,
+		constants.EventTypeHerb, constants.EventTypeLuckyBubble, constants.EventTypeRelic,
 		constants.EventTypeDivineBless, constants.EventTypeExchange, constants.EventTypeHiddenBuff,
 		constants.EventTypeTasteTest, constants.EventTypeMosquito, constants.EventTypeGhostHit,
 		constants.EventTypeDogPoop, constants.EventTypeWindGust, constants.EventTypeCurseBuddha,
