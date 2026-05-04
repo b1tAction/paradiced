@@ -805,7 +805,7 @@ func TestDeathMarkBlockNonPreActionPhase(t *testing.T) {
 // ========== Thorns Buff Handler Tests ==========
 
 func TestThornsReflectHandler(t *testing.T) {
-	// Thorns handler should push derived BossAttackAction for reflect damage
+	// Thorns handler should push derived PiercingDamageAction for reflect damage
 	// Thorns buff is on BossPlayer, ctx.Player = BossPlayer (PreDamage publishes to BossPlayer)
 	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})

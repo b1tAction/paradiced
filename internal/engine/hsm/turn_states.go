@@ -1227,7 +1227,7 @@ func (s *TurnBossBattleState) enterPlayerBranch(ctx *StateContext, player *core.
 	)
 	// Execute BossDamageAction (player attacks Boss).
 	// PreTrigger publishes PhasePreDamage to BossPlayer (Thorns handler).
-	// Thorns handler pushes derived BossAttackAction for reflect damage.
+	// Thorns handler pushes derived PiercingDamageAction for reflect damage.
 	// ExecuteAction internally calls ProcessQueue to handle derived actions.
 	if err := s.actionCtx.ExecuteAction(bossDamageAction); err != nil {
 		ctx.Error = errors.WrapHSMError(
