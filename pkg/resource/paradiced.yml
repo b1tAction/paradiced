@@ -107,13 +107,13 @@ buffs:
     evaluation: neutral
     english_name: Hidden
     name: 隐匿
-    desc: 接下来3回合免疫任意事件、BUFF或道具的影响
-    duration: 3
+    desc: 接下来1回合免疫任意事件、道具的影响
+    duration: 1
   thorns:
     evaluation: neutral
     english_name: Thorns
     name: 反刺
-    desc: Boss给自己施加反刺，玩家攻击Boss时受到30%反伤
+    desc: 收到伤害后，反伤30%给攻击者
     duration: 2
   divine:
     evaluation: very_good
