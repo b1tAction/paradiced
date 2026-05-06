@@ -357,7 +357,7 @@ func TestHandleUseSkill_PlayerNotFound(t *testing.T) {
 	mock := getMockDispatcher(handler)
 	mock.Clear()
 
-	err := handler.handleUseSkill(id.TestUUID(999))
+	err := handler.handleUseSkill(id.TestUUID(999), nil)
 	if err != nil {
 	 // Expected
 	}
@@ -380,7 +380,7 @@ func TestHandleUseSkill_NotCurrentPlayer(t *testing.T) {
 	 nonCurrentPlayerID = id.TestUUID(1)
 	}
 
-	err := handler.handleUseSkill(nonCurrentPlayerID)
+	err := handler.handleUseSkill(nonCurrentPlayerID, nil)
 	if err != nil {
 	 // Expected
 	}
@@ -411,7 +411,7 @@ func TestHandleUseSkill_SkillNotReady(t *testing.T) {
 	 player.SetChargeCount(0)
 	}
 
-	err := handler.handleUseSkill(currentPlayerID)
+	err := handler.handleUseSkill(currentPlayerID, nil)
 	if err != nil {
 	 // Expected
 	}
@@ -442,7 +442,7 @@ func TestHandleUseSkill_Success(t *testing.T) {
 	 player.SetChargeCount(1)
 	}
 
-	err := handler.handleUseSkill(currentPlayerID)
+	err := handler.handleUseSkill(currentPlayerID, nil)
 	// Skill usage should clear charge
 	if err != nil {
 	 t.Errorf("handleUseSkill should succeed with charge, got: %v", err)
@@ -773,7 +773,7 @@ func TestHandleUseSkill_NoCurrentPlayer(t *testing.T) {
 
 	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, id.TestUUID(1))
 
-	err := handler.handleUseSkill(id.TestUUID(1))
+	err := handler.handleUseSkill(id.TestUUID(1), nil)
 	if err != nil {
 	 // Expected
 	}

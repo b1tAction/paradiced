@@ -22,7 +22,7 @@ func (h *NakamaMatchHandler) HandleMessageWithOp(sender string, opCode int64, da
 	case int64(pkgnet.OpUseItem):
 		return h.handleUseItem(sender, data)
 	case int64(pkgnet.OpUseSkill):
-		return h.handleUseSkill(sender)
+		return h.handleUseSkill(sender, data)
 	case int64(pkgnet.OpUserChoice):
 		return h.handleUserChoice(sender, data)
 	case int64(pkgnet.OpMiniGameDataSubmit):
@@ -100,7 +100,7 @@ func (h *NakamaMatchHandler) HandleMessage(sender string, data []byte) error {
 	case strconv.FormatInt(int64(pkgnet.OpUseItem), 10):
 		return h.handleUseItem(sender, data)
 	case strconv.FormatInt(int64(pkgnet.OpUseSkill), 10):
-		return h.handleUseSkill(sender)
+		return h.handleUseSkill(sender, data)
 	case strconv.FormatInt(int64(pkgnet.OpUserChoice), 10):
 		return h.handleUserChoice(sender, data)
 	case strconv.FormatInt(int64(pkgnet.OpMiniGameDataSubmit), 10):
@@ -277,9 +277,19 @@ func (h *NakamaMatchHandler) handleUseItem(sender string, data []byte) error {
 }
 
 // handleUseSkill handles faction skill usage request.
-func (h *NakamaMatchHandler) handleUseSkill(sender string) error {
+func (h *NakamaMatchHandler) handleUseSkill(sender string, data []byte) error {
 	logger := NewLogger(h)
-	logger.logRequest("handleUseSkill", sender, nil)
+	logger.logRequest("handleUseSkill", sender, data)
+
+	// Parse UseSkill request (may contain target_id for BaiHu)
+	var req pkgnet.UseSkill
+	if data != nil && len(data) > 0 {
+		if err := json.Unmarshal(data, &req); err != nil {
+			h.logError("handleUseSkill: failed to parse request", "sender", sender, "error", err)
+			logger.logError("OpUseSkill", sender, err)
+			return h.sendActionRejectedWithCode(sender, pkgnet.OpUseSkill, constants.ErrInvalidParameter, "Invalid request format")
+		}
+	}
 
 	// Get current player
 	player := h.GetPlayer(sender)
@@ -302,6 +312,13 @@ func (h *NakamaMatchHandler) handleUseSkill(sender string) error {
 		return h.sendActionRejectedWithCode(sender, pkgnet.OpUseSkill, constants.ErrNotCurrentTurn, "Not your turn")
 	}
 
+	// ZhuQue has no charge-based skill
+	faction := player.GetFaction()
+	if faction == constants.FactionZhuQue {
+		logger.logReject("OpUseSkill", sender, constants.ErrConditionNotMet, "faction_no_skill", "ZhuQue faction has no charge-based skill")
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpUseSkill, constants.ErrConditionNotMet, "ZhuQue faction has no charge-based skill")
+	}
+
 	// Check if player has charge available
 	chargeCount := player.GetChargeCount()
 	logger.logValidation(sender, "charge_available", chargeCount >= 1, "charge_count", chargeCount)
@@ -311,28 +328,64 @@ func (h *NakamaMatchHandler) handleUseSkill(sender string) error {
 		return h.sendActionRejectedWithCode(sender, pkgnet.OpUseSkill, constants.ErrConditionNotMet, "Skill charge not ready")
 	}
 
-	h.logInfo("handleUseSkill: clearing charge", "sender", sender)
-	// Clear charge after use
-	player.SetChargeCount(0)
+	// BaiHu requires target_id validation
+	if faction == constants.FactionBaiHu {
+		if req.TargetID == "" {
+			logger.logReject("OpUseSkill", sender, constants.ErrInvalidParameter, "target_required", "BaiHu skill requires target player")
+			return h.sendActionRejectedWithCode(sender, pkgnet.OpUseSkill, constants.ErrInvalidParameter, "BaiHu skill requires target player")
+		}
+		// Validate target exists by UUID
+		game := h.hsm.GetGame()
+		targetFound := false
+		if game != nil {
+			for _, p := range game.Players {
+				if p.ID.UUID() == req.TargetID {
+					targetFound = true
+					break
+				}
+			}
+		}
+		if !targetFound {
+			logger.logReject("OpUseSkill", sender, constants.ErrPlayerNotFound, "target_not_found", "Target player not found")
+			return h.sendActionRejectedWithCode(sender, pkgnet.OpUseSkill, constants.ErrPlayerNotFound, "Target player not found")
+		}
+	}
 
-	// Broadcast state sync to reflect charge change
-	builder := internalnet.NewBuilder(h.hsm)
+	// Set target_id in StateContext for HSM OnUseSkill to read
 	ctx := hsm.NewStateContext().
+		WithHSM(h.hsm).
+		WithPlayer(player).
+		WithBroadcast(NewNakamaBroadcastAdapter(h))
+	if req.TargetID != "" {
+		ctx.SetString("use_skill_target_id", req.TargetID)
+	}
+
+	// Delegate to HSM.OnUseSkill for faction-specific buff application
+	if err := h.hsm.OnUseSkill(ctx); err != nil {
+		h.logError("handleUseSkill: OnUseSkill failed", "sender", sender, "error", err)
+		logger.logError("OpUseSkill", sender, err)
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpUseSkill, constants.ErrHSMError, "Skill execution failed")
+	}
+
+	h.logInfo("handleUseSkill: skill used successfully", "sender", sender, "faction", faction)
+
+	// Broadcast state sync to reflect buff application and charge change
+	builder := internalnet.NewBuilder(h.hsm)
+	broadcastCtx := hsm.NewStateContext().
 		WithHSM(h.hsm).
 		WithPlayer(player).
 		WithBroadcast(NewNakamaBroadcastAdapter(h)).
 		WithBuilder(builder)
 
-	if ctx.Builder != nil {
-		stateSync := ctx.Builder.BuildStateSync()
-		ctx.Broadcast.BroadcastStateSync(stateSync)
+	if broadcastCtx.Builder != nil {
+		stateSync := broadcastCtx.Builder.BuildStateSync()
+		broadcastCtx.Broadcast.BroadcastStateSync(stateSync)
 
 		// Re-send Available to current player (still in MainAction state)
-		// Set dice type from context before building available
-		diceType := ctx.GetDiceType(player.ID.UUID())
-		ctx.Builder.SetDiceType(diceType.String())
-		available := ctx.Builder.BuildAvailable()
-		ctx.Broadcast.SendAvailable(player.ID.UUID(), available)
+		diceType := broadcastCtx.GetDiceType(player.ID.UUID())
+		broadcastCtx.Builder.SetDiceType(diceType.String())
+		available := broadcastCtx.Builder.BuildAvailable()
+		broadcastCtx.Broadcast.SendAvailable(player.ID.UUID(), available)
 	}
 
 	logger.logResponse("OpUseSkill", sender, "skill used successfully")
