@@ -5,8 +5,10 @@ import (
 	"math"
 
 	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
+	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/b1tAction/paradiced/pkg/resource"
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
@@ -277,7 +279,7 @@ func registerAllBuffs() {
 		Handler:     handleExorcismImmunePoison,
 	})
 
-	// Fire: ZhuQue passive, LP+1 every 4 turns (permanent)
+	// Fire: ZhuQue passive, LP+1 every 3 turns (permanent)
 	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeFire], &BuffHandlerConfig{
 		Phases:      []constants.Phase{constants.PhaseBeforeTurn},
 		Priority:    10,
@@ -301,6 +303,30 @@ func registerAllBuffs() {
 		Priority:    999,
 		NeedConfirm: false,
 		Handler:     handleDeathMarkBlock,
+	})
+
+	// Dominance: QingLong faction skill — double beneficial action effects for 1 turn
+	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeDominance], &BuffHandlerConfig{
+		Phases:      []constants.Phase{constants.PhasePreAction},
+		Priority:    50,
+		NeedConfirm: false,
+		Handler:     handleDominanceAmplify,
+	})
+
+	// RobLuck: BaiHu faction skill — redirect good actions to BaiHu player
+	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeRobLuck], &BuffHandlerConfig{
+		Phases:      []constants.Phase{constants.PhasePreAction, constants.PhasePreBuffApplied},
+		Priority:    80,
+		NeedConfirm: false,
+		Handler:     handleRobLuckRedirect,
+	})
+
+	// Suppress: XuanWu faction skill — immunity to bad events and negative buffs for 1 turn
+	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeSuppress], &BuffHandlerConfig{
+		Phases:      []constants.Phase{constants.PhasePreEvent, constants.PhasePreBuffApplied},
+		Priority:    90,
+		NeedConfirm: false,
+		Handler:     handleSuppressImmune,
 	})
 }
 
@@ -397,7 +423,7 @@ func handleZhuQueFire(phase constants.Phase, ctx *event.Context) error {
 	}
 
 	newCount := ctx.Player.IncrementFireCounter()
-	if newCount >= 4 {
+	if newCount >= 3 {
 		// Must use Action system - no direct modification
 		actionCtx, err := getActionCtxFromEventCtx(ctx)
 		if err != nil {
@@ -650,4 +676,194 @@ func getActionCtxFromEventCtx(ctx *event.Context) (*engineaction.ActionContext, 
 		return nil, fmt.Errorf("handler: action_context is nil")
 	}
 	return actionCtx, nil
+}
+
+// ========== Faction Skill Buff Handlers ==========
+
+// handleDominanceAmplify doubles beneficial action effects.
+// When Dominance buff is active on QingLong player:
+// - BossDamageAction: push derived BossDamageAction with same damage amount (total = 2x)
+// - HealAction targeting self: push derived HealAction with same amount (total = 2x)
+// - ModifyLPAction (positive) targeting self: push derived ModifyLPAction with same amount (total = 2x)
+// Does NOT block the original action — both original + derived execute for 2x total effect.
+func handleDominanceAmplify(phase constants.Phase, ctx *event.Context) error {
+	if phase != constants.PhasePreAction {
+		return nil
+	}
+	if ctx == nil || ctx.Player == nil {
+		return nil
+	}
+
+	raw, ok := ctx.Get("current_action")
+	if !ok {
+		return nil
+	}
+	action, ok := raw.(engineaction.Action)
+	if !ok || action == nil {
+		return nil
+	}
+
+	// Skip if this action was already amplified by Dominance (prevents infinite loops)
+	if action.Source() == string(constants.SourceFactionQingLongDominance) {
+		return nil
+	}
+
+	source := string(constants.SourceFactionQingLongDominance)
+
+	switch a := action.(type) {
+	case *engineaction.BossDamageAction:
+		// Only amplify if QingLong player (Dominance holder) is the attacker
+		if a.SourcePlayer != ctx.Player {
+			return nil
+		}
+		ctx.AddDerivedAction(engineaction.NewBossDamageAction(
+			a.SourcePlayer, a.TargetPlayer(), a.Damage, false, source,
+		))
+
+	case *engineaction.HealAction:
+		// Only amplify heal targeting Dominance holder
+		if a.TargetPlayer() != ctx.Player || a.Amount <= 0 {
+			return nil
+		}
+		ctx.AddDerivedAction(engineaction.NewHealAction(ctx.Player, a.Amount, source))
+
+	case *engineaction.ModifyLPAction:
+		// Only amplify positive LP targeting Dominance holder
+		if a.TargetPlayer() != ctx.Player || a.Amount <= 0 {
+			return nil
+		}
+		ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, a.Amount, source))
+	}
+
+	return nil
+}
+
+// handleRobLuckRedirect redirects beneficial actions from RobLuck target to BaiHu player.
+// PhasePreAction: intercept HealAction/ModifyLPAction(positive)/AddItemAction targeting
+// RobLuck-buffed player → block + push derived to BaiHu player.
+// PhasePreBuffApplied: intercept positive buff applied to RobLuck-buffed player →
+// block + push AddBuffAction to BaiHu player.
+func handleRobLuckRedirect(phase constants.Phase, ctx *event.Context) error {
+	if ctx == nil || ctx.Player == nil {
+		return nil
+	}
+
+	// Get BaiHu source player from buff metadata
+	buff := ctx.Player.GetBuff(constants.BuffTypeRobLuck)
+	if buff == nil {
+		return nil
+	}
+	sourcePlayerID := buff.GetStringOrDefault("rob_luck_source_player", "")
+	if sourcePlayerID == "" {
+		return nil
+	}
+
+	// Skip if this action was already redirected by RobLuck (prevents infinite loops)
+	// Applies to both PhasePreAction and PhasePreBuffApplied
+	if raw, ok := ctx.Get("current_action"); ok {
+		action, ok := raw.(engineaction.Action)
+		if ok && action != nil && action.Source() == string(constants.SourceFactionBaiHuRobLuck) {
+			return nil
+		}
+	}
+
+	// Find BaiHu player from game via ActionContext
+	actionCtx, err := getActionCtxFromEventCtx(ctx)
+	if err != nil {
+		return err
+	}
+	parsedID, err := id.ParsePlayerID(sourcePlayerID)
+	if err != nil {
+		return nil // Invalid ID format, skip redirect
+	}
+	rawPlayer := actionCtx.Game.GetPlayerInterface(parsedID)
+	baiHuPlayer, ok := rawPlayer.(*core.Player)
+	if !ok || baiHuPlayer == nil {
+		return nil // BaiHu player not found, skip redirect
+	}
+
+	source := string(constants.SourceFactionBaiHuRobLuck)
+
+	switch phase {
+	case constants.PhasePreAction:
+		raw, ok := ctx.Get("current_action")
+		if !ok {
+			return nil
+		}
+		action, ok := raw.(engineaction.Action)
+		if !ok || action == nil {
+			return nil
+		}
+
+		switch a := action.(type) {
+		case *engineaction.HealAction:
+			if a.Amount > 0 && a.TargetPlayer() == ctx.Player {
+				ctx.SetBool("action_blocked", true)
+				ctx.SetString("blocked_by", source)
+				ctx.AddDerivedAction(engineaction.NewHealAction(baiHuPlayer, a.Amount, source))
+			}
+
+		case *engineaction.ModifyLPAction:
+			if a.Amount > 0 && a.TargetPlayer() == ctx.Player {
+				ctx.SetBool("action_blocked", true)
+				ctx.SetString("blocked_by", source)
+				ctx.AddDerivedAction(engineaction.NewModifyLPAction(baiHuPlayer, a.Amount, source))
+			}
+
+		case *engineaction.AddItemAction:
+			if a.TargetPlayer() == ctx.Player {
+				ctx.SetBool("action_blocked", true)
+				ctx.SetString("blocked_by", source)
+				ctx.AddDerivedAction(engineaction.NewAddItemAction(baiHuPlayer, a.ItemType, source))
+			}
+		}
+
+	case constants.PhasePreBuffApplied:
+		if raw, ok := ctx.Get("applied_buff_type"); ok {
+			buffType := constants.BuffType(raw.(string))
+			if buffType.IsPositive() {
+				ctx.SetBool("action_blocked", true)
+				ctx.SetString("blocked_by", source)
+				ctx.AddDerivedAction(engineaction.NewAddBuffAction(baiHuPlayer, buffType, source))
+			}
+		}
+	}
+
+	return nil
+}
+
+// handleSuppressImmune blocks bad events and negative buffs.
+// PhasePreEvent: block events with bad evaluation.
+// PhasePreBuffApplied: block negative buff types.
+// Does NOT block damage (distinct from Hidden buff).
+func handleSuppressImmune(phase constants.Phase, ctx *event.Context) error {
+	if ctx == nil || ctx.Player == nil {
+		return nil
+	}
+
+	source := string(constants.SourceFactionXuanWu) + "_suppress"
+
+	switch phase {
+	case constants.PhasePreEvent:
+		// Block bad events (evaluation ≤ 40)
+		if raw, ok := ctx.Get("event_evaluation"); ok {
+			eval := constants.Evaluation(raw.(int))
+			if eval.IsBad() {
+				ctx.SetBool("action_blocked", true)
+				ctx.SetString("blocked_by", source)
+			}
+		}
+
+	case constants.PhasePreBuffApplied:
+		// Block negative buffs
+		if raw, ok := ctx.Get("applied_buff_type"); ok {
+			buffType := constants.BuffType(raw.(string))
+			if buffType.IsNegative() {
+				ctx.SetBool("action_blocked", true)
+				ctx.SetString("blocked_by", source)
+			}
+		}
+	}
+
+	return nil
 }

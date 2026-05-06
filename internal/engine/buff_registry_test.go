@@ -98,8 +98,8 @@ func TestFireBuffHandlerBehavior(t *testing.T) {
 
 	handler := GetBuffHandlerConfig(constants.BuffTypeFire).Handler
 
-	// Execute 4 times to trigger LP+1
-	for i := 0; i < 4; i++ {
+	// Execute 3 times to trigger LP+1
+	for i := 0; i < 3; i++ {
 		handler(constants.PhaseBeforeTurn, ctx)
 
 		// Bridge derived actions and process
@@ -1138,5 +1138,292 @@ func TestCreateModifyLPHandlerWithActionContext(t *testing.T) {
 	actions := ctx.GetDerivedActions()
 	if len(actions) == 0 {
 		t.Error("createModifyLPHandler should produce a derived action")
+	}
+}
+
+// ========== Dominance Anti-Recursion Tests ==========
+
+func TestDominanceAmplifySkipAlreadyAmplified(t *testing.T) {
+	// Dominance handler should skip actions whose source is "faction_qing_long_dominance"
+	// This prevents infinite loops where Dominance amplifies its own derived actions.
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{
+		ID:      id.NewPlayerID(),
+		Faction: constants.FactionQingLong,
+		MaxHP:   10,
+		MaxLP:   5,
+	})
+	game.AddPlayer(player)
+
+	// Apply Dominance buff to QingLong player
+	dominanceBuff := core.NewBuff(constants.BuffTypeDominance, 1)
+	game.ApplyBuffToPlayer(player, dominanceBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
+	// Create a BossDamageAction with source "faction_qing_long_dominance" (already amplified)
+	amplifiedAction := engineaction.NewBossDamageAction(
+		player, game.InitializeBoss(19), 4, false, string(constants.SourceFactionQingLongDominance),
+	)
+	ctx.Set("current_action", amplifiedAction)
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeDominance).Handler
+	err := handler(constants.PhasePreAction, ctx)
+	if err != nil {
+		t.Fatalf("Handler should not return error for already-amplified action: %v", err)
+	}
+
+	// Should NOT produce any derived actions (skip check prevents amplification)
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Errorf("Dominance should skip already-amplified action, got %d derived actions", len(ctx.GetDerivedActions()))
+	}
+}
+
+func TestDominanceAmplifyNormalAction(t *testing.T) {
+	// Dominance handler should amplify normal BossDamageAction (not already amplified)
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{
+		ID:      id.NewPlayerID(),
+		Faction: constants.FactionQingLong,
+		MaxHP:   10,
+		MaxLP:   5,
+	})
+	bossPlayer := game.InitializeBoss(19)
+	game.AddPlayer(player)
+
+	// Apply Dominance buff to QingLong player
+	dominanceBuff := core.NewBuff(constants.BuffTypeDominance, 1)
+	game.ApplyBuffToPlayer(player, dominanceBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
+	// Create a BossDamageAction with normal source
+	bossDamageAction := engineaction.NewBossDamageAction(
+		player, bossPlayer, 4, false, string(constants.SourceBossDamage),
+	)
+	ctx.Set("current_action", bossDamageAction)
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeDominance).Handler
+	err := handler(constants.PhasePreAction, ctx)
+	if err != nil {
+		t.Fatalf("Handler should not return error: %v", err)
+	}
+
+	// Should produce one derived BossDamageAction (amplified)
+	if len(ctx.GetDerivedActions()) != 1 {
+		t.Fatalf("Dominance should amplify BossDamageAction, got %d derived actions", len(ctx.GetDerivedActions()))
+	}
+
+	derived, ok := ctx.GetDerivedActions()[0].(*engineaction.BossDamageAction)
+	if !ok {
+		t.Fatalf("Derived action should be BossDamageAction, got %T", ctx.GetDerivedActions()[0])
+	}
+
+	// Derived action source should be the Dominance source constant
+	if derived.Source() != string(constants.SourceFactionQingLongDominance) {
+		t.Errorf("Derived action source = %s, expected %s", derived.Source(), string(constants.SourceFactionQingLongDominance))
+	}
+}
+
+// ========== RobLuck Anti-Recursion Tests ==========
+
+func TestRobLuckRedirectSkipAlreadyRedirected(t *testing.T) {
+	// RobLuck handler should skip actions whose source is "faction_bai_hu_rob_luck"
+	// This prevents infinite loops from circular redirects (two BaiHu players targeting each other).
+	game := NewGame(id.NewGameID(), 0)
+	targetPlayer := core.NewPlayer(core.PlayerConfig{
+		ID:      id.NewPlayerID(),
+		Faction: constants.FactionQingLong,
+		MaxHP:   10,
+		MaxLP:   5,
+	})
+	baiHuPlayer := core.NewPlayer(core.PlayerConfig{
+		ID:      id.NewPlayerID(),
+		Faction: constants.FactionBaiHu,
+		MaxHP:   10,
+		MaxLP:   5,
+	})
+	game.AddPlayer(targetPlayer)
+	game.AddPlayer(baiHuPlayer)
+
+	// Apply RobLuck buff to target player, pointing to BaiHu player
+	robLuckBuff := core.NewBuff(constants.BuffTypeRobLuck, 1)
+	game.ApplyBuffToPlayer(targetPlayer, robLuckBuff)
+	robLuckBuff.SetString("rob_luck_source_player", baiHuPlayer.ID.UUID())
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(targetPlayer)
+	ctx.Set("action_context", actionCtx)
+
+	// Create a HealAction with source "faction_bai_hu_rob_luck" (already redirected)
+	redirectedHeal := engineaction.NewHealAction(baiHuPlayer, 3, string(constants.SourceFactionBaiHuRobLuck))
+	ctx.Set("current_action", redirectedHeal)
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeRobLuck).Handler
+	err := handler(constants.PhasePreAction, ctx)
+	if err != nil {
+		t.Fatalf("Handler should not return error for already-redirected action: %v", err)
+	}
+
+	// Should NOT block or produce derived actions (skip check prevents redirect)
+	if ctx.GetBoolOrDefault("action_blocked", false) {
+		t.Error("RobLuck should skip already-redirected action, should not block")
+	}
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Errorf("RobLuck should skip already-redirected action, got %d derived actions", len(ctx.GetDerivedActions()))
+	}
+}
+
+func TestRobLuckRedirectPreBuffAppliedSkipAlreadyRedirected(t *testing.T) {
+	// RobLuck PreBuffApplied handler should also skip AddBuffActions
+	// whose source is "faction_bai_hu_rob_luck"
+	game := NewGame(id.NewGameID(), 0)
+	targetPlayer := core.NewPlayer(core.PlayerConfig{
+		ID:      id.NewPlayerID(),
+		Faction: constants.FactionQingLong,
+		MaxHP:   10,
+		MaxLP:   5,
+	})
+	baiHuPlayer := core.NewPlayer(core.PlayerConfig{
+		ID:      id.NewPlayerID(),
+		Faction: constants.FactionBaiHu,
+		MaxHP:   10,
+		MaxLP:   5,
+	})
+	game.AddPlayer(targetPlayer)
+	game.AddPlayer(baiHuPlayer)
+
+	// Apply RobLuck buff to target player, pointing to BaiHu player
+	robLuckBuff := core.NewBuff(constants.BuffTypeRobLuck, 1)
+	game.ApplyBuffToPlayer(targetPlayer, robLuckBuff)
+	robLuckBuff.SetString("rob_luck_source_player", baiHuPlayer.ID.UUID())
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(targetPlayer)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("applied_buff_type", string(constants.BuffTypeDivine))
+
+	// Create an AddBuffAction with source "faction_bai_hu_rob_luck" (already redirected)
+	redirectedBuff := engineaction.NewAddBuffAction(baiHuPlayer, constants.BuffTypeDivine, string(constants.SourceFactionBaiHuRobLuck))
+	ctx.Set("current_action", redirectedBuff)
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeRobLuck).Handler
+	err := handler(constants.PhasePreBuffApplied, ctx)
+	if err != nil {
+		t.Fatalf("Handler should not return error for already-redirected buff: %v", err)
+	}
+
+	// Should NOT block or produce derived actions (skip check prevents redirect)
+	if ctx.GetBoolOrDefault("action_blocked", false) {
+		t.Error("RobLuck should skip already-redirected buff, should not block")
+	}
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Errorf("RobLuck should skip already-redirected buff, got %d derived actions", len(ctx.GetDerivedActions()))
+	}
+}
+
+func TestRobLuckRedirectNormalAction(t *testing.T) {
+	// RobLuck handler should redirect normal HealAction to BaiHu player
+	game := NewGame(id.NewGameID(), 0)
+	targetPlayer := core.NewPlayer(core.PlayerConfig{
+		ID:      id.NewPlayerID(),
+		Faction: constants.FactionQingLong,
+		MaxHP:   10,
+		MaxLP:   5,
+	})
+	baiHuPlayer := core.NewPlayer(core.PlayerConfig{
+		ID:      id.NewPlayerID(),
+		Faction: constants.FactionBaiHu,
+		MaxHP:   10,
+		MaxLP:   5,
+	})
+	game.AddPlayer(targetPlayer)
+	game.AddPlayer(baiHuPlayer)
+
+	// Apply RobLuck buff to target player, pointing to BaiHu player
+	robLuckBuff := core.NewBuff(constants.BuffTypeRobLuck, 1)
+	game.ApplyBuffToPlayer(targetPlayer, robLuckBuff)
+	robLuckBuff.SetString("rob_luck_source_player", baiHuPlayer.ID.UUID())
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(targetPlayer)
+	ctx.Set("action_context", actionCtx)
+
+	// Create a normal HealAction targeting the RobLuck-buffed player
+	healAction := engineaction.NewHealAction(targetPlayer, 3, "TestHeal")
+	ctx.Set("current_action", healAction)
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeRobLuck).Handler
+	err := handler(constants.PhasePreAction, ctx)
+	if err != nil {
+		t.Fatalf("Handler should not return error: %v", err)
+	}
+
+	// Should block original and produce one derived HealAction targeting BaiHu
+	if !ctx.GetBoolOrDefault("action_blocked", false) {
+		t.Error("RobLuck should block original HealAction")
+	}
+	if len(ctx.GetDerivedActions()) != 1 {
+		t.Fatalf("RobLuck should redirect HealAction, got %d derived actions", len(ctx.GetDerivedActions()))
+	}
+
+	derived, ok := ctx.GetDerivedActions()[0].(*engineaction.HealAction)
+	if !ok {
+		t.Fatalf("Derived action should be HealAction, got %T", ctx.GetDerivedActions()[0])
+	}
+
+	// Derived action target should be BaiHu player
+	if derived.TargetPlayer() != baiHuPlayer {
+		t.Errorf("Derived HealAction should target BaiHu player, got %s", derived.Target())
+	}
+
+	// Derived action source should be the RobLuck source constant
+	if derived.Source() != string(constants.SourceFactionBaiHuRobLuck) {
+		t.Errorf("Derived action source = %s, expected %s", derived.Source(), string(constants.SourceFactionBaiHuRobLuck))
+	}
+}
+
+// ========== Dominance BossDamage End-to-End Tests ==========
+
+func TestDominanceAmplifyBossDamageViaExecuteAction(t *testing.T) {
+	// Full end-to-end test: QingLong with Dominance attacks Boss via ExecuteAction,
+	// Dominance should amplify BossDamageAction through PhasePreAction ActorPlayers.
+	// Boss total damage = original × 2.
+
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{
+		ID:      id.NewPlayerID(),
+		Faction: constants.FactionQingLong,
+		MaxHP:   10,
+		MaxLP:   5,
+	})
+	game.AddPlayer(player)
+
+	// Apply Dominance buff to QingLong player (subscribes to PhasePreAction)
+	dominanceBuff := core.NewBuff(constants.BuffTypeDominance, 1)
+	game.ApplyBuffToPlayer(player, dominanceBuff)
+
+	// Initialize Boss player for target
+	bossPlayer := game.InitializeBoss(19)
+	bossHPBefore := bossPlayer.HP
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+
+	// Execute BossDamageAction: QingLong attacks Boss with 5 damage
+	action := engineaction.NewBossDamageAction(player, bossPlayer, 5, false, "boss_damage")
+
+	err := actionCtx.ExecuteAction(action)
+	if err != nil {
+		t.Fatalf("ExecuteAction should not error: %v", err)
+	}
+
+	// Dominance should have amplified: original 5 damage + derived 5 damage = 10 total
+	damageDealt := bossHPBefore - bossPlayer.HP
+	if damageDealt != 10 {
+		t.Errorf("Boss damage = %d, expected 10 (5 original + 5 Dominance amplified)", damageDealt)
 	}
 }
