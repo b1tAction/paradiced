@@ -983,7 +983,7 @@ func TestFactionGetSkillName(t *testing.T) {
 		faction  Faction
 		expected string
 	}{
-		{FactionQingLong, "行迹"},
+		{FactionQingLong, "威势"},
 		{FactionZhuQue, "离火"},
 		{FactionBaiHu, "劫运"},
 		{FactionXuanWu, "镇厄"},

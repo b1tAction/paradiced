@@ -849,3 +849,220 @@ func TestHSMStateDuringMessageHandling(t *testing.T) {
 	 t.Error("HSM should still exist")
 	}
 }
+
+// ========== handleKickPlayer Tests ==========
+
+// setupWaitingRoomHandler creates a handler in WaitingForHost state with host and players.
+func setupWaitingRoomHandler(t *testing.T, playerCount int) *NakamaMatchHandler {
+	t.Helper()
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	mockDispatcher := NewMockDispatcherAdapter()
+	handler.WithDispatcher(mockDispatcher)
+
+	factions := []constants.Faction{
+	 constants.FactionQingLong,
+	 constants.FactionZhuQue,
+	 constants.FactionBaiHu,
+	 constants.FactionXuanWu,
+	}
+
+	for i := 0; i < playerCount; i++ {
+	 userID := id.TestUUID(i + 1)
+	 handler.addPlayer(userID, factions[i%4], fmt.Sprintf("player_%d", i+1))
+	}
+
+	// Set hostUserID to first player
+	handler.hostUserID = id.TestUUID(1)
+
+	// Initialize game and HSM
+	err := handler.MatchInit()
+	if err != nil {
+	 t.Fatalf("MatchInit failed: %v", err)
+	}
+
+	// Tick MatchLoop until WaitingForHost state
+	for i := 0; i < 50; i++ {
+	 handler.MatchLoop(50 * time.Millisecond)
+	 if handler.hsm.GetGlobalStateID() == hsm.StateWaitingForHost {
+		 break
+	 }
+	}
+
+	if handler.hsm.GetGlobalStateID() != hsm.StateWaitingForHost {
+	 t.Fatalf("Expected WaitingForHost state, got %s", handler.hsm.GetGlobalStateID().String())
+	}
+
+	return handler
+}
+
+func TestHandleKickPlayer_HostSuccess(t *testing.T) {
+	handler := setupWaitingRoomHandler(t, 3)
+	mock := getMockDispatcher(handler)
+	mock.Clear()
+
+	hostID := id.TestUUID(1)
+	targetID := id.TestUUID(2)
+
+	data, err := json.Marshal(pkgnet.KickPlayerRequest{TargetID: targetID})
+	if err != nil {
+	 t.Fatalf("Marshal failed: %v", err)
+	}
+
+	err = handler.handleKickPlayer(hostID, data)
+	if err != nil {
+	 t.Errorf("handleKickPlayer should succeed for host, got: %v", err)
+	}
+
+	// Verify target player removed from handler state
+	if handler.players[targetID] != nil {
+	 t.Error("Target player should be removed from players map")
+	}
+
+	// Verify target not in playerList
+	for _, id := range handler.playerList {
+	 if id == targetID {
+		 t.Error("Target player should be removed from playerList")
+	 }
+	}
+
+	// Verify kicked player received ErrKickedByHost notification
+	verifyActionRejected(t, mock, targetID, pkgnet.OpKickPlayer, constants.ErrKickedByHost)
+
+	// Verify WaitingSync was sent to remaining players (broadcastWaitingSyncToAll sends individually)
+	remainingPlayerID := id.TestUUID(1)
+	msgs := mock.GetMessages(remainingPlayerID)
+	hasWaitingSync := false
+	for _, msg := range msgs {
+	 if msg.OpCode == int64(pkgnet.OpWaitingSync) {
+		 hasWaitingSync = true
+		 break
+	 }
+	}
+	if !hasWaitingSync {
+	 t.Error("WaitingSync should be sent to remaining players after kick")
+	}
+}
+
+func TestHandleKickPlayer_NotHost(t *testing.T) {
+	handler := setupWaitingRoomHandler(t, 3)
+	mock := getMockDispatcher(handler)
+	mock.Clear()
+
+	nonHostID := id.TestUUID(2)
+	targetID := id.TestUUID(3)
+
+	data, err := json.Marshal(pkgnet.KickPlayerRequest{TargetID: targetID})
+	if err != nil {
+	 t.Fatalf("Marshal failed: %v", err)
+	}
+
+	err = handler.handleKickPlayer(nonHostID, data)
+	if err != nil {
+	 // Expected error path
+	}
+
+	// Verify sender received ErrNotHost rejection
+	verifyActionRejected(t, mock, nonHostID, pkgnet.OpKickPlayer, constants.ErrNotHost)
+
+	// Verify target player NOT removed
+	if handler.players[targetID] == nil {
+	 t.Error("Target player should NOT be removed when non-host tries to kick")
+	}
+}
+
+func TestHandleKickPlayer_HostKicksSelf(t *testing.T) {
+	handler := setupWaitingRoomHandler(t, 3)
+	mock := getMockDispatcher(handler)
+	mock.Clear()
+
+	hostID := id.TestUUID(1)
+
+	data, err := json.Marshal(pkgnet.KickPlayerRequest{TargetID: hostID})
+	if err != nil {
+	 t.Fatalf("Marshal failed: %v", err)
+	}
+
+	err = handler.handleKickPlayer(hostID, data)
+	if err != nil {
+	 // Expected error path
+	}
+
+	// Verify host received ErrInvalidParameter rejection
+	verifyActionRejected(t, mock, hostID, pkgnet.OpKickPlayer, constants.ErrInvalidParameter)
+
+	// Verify host NOT removed
+	if handler.players[hostID] == nil {
+	 t.Error("Host should NOT be removed when trying to kick self")
+	}
+}
+
+func TestHandleKickPlayer_TargetNotFound(t *testing.T) {
+	handler := setupWaitingRoomHandler(t, 3)
+	mock := getMockDispatcher(handler)
+	mock.Clear()
+
+	hostID := id.TestUUID(1)
+	unknownTarget := id.TestUUID(999)
+
+	data, err := json.Marshal(pkgnet.KickPlayerRequest{TargetID: unknownTarget})
+	if err != nil {
+	 t.Fatalf("Marshal failed: %v", err)
+	}
+
+	err = handler.handleKickPlayer(hostID, data)
+	if err != nil {
+	 // Expected error path
+	}
+
+	// Verify host received ErrPlayerNotFound rejection
+	verifyActionRejected(t, mock, hostID, pkgnet.OpKickPlayer, constants.ErrPlayerNotFound)
+}
+
+func TestHandleKickPlayer_InvalidJSON(t *testing.T) {
+	handler := setupWaitingRoomHandler(t, 3)
+	mock := getMockDispatcher(handler)
+	mock.Clear()
+
+	hostID := id.TestUUID(1)
+
+	err := handler.handleKickPlayer(hostID, []byte("invalid json"))
+	if err != nil {
+	 // Expected error path
+	}
+
+	// Verify host received ErrInvalidParameter rejection
+	verifyActionRejected(t, mock, hostID, pkgnet.OpKickPlayer, constants.ErrInvalidParameter)
+}
+
+func TestHandleKickPlayer_InvalidState(t *testing.T) {
+	// Use a handler that has progressed past WaitingForHost state
+	handler := setupHandlerWithPlayers(t, 2)
+	mock := getMockDispatcher(handler)
+	mock.Clear()
+
+	// Run MatchLoop ticks to get past WaitingForHost
+	for i := 0; i < 50; i++ {
+	 handler.MatchLoop(50 * time.Millisecond)
+	}
+
+	// Verify not in WaitingForHost state
+	if handler.hsm.GetGlobalStateID() == hsm.StateWaitingForHost {
+	 t.Skip("Still in WaitingForHost state")
+	}
+
+	hostID := id.TestUUID(1)
+	targetID := id.TestUUID(2)
+
+	data, err := json.Marshal(pkgnet.KickPlayerRequest{TargetID: targetID})
+	if err != nil {
+	 t.Fatalf("Marshal failed: %v", err)
+	}
+
+	err = handler.handleKickPlayer(hostID, data)
+	if err != nil {
+	 // Expected error path
+	}
+
+	// Verify host received ErrInvalidState rejection
+	verifyActionRejected(t, mock, hostID, pkgnet.OpKickPlayer, constants.ErrInvalidState)
+}

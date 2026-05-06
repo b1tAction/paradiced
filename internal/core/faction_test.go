@@ -30,7 +30,7 @@ func TestGetFactionSkillName(t *testing.T) {
 		faction  constants.Faction
 		expected string
 	}{
-		{constants.FactionQingLong, "行迹"},
+		{constants.FactionQingLong, "威势"},
 		{constants.FactionZhuQue, "离火"},
 		{constants.FactionBaiHu, "劫运"},
 		{constants.FactionXuanWu, "镇厄"},

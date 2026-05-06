@@ -25,6 +25,8 @@ func (h *NakamaMatchHandler) HandleMessageWithOp(sender string, opCode int64, da
 		return h.handleUseSkill(sender, data)
 	case int64(pkgnet.OpUserChoice):
 		return h.handleUserChoice(sender, data)
+	case int64(pkgnet.OpKickPlayer):
+		return h.handleKickPlayer(sender, data)
 	case int64(pkgnet.OpMiniGameDataSubmit):
 		return h.handleMiniGameDataSubmit(sender, data)
 	case int64(pkgnet.OpStartGame):
@@ -611,5 +613,76 @@ func (h *NakamaMatchHandler) handleStartGame(sender string) error {
 	}
 
 	logger.logResponse("OpStartGame", sender, "game starting")
+	return nil
+}
+
+// handleKickPlayer handles host kick player request from waiting room.
+// Only the host can kick, and only before the game starts (WaitingForHost state).
+func (h *NakamaMatchHandler) handleKickPlayer(sender string, data []byte) error {
+	logger := NewLogger(h)
+	logger.logRequest("handleKickPlayer", sender, data)
+
+	// Parse kick player request
+	var req pkgnet.KickPlayerRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		h.logError("handleKickPlayer: failed to parse request", "sender", sender, "error", err)
+		logger.logError("OpKickPlayer", sender, err)
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpKickPlayer, constants.ErrInvalidParameter, "Invalid request format")
+	}
+
+	// Validate: only host can kick
+	if sender != h.hostUserID {
+		logger.logReject("OpKickPlayer", sender, constants.ErrNotHost, "not_host", "Only host can kick players")
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpKickPlayer, constants.ErrNotHost, "Only host can kick players")
+	}
+
+	// Validate: host cannot kick self
+	if req.TargetID == h.hostUserID {
+		logger.logReject("OpKickPlayer", sender, constants.ErrInvalidParameter, "cannot_kick_self", "Host cannot kick themselves")
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpKickPlayer, constants.ErrInvalidParameter, "Host cannot kick themselves")
+	}
+
+	// Validate: must be in WaitingForHost state
+	if h.hsm == nil || h.hsm.GetGlobalStateID() != hsm.StateWaitingForHost {
+		logger.logReject("OpKickPlayer", sender, constants.ErrInvalidState, "invalid_state", "Can only kick in waiting room")
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpKickPlayer, constants.ErrInvalidState, "Can only kick in waiting room")
+	}
+
+	// Validate: target must exist in match
+	targetPlayer := h.players[req.TargetID]
+	if targetPlayer == nil {
+		logger.logReject("OpKickPlayer", sender, constants.ErrPlayerNotFound, "target_not_found", "Target player not found")
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpKickPlayer, constants.ErrPlayerNotFound, "Target player not found")
+	}
+
+	h.logInfo("handleKickPlayer: host kicking player", "host", sender, "target", req.TargetID)
+
+	// Remove player from game if game exists
+	if h.hsm != nil {
+		if game := h.hsm.GetGame(); game != nil {
+			game.RemovePlayer(targetPlayer.ID)
+		}
+	}
+
+	// Remove player from handler state
+	delete(h.players, req.TargetID)
+	delete(h.disconnected, req.TargetID)
+
+	for i, id := range h.playerList {
+		if id == req.TargetID {
+			h.playerList = append(h.playerList[:i], h.playerList[i+1:]...)
+			break
+		}
+	}
+
+	// Send kicked notification to the target player
+	h.sendActionRejectedWithCode(req.TargetID, pkgnet.OpKickPlayer, constants.ErrKickedByHost, "You have been kicked by the host")
+
+	// Broadcast updated WaitingSync to remaining players
+	h.broadcastWaitingSyncToAll()
+
+	h.logInfo("handleKickPlayer: player kicked successfully", "target", req.TargetID, "remaining_players", len(h.playerList))
+
+	logger.logResponse("OpKickPlayer", sender, "player kicked")
 	return nil
 }

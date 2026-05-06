@@ -439,6 +439,13 @@ type ItemDefinitionConfig struct {
 	Desc        string `json:"desc"`         // Chinese description
 }
 
+// KickPlayerRequest represents a host kick player request from client.
+// Only the host can kick, and only in the waiting room (WaitingForHost state).
+type KickPlayerRequest struct {
+	// TargetID is the user ID of the player to be kicked.
+	TargetID string `json:"target_id"`
+}
+
 // NewLogEntry creates a simple log entry for protocol testing.
 // For production use, use gamelog.NewActionEntry instead.
 func NewLogEntry(actionType string, target string, source string) gamelog.LogEntry {

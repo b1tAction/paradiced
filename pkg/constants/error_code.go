@@ -30,6 +30,9 @@ const (
 	// ErrConditionNotMet indicates required conditions are not met.
 	ErrConditionNotMet ErrorCode = 1005
 
+	// ErrNotHost indicates the player is not the room host.
+	ErrNotHost ErrorCode = 1006
+
 	// === Game Logic Errors (2xxx) ===
 
 	// ErrActionRejected indicates the action was rejected by game logic.
@@ -37,6 +40,9 @@ const (
 
 	// ErrCooldownActive indicates a cooldown is still active.
 	ErrCooldownActive ErrorCode = 2002
+
+	// ErrKickedByHost indicates the player was kicked by the host from the waiting room.
+	ErrKickedByHost ErrorCode = 2003
 
 	// === System Errors (3xxx) ===
 
@@ -90,6 +96,10 @@ var ErrorCodeDetails = map[ErrorCode]ErrorDetail{
 		Code:    ErrConditionNotMet,
 		Message: "Required conditions not met",
 	},
+	ErrNotHost: {
+		Code:    ErrNotHost,
+		Message: "Only host can perform this action",
+	},
 	ErrActionRejected: {
 		Code:    ErrActionRejected,
 		Message: "Action rejected by game rules",
@@ -97,6 +107,10 @@ var ErrorCodeDetails = map[ErrorCode]ErrorDetail{
 	ErrCooldownActive: {
 		Code:    ErrCooldownActive,
 		Message: "Cooldown still active",
+	},
+	ErrKickedByHost: {
+		Code:    ErrKickedByHost,
+		Message: "Kicked by host from waiting room",
 	},
 	ErrInternal: {
 		Code:    ErrInternal,
@@ -165,8 +179,12 @@ func (e ErrorCode) ToReason() string {
 		return "invalid_timing"
 	case ErrConditionNotMet:
 		return "condition_not_met"
+	case ErrNotHost:
+		return "not_host"
 	case ErrActionRejected:
 		return "action_rejected"
+	case ErrKickedByHost:
+		return "kicked_by_host"
 	default:
 		return "unknown_error"
 	}

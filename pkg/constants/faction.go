@@ -9,7 +9,7 @@ const (
 	FactionNone Faction = "none"
 
 	// Four Divine Beasts
-	FactionQingLong Faction = "qing_long" // 青龙 (东方): 行迹
+	FactionQingLong Faction = "qing_long" // 青龙 (东方): 威势
 	FactionZhuQue   Faction = "zhu_que"   // 朱雀 (南方): 离火
 	FactionBaiHu    Faction = "bai_hu"    // 白虎 (西方): 劫运
 	FactionXuanWu   Faction = "xuan_wu"   // 玄武 (北方): 鎮厄
@@ -60,7 +60,7 @@ func (f Faction) GetChineseName() string {
 // GetSkillName returns the faction passive skill name.
 func (f Faction) GetSkillName() string {
 	skills := map[Faction]string{
-		FactionQingLong: "行迹",
+		FactionQingLong: "威势",
 		FactionZhuQue:   "离火",
 		FactionBaiHu:    "劫运",
 		FactionXuanWu:   "镇厄",
@@ -74,10 +74,10 @@ func (f Faction) GetSkillName() string {
 // GetSkillDesc returns the faction passive skill description.
 func (f Faction) GetSkillDesc() string {
 	descs := map[Faction]string{
-		FactionQingLong: "每2回合获得充能，使用后1回合内增益效果翻倍",
+		FactionQingLong: "每2回合获得充能，使用后1回合内增益效果翻倍(威势)",
 		FactionZhuQue:   "每3回合幸运值+1，最高不超过8点",
-		FactionBaiHu:    "每2回合获得充能，指定目标玩家，使其增益效果改向自身",
-		FactionXuanWu:   "每2回合获得充能，使用后1回合免疫恶性事件和负面Buff",
+		FactionBaiHu:    "每2回合获得充能，指定目标玩家，使其增益效果改向自身(劫运)",
+		FactionXuanWu:   "每2回合获得充能，使用后1回合免疫恶性事件和负面Buff(镇厄)",
 	}
 	if desc, ok := descs[f]; ok {
 		return desc
