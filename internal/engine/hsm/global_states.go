@@ -132,6 +132,15 @@ func (s *WaitingForHostState) Exit(ctx *StateContext) {
 		}
 	}
 
+	// Broadcast StateSync so clients update faction and buff data
+	// before entering MiniGame (MiniGameStart does not carry player data).
+	// Without this, the host's client retains the initial faction (qing_long)
+	// from MatchInit StateSync until the first TurnUpkeep StateSync arrives.
+	if ctx.Broadcast != nil && ctx.Builder != nil {
+		stateSync := ctx.Builder.BuildStateSync()
+		ctx.Broadcast.BroadcastStateSync(stateSync)
+	}
+
 	// Cleanup waiting state markers
 	ctx.Delete("waiting_for_host")
 	ctx.Delete(KeyStartRequested)
