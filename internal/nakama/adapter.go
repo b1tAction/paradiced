@@ -62,16 +62,30 @@ func (a *NakamaMatchHandlerAdapter) MatchInit(ctx context.Context, logger runtim
 	if mp, ok := params["max_players"].(float64); ok {
 		maxPlayers = int(mp)
 	}
+	if mp, ok := params["maxPlayers"].(int); ok {
+		maxPlayers = mp
+	}
+	if mp, ok := params["maxPlayers"].(float64); ok {
+		maxPlayers = int(mp)
+	}
 	if ml, ok := params["map_length"].(int); ok {
 		mapLength = ml
 	}
 	if ml, ok := params["map_length"].(float64); ok {
 		mapLength = int(ml)
 	}
+	lobbyName := ""
+	if name, ok := params["lobby_name"].(string); ok {
+		lobbyName = name
+	}
+	if name, ok := params["lobbyName"].(string); ok && lobbyName == "" {
+		lobbyName = name
+	}
 
 	// Create handler
 	a.handler = NewNakamaMatchHandler(matchID, seed, maxPlayers, mapLength)
 	a.handler.WithLogger(logger)
+	a.handler.lobbyName = lobbyName
 
 	// Build match label (JSON format for match queries)
 	label := matchLabel{
@@ -79,6 +93,7 @@ func (a *NakamaMatchHandlerAdapter) MatchInit(ctx context.Context, logger runtim
 		Game:            "paradiced",
 		Status:          "waiting",
 		HostDisplayName: "",
+		LobbyName:       lobbyName,
 	}
 	labelJSON, _ := json.Marshal(label)
 
@@ -370,6 +385,7 @@ type matchLabel struct {
 	Game            string `json:"game"`
 	Status          string `json:"status"`
 	HostDisplayName string `json:"host_display_name"`
+	LobbyName       string `json:"lobby_name"`
 }
 
 // buildCurrentLabel builds the current match label JSON from handler state.
@@ -397,6 +413,7 @@ func (a *NakamaMatchHandlerAdapter) buildCurrentLabel(handler *NakamaMatchHandle
 		Game:            "paradiced",
 		Status:          status,
 		HostDisplayName: hostDN,
+		LobbyName:       handler.lobbyName,
 	}
 	b, _ := json.Marshal(l)
 	return string(b)

@@ -23,9 +23,9 @@ import (
 // HSM is the single source of truth - Game is accessed via hsm.GetGame().
 type NakamaMatchHandler struct {
 	// Core game components
-	hsm       *hsm.HSM          // Hierarchical State Machine (holds Game reference)
+	hsm       *hsm.HSM           // Hierarchical State Machine (holds Game reference)
 	mapEngine *gamemap.MapEngine // Map engine for path calculation
-	diceMgr   *rng.DiceManager  // Dice manager for rolling
+	diceMgr   *rng.DiceManager   // Dice manager for rolling
 
 	// Message dispatcher
 	dispatcher DispatcherAdapter // Dispatcher for sending messages to clients
@@ -37,9 +37,9 @@ type NakamaMatchHandler struct {
 	matchID string // Nakama match ID
 
 	// Player tracking
-	players         map[string]*core.Player // userID -> Player mapping
-	playerList      []string                // Ordered player list for turn sequence
-	disconnected    map[string]bool         // userID -> disconnected status
+	players      map[string]*core.Player // userID -> Player mapping
+	playerList   []string                // Ordered player list for turn sequence
+	disconnected map[string]bool         // userID -> disconnected status
 
 	// Host tracking
 	hostUserID string // User ID of the host (first player to join)
@@ -51,9 +51,10 @@ type NakamaMatchHandler struct {
 	mapConfig *pkgnet.MapConfig
 
 	// Configuration
-	maxPlayers  int    // Maximum players (default: 4)
-	mapLength   int    // Map length (default: 100)
-	randomSeed  int64  // Random seed for reproducibility
+	maxPlayers int    // Maximum players (default: 4)
+	mapLength  int    // Map length (default: 100)
+	randomSeed int64  // Random seed for reproducibility
+	lobbyName  string // Human-readable lobby name for match listing
 
 	// Decision tracking (prevent duplicate sends)
 	lastDecisionID string // Last sent decision ID to prevent duplicate sends
@@ -77,15 +78,15 @@ func NewNakamaMatchHandler(matchID string, seed int64, maxPlayers int, mapLength
 	}
 
 	return &NakamaMatchHandler{
-		matchID:     matchID,
-		maxPlayers:  maxPlayers,
-		mapLength:   mapLength,
-		randomSeed:  seed,
-		players:     make(map[string]*core.Player),
-		playerList:  make([]string, 0),
+		matchID:      matchID,
+		maxPlayers:   maxPlayers,
+		mapLength:    mapLength,
+		randomSeed:   seed,
+		players:      make(map[string]*core.Player),
+		playerList:   make([]string, 0),
 		disconnected: make(map[string]bool),
-		diceMgr:     rng.NewDiceManager(rngInst),
-		dispatcher:  nil, // Set via WithDispatcher or during MatchInit
+		diceMgr:      rng.NewDiceManager(rngInst),
+		dispatcher:   nil, // Set via WithDispatcher or during MatchInit
 	}
 }
 
