@@ -333,6 +333,23 @@ func (p *Player) IncrementChargeCount() int {
 	return p.IncrementInt("charge_count", 1)
 }
 
+// ========== Charge Turn Counter Methods (using Metadata) ==========
+
+// GetChargeTurnCounter gets the charge turn counter (used for every 2 turns charging).
+func (p *Player) GetChargeTurnCounter() int {
+	return p.GetIntOrDefault("charge_turn_counter", 0)
+}
+
+// SetChargeTurnCounter sets the charge turn counter.
+func (p *Player) SetChargeTurnCounter(count int) {
+	p.SetInt("charge_turn_counter", count)
+}
+
+// IncrementChargeTurnCounter increments the charge turn counter, returns new value.
+func (p *Player) IncrementChargeTurnCounter() int {
+	return p.IncrementInt("charge_turn_counter", 1)
+}
+
 // ========== Fire Counter Methods (using Metadata) ==========
 
 // GetFireCounter gets the fire counter (used by ZhuQue朱雀 faction).
