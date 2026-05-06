@@ -948,6 +948,21 @@ func (a *BossDamageAction) CanModify() bool            { return false }
 func (a *BossDamageAction) Source() string             { return a.SourceID }
 func (a *BossDamageAction) Target() string             { return a.targetPlayer.ID.UUID() }
 func (a *BossDamageAction) TargetPlayer() *core.Player { return a.targetPlayer }
+
+// ActorPlayers returns players that should receive PhasePreAction publication.
+// BossDamageAction needs both Boss (target for DeathMark/Thorns interception)
+// and SourcePlayer (attacker for Dominance amplification).
+func (a *BossDamageAction) ActorPlayers() []*core.Player {
+	players := []*core.Player{}
+	if a.targetPlayer != nil {
+		players = append(players, a.targetPlayer)
+	}
+	if a.SourcePlayer != nil && a.SourcePlayer.ID.UUID() != a.targetPlayer.ID.UUID() {
+		players = append(players, a.SourcePlayer)
+	}
+	return players
+}
+
 func (a *BossDamageAction) PreTriggerPhase() constants.Phase {
 	return constants.PhasePreDamage // Thorns handler intercepts at PreDamage on BossPlayer
 }

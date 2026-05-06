@@ -48,3 +48,15 @@ type Action interface {
 	// LogEntry generates a game log entry for client animation.
 	LogEntry() gamelog.LogEntry
 }
+
+// ActorPlayerer is an optional interface for Actions that need PhasePreAction
+// published to additional players beyond TargetPlayer.
+// Returns the list of players that should receive PhasePreAction publication.
+// Actions not implementing this interface default to [TargetPlayer()] only.
+//
+// Use case: BossDamageAction's TargetPlayer is Boss (damage receiver), but
+// Dominance buff on the attacking player (SourcePlayer) also needs to intercept.
+// ActorPlayers returns [Boss, SourcePlayer] so both receive PhasePreAction.
+type ActorPlayerer interface {
+	ActorPlayers() []*core.Player
+}

@@ -1,6 +1,8 @@
 package action
 
 import (
+	"fmt"
+
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/internal/gamemap"
@@ -29,6 +31,10 @@ type ActionContext struct {
 	ProbGood      float64               // Probability weight for Good pool
 	ProbNeutral   float64               // Probability weight for Neutral pool
 	ProbBad       float64               // Probability weight for Bad pool
+
+	// processedCount tracks total actions processed in this context's lifecycle.
+	// Shared across all nested ProcessQueue calls to enforce depth limit.
+	processedCount int
 
 	// Buff lifecycle callbacks - injected by HSM layer (engine.Game)
 	// These handle EventBus subscription/unsubscription for Buff add/remove.
@@ -74,9 +80,13 @@ func (ctx *ActionContext) SetCellDraw(probGood, probNeutral, probBad float64) *A
 	return ctx
 }
 
+// maxQueueProcessingDepth limits the number of actions processed in a single
+// ProcessQueue cycle to prevent infinite loops from recursive derived actions.
+const maxQueueProcessingDepth = 50
+
 // ExecuteAction executes an action with interception support.
 // Flow:
-// 1. PreAction death check - block actions for dead target players
+// 1. PhasePreAction - interception for ALL target players (DeathMark blocks dead, Dominance amplifies, RobLuck redirects)
 // 2. PreTrigger phase - publish for interception (if not PhaseAnyTime)
 // 3. Collect derived actions from handler into queue
 // 4. Execute the (possibly modified) action
@@ -86,32 +96,45 @@ func (ctx *ActionContext) SetCellDraw(probGood, probNeutral, probBad float64) *A
 // 8. Process any derived actions in queue
 // Returns first error from handlers or action execution.
 func (ctx *ActionContext) ExecuteAction(action Action) error {
-	// Step 0: PhasePreAction - death mark interception
-	// If the action's target player is dead (has DeathMark buff), publish PhasePreAction.
-	// The DeathMark handler decides whether to block based on action type:
-	// RespawnAction and RemoveBuffAction(DeathMark) are exempted by the handler.
+	// Step 0: PhasePreAction - interception for relevant players
+	// DeathMark blocks actions on dead players, Dominance amplifies from actor,
+	// RobLuck redirects beneficial actions to BaiHu player.
 	if ctx.EventBus != nil {
-		targetPlayer := action.TargetPlayer()
-		if targetPlayer != nil && targetPlayer.IsDead {
-			preCtx := event.NewContext(targetPlayer)
+		// Determine players to publish PhasePreAction to:
+		// - Default: [TargetPlayer()] (most actions only need target publication)
+		// - ActorPlayerer: custom list (e.g., BossDamageAction needs both Boss + attacker)
+		playersToPublish := []*core.Player{}
+		if actor, ok := action.(ActorPlayerer); ok {
+			playersToPublish = actor.ActorPlayers()
+		} else {
+			targetPlayer := action.TargetPlayer()
+			if targetPlayer != nil {
+				playersToPublish = []*core.Player{targetPlayer}
+			}
+		}
+
+		for _, player := range playersToPublish {
+			preCtx := event.NewContext(player)
 			preCtx.Set("action_context", ctx)
 			preCtx.Set("current_action", action)
-			ctx.EventBus.Publish(constants.PhasePreAction, targetPlayer.ID.UUID(), preCtx)
+			ctx.EventBus.Publish(constants.PhasePreAction, player.ID.UUID(), preCtx)
 
 			// Check for handler errors in PhasePreAction
 			if preCtx.HasError() {
 				return preCtx.FirstError()
 			}
 
-			// Check if action was blocked by DeathMark buff
-			if preCtx.GetBoolOrDefault("action_blocked", false) {
-				// Action blocked by DeathMark, but still process any derived actions
-				for _, derived := range preCtx.GetDerivedActions() {
-					if execAction, ok := derived.(Action); ok {
-						ctx.PushDerivedAction(execAction)
-					}
+			// Collect derived actions from PhasePreAction handlers
+			// (Dominance adds amplified actions, RobLuck adds redirected actions)
+			for _, derived := range preCtx.GetDerivedActions() {
+				if execAction, ok := derived.(Action); ok {
+					ctx.PushDerivedAction(execAction)
 				}
-				return nil
+			}
+
+			// Check if action was blocked (DeathMark, RobLuck)
+			if preCtx.GetBoolOrDefault("action_blocked", false) {
+				return nil // Action blocked, derived actions already pushed above
 			}
 		}
 	}
@@ -215,9 +238,15 @@ func (ctx *ActionContext) ExecuteAction(action Action) error {
 
 // ProcessQueue executes all actions in the queue.
 // Returns first error encountered, or nil if all succeeded.
+// Uses a shared processedCount to limit total depth across all nested calls,
+// preventing infinite loops from recursive derived actions.
 func (ctx *ActionContext) ProcessQueue() error {
 	for !ctx.ActionQueue.IsEmpty() {
+		if ctx.processedCount >= maxQueueProcessingDepth {
+			return fmt.Errorf("action queue exceeded maximum depth (%d), possible infinite loop", maxQueueProcessingDepth)
+		}
 		action := ctx.ActionQueue.Pop()
+		ctx.processedCount++
 		if err := ctx.ExecuteAction(action); err != nil {
 			return err
 		}
@@ -235,6 +264,7 @@ func (ctx *ActionContext) PushDerivedAction(action Action) {
 func (ctx *ActionContext) Clear() {
 	ctx.ActionQueue.Clear()
 	ctx.Metadata.Clear()
+	ctx.processedCount = 0
 }
 
 // GetGameLog returns the global game log (helper method).

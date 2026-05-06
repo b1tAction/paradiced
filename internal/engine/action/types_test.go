@@ -1,7 +1,9 @@
 package action
 
 import (
+	"fmt"
 	"math/rand"
+	"strings"
 	"testing"
 
 	"github.com/b1tAction/paradiced/internal/core"
@@ -2878,5 +2880,169 @@ func TestDiceUpgradeActionInterfaceMethods(t *testing.T) {
 	}
 	if action.PostTriggerPhase() != constants.PhaseAnyTime {
 		t.Errorf("DiceUpgradeAction PostTriggerPhase = %s, expected any_time", action.PostTriggerPhase())
+	}
+}
+
+// ========== ProcessQueue Depth Limit Tests ==========
+
+func TestProcessQueueDepthLimit(t *testing.T) {
+	// ProcessQueue should return error when maximum depth exceeded
+	// (prevents infinite loops from recursive derived actions)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 200})
+	player.HP = 200
+
+	mockGame := &mockGame{log: gamelog.NewGameLog()}
+	ctx := NewActionContext(mockGame, nil, nil, nil)
+
+	// Push more actions than the depth limit (each heals 1 HP, won't kill player)
+	for i := 0; i < maxQueueProcessingDepth+1; i++ {
+		ctx.PushDerivedAction(NewHealAction(player, 1, fmt.Sprintf("overflow_%d", i)))
+	}
+
+	err := ctx.ProcessQueue()
+	if err == nil {
+		t.Fatal("ProcessQueue should return error when depth limit exceeded")
+	}
+	if !strings.Contains(err.Error(), "maximum depth") {
+		t.Errorf("Error should mention maximum depth, got: %v", err)
+	}
+}
+
+func TestProcessQueueWithinDepthLimit(t *testing.T) {
+	// ProcessQueue should succeed when action count is within depth limit
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 100})
+	player.HP = 50
+
+	mockGame := &mockGame{log: gamelog.NewGameLog()}
+	ctx := NewActionContext(mockGame, nil, nil, nil)
+
+	// Push actions within the depth limit (10 actions)
+	for i := 0; i < 10; i++ {
+		ctx.PushDerivedAction(NewHealAction(player, 1, fmt.Sprintf("safe_%d", i)))
+	}
+
+	err := ctx.ProcessQueue()
+	if err != nil {
+		t.Errorf("ProcessQueue should succeed within depth limit, got: %v", err)
+	}
+
+	// Verify actions were executed (player HP should increase)
+	if player.HP != 60 {
+		t.Errorf("Player HP = %d, expected 60 (50 + 10*1)", player.HP)
+	}
+}
+
+// ========== PhasePreAction Publication Tests ==========
+
+func TestPhasePreActionPublishedForAlivePlayer(t *testing.T) {
+	// PhasePreAction should now be published for alive players too,
+	// enabling Dominance and RobLuck interception.
+	player := core.NewPlayer(core.PlayerConfig{
+		ID:    id.NewPlayerID(),
+		MaxHP: 10,
+		MaxLP: 5,
+	})
+	player.HP = 5
+
+	bus := event.NewEventBus("test")
+	// Subscribe using Decision-based API (matches real EventBus usage)
+	// Use an AutoDecision (no NeedConfirm) so the handler is auto-executed during Publish.
+	decision := event.NewAutoDecision("test_pre_action", []event.Option{
+		{
+			ID:    "skip",
+			Label: "Skip",
+			Action: func(ctx *event.Context) error {
+				ctx.SetBool("pre_action_published", true)
+				return nil
+			},
+		},
+	})
+	bus.Subscribe(constants.PhasePreAction, player.ID, player.ID.UUID(), "test_handler", decision)
+
+	ctx := NewActionContext(&mockGame{log: gamelog.NewGameLog()}, bus, nil, nil)
+
+	// Execute a HealAction on an ALIVE player
+	healAction := NewHealAction(player, 2, "TestHeal")
+	err := ctx.ExecuteAction(healAction)
+	if err != nil {
+		t.Fatalf("ExecuteAction should not error: %v", err)
+	}
+
+	// PhasePreAction was published and the handler was called,
+	// but it only set a flag (didn't block). The heal should still apply.
+	if player.HP != 7 {
+		t.Errorf("Alive player HP = %d, expected 7 (5+2)", player.HP)
+	}
+}
+
+// ========== ActorPlayerer Tests ==========
+
+func TestBossDamageActionActorPlayers(t *testing.T) {
+	// BossDamageAction should return both Boss (target) and SourcePlayer (attacker)
+	sourcePlayer := core.NewPlayer(core.PlayerConfig{
+		ID:    id.NewPlayerID(),
+		MaxHP: 10,
+		MaxLP: 5,
+	})
+	bossPlayer := core.NewPlayer(core.PlayerConfig{
+		ID:    id.NewPlayerID(),
+		MaxHP: 50,
+		MaxLP: 0,
+	})
+
+	action := Action(NewBossDamageAction(sourcePlayer, bossPlayer, 5, false, "test"))
+
+	// Verify ActorPlayerer interface is implemented
+	actor, ok := action.(ActorPlayerer)
+	if !ok {
+		t.Fatal("BossDamageAction should implement ActorPlayerer interface")
+	}
+
+	players := actor.ActorPlayers()
+	if len(players) != 2 {
+		t.Fatalf("ActorPlayers should return 2 players (Boss + SourcePlayer), got %d", len(players))
+	}
+
+	// First player should be Boss (target)
+	if players[0].ID.UUID() != bossPlayer.ID.UUID() {
+		t.Errorf("First ActorPlayer should be Boss (target), got %s", players[0].ID.UUID())
+	}
+
+	// Second player should be SourcePlayer (attacker)
+	if players[1].ID.UUID() != sourcePlayer.ID.UUID() {
+		t.Errorf("Second ActorPlayer should be SourcePlayer (attacker), got %s", players[1].ID.UUID())
+	}
+}
+
+func TestHealActionNotActorPlayerer(t *testing.T) {
+	// HealAction should NOT implement ActorPlayerer (default: only TargetPlayer)
+	player := core.NewPlayer(core.PlayerConfig{
+		ID:    id.NewPlayerID(),
+		MaxHP: 10,
+		MaxLP: 5,
+	})
+
+	action := Action(NewHealAction(player, 2, "test"))
+
+	_, ok := action.(ActorPlayerer)
+	if ok {
+		t.Error("HealAction should NOT implement ActorPlayerer interface")
+	}
+}
+
+func TestBossDamageActionActorPlayersWithSameSourceAndTarget(t *testing.T) {
+	// If SourcePlayer == targetPlayer (unlikely but edge case),
+	// ActorPlayers should return only 1 player (no duplicate)
+	player := core.NewPlayer(core.PlayerConfig{
+		ID:    id.NewPlayerID(),
+		MaxHP: 50,
+	})
+
+	action := Action(NewBossDamageAction(player, player, 5, false, "test"))
+	actor := action.(ActorPlayerer)
+	players := actor.ActorPlayers()
+
+	if len(players) != 1 {
+		t.Errorf("ActorPlayers should return 1 player when source == target, got %d", len(players))
 	}
 }

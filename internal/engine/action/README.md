@@ -6,7 +6,7 @@ internal/engine/action 包提供了 Action 接口的具体实现。
 
 | 文件 | 说明 |
 |------|------|
-| `action.go` | Action接口定义，ActionType常量 |
+| `action.go` | Action接口定义，ActorPlayerer可选接口，ActionType常量 |
 | `types.go` | 具体Action类型（DamageAction, HealAction等） |
 | `context.go` | ActionContext执行上下文 |
 | `queue.go` | Queue衍生动作队列 |
@@ -26,6 +26,16 @@ type Action interface {
     LogEntry() gamelog.LogEntry
 }
 ```
+
+**ActorPlayerer 可选接口**：Action 可选实现此接口，自定义 PhasePreAction 的发布目标列表。未实现的 Action 默认发布给 `[TargetPlayer()]`。
+
+```go
+type ActorPlayerer interface {
+    ActorPlayers() []*core.Player
+}
+```
+
+**BossDamageAction 实现示例**：`ActorPlayers()` 返回 `[targetPlayer(Boss), SourcePlayer(attacker)]`，使 Dominance（订阅在攻击者）也能拦截玩家发起的 BossDamageAction。
 
 **TargetPlayer() 方法**：返回 Action 的目标玩家实例。ExecuteAction 在 PreTrigger/PostTrigger 阶段使用 `action.TargetPlayer()` 创建 `event.NewContext(action.TargetPlayer())`，确保 Handler 收到正确的 Player 实例。
 
@@ -359,9 +369,13 @@ type ActionContext struct {
 
 **设计原则：谁产生时机，谁发布Phase**
 
-1. **PhasePreAction 死亡拦截** - 如果 Action 的 `TargetPlayer` 已死亡（`IsDead=true`），且不是 RemoveBuffAction/RespawnAction，则发布 `PhasePreAction` 供 DeathMark 阻断
-   - 使用 `action.TargetPlayer()` 获取目标玩家
-   - 使用 `event.NewContext(action.TargetPlayer())` 创建触发上下文
+1. **PhasePreAction 拦截** - 对 Action 的相关玩家发布 `PhasePreAction`
+   - DeathMark 阻断死亡玩家动作；Dominance 翻倍有益动作；RobLuck 重定向有益动作
+   - **默认**: 只发布给 `TargetPlayer()`（大多数 Action 的目标 == 受益者/受害者）
+   - **ActorPlayerer**: 实现此可选接口的 Action 可自定义发布列表。如 `BossDamageAction.ActorPlayers()` 返回 `[Boss, SourcePlayer]`，使 Dominance（订阅在攻击者）也能拦截 BossDamageAction
+   - 收集衍生动作（Dominance/RobLuck 产生）→ 推入 ActionQueue
+   - 检查 `action_blocked` 标志，若被阻断（DeathMark/RobLuck）则跳过执行
+   - **防循环机制**: Dominance/RobLuck 的衍生 Action 使用专属 Source（`SourceFactionQingLongDominance` / `SourceFactionBaiHuRobLuck`），handler 检测到匹配 Source 时跳过处理，防止无限递归
 2. **PreTrigger阶段** - 发布Phase供拦截（如 `PhasePreDamage`、`PhasePreMove`）
    - 若 `PreTriggerPhase() != PhaseAnyTime`，则 Publish 到 EventBus
    - 使用 `event.NewContext(action.TargetPlayer())` 创建触发上下文
@@ -371,9 +385,12 @@ type ActionContext struct {
    - 使用 `event.NewContext(action.TargetPlayer())` 创建触发上下文
    - AddBuffAction 设置 `applied_buff_type`；RemoveBuffAction 设置 `removed_buff_type`
 5. 记录 `LogEntry()` 到全局 GameLog（通过 `protocol.Game.GetGameLog()`）
-6. 处理 ActionQueue 中的衍生动作
+6. 处理 ActionQueue 中的衍生动作（ProcessQueue，最大深度 50，防止无限循环）
 
-**关键变更**：PreTrigger/PostTrigger 阶段使用 `action.TargetPlayer()` 创建 `event.NewContext()`，而非之前已删除的 `ctx.CurrentPlayer`。这确保 Handler 总能收到正确的 Player 实例。
+**关键变更**：
+- PhasePreAction 通过 `ActorPlayerer` 可选接口决定发布给哪些玩家。默认发布给 `[TargetPlayer()]`，实现 `ActorPlayerer` 的 Action（如 `BossDamageAction`）可返回自定义列表（如 `[Boss, SourcePlayer]`），使 Dominance 能拦截攻击者发起的 BossDamageAction。
+- ProcessQueue 使用 `processedCount` 共享计数器（跨嵌套调用），超过 `maxQueueProcessingDepth=50` 时返回错误，防止衍生 Action 递归导致的无限循环。
+- PreTrigger/PostTrigger 阶段使用 `action.TargetPlayer()` 创建 `event.NewContext()`，而非之前已删除的 `ctx.CurrentPlayer`。这确保 Handler 总能收到正确的 Player 实例。
 
 ### Phase方法实现
 
