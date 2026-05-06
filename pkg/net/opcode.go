@@ -81,6 +81,10 @@ const (
 	// Data: RoundReady (empty, server checks all clients have signaled)
 	OpRoundReady OpCode = 106
 
+	// OpUpdateLobbyPlayer updates waiting-room player metadata before the game starts.
+	// Data: UpdateLobbyPlayer (faction/display_name)
+	OpUpdateLobbyPlayer OpCode = 108
+
 	// OpMiniGameDataSubmit submits mini-game data for server-side rank calculation.
 	// Data: MiniGameDataSubmit (includes game_type and game_data)
 	OpMiniGameDataSubmit OpCode = 107
@@ -89,24 +93,25 @@ const (
 // String returns the opcode name for logging and debugging.
 func (op OpCode) String() string {
 	names := map[OpCode]string{
-		OpStateSync:            "state_sync",
-		OpDecisionRequest:      "decision_request",
-		OpAvailable:            "available",
-		OpMiniGameStart:        "mini_game_start",
-		OpMiniGameResult:       "mini_game_result",
-		OpGameOver:             "game_over",
-		OpFullSync:             "full_sync",
-		OpActionRejected:       "action_rejected",
-		OpWaitingSync:          "waiting_sync",
-		OpStartGameAck:         "start_game_ack",
-		OpRollDice:             "roll_dice",
-		OpUseItem:              "use_item",
-		OpUseSkill:             "use_skill",
-		OpUserChoice:           "user_choice",
+		OpStateSync:          "state_sync",
+		OpDecisionRequest:    "decision_request",
+		OpAvailable:          "available",
+		OpMiniGameStart:      "mini_game_start",
+		OpMiniGameResult:     "mini_game_result",
+		OpGameOver:           "game_over",
+		OpFullSync:           "full_sync",
+		OpActionRejected:     "action_rejected",
+		OpWaitingSync:        "waiting_sync",
+		OpStartGameAck:       "start_game_ack",
+		OpRollDice:           "roll_dice",
+		OpUseItem:            "use_item",
+		OpUseSkill:           "use_skill",
+		OpUserChoice:         "user_choice",
 		OpKickPlayer:           "kick_player",
-		OpMiniGameDataSubmit:  "mini_game_data_submit",
-		OpStartGame:            "start_game",
-		OpRoundReady:           "round_ready",
+		OpMiniGameDataSubmit: "mini_game_data_submit",
+		OpStartGame:          "start_game",
+		OpRoundReady:         "round_ready",
+		OpUpdateLobbyPlayer:  "update_lobby_player",
 	}
 	if name, ok := names[op]; ok {
 		return name
