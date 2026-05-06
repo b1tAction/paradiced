@@ -95,7 +95,7 @@ func TestNewPlayerZhuQue(t *testing.T) {
 
 	player := NewPlayer(config)
 	// Note: ZhuQue Fire buff is now added by game.InitializePlayerFactionBuffs()
-	// during match initialization, not in NewPlayer. This keeps core layer pure.
+	// during WaitingForHostState.Exit(), not in NewPlayer. This keeps core layer pure.
 	// The test here verifies player creation works for ZhuQue faction.
 	if player.Faction != constants.FactionZhuQue {
 		t.Error("Player faction should be ZhuQue")

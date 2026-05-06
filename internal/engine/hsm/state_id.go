@@ -8,8 +8,8 @@ type StateID int
 
 const (
 	// Global layer states manage the overall game lifecycle
-	StateMatchInit StateID = iota + 100 // 100: Initialize match (map, factions, initial buffs)
-	StateWaitingForHost                  // 101: Wait for host to start game (manual start mode)
+	StateMatchInit StateID = iota + 100 // 100: Initialize match (map, factions)
+	StateWaitingForHost                  // 101: Wait for host to start game; faction buffs initialized on Exit
 	StateRoundMiniGame                   // 102: Mini-game phase, wait for rankings
 	StateRoundPrep                       // 103: Round preparation, assign dice types
 	StateTurnLoop                        // 104: Turn loop, iterate through player turns

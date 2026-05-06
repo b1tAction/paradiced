@@ -31,7 +31,9 @@ func (s *BaseGlobalState) CanTransitionTo(target StateID) bool {
 }
 
 // MatchInitState - Match Initialization State
-// Generates map, assigns factions, initializes buffs.
+// Generates map, assigns factions. Faction buffs are initialized later in
+// WaitingForHostState.Exit() so that late-joining players and faction changes
+// are correctly handled.
 
 type MatchInitState struct {
 	BaseGlobalState
@@ -59,13 +61,11 @@ func (s *MatchInitState) Enter(ctx *StateContext) {
 	// NOT regenerate the map, as that would overwrite DrawType, ProbGood,
 	// ProbNeutral, ProbBad, EventID and other per-cell configuration.
 
-	// 1. Initialize faction-specific buffs for all players
-	// Uses ApplyBuffToPlayer for complete lifecycle (AddBuff + Subscribe)
-	for _, player := range game.Players {
-		game.InitializePlayerFactionBuffs(player)
-	}
+	// Faction buffs are NOT initialized here — they are deferred to
+	// WaitingForHostState.Exit() so that late-joining players and
+	// faction changes during the waiting room are correctly reflected.
 
-	// 3. Broadcast initial state sync
+	// Broadcast initial state sync
 	if ctx.Broadcast != nil && ctx.Builder != nil {
 		stateSync := ctx.Builder.BuildStateSync()
 		ctx.Broadcast.BroadcastStateSync(stateSync)
@@ -122,6 +122,16 @@ func (s *WaitingForHostState) Update(ctx *StateContext) StateID {
 }
 
 func (s *WaitingForHostState) Exit(ctx *StateContext) {
+	// Initialize faction-specific buffs for all players now that factions
+	// are finalized (late joiners and faction changes are settled).
+	// Uses ApplyBuffToPlayer for complete lifecycle (AddBuff + Subscribe).
+	game := ctx.GetGame()
+	if game != nil {
+		for _, player := range game.Players {
+			game.InitializePlayerFactionBuffs(player)
+		}
+	}
+
 	// Cleanup waiting state markers
 	ctx.Delete("waiting_for_host")
 	ctx.Delete(KeyStartRequested)

@@ -393,5 +393,5 @@ func TestFactionSetDuringAddPlayer(t *testing.T) {
 	}
 
 	// Note: Fire buff is NOT added here - it's added by InitializePlayerFactionBuffs
-	// during match initialization (see engine/game_test.go)
+	// during WaitingForHostState.Exit() when the host starts the game (see engine/game_test.go)
 }

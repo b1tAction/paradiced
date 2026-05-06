@@ -147,7 +147,8 @@ func TestAssignFactions(t *testing.T) {
 
 	// Note: assignFactions() is deprecated and does nothing now.
 	// Factions are set during addPlayer via PlayerConfig.
-	// Fire buff is added later by game.InitializePlayerFactionBuffs().
+	// Fire buff is added later by game.InitializePlayerFactionBuffs()
+	// which is called in WaitingForHostState.Exit() when the host starts the game.
 
 	// Verify ZhuQue player does NOT have Fire buff yet (added later)
 	zhuQuePlayer := handler.players[id.TestUUID(2)]
@@ -159,7 +160,7 @@ func TestAssignFactions(t *testing.T) {
 		t.Errorf("ZhuQue player faction = %v, want ZhuQue", zhuQuePlayer.GetFaction())
 	}
 
-	// No Fire buff yet - will be added by InitializePlayerFactionBuffs during match init
+	// No Fire buff yet - will be added by InitializePlayerFactionBuffs during WaitingForHostState.Exit()
 	if zhuQuePlayer.HasBuff(constants.BuffTypeFire) {
 		t.Error("ZhuQue player should NOT have Fire buff yet (added by InitializePlayerFactionBuffs)")
 	}

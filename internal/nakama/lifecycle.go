@@ -336,7 +336,7 @@ func (h *NakamaMatchHandler) addPlayer(userID string, faction constants.Faction,
 
 // assignFactions assigns factions to players based on join order.
 // Note: Faction-specific buffs (like ZhuQue Fire) are added later by
-// game.InitializePlayerFactionBuffs() during MatchInitState.Enter().
+// game.InitializePlayerFactionBuffs() during WaitingForHostState.Exit().
 func (h *NakamaMatchHandler) assignFactions() {
 	// This method is deprecated - factions are set during addPlayer via PlayerConfig.
 	// The function exists for backwards compatibility but does nothing.

@@ -5,12 +5,12 @@
 # ========== Event Definitions ==========
 
 events:
-  herb:
+  herb: # bingo
     evaluation: mild_good    # Supports named constants (mild_good=70) and raw numbers
     english_name: Herb
     name: 采集到草药
     desc: 在路边发现了草药，恢复了体力
-  lucky_bubble:
+  lucky_bubble: # bingo
     evaluation: good
     english_name: LuckyBubble
     name: 吹出幸运泡泡
@@ -55,7 +55,7 @@ events:
     english_name: DogPoop
     name: 踩到了狗屎
     desc: 运气糟糕的一天
-  wind_gust:
+  wind_gust: # bingo
     evaluation: bad
     english_name: WindGust
     name: 一阵风
@@ -70,7 +70,7 @@ events:
     english_name: LostWay
     name: 迷途
     desc: 迷失方向，获得迷途Buff
-  thunder:
+  thunder: # bingo
     evaluation: very_bad
     english_name: Thunder
     name: 雷劫
