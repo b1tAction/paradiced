@@ -465,6 +465,85 @@ func (s *MainActionState) OnUseItem(ctx *StateContext, itemID string) {
 	s.sendAvailable(ctx)
 }
 
+// OnUseSkill handles faction skill usage.
+// Consumes charge and applies faction-specific buff based on player's faction.
+func (s *MainActionState) OnUseSkill(ctx *StateContext) {
+	player := ctx.Player
+	if player == nil || s.actionCtx == nil {
+		return
+	}
+
+	faction := player.GetFaction()
+
+	// Consume charge and reset turn counter
+	player.SetChargeCount(0)
+	player.SetChargeTurnCounter(0)
+
+	switch faction {
+	case constants.FactionQingLong:
+		// Dominance: apply to self
+		buffAction := engineaction.NewAddBuffAction(player, constants.BuffTypeDominance, string(constants.SourceFactionQingLong))
+		if err := s.actionCtx.ExecuteAction(buffAction); err != nil {
+			ctx.Error = errors.WrapHSMError(err, "MainAction", 2, "OnUseSkill", "add dominance buff failed")
+			return
+		}
+	case constants.FactionBaiHu:
+		// RobLuck: apply to target player
+		targetID := ctx.GetStringOrDefault("use_skill_target_id", "")
+		if targetID == "" {
+			ctx.Error = errors.WrapHSMError(
+				errors.NewValidationError("use_skill_target_id", targetID, "BaiHu skill requires target_id"),
+				"MainAction", 2, "OnUseSkill", "BaiHu skill requires target_id")
+			return
+		}
+		targetPlayer := s.findPlayerByUUID(ctx, targetID)
+		if targetPlayer == nil {
+			ctx.Error = errors.WrapHSMError(
+				errors.NewValidationError("use_skill_target_id", targetID, "BaiHu target player not found"),
+				"MainAction", 2, "OnUseSkill", "BaiHu target player not found")
+			return
+		}
+		buffAction := engineaction.NewAddBuffAction(targetPlayer, constants.BuffTypeRobLuck, string(constants.SourceFactionBaiHu))
+		if err := s.actionCtx.ExecuteAction(buffAction); err != nil {
+			ctx.Error = errors.WrapHSMError(err, "MainAction", 2, "OnUseSkill", "add rob_luck buff failed")
+			return
+		}
+		// Set rob_luck_source_player metadata on the newly added buff
+		robLuckBuff := targetPlayer.GetBuff(constants.BuffTypeRobLuck)
+		if robLuckBuff != nil {
+			robLuckBuff.SetString("rob_luck_source_player", player.ID.UUID())
+		}
+	case constants.FactionXuanWu:
+		// Suppress: apply to self
+		buffAction := engineaction.NewAddBuffAction(player, constants.BuffTypeSuppress, string(constants.SourceFactionXuanWu))
+		if err := s.actionCtx.ExecuteAction(buffAction); err != nil {
+			ctx.Error = errors.WrapHSMError(err, "MainAction", 2, "OnUseSkill", "add suppress buff failed")
+			return
+		}
+	default:
+		// ZhuQue and other factions: no charge-based skill
+		return
+	}
+
+	// Broadcast updated state and resend available actions
+	s.broadcastStateSync(ctx)
+	s.sendAvailable(ctx)
+}
+
+// findPlayerByUUID finds a player by UUID string from game state.
+func (s *MainActionState) findPlayerByUUID(ctx *StateContext, uuid string) *core.Player {
+	game := ctx.GetGame()
+	if game == nil {
+		return nil
+	}
+	for _, p := range game.Players {
+		if p.ID.UUID() == uuid {
+			return p
+		}
+	}
+	return nil
+}
+
 // isOnBossCell checks if a player is on the Boss cell.
 func (s *MainActionState) isOnBossCell(ctx *StateContext, player *core.Player) bool {
 	game := ctx.GetGame()
@@ -1109,6 +1188,14 @@ func (s *TurnDrawState) Enter(ctx *StateContext) {
 				err, "TurnDraw", 2, "Enter", "draw item action failed")
 			return
 		}
+	case constants.DrawTypeBuff:
+		// Draw buff (Boss battle reward or special cell)
+		drawAction := engineaction.NewDrawBuffAction(player, string(constants.SourceBossBattleDraw))
+		if err := s.actionCtx.ExecuteAction(drawAction); err != nil {
+			ctx.Error = errors.WrapHSMError(
+				err, "TurnDraw", 2, "Enter", "draw buff action failed")
+			return
+		}
 	}
 
 	// Broadcast StateSync after draw effects (event or item)
@@ -1144,10 +1231,16 @@ func (s *TurnDrawState) Exit(ctx *StateContext) {
 // Two branches based on current player identity:
 // - Player branch: player attacks Boss (dice damage, probability-based crit)
 // - Boss branch: Boss counter-attacks (normal/crit/skill based on avgLP)
+// After player branch, may enter TurnDraw based on LP probability.
 type TurnBossBattleState struct {
 	BaseTurnState
 	isPlayerBranch bool // true = player attacking Boss, false = Boss counter-attacking
 	bossDefeated   bool // Boss was defeated in this state
+	shouldDraw     bool // Whether to enter TurnDraw after this state
+	drawType       constants.DrawType // DrawType for TurnDraw (Buff or Item)
+	probGood       float64 // Boss battle draw probability
+	probNeutral    float64
+	probBad        float64
 	actionCtx      *engineaction.ActionContext
 }
 
@@ -1269,6 +1362,23 @@ func (s *TurnBossBattleState) enterPlayerBranch(ctx *StateContext, player *core.
 		game.RoundData.SetBool(KeyBossDefeated, true)
 		game.RoundData.SetString(KeyBossDefeatedBy, player.ID.UUID())
 		ctx.SetString(KeyWinner, player.ID.UUID())
+	} else {
+		// After player branch attack, determine if TurnDraw should happen
+		// drawTriggerProbability = LP / MaxLP (higher LP = higher chance)
+		drawTriggerProbability := float64(player.LP) / float64(player.MaxLP)
+		if game.RNG != nil && game.RNG.Float64() < drawTriggerProbability {
+			s.shouldDraw = true
+			// Fixed probabilities for Boss battle draw (DrawEngine handles LP internally)
+			s.probGood = 0.5
+			s.probNeutral = 0.3
+			s.probBad = 0.2
+			// Random draw type: 50% Item, 50% Buff
+			if game.RNG.Float64() < 0.5 {
+				s.drawType = constants.DrawTypeItem
+			} else {
+				s.drawType = constants.DrawTypeBuff
+			}
+		}
 	}
 }
 
@@ -1391,6 +1501,19 @@ func (s *TurnBossBattleState) enterBossBranch(ctx *StateContext, bossPlayer *cor
 
 func (s *TurnBossBattleState) Update(ctx *StateContext) StateID {
 	// If Boss defeated -> signal for GameOver (handled by TurnLoop)
+	// If shouldDraw -> TurnDraw (Boss battle reward draw based on LP)
+	if s.shouldDraw && !s.bossDefeated {
+		// Pass draw configuration to TurnDrawState
+		if ctx.HSM != nil {
+			if drawState, ok := ctx.HSM.states[StateTurnDraw].(*TurnDrawState); ok {
+				drawState.drawType = s.drawType
+				drawState.probGood = s.probGood
+				drawState.probNeutral = s.probNeutral
+				drawState.probBad = s.probBad
+			}
+		}
+		return StateTurnDraw
+	}
 	// Normal flow -> TurnEnd
 	return StateTurnEnd
 }
@@ -1398,6 +1521,11 @@ func (s *TurnBossBattleState) Update(ctx *StateContext) StateID {
 func (s *TurnBossBattleState) Exit(ctx *StateContext) {
 	s.isPlayerBranch = false
 	s.bossDefeated = false
+	s.shouldDraw = false
+	s.drawType = constants.DrawTypeNone
+	s.probGood = 0
+	s.probNeutral = 0
+	s.probBad = 0
 	if s.actionCtx != nil {
 		s.actionCtx.Clear()
 	}
@@ -1626,23 +1754,17 @@ func (s *TurnEndState) handleFactionCharging(ctx *StateContext, player *core.Pla
 	faction := player.GetFaction()
 
 	switch faction {
-	case constants.FactionQingLong:
-		// 青龙行迹: charge every turn (max 1)
-		current := player.GetChargeCount()
-		if current < 1 {
-			player.SetChargeCount(current + 1)
-		}
-	case constants.FactionXuanWu:
-		// 玄武镇厄: charge every turn (max 1)
-		current := player.GetChargeCount()
-		if current < 1 {
-			player.SetChargeCount(current + 1)
+	case constants.FactionQingLong, constants.FactionXuanWu, constants.FactionBaiHu:
+		// QingLong/XuanWu/BaiHu: charge every 2 turns (max 1)
+		counter := player.IncrementChargeTurnCounter()
+		if counter%2 == 0 {
+			current := player.GetChargeCount()
+			if current < 1 {
+				player.SetChargeCount(current + 1)
+			}
 		}
 	case constants.FactionZhuQue:
-		// 朱雀离火: handled by Fire buff handler in PhaseBeforeTurn
-		// No additional action needed here
-	case constants.FactionBaiHu:
-		// 白虎劫运: handled during movement (overtaken check)
+		// ZhuQue: handled by Fire buff handler in PhaseBeforeTurn
 		// No additional action needed here
 	}
 }

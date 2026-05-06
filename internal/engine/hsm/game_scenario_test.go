@@ -193,16 +193,22 @@ func TestScenarioFaction_QingLong_ChargeOnTurnEnd(t *testing.T) {
 
 	qingLongPlayer := harness.Players[0]
 
-	// Run player 0's (QingLong) turn
+	// Run player 0's (QingLong) turn twice to get charge (every 2 turns)
 	err := harness.RunPlayerTurn(0, 3)
 	if err != nil {
-		t.Fatalf("RunPlayerTurn failed: %v", err)
+		t.Fatalf("First RunPlayerTurn failed: %v", err)
 	}
 
-	// QingLong should have charge after TurnEnd
+	// Run second turn for QingLong to trigger charge (charge_turn_counter reaches 2)
+	err = harness.RunPlayerTurn(0, 3)
+	if err != nil {
+		t.Fatalf("Second RunPlayerTurn failed: %v", err)
+	}
+
+	// QingLong should have charge after 2 turns
 	charge := qingLongPlayer.GetChargeCount()
 	if charge < 1 {
-		t.Errorf("QingLong should have at least 1 charge after TurnEnd, got %d", charge)
+		t.Errorf("QingLong should have at least 1 charge after 2 TurnEnds, got %d", charge)
 	}
 }
 

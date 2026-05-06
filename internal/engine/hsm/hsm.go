@@ -737,6 +737,38 @@ type UseItemHandler interface {
 	OnUseItem(ctx *StateContext, itemID string)
 }
 
+// UseSkillHandler is an interface for states that handle faction skill usage input.
+type UseSkillHandler interface {
+	OnUseSkill(ctx *StateContext)
+}
+
+// OnUseSkill handles faction skill usage input during MainActionState.
+func (hsm *HSM) OnUseSkill(ctx *StateContext) error {
+	// Must be in MainAction state
+	if hsm.turnStateID != StateMainAction {
+		return errors.New("OnUseSkill requires MainAction state")
+	}
+
+	// Create context if not provided
+	if ctx == nil {
+		ctx = NewStateContext().WithHSM(hsm).WithPlayer(hsm.turnPlayer)
+	}
+
+	// Call OnUseSkill on the turn state if it implements UseSkillHandler
+	if handler, ok := hsm.turnState.(UseSkillHandler); ok {
+		handler.OnUseSkill(ctx)
+	} else {
+		return errors.New("current turn state does not handle UseSkill")
+	}
+
+	// Check for errors from OnUseSkill execution
+	if ctx.Error != nil {
+		return ctx.Error
+	}
+
+	return nil
+}
+
 // ========== Mini-Game Result Handler ==========
 
 // OnMiniGameDataSubmit handles mini-game data submission from client.

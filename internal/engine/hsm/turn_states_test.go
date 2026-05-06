@@ -1057,15 +1057,24 @@ func TestTurnEndState_Enter_FactionCharging(t *testing.T) {
 	game.AddPlayer(player)
 
 	state := NewTurnEndState()
-	ctx := NewStateContext().
+
+	// QingLong charges every 2 turns (charge_turn_counter % 2 == 0 triggers charge)
+	// First TurnEnd: counter=1, not even → no charge
+	ctx1 := NewStateContext().
 		WithHSM(NewHSM(game)).
 		WithPlayer(player)
+	state.Enter(ctx1)
+	if player.GetChargeCount() != 0 {
+		t.Errorf("QingLong charge count should be 0 after 1st TurnEnd, got %d", player.GetChargeCount())
+	}
 
-	state.Enter(ctx)
-
-	// QingLong charges every turn (max 1)
+	// Second TurnEnd: counter=2, even → charge +1
+	ctx2 := NewStateContext().
+		WithHSM(NewHSM(game)).
+		WithPlayer(player)
+	state.Enter(ctx2)
 	if player.GetChargeCount() != 1 {
-		t.Errorf("QingLong charge count should be 1, got %d", player.GetChargeCount())
+		t.Errorf("QingLong charge count should be 1 after 2nd TurnEnd, got %d", player.GetChargeCount())
 	}
 }
 
