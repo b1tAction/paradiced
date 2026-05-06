@@ -391,7 +391,7 @@ interface UseItem {
 
 ```typescript
 interface UseSkill {
-    // 空结构，服务器检查玩家阵营和充能状态
+    target_id?: string;       // 目标玩家 ID（白虎劫运需要指定目标）
 }
 ```
 
@@ -851,12 +851,17 @@ interface LogEntry {
 
 **前置条件**：
 1. 发送者必须是当前回合玩家
-2. 玩家阵营为青龙或玄武
+2. 玩家阵营为青龙、玄武或白虎
 3. `charge >= 1`（充能已满）
+4. 白虎阵营必须提供 `target_id`（指定劫运目标玩家）
+
+**请求格式**：
+- 青龙/玄武：`{}`（空对象）
+- 白虎：`{ target_id: "player-uuid" }`
 
 **服务器响应**：
 - 成功：执行阵营技能，消耗充能
-- 失败：发送 `OpActionRejected`（`skill_not_ready`）
+- 失败：发送 `OpActionRejected`（`skill_not_ready` / `target_required` / `target_not_found`）
 
 ---
 

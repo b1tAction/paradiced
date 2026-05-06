@@ -590,22 +590,22 @@ func TestUseItemRequest_JSON(t *testing.T) {
 	}
 }
 
-func TestUseSkillRequest_JSON(t *testing.T) {
-	req := UseSkillRequest{OpCode: "102"}
+func TestUseSkill_JSON(t *testing.T) {
+	req := pkgnet.UseSkill{TargetID: "player-uuid-123"}
 
 	data, err := json.Marshal(req)
 	if err != nil {
 	 t.Fatalf("Marshal failed: %v", err)
 	}
 
-	var parsed UseSkillRequest
+	var parsed pkgnet.UseSkill
 	err = json.Unmarshal(data, &parsed)
 	if err != nil {
 	 t.Fatalf("Unmarshal failed: %v", err)
 	}
 
-	if parsed.OpCode != "102" {
-	 t.Errorf("OpCode = %s, expected 102", parsed.OpCode)
+	if parsed.TargetID != "player-uuid-123" {
+	 t.Errorf("TargetID = %s, expected player-uuid-123", parsed.TargetID)
 	}
 }
 

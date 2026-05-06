@@ -57,11 +57,6 @@ type UseItemRequest struct {
 	TargetID string `json:"target_id"` // Target player UUID (for targeted items like ReverseClock, AnyDoor)
 }
 
-// UseSkillRequest represents a faction skill usage request from client.
-type UseSkillRequest struct {
-	OpCode string `json:"op_code"`
-}
-
 // UserChoiceResponse represents a user choice response.
 type UserChoiceResponse struct {
 	OpCode     string `json:"op_code"`

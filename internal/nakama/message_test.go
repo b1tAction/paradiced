@@ -6,8 +6,9 @@ import (
 	"testing"
 
 	"github.com/b1tAction/paradiced/internal/core"
-	"github.com/b1tAction/paradiced/pkg/id"
 	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/id"
+	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 )
 
 func TestHandleMessageUnknownOpCode(t *testing.T) {
@@ -91,7 +92,7 @@ func TestHandleUseSkill(t *testing.T) {
 
 	// Note: Skill usage requires being in MainAction state and being current player
 	// This test verifies message handling, not actual skill execution
-	data, _ := json.Marshal(UseSkillRequest{OpCode: "3"}) // OpCode for UseSkill
+	data, _ := json.Marshal(pkgnet.UseSkill{}) // UseSkill request
 
 	err := handler.HandleMessage(id.TestUUID(1), data)
 	if err != nil {
@@ -114,7 +115,7 @@ func TestHandleUseSkillNoCharge(t *testing.T) {
 	handler.MatchInit()
 
 	// Send use skill request
-	data, _ := json.Marshal(UseSkillRequest{OpCode: "3"})
+	data, _ := json.Marshal(pkgnet.UseSkill{})
 
 	err := handler.HandleMessage(id.TestUUID(1), data)
 	if err != nil {
@@ -342,7 +343,7 @@ func TestHandleUseSkillNoDispatcher(t *testing.T) {
 	handler.MatchInit()
 
 	// Send use skill request - should not crash without dispatcher
-	data, _ := json.Marshal(UseSkillRequest{OpCode: "3"})
+	data, _ := json.Marshal(pkgnet.UseSkill{})
 
 	err := handler.HandleMessage(id.TestUUID(1), data)
 	// Should work even without dispatcher
