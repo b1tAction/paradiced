@@ -803,7 +803,7 @@ func TestBuildDefinitionsConfigEventCategory(t *testing.T) {
 		}
 	}
 
-	badEvents := []string{"mosquito", "ghost_hit", "dog_poop", "wind_gust", "curse_buddha", "lost_way", "thunder"}
+	badEvents := []string{"mosquito", "ghost_hit", "dog_poop", "wind_gust", "skull_gaze", "lost_way", "thunder"}
 	for _, key := range badEvents {
 		if _, ok := defs.Events[key]; !ok {
 			t.Fatalf("missing %s event in DefinitionsConfig", key)

@@ -42,7 +42,7 @@ const (
 	SourceEventTasteTest   ActionSource = "event_taste_test"
 	SourceEventWindGust    ActionSource = "event_wind_gust"
 	SourceEventDivineBless ActionSource = "event_divine_bless"
-	SourceEventCurseBuddha ActionSource = "event_curse_buddha"
+	SourceEventSkullGaze  ActionSource = "event_skull_gaze"
 	SourceEventHiddenBuff  ActionSource = "event_hidden_buff"
 	SourceEventLostWay     ActionSource = "event_lost_way"
 

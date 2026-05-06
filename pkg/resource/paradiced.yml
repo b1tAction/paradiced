@@ -60,11 +60,11 @@ events:
     english_name: WindGust
     name: 一阵风
     desc: 一阵狂风卷走了你的道具
-  curse_buddha:
+  skull_gaze: # bingo
     evaluation: bad
-    english_name: CurseBuddha
-    name: 虔诚拜三拜
-    desc: 拜路边的野佛，获得诅咒Buff
+    english_name: SkullGaze
+    name: 恶魔之眼
+    desc: 你注视了恶魔的眼睛，获得诅咒Buff
   lost_way:
     evaluation: mild_bad
     english_name: LostWay

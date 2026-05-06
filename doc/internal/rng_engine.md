@@ -98,7 +98,7 @@ pkg/rng/
 |------|---------------|------|
 | Good | > 65 | DivineBless(100), LuckyBubble(80), Herb(70) |
 | Neutral | 41-65 | Exchange(50), HiddenBuff(55), TasteTest(55) |
-| Bad | ≤ 40 | Thunder(10), CurseBuddha(25), Mosquito(35) |
+| Bad | ≤ 40 | Thunder(10), SkullGaze(25), Mosquito(35) |
 
 ## LP 影响示例
 
@@ -117,7 +117,7 @@ LP=8时，DivineBless（Evaluation=100）概率显著高于 Herb（Evaluation=70
 | Event | Evaluation | LP=0权重 | LP=8权重 |
 |-------|------------|---------|---------|
 | Thunder | 10 | 0.25 | 0.45 |
-| CurseBuddha | 25 | 0.625 | 1.05 |
+| SkullGaze | 25 | 0.625 | 1.05 |
 | Mosquito | 35 | 0.875 | 1.58 |
 
 LP=8时，Mosquito（Evaluation=35，仅损失 HP-1）概率高于 Thunder（Evaluation=10，HP归零）。

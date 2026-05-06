@@ -56,7 +56,7 @@ func TestEventDefinitionsFields(t *testing.T) {
 		{constants.EventTypeGhostHit, constants.EvaluationMildBad, "GhostHit", "偶遇孤魂野鬼"},
 		{constants.EventTypeDogPoop, constants.EvaluationMildBad, "DogPoop", "踩到了狗屎"},
 		{constants.EventTypeWindGust, constants.EvaluationBad, "WindGust", "一阵风"},
-		{constants.EventTypeCurseBuddha, constants.EvaluationBad, "CurseBuddha", "虔诚拜三拜"},
+		{constants.EventTypeSkullGaze, constants.EvaluationBad, "SkullGaze", "注视恶魔的研究"},
 		{constants.EventTypeLostWay, constants.EvaluationMildBad, "LostWay", "迷途"},
 		{constants.EventTypeThunder, constants.EvaluationVeryBad, "Thunder", "雷劫"},
 	}
@@ -417,13 +417,13 @@ func TestWindGustEventHandler(t *testing.T) {
 	}
 }
 
-func TestCurseBuddhaEventHandler(t *testing.T) {
-	// Test CurseBuddha gives Curse buff through Action system
+func TestSkullGazeEventHandler(t *testing.T) {
+	// Test SkullGaze gives Curse buff through Action system
 	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	game.AddPlayer(player)
 
-	handler := GetEventHandlerConfig(constants.EventTypeCurseBuddha).Handler
+	handler := GetEventHandlerConfig(constants.EventTypeSkullGaze).Handler
 
 	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)

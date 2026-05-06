@@ -241,10 +241,10 @@ func registerAllEvents() {
 		Handler:  handleLoseItem,
 	})
 
-	// CurseBuddha: Give Curse buff
-	GlobalEventRegistry.RegisterEvent(defs.Events[constants.EventTypeCurseBuddha], &EventHandlerConfig{
+	// SkullGaze: Give Curse buff
+	GlobalEventRegistry.RegisterEvent(defs.Events[constants.EventTypeSkullGaze], &EventHandlerConfig{
 		Priority: 30,
-		Handler:  createEventGiveBuffHandler(constants.BuffTypeCurse, constants.SourceEventCurseBuddha),
+		Handler:  createEventGiveBuffHandler(constants.BuffTypeCurse, constants.SourceEventSkullGaze),
 	})
 
 	// LostWay: Give Lost buff
