@@ -4,6 +4,7 @@ package nakama
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
 
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
 	internalnet "github.com/b1tAction/paradiced/internal/net"
@@ -31,6 +32,8 @@ func (h *NakamaMatchHandler) HandleMessageWithOp(sender string, opCode int64, da
 		return h.handleStartGame(sender)
 	case int64(pkgnet.OpRoundReady):
 		return h.handleRoundReady(sender)
+	case int64(pkgnet.OpUpdateLobbyPlayer):
+		return h.handleUpdateLobbyPlayer(sender, data)
 	default:
 		h.logWarn("Unknown opcode received", "sender", sender, "op_code", opCode)
 	}
@@ -72,6 +75,13 @@ type MiniGameDataSubmitRequest struct {
 	GameData map[string]interface{} `json:"game_data"`
 }
 
+// UpdateLobbyPlayerRequest represents waiting-room player configuration updates.
+type UpdateLobbyPlayerRequest struct {
+	OpCode      string `json:"op_code"`
+	Faction     string `json:"faction"`
+	DisplayName string `json:"display_name"`
+}
+
 // HandleMessage processes incoming messages from clients.
 // Called by Nakama when a player sends a message.
 func (h *NakamaMatchHandler) HandleMessage(sender string, data []byte) error {
@@ -102,6 +112,8 @@ func (h *NakamaMatchHandler) HandleMessage(sender string, data []byte) error {
 		return h.handleMiniGameDataSubmit(sender, data)
 	case strconv.FormatInt(int64(pkgnet.OpRoundReady), 10):
 		return h.handleRoundReady(sender)
+	case strconv.FormatInt(int64(pkgnet.OpUpdateLobbyPlayer), 10):
+		return h.handleUpdateLobbyPlayer(sender, data)
 	default:
 		h.logWarn("Unknown opcode in payload", "sender", sender, "op_code", opCode)
 		// Unknown opcode, ignore
@@ -603,7 +615,7 @@ func (h *NakamaMatchHandler) handleStartGame(sender string) error {
 		broadcastAdapter := NewNakamaBroadcastAdapter(h)
 		definitions := internalnet.BuildDefinitionsConfig()
 		ack := &pkgnet.StartGameAck{
-			MapConfig:    *h.mapConfig,
+			MapConfig:   *h.mapConfig,
 			Definitions: definitions,
 		}
 		broadcastAdapter.BroadcastStartGameAck(ack)
@@ -611,5 +623,40 @@ func (h *NakamaMatchHandler) handleStartGame(sender string) error {
 	}
 
 	logger.logResponse("OpStartGame", sender, "game starting")
+	return nil
+}
+
+// handleUpdateLobbyPlayer updates player metadata while the room is waiting.
+func (h *NakamaMatchHandler) handleUpdateLobbyPlayer(sender string, data []byte) error {
+	logger := NewLogger(h)
+	logger.logRequest("handleUpdateLobbyPlayer", sender, data)
+
+	player := h.GetPlayer(sender)
+	if player == nil {
+		logger.logReject("OpUpdateLobbyPlayer", sender, constants.ErrPlayerNotFound, "player_not_found", "Unknown player")
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpUpdateLobbyPlayer, constants.ErrPlayerNotFound, "Unknown player")
+	}
+
+	if h.hsm == nil || h.hsm.GetGlobalStateID() != hsm.StateWaitingForHost {
+		logger.logReject("OpUpdateLobbyPlayer", sender, constants.ErrInvalidState, "invalid_state", "Not in waiting state")
+		return h.sendActionRejectedWithCode(sender, pkgnet.OpUpdateLobbyPlayer, constants.ErrInvalidState, "Not in waiting state")
+	}
+
+	var req UpdateLobbyPlayerRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		logger.logError("OpUpdateLobbyPlayer", sender, err)
+		return err
+	}
+
+	if faction := constants.ParseFaction(strings.TrimSpace(req.Faction)); faction.IsValid() {
+		player.Faction = faction
+	}
+
+	if displayName := strings.TrimSpace(req.DisplayName); displayName != "" {
+		player.Metadata.SetString("display_name", displayName)
+	}
+
+	h.broadcastWaitingSyncToAll()
+	logger.logResponse("OpUpdateLobbyPlayer", sender, "lobby player updated")
 	return nil
 }
