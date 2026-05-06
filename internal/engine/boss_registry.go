@@ -125,44 +125,44 @@ func registerAllBossData() {
 		},
 	})
 
-	// // Curse: add curse buff to all boss-cell players
-	// GlobalBossRegistry.RegisterBossSkill(&BossSkillHandlerConfig{
-	// 	Type: constants.BossSkillCurse,
-	// 	Handler: func(game *Game, actionCtx *engineaction.ActionContext, targets []*core.Player) error {
-	// 		for _, target := range targets {
-	// 			addBuffAction := engineaction.NewAddBuffAction(target, constants.BuffTypeCurse, string(constants.SourceBossSkillCurse))
-	// 			actionCtx.PushDerivedAction(addBuffAction)
-	// 		}
-	// 		return nil
-	// 	},
-	// })
+	// Curse: add curse buff to all boss-cell players
+	GlobalBossRegistry.RegisterBossSkill(&BossSkillHandlerConfig{
+		Type: constants.BossSkillCurse,
+		Handler: func(game *Game, actionCtx *engineaction.ActionContext, targets []*core.Player) error {
+			for _, target := range targets {
+				addBuffAction := engineaction.NewAddBuffAction(target, constants.BuffTypeCurse, string(constants.SourceBossSkillCurse))
+				actionCtx.PushDerivedAction(addBuffAction)
+			}
+			return nil
+		},
+	})
 
-	// // Rest: Boss heals 20 HP
-	// GlobalBossRegistry.RegisterBossSkill(&BossSkillHandlerConfig{
-	// 	Type: constants.BossSkillRest,
-	// 	Handler: func(game *Game, actionCtx *engineaction.ActionContext, targets []*core.Player) error {
-	// 		bossPlayer := game.GetBossPlayer()
-	// 		if bossPlayer == nil || bossPlayer.IsDead {
-	// 			return nil
-	// 		}
-	// 		healAction := engineaction.NewHealAction(bossPlayer, 20, string(constants.SourceBossSkillRest))
-	// 		actionCtx.PushDerivedAction(healAction)
-	// 		return nil
-	// 	},
-	// })
+	// Rest: Boss heals 20 HP
+	GlobalBossRegistry.RegisterBossSkill(&BossSkillHandlerConfig{
+		Type: constants.BossSkillRest,
+		Handler: func(game *Game, actionCtx *engineaction.ActionContext, targets []*core.Player) error {
+			bossPlayer := game.GetBossPlayer()
+			if bossPlayer == nil || bossPlayer.IsDead {
+				return nil
+			}
+			healAction := engineaction.NewHealAction(bossPlayer, 20, string(constants.SourceBossSkillRest))
+			actionCtx.PushDerivedAction(healAction)
+			return nil
+		},
+	})
 
-	// // Thorns: Add thorns buff to Boss itself (reflect 30% damage to attacking player)
-	// GlobalBossRegistry.RegisterBossSkill(&BossSkillHandlerConfig{
-	// 	Type: constants.BossSkillThorns,
-	// 	Handler: func(game *Game, actionCtx *engineaction.ActionContext, targets []*core.Player) error {
-	// 		bossPlayer := game.GetBossPlayer()
-	// 		if bossPlayer != nil {
-	// 			addBuffAction := engineaction.NewAddBuffAction(bossPlayer, constants.BuffTypeThorns, string(constants.SourceBossSkillThorns))
-	// 			actionCtx.PushDerivedAction(addBuffAction)
-	// 		}
-	// 		return nil
-	// 	},
-	// })
+	// Thorns: Add thorns buff to Boss itself (reflect 30% damage to attacking player)
+	GlobalBossRegistry.RegisterBossSkill(&BossSkillHandlerConfig{
+		Type: constants.BossSkillThorns,
+		Handler: func(game *Game, actionCtx *engineaction.ActionContext, targets []*core.Player) error {
+			bossPlayer := game.GetBossPlayer()
+			if bossPlayer != nil {
+				addBuffAction := engineaction.NewAddBuffAction(bossPlayer, constants.BuffTypeThorns, string(constants.SourceBossSkillThorns))
+				actionCtx.PushDerivedAction(addBuffAction)
+			}
+			return nil
+		},
+	})
 
 	// Build skill pool
 	GlobalBossRegistry.BuildBossSkillPool()
