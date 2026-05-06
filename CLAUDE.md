@@ -60,7 +60,7 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **Phase**: Trigger timing (HSM: BeforeTurn/OnLand/AfterTurn/PreMove; Action: PreDamage/PreEvent/PreRespawn/PostBuffApplied/PreBuffRemoved)
 - **Faction**: Player faction type (青龙/朱雀/白虎/玄武)
 - **CellType**: Map cell type (Normal, Fragile, Fog, Checkpoint, Boss, Event)
-- **DrawType**: Cell draw type (none/event/item) - specifies what to draw when landing on a cell
+- **DrawType**: Cell draw type (none/event/item/buff) - specifies what to draw when landing on a cell
 - **StateID**: HSM state identifier (Global/Turn/Interrupt layers)
 - **EntryType**: GameLog entry type (action, state, mini_game, boss, decision)
 - **ActionSource**: Action source identifier (Buff/Item/Event/Faction/System/Boss)
@@ -88,7 +88,7 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **BroadcastAdapter**: Broadcast abstraction for client communication
 - **OpCode**: Message operation codes (Server→Client: 1-99, Client→Server: 100+)
   - Server→Client: OpStateSync(1), OpDecisionRequest(3), OpAvailable(4), OpMiniGameStart(5), OpMiniGameResult(6), OpGameOver(7), OpFullSync(8), OpActionRejected(9), OpWaitingSync(10), OpStartGameAck(11)
-  - Client→Server: OpRollDice(100), OpUseItem(101), OpUseSkill(102), OpUserChoice(103), OpStartGame(105), OpRoundReady(106), OpMiniGameDataSubmit(107)
+  - Client→Server: OpRollDice(100), OpUseItem(101), OpUseSkill(102) [BaiHu requires target_id], OpUserChoice(103), OpStartGame(105), OpRoundReady(106), OpMiniGameDataSubmit(107)
 - **StateSync**: Complete state synchronization structure
 - **Decision**: User confirmation request structure
 - **ActionRejected**: Action rejection notification with ErrorCode for client-side error handling
@@ -97,7 +97,7 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **NakamaMatchHandler**: Main match handler with HSM integration
 - **Logger**: Structured logging helper for request/response/rejection tracking (nil-safe)
 - **ErrorCode System**: Standardized error codes (pkg/constants.ErrorCode) for client feedback
-- **Message Handlers**: Handle client requests (roll dice, use item, use skill, etc.) with validation and error reporting
+- **Message Handlers**: Handle client requests (roll dice, use item, use skill, etc.) with validation and error reporting. UseSkill includes faction-specific validation: BaiHu requires target_id, ZhuQue rejected (no charge skill), QingLong/XuanWu/BaiHu require charge >= 1.
 
 #### CLI Tool (`internal/cli`)
 - **playtest run**: Run single automated playtest (2-4 players)
@@ -145,9 +145,10 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 - **Global States**: MatchInit, RoundMiniGame, RoundPrep, TurnLoop, GameOver
 - **Turn States**: TurnUpkeep, MainAction, TurnMoving, TurnCheckpoint, TurnLanded, TurnDraw, TurnBossBattle, TurnEnd
 - **Interrupt States**: WaitDecision for user input
-- **TurnDrawState**: Unified draw state that handles both Event and Item draws based on cell's DrawType configuration. Entered from TurnLanded when cell has a valid DrawType (event/item) and prob settings.
+- **TurnDrawState**: Unified draw state that handles Event, Item, and Buff draws based on cell's DrawType configuration. Entered from TurnLanded when cell has a valid DrawType (event/item/buff) and prob settings. Also entered from TurnBossBattle when player triggers LP-based draw.
 - **decisionStateResetter**: Interface for states that cache pending decisions, called after decision resolution
 - **OnUseItem**: Handler execution + item consumption via RemoveItemAction
+- **OnUseSkill**: Faction skill handler. Consumes charge, applies faction buff (Dominance/RobLuck/Suppress). BaiHu reads target_id from StateContext metadata.
 
 #### Map System (`internal/gamemap`)
 - **MapEngine**: Linear map generation and path calculation
@@ -172,14 +173,15 @@ This is a turn-based party game backend similar to Mario Party. Players from fou
 
 **Phase Design Principle: Who produces timing, who publishes Phase**
 
-1. **BeforeTurn** (HSM publishes): Trigger BeforeTurn phase effects (神眷/诅咒 LP±1, 离火 every 4 turns). Poison buff draws bad event (100% bad probability). Boss player skips.
-2. **MainAction**: Player can use items or faction skills. OnUseItem executes handler + consumes item via RemoveItemAction. If on Boss cell → TurnBossBattle.
+1. **BeforeTurn** (HSM publishes): Trigger BeforeTurn phase effects (神眷/诅咒 LP±1, 离火 every 3 turns). Poison buff draws bad event (100% bad probability). Boss player skips.
+2. **MainAction**: Player can use items or faction skills. OnUseItem executes handler + consumes item via RemoveItemAction. OnUseSkill consumes charge and applies faction buff (Dominance/RobLuck/Suppress). If on Boss cell → TurnBossBattle.
 3. **PreMove** (HSM publishes): TurnMovingState publishes PreMove, 迷途 handler modifies Steps via StepsModifier interface
 4. **OnLand** (HSM publishes): Trigger landing events
-5. **TurnDraw** (HSM state): When landing on a cell with DrawType (event/item), enter TurnDraw state to perform probability-based draw
-6. **TurnBossBattle** (HSM state): When player is on Boss cell, enter TurnBossBattle for player attack; Boss counter-attack on Boss's turn
+5. **TurnDraw** (HSM state): When landing on a cell with DrawType (event/item/buff), enter TurnDraw state to perform probability-based draw. Also triggered after Boss battle player branch based on LP probability.
+6. **TurnBossBattle** (HSM state): When player is on Boss cell, enter TurnBossBattle for player attack; Boss counter-attack on Boss's turn. After player branch, may trigger TurnDraw based on LP probability (drawTriggerProbability = LP/MaxLP). Draw type is random (50% Item, 50% Buff).
 7. **PreEvent** (Action publishes): DrawEventAction triggers PreEvent for 辟邪/玄武
-8. **AfterTurn** (HSM publishes): Tick Buff durations, trigger AfterTurn effects. Boss player and Boss-defeated turn skip.
+8. **PreAction** (Action publishes): ExecuteAction publishes PhasePreAction for ALL target players (not just dead). DeathMark blocks dead players, Dominance amplifies beneficial actions, RobLuck redirects beneficial actions/buffs. Skip check prevents infinite loops (Source-based detection).
+9. **AfterTurn** (HSM publishes): Tick Buff durations, trigger AfterTurn effects. Boss player and Boss-defeated turn skip.
 
 ## Development Guidelines
 
@@ -318,10 +320,10 @@ Git Commit信息必须使用英文提交
 
 | Faction | Skill | Description |
 |---------|-------|-------------|
-| 青龙 (QingLong) | 行迹 | Every 5 turns gain charge, ignore negative terrain for 1 turn |
-| 朱雀 (ZhuQue) | 离火 | Every 4 turns LP+1 (max 8) |
-| 白虎 (BaiHu) | 劫运 | When overtaking others, steal random Buff |
-| 玄武 (XuanWu) | 鎮厄 | Every 5 turns gain charge, cancel one bad event |
+| 青龙 (QingLong) | 威势 (Dominance) | Every 2 turns gain charge, use to double beneficial action effects for 1 turn |
+| 朱雀 (ZhuQue) | 离火 (Fire) | Every 3 turns LP+1 (max 8) |
+| 白虎 (BaiHu) | 劫运 (RobLuck) | Every 2 turns gain charge, target player to redirect their beneficial actions to self for 1 turn |
+| 玄武 (XuanWu) | 鎮厄 (Suppress) | Every 2 turns gain charge, use to gain 1-turn immunity to bad events and negative buffs |
 
 ## Buff System
 
@@ -335,7 +337,10 @@ Git Commit信息必须使用英文提交
 | 腐化 (Corrupt) | AfterTurn | HP-1 every 2 turns |
 | 辟邪 (Exorcism) | PreEvent | Immune to poison |
 | 毒瘴 (Poison) | BeforeTurn | Bad event each turn |
-| 离火 (Fire) | BeforeTurn | ZhuQue passive, LP+1 every 4 turns (IsFaction=true, not in draw pool) |
+| 离火 (Fire) | BeforeTurn | ZhuQue passive, LP+1 every 3 turns (IsFaction=true, not in draw pool) |
+| 威势 (Dominance) | PreAction | QingLong faction skill, double beneficial actions (BossDamage/Heal/positive ModifyLP) via derived Actions. Skip check: derived actions use SourceFactionQingLongDominance source to prevent infinite loops |
+| 劫运 (RobLuck) | PreAction, PreBuffApplied | BaiHu faction skill, redirect target's beneficial actions/buffs to BaiHu player. Skip check: derived actions use SourceFactionBaiHuRobLuck source to prevent infinite loops (including circular redirects between two BaiHu players) |
+| 鎮厄 (Suppress) | PreEvent, PreBuffApplied | XuanWu faction skill, 1-turn immunity to bad events (IsBad) and negative buffs (IsNegative) |
 | 死亡标记 (DeathMark) | PreAction (Hidden) | Block all actions for dead players (exempt: RespawnAction, RemoveBuffAction(DeathMark)) |
 | 反刺 (Thorns) | PreDamage (Boss self) | Boss reflect: 30% damage back as derived PiercingDamageAction |
 

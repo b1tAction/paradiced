@@ -30,8 +30,9 @@ func (p *Player) SetChargeCount(count int) {
 | 字段 | 类型 | 所属阵营 | 用途 | 便捷方法 |
 |------|------|----------|------|----------|
 | `display_name` | string | 通用 | 用户显示名称，fallback 到 userID | 无（直接通过 Metadata 访问） |
-| `charge_count` | int | 青龙/玄武 | 阵营技能充能数 | `GetChargeCount/SetChargeCount/IncrementChargeCount` |
-| `fire_counter` | int | 朱雀 | 离火计数器（每4回合LP+1） | `GetFireCounter/SetFireCounter/IncrementFireCounter` |
+| `charge_count` | int | 青龙/白虎/玄武 | 阵营技能充能数 | `GetChargeCount/SetChargeCount/IncrementChargeCount` |
+| `charge_turn_counter` | int | 青龙/白虎/玄武 | 充能回合计数器（每2回合+1充能） | `GetChargeTurnCounter/SetChargeTurnCounter/IncrementChargeTurnCounter` |
+| `fire_counter` | int | 朱雀 | 离火计数器（每3回合LP+1） | `GetFireCounter/SetFireCounter/IncrementFireCounter` |
 | `events_drawn` | int | 通用 | 累计抽取Event次数 | `GetEventsDrawn/IncrementEventsDrawn` |
 | `items_used` | int | 通用 | 累计消耗Item次数 | `GetItemsUsed/IncrementItemsUsed` |
 | `rounds_won` | int | 通用 | 累计MiniGame排名第1次数 | `GetRoundsWon/IncrementRoundsWon` |
@@ -47,17 +48,21 @@ func (p *Player) SetChargeCount(count int) {
 
 ### 阵营用途说明
 
-**青龙（行迹）**：
-- `charge_count` 每5回合增加1
-- 充能达到1时可使用行迹技能，忽略负面地形
+**青龙（威势）**：
+- `charge_turn_counter` 每回合增加1，达到2时 `charge_count` 增加1并重置
+- 充能达到1时可使用威势技能，增益效果翻倍
+
+**白虎（劫运）**：
+- `charge_turn_counter` 每回合增加1，达到2时 `charge_count` 增加1并重置
+- 充能达到1时可使用劫运技能，指定目标玩家，使其增益改向自身
 
 **玄武（镇厄）**：
-- `charge_count` 每5回合增加1
-- 充能达到1时可使用镇厄技能，取消一次坏事件
+- `charge_turn_counter` 每回合增加1，达到2时 `charge_count` 增加1并重置
+- 充能达到1时可使用镇厄技能，1回合免疫恶性事件和负面Buff
 
 **朱雀（离火）**：
 - `fire_counter` 每回合增加1
-- 达到4时触发LP+1，并重置为0
+- 达到3时触发LP+1，并重置为0
 - 最大LP为8，超过则不增加
 
 ---
@@ -99,7 +104,7 @@ interface Player {
     lp: number;
     buffs: Buff[];
     items: Item[];
-    charge: number;      // 青龙/玄武充能数
+    charge: number;      // 青龙/白虎/玄武充能数
     fire_counter: number; // 朱雀火计数
     is_dead: boolean;
     skip_turn: boolean;
@@ -107,17 +112,17 @@ interface Player {
 
 // 渲染逻辑
 function renderPlayerStatus(player: Player) {
-    if (player.faction === "qing_long" || player.faction === "xuan_wu") {
+    if (player.faction === "qing_long" || player.faction === "xuan_wu" || player.faction === "bai_hu") {
         // 显示充能状态
         if (player.charge >= 1) {
             showSkillReadyIcon();
         }
         showChargeCount(player.charge);
     }
-    
+
     if (player.faction === "zhu_que") {
         // 显示火计数进度
-        showFireProgress(player.fire_counter, 4);
+        showFireProgress(player.fire_counter, 3);
     }
 }
 ```
@@ -126,8 +131,9 @@ function renderPlayerStatus(player: Player) {
 
 ## 扩展说明
 
-未来可能添加其他阵营特定属性：
-- 白虎劫运相关计数器
+白虎劫运相关计数器已实现（charge_count + charge_turn_counter）。
+
+未来可能添加：
 - 通用临时标记（如"已访问检查点"）
 
 新增属性时：

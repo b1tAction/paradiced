@@ -42,6 +42,7 @@ type Buff struct {
 | 字段 | 类型 | 来源 | 用途 | 说明 |
 |------|------|------|------|------|
 | `buff_turn_counter` | int | everyNTurns handler | 甘霖/腐化每N回合触发计数器 | counter<N时不触发，达到N时触发并重置为0 |
+| `rob_luck_source_player` | string | OnUseSkill (BaiHu) | 劫运Buff重定向目标 | 白虎玩家的UUID，用于将目标的增益Action重定向到白虎玩家 |
 
 ---
 

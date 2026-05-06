@@ -75,6 +75,7 @@ events:
     english_name: Thunder
     name: 雷劫
     desc: 天雷降临，HP归零
+  # TODO: 添加抽取任意Buff的事件
 
 # ========== Buff Definitions ==========
 
@@ -145,6 +146,24 @@ buffs:
     name: 死亡标记
     desc: 死亡后阻止后续行动
     duration: 1
+  dominance:
+    evaluation: very_good
+    english_name: Dominance
+    name: 威势
+    desc: 青龙阵营增益，增益效果翻倍
+    duration: 1
+  rob_luck:
+    evaluation: mild_bad
+    english_name: RobLuck
+    name: 劫运
+    desc: 白虎阵营增益，抢夺目标好运
+    duration: 1
+  suppress:
+    evaluation: good
+    english_name: Suppress
+    name: 鎮厄
+    desc: 玄武阵营增益，1回合免疫恶性事件和负面Buff
+    duration: 1
 
 # ========== Item Definitions ==========
 
@@ -164,3 +183,7 @@ items:
     english_name: DiceUpgrade
     name: 骰子升级卡
     desc: 将当前骰子升级为更高等级
+  # TODO: 添加更多道具
+  # 名刀司命(抵挡一次致命伤害)
+  # 贤者的庇护(原地复活，不回到检查点)
+  # 贪、嗔、痴之戒(永久改变自己的属性与属性上限)

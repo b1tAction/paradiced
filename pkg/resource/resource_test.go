@@ -186,6 +186,7 @@ func TestLoadDefinitionsFromYAML(t *testing.T) {
 		constants.BuffTypePoison, constants.BuffTypeHidden, constants.BuffTypeThorns,
 		constants.BuffTypeDivine, constants.BuffTypeRain, constants.BuffTypeExorcism,
 		constants.BuffTypeFire, constants.BuffTypeDeathMark,
+		constants.BuffTypeDominance, constants.BuffTypeRobLuck, constants.BuffTypeSuppress,
 	}
 	if len(defs.Buffs) != len(expectedBuffs) {
 		t.Errorf("len(defs.Buffs) = %d, want %d", len(defs.Buffs), len(expectedBuffs))
