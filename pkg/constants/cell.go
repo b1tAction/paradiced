@@ -64,12 +64,13 @@ const (
 	DrawTypeNone  DrawType = "none"  // No draw
 	DrawTypeEvent DrawType = "event" // Draw event
 	DrawTypeItem  DrawType = "item"  // Draw item
+	DrawTypeBuff  DrawType = "buff"  // Draw buff
 )
 
 // IsValid checks if DrawType is valid.
 func (dt DrawType) IsValid() bool {
 	switch dt {
-	case DrawTypeNone, DrawTypeEvent, DrawTypeItem:
+	case DrawTypeNone, DrawTypeEvent, DrawTypeItem, DrawTypeBuff:
 		return true
 	default:
 		return false
@@ -86,6 +87,8 @@ func ParseDrawType(s string) DrawType {
 		return DrawTypeEvent
 	case "item", "Item":
 		return DrawTypeItem
+	case "buff", "Buff":
+		return DrawTypeBuff
 	default:
 		return DrawTypeNone
 	}

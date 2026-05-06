@@ -26,6 +26,11 @@ const (
 	BuffTypeExorcism BuffType = "exorcism" // Exorcism辟邪: immune to poison
 	BuffTypeFire     BuffType = "fire"     // Fire离火: ZhuQue passive
 
+	// Faction Buffs (faction passive skills, not drawn from lottery pool)
+	BuffTypeDominance BuffType = "dominance" // Dominance威势: QingLong faction, double beneficial actions
+	BuffTypeRobLuck   BuffType = "rob_luck"  // RobLuck劫运: BaiHu faction, redirect good actions to self
+	BuffTypeSuppress  BuffType = "suppress"  // Suppress鎮厄: XuanWu faction, immunity to bad events/buffs
+
 	// Hidden Buffs (internal mechanism, not visible to player/client)
 	BuffTypeDeathMark BuffType = "death_mark" // DeathMark死亡标记: blocks actions after death
 )
@@ -35,7 +40,8 @@ func (bt BuffType) IsValid() bool {
 	switch bt {
 	case BuffTypeCurse, BuffTypeLost, BuffTypeCorrupt, BuffTypePoison,
 		BuffTypeHidden, BuffTypeThorns, BuffTypeDivine, BuffTypeRain,
-		BuffTypeExorcism, BuffTypeFire, BuffTypeDeathMark:
+		BuffTypeExorcism, BuffTypeFire, BuffTypeDeathMark,
+		BuffTypeDominance, BuffTypeRobLuck, BuffTypeSuppress:
 		return true
 	default:
 		return false
@@ -45,12 +51,13 @@ func (bt BuffType) IsValid() bool {
 // IsPositive checks if the Buff is positive (based on effect, not evaluation).
 func (bt BuffType) IsPositive() bool {
 	return bt == BuffTypeDivine || bt == BuffTypeHidden ||
-		bt == BuffTypeRain || bt == BuffTypeExorcism || bt == BuffTypeFire
+		bt == BuffTypeRain || bt == BuffTypeExorcism || bt == BuffTypeFire ||
+		bt == BuffTypeDominance || bt == BuffTypeSuppress
 }
 
 func (bt BuffType) IsNegative() bool {
 	return bt == BuffTypeCurse || bt == BuffTypeLost ||
-		bt == BuffTypeCorrupt || bt == BuffTypePoison
+		bt == BuffTypeCorrupt || bt == BuffTypePoison || bt == BuffTypeRobLuck
 }
 
 // IsHidden checks if the Buff is hidden (internal mechanism, not visible to player).
@@ -65,7 +72,7 @@ func (bt BuffType) IsBoss() bool {
 
 // IsFaction checks if the Buff is a faction passive skill (not drawn from lottery pool).
 func (bt BuffType) IsFaction() bool {
-	return bt == BuffTypeFire
+	return bt == BuffTypeFire || bt == BuffTypeDominance || bt == BuffTypeRobLuck || bt == BuffTypeSuppress
 }
 
 // IsDraw checks if the Buff should participate in lottery pool draws.
@@ -100,6 +107,12 @@ func ParseBuffType(s string) BuffType {
 		return BuffTypeFire
 	case "death_mark":
 		return BuffTypeDeathMark
+	case "dominance":
+		return BuffTypeDominance
+	case "rob_luck":
+		return BuffTypeRobLuck
+	case "suppress":
+		return BuffTypeSuppress
 	default:
 		return BuffTypeNone
 	}

@@ -47,8 +47,13 @@ const (
 	SourceEventLostWay     ActionSource = "event_lost_way"
 
 	// Faction sources
-	SourceFactionBaiHu  ActionSource = "faction_bai_hu"  // 劫运
-	SourceFactionQingLong ActionSource = "faction_qing_long" // 行迹
+	SourceFactionBaiHu              ActionSource = "faction_bai_hu"              // 劫运
+	SourceFactionQingLong           ActionSource = "faction_qing_long"         // 行迹/威势
+	SourceFactionXuanWu             ActionSource = "faction_xuan_wu"           // 镇厄
+
+	// Faction skill derived sources (for skip checks to prevent infinite loops)
+	SourceFactionQingLongDominance  ActionSource = "faction_qing_long_dominance" // Dominance amplified action
+	SourceFactionBaiHuRobLuck       ActionSource = "faction_bai_hu_rob_luck"     // RobLuck redirected action
 
 	// System sources
 	SourceSystemDice                ActionSource = "system_dice"
@@ -70,6 +75,7 @@ const (
 	SourceBossNormal       ActionSource = "boss_normal"       // Boss normal attack
 	SourceBossCrit         ActionSource = "boss_crit"         // Boss critical attack
 	SourceBossDamage       ActionSource = "boss_damage"       // Player attacks Boss
+	SourceBossBattleDraw   ActionSource = "boss_battle_draw"  // Boss battle TurnDraw
 	SourceBossSkillThunder ActionSource = "boss_skill_thunder" // Boss thunder skill
 	SourceBossSkillCurse   ActionSource = "boss_skill_curse"  // Boss curse skill
 	SourceBossSkillLost    ActionSource = "boss_skill_lost"   // Boss lost skill

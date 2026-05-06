@@ -74,10 +74,10 @@ func (f Faction) GetSkillName() string {
 // GetSkillDesc returns the faction passive skill description.
 func (f Faction) GetSkillDesc() string {
 	descs := map[Faction]string{
-		FactionQingLong: "每5回合获得充能，使用后1回合内无视负面地形",
-		FactionZhuQue:   "每4回合幸运值+1，最高不超过8点",
-		FactionBaiHu:    "反超其他玩家时随机从该玩家身上偷取一个Buff",
-		FactionXuanWu:   "每5回合获得充能，可以抵消一次任意恶性事件",
+		FactionQingLong: "每2回合获得充能，使用后1回合内增益效果翻倍",
+		FactionZhuQue:   "每3回合幸运值+1，最高不超过8点",
+		FactionBaiHu:    "每2回合获得充能，指定目标玩家，使其增益效果改向自身",
+		FactionXuanWu:   "每2回合获得充能，使用后1回合免疫恶性事件和负面Buff",
 	}
 	if desc, ok := descs[f]; ok {
 		return desc

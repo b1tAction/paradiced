@@ -119,7 +119,7 @@ func TestBuffTypeIsDraw(t *testing.T) {
 	}
 
 	// IsDraw = false means excluded from lottery pools (IsBoss, IsHidden, or IsFaction)
-	noDrawTypes := []BuffType{BuffTypeThorns, BuffTypeDeathMark, BuffTypeFire}
+	noDrawTypes := []BuffType{BuffTypeThorns, BuffTypeDeathMark, BuffTypeFire, BuffTypeDominance, BuffTypeRobLuck, BuffTypeSuppress}
 	for _, bt := range noDrawTypes {
 		if bt.IsDraw() {
 			t.Errorf("BuffType(%s).IsDraw() should be false", bt)
@@ -715,7 +715,7 @@ func TestBossAttackTypeIsValid(t *testing.T) {
 // ========== DrawType Tests ==========
 
 func TestDrawTypeIsValid(t *testing.T) {
-	validTypes := []DrawType{DrawTypeNone, DrawTypeEvent, DrawTypeItem}
+	validTypes := []DrawType{DrawTypeNone, DrawTypeEvent, DrawTypeItem, DrawTypeBuff}
 	for _, dt := range validTypes {
 		if !dt.IsValid() {
 			t.Errorf("DrawType(%s).IsValid() should be true", dt)
@@ -741,6 +741,8 @@ func TestParseDrawType(t *testing.T) {
 		{"Event", DrawTypeEvent},
 		{"item", DrawTypeItem},
 		{"Item", DrawTypeItem},
+		{"buff", DrawTypeBuff},
+		{"Buff", DrawTypeBuff},
 		{"invalid", DrawTypeNone},
 	}
 	for _, tt := range tests {
@@ -1001,10 +1003,10 @@ func TestFactionGetSkillDesc(t *testing.T) {
 		faction  Faction
 		expected string
 	}{
-		{FactionQingLong, "每5回合获得充能，使用后1回合内无视负面地形"},
-		{FactionZhuQue, "每4回合幸运值+1，最高不超过8点"},
-		{FactionBaiHu, "反超其他玩家时随机从该玩家身上偷取一个Buff"},
-		{FactionXuanWu, "每5回合获得充能，可以抵消一次任意恶性事件"},
+		{FactionQingLong, "每2回合获得充能，使用后1回合内增益效果翻倍(威势)"},
+		{FactionZhuQue, "每3回合幸运值+1，最高不超过8点"},
+		{FactionBaiHu, "每2回合获得充能，指定目标玩家，使其增益效果改向自身(劫运)"},
+		{FactionXuanWu, "每2回合获得充能，使用后1回合免疫恶性事件和负面Buff(镇厄)"},
 		{FactionNone, "未知"},
 		{"invalid", "未知"},
 	}
@@ -1032,6 +1034,9 @@ func TestParseBuffType(t *testing.T) {
 		{"rain", BuffTypeRain},
 		{"exorcism", BuffTypeExorcism},
 		{"fire", BuffTypeFire},
+		{"dominance", BuffTypeDominance},
+		{"rob_luck", BuffTypeRobLuck},
+		{"suppress", BuffTypeSuppress},
 		{"invalid", BuffTypeNone},
 		{"", BuffTypeNone},
 	}
