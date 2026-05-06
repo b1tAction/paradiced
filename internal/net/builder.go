@@ -191,6 +191,9 @@ func (b *Builder) BuildAvailableForPlayer(player *core.Player) *pkgnet.Available
 	switch player.Faction {
 	case constants.FactionQingLong, constants.FactionXuanWu:
 		canUseSkill = player.GetChargeCount() >= 1
+	case constants.FactionBaiHu:
+		// BaiHu needs charge AND at least one other alive player as target
+		canUseSkill = player.GetChargeCount() >= 1 && b.hasBaiHuTarget(player)
 	}
 
 	return &pkgnet.Available{
@@ -198,6 +201,20 @@ func (b *Builder) BuildAvailableForPlayer(player *core.Player) *pkgnet.Available
 		CanUseSkill: canUseSkill,
 		DiceType:    b.turnDiceType.String(),
 	}
+}
+
+// hasBaiHuTarget checks if there is at least one other alive non-Boss player available as target.
+func (b *Builder) hasBaiHuTarget(player *core.Player) bool {
+	game := b.hsm.GetGame()
+	if game == nil {
+		return false
+	}
+	for _, p := range game.Players {
+		if p.ID.UUID() != player.ID.UUID() && !p.IsDead && !p.ID.IsBoss() {
+			return true
+		}
+	}
+	return false
 }
 
 // BuildDecision builds decision request from event.Decision.

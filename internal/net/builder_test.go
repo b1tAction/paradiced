@@ -652,7 +652,7 @@ func TestBuildStateSyncFiltersStateEntries(t *testing.T) {
 func TestBuildDefinitionsConfigBuffClassification(t *testing.T) {
 	defs := BuildDefinitionsConfig()
 
-	// Test IsFaction: only Fire (朱雀离火) should be faction
+	// Test IsFaction: Fire, Dominance, RobLuck, Suppress are faction buffs
 	if _, ok := defs.Buffs["fire"]; !ok {
 		t.Fatal("missing fire buff in DefinitionsConfig")
 	}
@@ -661,9 +661,20 @@ func TestBuildDefinitionsConfigBuffClassification(t *testing.T) {
 		t.Error("fire.IsFaction should be true (朱雀 faction passive)")
 	}
 
+	factionBuffs := []string{"dominance", "rob_luck", "suppress"}
+	for _, key := range factionBuffs {
+		if _, ok := defs.Buffs[key]; !ok {
+			t.Fatalf("missing %s buff in DefinitionsConfig", key)
+		}
+		buff := defs.Buffs[key]
+		if !buff.IsFaction {
+			t.Errorf("%s.IsFaction should be true", key)
+		}
+	}
+
 	// Test other buffs are not faction
 	for key, buff := range defs.Buffs {
-		if key == "fire" {
+		if key == "fire" || key == "dominance" || key == "rob_luck" || key == "suppress" {
 			continue
 		}
 		if buff.IsFaction {
@@ -671,8 +682,8 @@ func TestBuildDefinitionsConfigBuffClassification(t *testing.T) {
 		}
 	}
 
-	// Test IsDraw: Boss and Hidden buffs should NOT be drawable
-	nonDrawBuffs := []string{"death_mark", "thorns", "fire"}
+	// Test IsDraw: Boss, Hidden, and Faction buffs should NOT be drawable
+	nonDrawBuffs := []string{"death_mark", "thorns", "fire", "dominance", "rob_luck", "suppress"}
 	for _, key := range nonDrawBuffs {
 		if _, ok := defs.Buffs[key]; !ok {
 			t.Fatalf("missing %s buff in DefinitionsConfig", key)
@@ -811,9 +822,9 @@ func TestBuildDefinitionsConfigCompleteness(t *testing.T) {
 	if len(defs.Events) != 14 {
 		t.Errorf("len(defs.Events) = %d, want 14", len(defs.Events))
 	}
-	// Verify all 11 buffs present
-	if len(defs.Buffs) != 11 {
-		t.Errorf("len(defs.Buffs) = %d, want 11", len(defs.Buffs))
+	// Verify all 14 buffs present (11 original + 3 new faction buffs)
+	if len(defs.Buffs) != 14 {
+		t.Errorf("len(defs.Buffs) = %d, want 14", len(defs.Buffs))
 	}
 	// Verify all 3 items present
 	if len(defs.Items) != 3 {

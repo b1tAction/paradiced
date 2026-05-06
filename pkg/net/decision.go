@@ -54,8 +54,11 @@ type UseItem struct {
 }
 
 // UseSkill represents a faction skill activation request.
-// Empty structure - server checks player's faction and charge status.
-type UseSkill struct{}
+// BaiHu faction requires TargetID to specify the player targeted by 劫运(RobLuck).
+type UseSkill struct {
+	// TargetID is optional target player ID for targeted faction skills (BaiHu 劫运).
+	TargetID string `json:"target_id,omitempty"`
+}
 
 // UserChoice represents a decision choice response.
 type UserChoice struct {
