@@ -56,7 +56,7 @@ func TestEventDefinitionsFields(t *testing.T) {
 		{constants.EventTypeGhostHit, constants.EvaluationMildBad, "GhostHit", "偶遇孤魂野鬼"},
 		{constants.EventTypeDogPoop, constants.EvaluationMildBad, "DogPoop", "踩到了狗屎"},
 		{constants.EventTypeWindGust, constants.EvaluationBad, "WindGust", "一阵风"},
-		{constants.EventTypeSkullGaze, constants.EvaluationBad, "SkullGaze", "注视恶魔的研究"},
+		{constants.EventTypeSkullGaze, constants.EvaluationBad, "SkullGaze", "恶魔之眼"},
 		{constants.EventTypeLostWay, constants.EvaluationMildBad, "LostWay", "迷途"},
 		{constants.EventTypeThunder, constants.EvaluationVeryBad, "Thunder", "雷劫"},
 	}
@@ -580,6 +580,7 @@ func TestGetEventTypesByCategory(t *testing.T) {
 		t.Error("Unknown category should return all events")
 	}
 }
+
 // ========== Edge Case Tests: nil player/context ==========
 
 func TestEventHandlerWithNilContext(t *testing.T) {

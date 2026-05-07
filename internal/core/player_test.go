@@ -425,7 +425,7 @@ func TestTickBuffsMixedEligibility(t *testing.T) {
 	// Mix of eligible and not-eligible buffs: only eligible ones are decremented
 	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
 	existingBuff := NewBuff(constants.BuffTypeCurse, 2)
-	existingBuff.MarkTickEligible() // Already marked eligible
+	existingBuff.MarkTickEligible()                 // Already marked eligible
 	newBuff := NewBuff(constants.BuffTypeDivine, 3) // Not yet eligible
 
 	player.AddBuff(existingBuff)
@@ -957,7 +957,9 @@ func TestPlayerAddBuffDurationExtendPreservesTickEligible(t *testing.T) {
 	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
 
 	buff := NewBuff(constants.BuffTypeDivine, 3)
-	player.AddBuff(buff)
+	if err := player.AddBuff(buff); err != nil {
+		t.Fatalf("AddBuff failed: %v", err)
+	}
 
 	// Simulate TurnUpkeep: mark all buffs tick-eligible
 	player.MarkAllBuffsTickEligible()
@@ -968,7 +970,9 @@ func TestPlayerAddBuffDurationExtendPreservesTickEligible(t *testing.T) {
 
 	// Extend duration mid-turn (simulates drawing the same buff again)
 	extendBuff := NewBuff(constants.BuffTypeDivine, 2)
-	player.AddBuff(extendBuff)
+	if err := player.AddBuff(extendBuff); err != nil {
+		t.Fatalf("AddBuff extend failed: %v", err)
+	}
 
 	// tickEligible should still be true after extension
 	if !player.ActiveBuffs[0].TickEligible() {
@@ -992,7 +996,9 @@ func TestPlayerAddBuffDurationExtendNotEligible(t *testing.T) {
 	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
 
 	buff := NewBuff(constants.BuffTypeCurse, 2)
-	player.AddBuff(buff)
+	if err := player.AddBuff(buff); err != nil {
+		t.Fatalf("AddBuff failed: %v", err)
+	}
 
 	// buff is NOT tickEligible (default for NewBuff)
 	if buff.TickEligible() {
@@ -1001,7 +1007,9 @@ func TestPlayerAddBuffDurationExtendNotEligible(t *testing.T) {
 
 	// Extend duration mid-turn
 	extendBuff := NewBuff(constants.BuffTypeCurse, 2)
-	player.AddBuff(extendBuff)
+	if err := player.AddBuff(extendBuff); err != nil {
+		t.Fatalf("AddBuff extend failed: %v", err)
+	}
 
 	// tickEligible should still be false after extension
 	if player.ActiveBuffs[0].TickEligible() {
