@@ -166,7 +166,7 @@ func TestScenarioFaction_ZhuQue_FireBuffAutoApplied(t *testing.T) {
 	harness := NewGameTestHarness(&HarnessConfig{
 		Seed:        42,
 		PlayerCount: 4,
-		Factions:    []constants.Faction{
+		Factions: []constants.Faction{
 			constants.FactionQingLong,
 			constants.FactionZhuQue,
 			constants.FactionBaiHu,
@@ -254,14 +254,14 @@ func TestScenarioFullRound_4Players_AllFactions(t *testing.T) {
 	harness := NewGameTestHarness(&HarnessConfig{
 		Seed:        42,
 		PlayerCount: 4,
-		Factions:    []constants.Faction{
+		Factions: []constants.Faction{
 			constants.FactionQingLong,
 			constants.FactionZhuQue,
 			constants.FactionBaiHu,
 			constants.FactionXuanWu,
 		},
-		InitialHP:   6,
-		InitialLP:   3,
+		InitialHP: 6,
+		InitialLP: 3,
 	})
 
 	// Verify faction buff initialization
@@ -446,10 +446,10 @@ func TestScenarioCustomConfig(t *testing.T) {
 			10: constants.CellTypeCheckpoint,
 			20: constants.CellTypeFragile,
 		},
-		Factions:    []constants.Faction{constants.FactionBaiHu, constants.FactionXuanWu},
-		InitialHP:   10,
-		MaxHP:       10,
-		InitialLP:   5,
+		Factions:  []constants.Faction{constants.FactionBaiHu, constants.FactionXuanWu},
+		InitialHP: 10,
+		MaxHP:     10,
+		InitialLP: 5,
 	})
 
 	if len(harness.Players) != 2 {
@@ -886,13 +886,13 @@ func TestScenarioDeath_DeathActionLogEntryMetadata(t *testing.T) {
 // death check did not exempt RespawnAction (only RemoveBuffAction was exempted).
 func TestScenarioDeath_RespawnWithDeathMarkPresent(t *testing.T) {
 	harness := NewGameTestHarness(&HarnessConfig{
-		Seed:        42,
-		PlayerCount: 2,
-		Factions:    []constants.Faction{constants.FactionQingLong, constants.FactionZhuQue},
-		InitialHP:   3,
-		MaxHP:       3,
-		InitialLP:   3,
-		MaxLP:       3,
+		Seed:              42,
+		PlayerCount:       2,
+		Factions:          []constants.Faction{constants.FactionQingLong, constants.FactionZhuQue},
+		InitialHP:         3,
+		MaxHP:             3,
+		InitialLP:         3,
+		MaxLP:             3,
 		CellTypeOverrides: map[int]constants.CellType{30: constants.CellTypeCheckpoint},
 	})
 
@@ -1066,7 +1066,7 @@ func TestScenarioStealBuff_BaiHuStealsBuff(t *testing.T) {
 		InitialLP:   3,
 	})
 
-	target := harness.Players[0] // QingLong (victim)
+	target := harness.Players[0]  // QingLong (victim)
 	stealer := harness.Players[1] // BaiHu (stealer)
 
 	actionCtx := newActionContextWithPools(
@@ -1704,7 +1704,9 @@ func TestScenarioBuff_DurationExtension_TickEligiblePreserved(t *testing.T) {
 
 	// Step 1: Add Curse buff with duration 2 (tickEligible=false by default)
 	buff := core.NewBuff(constants.BuffTypeCurse, 2)
-	player.AddBuff(buff)
+	if err := player.AddBuff(buff); err != nil {
+		t.Fatalf("AddBuff failed: %v", err)
+	}
 
 	// Verify initial state
 	if buff.TickEligible() {
@@ -1720,7 +1722,9 @@ func TestScenarioBuff_DurationExtension_TickEligiblePreserved(t *testing.T) {
 
 	// Step 3: Extend duration mid-turn (simulates drawing another Curse buff)
 	extendBuff := core.NewBuff(constants.BuffTypeCurse, 2)
-	player.AddBuff(extendBuff)
+	if err := player.AddBuff(extendBuff); err != nil {
+		t.Fatalf("AddBuff extend failed: %v", err)
+	}
 
 	// Duration should be 2+2=4
 	if player.ActiveBuffs[0].Duration != 4 {
