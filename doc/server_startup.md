@@ -79,7 +79,7 @@ Docker internal network
 - Actions 通过 `git archive` 生成不含 `.git` 的 source archive。
 - Archive 上传到 `/opt/paradiced/incoming/<sha>.tar.gz`。
 - 服务器通过受控 sudo wrapper `/usr/local/sbin/paradiced-deploy-archive` 调用 root-owned 固定部署实现 `/usr/local/lib/paradiced/deploy-archive.sh`，校验 archive 后同步到固定实际目录 `/opt/paradiced/current`。
-- 激活流程固定为 pluginbuilder 构建 `paradiced-server.so` 后执行 `COMPOSE_PROJECT_NAME=paradiced docker compose restart nakama`，不执行 archive 提供的 `Makefile`，也不授予 deploy 用户通用 root shell 或 Docker socket 权限。
+- 激活流程固定为 pluginbuilder 构建 `paradiced-server.so` 后执行 `COMPOSE_PROJECT_NAME=paradiced docker compose up -d --no-deps --force-recreate nakama cron-cleanup`，确保首次迁移也会更新 Docker bind mount 与端口发布；不执行 archive 提供的 `Makefile`，也不授予 deploy 用户通用 root shell 或 Docker socket 权限。
 
 `/opt/paradiced/current` 必须是固定实际目录，不使用 symlink 切换 release，避免 Docker Compose 相对 bind mount 指向旧 release。
 
@@ -145,7 +145,7 @@ make docker-down
 make docker-clean
 ```
 
-`make docker-clean` 会删除数据，生产环境禁止在未确认备份和维护窗口前执行。部署失败时应优先由固定部署实现回滚上一版 source snapshot，再重新执行固定 pluginbuilder / `docker compose restart nakama` 激活流程，不要恢复旧的公网 `7349` / `7351` 暴露。
+`make docker-clean` 会删除数据，生产环境禁止在未确认备份和维护窗口前执行。部署失败时应优先由固定部署实现回滚上一版 source snapshot，再重新执行固定 pluginbuilder / `docker compose up -d --no-deps --force-recreate nakama cron-cleanup` 激活流程，不要恢复旧的公网 `7349` / `7351` 暴露。
 
 ## 相关文档
 
