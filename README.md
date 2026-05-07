@@ -71,7 +71,7 @@ Nakama gRPC `7349` 和 Console `7351` 不发布到宿主机端口。Console 默�
 | HTTP API | `https://bitaction.cn/v2/...` | `127.0.0.1:17350` |
 | WebSocket | `wss://bitaction.cn/ws` | `127.0.0.1:17350` |
 
-生产不公网暴露 `7349`、`7350`、`7351`。后端发布由 GitHub Actions 上传 source archive 到 `/opt/paradiced/incoming/`，服务器通过受控 sudo wrapper `/usr/local/sbin/paradiced-deploy-archive` 调用 root-owned 固定部署实现 `/usr/local/lib/paradiced/deploy-archive.sh`，同步到固定实际目录 `/opt/paradiced/current`，再用固定 pluginbuilder / `docker compose restart nakama` 流程激活。
+生产不公网暴露 `7349`、`7350`、`7351`。后端发布由 GitHub Actions 上传 source archive 到 `/opt/paradiced/incoming/`，服务器通过受控 sudo wrapper `/usr/local/sbin/paradiced-deploy-archive` 调用 root-owned 固定部署实现 `/usr/local/lib/paradiced/deploy-archive.sh`，同步到固定实际目录 `/opt/paradiced/current`，再用固定 pluginbuilder / `docker compose up -d --no-deps --force-recreate nakama cron-cleanup` 流程激活，确保首次迁移也会更新 Docker bind mount 与端口发布。
 
 ## 停止与清理
 

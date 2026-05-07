@@ -313,7 +313,7 @@ run_rebuild() {
 
   (
     cd "${CURRENT_DIR}"
-    COMPOSE_PROJECT_NAME=paradiced docker compose restart nakama
+    COMPOSE_PROJECT_NAME=paradiced docker compose up -d --no-deps --force-recreate nakama cron-cleanup
   )
 }
 
