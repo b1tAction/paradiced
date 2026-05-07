@@ -42,16 +42,12 @@ services:
     volumes:
       - nakama_data:/nakama/data
       - ./modules:/nakama/modules
-      - ./config.yml:/nakama/data/config.yml 
+      - ./config.yml:/nakama/data/config.yml
       - ./logs:/nakama/logs
     expose:
-      - "7349"
       - "7350"
-      - "7351"
     ports:
-      - "7349:7349"   # RPC
-      - "7350:7350"   # HTTP / WebSocket
-      - "7351:7351"   # Nakama Console
+      - "127.0.0.1:17350:7350"   # HTTP / WebSocket via host nginx upstream
     healthcheck:
       test: ["CMD", "/nakama/nakama", "healthcheck"]
       interval: 10s
