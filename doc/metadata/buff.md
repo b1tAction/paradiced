@@ -30,6 +30,7 @@ type Buff struct {
 - `TurnUpkeepState.Enter()` 在回合开始时调用 `player.MarkAllBuffsTickEligible()`，将所有已有buff标记为eligible
 - 回合中途添加的buff（如另一玩家使用道具定向添加）默认 `tickEligible=false`，不会被当回合的TurnEnd扣减，到下一回合的TurnUpkeep才被标记
 - `TickDuration()` 仅在 `tickEligible=true` 时扣减Duration
+- **Duration Extend 时 tickEligible 保持不变**：当 AddBuffAction 检测到玩家已有相同 BuffType 并执行 duration 延长时，不会重置 `tickEligible`。如果 buff 已经在 TurnUpkeep 被标记为 eligible，延长后仍然 eligible，本回合的 TurnEnd 会正常扣减 Duration（原有部分扣减 1，扩展部分不受影响，因为 TickDuration 每次只扣减 1）。
 
 **初始化**：`NewBuff` 和 `NewBuffWithID` 自动初始化 `Metadata: util.NewMetadata()`。
 

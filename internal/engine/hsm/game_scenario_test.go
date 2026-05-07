@@ -1684,6 +1684,89 @@ func TestScenarioBuff_DurationExtension(t *testing.T) {
 	}
 }
 
+// TestScenarioBuff_DurationExtension_TickEligiblePreserved verifies that when a buff's
+// duration is extended (same BuffType already exists), the tickEligible state is preserved.
+// Previously, AddBuff reset tickEligible=false on duration extension, which caused the
+// original duration portion to also get a free turn. This test ensures the fix works:
+// if the buff was already tickEligible=true (marked at TurnUpkeep), it stays true after
+// extension and is properly decremented at TurnEnd.
+func TestScenarioBuff_DurationExtension_TickEligiblePreserved(t *testing.T) {
+	harness := NewGameTestHarness(&HarnessConfig{
+		Seed:        42,
+		PlayerCount: 2,
+		Factions:    []constants.Faction{constants.FactionQingLong, constants.FactionZhuQue},
+		InitialHP:   6,
+		InitialLP:   4,
+		MaxLP:       8,
+	})
+
+	player := harness.Players[0]
+
+	// Step 1: Add Curse buff with duration 2 (tickEligible=false by default)
+	buff := core.NewBuff(constants.BuffTypeCurse, 2)
+	player.AddBuff(buff)
+
+	// Verify initial state
+	if buff.TickEligible() {
+		t.Fatal("new buff should have tickEligible=false by default")
+	}
+
+	// Step 2: Simulate TurnUpkeep — mark all buffs tick-eligible
+	player.MarkAllBuffsTickEligible()
+
+	if !buff.TickEligible() {
+		t.Fatal("buff should be tickEligible=true after MarkAllBuffsTickEligible")
+	}
+
+	// Step 3: Extend duration mid-turn (simulates drawing another Curse buff)
+	extendBuff := core.NewBuff(constants.BuffTypeCurse, 2)
+	player.AddBuff(extendBuff)
+
+	// Duration should be 2+2=4
+	if player.ActiveBuffs[0].Duration != 4 {
+		t.Fatalf("duration should be 4 after extension, got %d", player.ActiveBuffs[0].Duration)
+	}
+
+	// CRITICAL: tickEligible should remain true (preserved, not reset to false)
+	if !player.ActiveBuffs[0].TickEligible() {
+		t.Error("tickEligible should remain true after duration extension — the original buff was already eligible at TurnUpkeep")
+	}
+
+	// Step 4: Simulate TurnEnd — TickBuffs should decrement
+	expired := player.TickBuffs()
+	if len(expired) != 0 {
+		t.Errorf("expected 0 expired buffs (duration 4→3), got %d", len(expired))
+	}
+	if player.ActiveBuffs[0].Duration != 3 {
+		t.Errorf("duration should be 3 after first tick (4-1), got %d — original portion was properly decremented", player.ActiveBuffs[0].Duration)
+	}
+
+	// Step 5: Continue ticking — duration should decrease normally
+	player.MarkAllBuffsTickEligible()
+	expired = player.TickBuffs()
+	if len(expired) != 0 {
+		t.Errorf("expected 0 expired buffs (duration 3→2), got %d", len(expired))
+	}
+	if player.ActiveBuffs[0].Duration != 2 {
+		t.Errorf("duration should be 2 after second tick, got %d", player.ActiveBuffs[0].Duration)
+	}
+
+	player.MarkAllBuffsTickEligible()
+	expired = player.TickBuffs()
+	if len(expired) != 0 {
+		t.Errorf("expected 0 expired buffs (duration 2→1), got %d", len(expired))
+	}
+	if player.ActiveBuffs[0].Duration != 1 {
+		t.Errorf("duration should be 1 after third tick, got %d", player.ActiveBuffs[0].Duration)
+	}
+
+	player.MarkAllBuffsTickEligible()
+	expired = player.TickBuffs()
+	if len(expired) != 1 {
+		t.Errorf("expected 1 expired buff (duration 1→0), got %d", len(expired))
+	}
+}
+
 // ========== Scenario Group M: Poison Bad Event Draw ==========
 
 // TestScenarioBuff_Poison_BadEventDraw verifies that 毒瘴 (Poison) buff

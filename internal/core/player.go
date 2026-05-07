@@ -195,8 +195,10 @@ func (p *Player) AddBuff(buffInstance *Buff) error {
 		if existing.Duration != -1 && buffInstance.Duration != -1 {
 			existing.Duration += buffInstance.Duration
 		}
-		// Reset tickEligible so the extended duration survives the next tick
-		existing.tickEligible = false
+		// Preserve the existing buff's tickEligible state.
+		// If the buff was already marked eligible at TurnUpkeep, it should be
+		// decremented at this turn's TurnEnd. The extended duration portion is
+		// naturally protected because TickDuration decrements by 1, not proportionally.
 		return nil // Don't add new instance, duration was extended
 	}
 

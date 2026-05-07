@@ -943,4 +943,77 @@ func TestPlayerAddBuffDurationExtend(t *testing.T) {
 	if player.ActiveBuffs[0].Duration != 5 {
 		t.Errorf("Extended duration = %d, want 5", player.ActiveBuffs[0].Duration)
 	}
+
+	// tickEligible should NOT be reset on duration extend.
+	// The default NewBuff tickEligible=false should remain false after extend.
+	if player.ActiveBuffs[0].TickEligible() {
+		t.Error("tickEligible should remain false (default NewBuff state) after duration extension")
+	}
+}
+
+func TestPlayerAddBuffDurationExtendPreservesTickEligible(t *testing.T) {
+	// When a buff was already marked tickEligible=true (by MarkAllBuffsTickEligible at TurnUpkeep),
+	// duration extension should preserve that state so the buff is still decremented at TurnEnd.
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
+
+	buff := NewBuff(constants.BuffTypeDivine, 3)
+	player.AddBuff(buff)
+
+	// Simulate TurnUpkeep: mark all buffs tick-eligible
+	player.MarkAllBuffsTickEligible()
+
+	if !buff.TickEligible() {
+		t.Fatal("buff should be tickEligible after MarkAllBuffsTickEligible")
+	}
+
+	// Extend duration mid-turn (simulates drawing the same buff again)
+	extendBuff := NewBuff(constants.BuffTypeDivine, 2)
+	player.AddBuff(extendBuff)
+
+	// tickEligible should still be true after extension
+	if !player.ActiveBuffs[0].TickEligible() {
+		t.Error("tickEligible should remain true after duration extension, not reset to false")
+	}
+
+	// Verify: TickBuffs should decrement the extended buff
+	expired := player.TickBuffs()
+	if len(expired) != 0 {
+		t.Errorf("expected 0 expired buffs (duration 5→4), got %d", len(expired))
+	}
+	if player.ActiveBuffs[0].Duration != 4 {
+		t.Errorf("duration should be 4 (5-1), got %d", player.ActiveBuffs[0].Duration)
+	}
+}
+
+func TestPlayerAddBuffDurationExtendNotEligible(t *testing.T) {
+	// When a buff is newly created mid-turn (tickEligible=false by default),
+	// duration extension should preserve tickEligible=false so it won't be
+	// decremented at this turn's TurnEnd.
+	player := NewPlayer(PlayerConfig{ID: id.NewPlayerID()})
+
+	buff := NewBuff(constants.BuffTypeCurse, 2)
+	player.AddBuff(buff)
+
+	// buff is NOT tickEligible (default for NewBuff)
+	if buff.TickEligible() {
+		t.Fatal("new buff should have tickEligible=false by default")
+	}
+
+	// Extend duration mid-turn
+	extendBuff := NewBuff(constants.BuffTypeCurse, 2)
+	player.AddBuff(extendBuff)
+
+	// tickEligible should still be false after extension
+	if player.ActiveBuffs[0].TickEligible() {
+		t.Error("tickEligible should remain false after duration extension of a non-eligible buff")
+	}
+
+	// Verify: TickBuffs should NOT decrement (not eligible)
+	expired := player.TickBuffs()
+	if len(expired) != 0 {
+		t.Errorf("expected 0 expired buffs (not eligible), got %d", len(expired))
+	}
+	if player.ActiveBuffs[0].Duration != 4 {
+		t.Errorf("duration should remain 4 (not decremented), got %d", player.ActiveBuffs[0].Duration)
+	}
 }
