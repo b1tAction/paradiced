@@ -1,0 +1,128 @@
+name: Deploy Production
+
+on:
+  pull_request:
+    branches:
+      - master
+    types:
+      - closed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paradiced-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy production
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'master')
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+
+      - name: Resolve deployment commit
+        id: deploy
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            deploy_sha="${{ github.event.pull_request.merge_commit_sha }}"
+          else
+            deploy_sha="${{ github.sha }}"
+          fi
+
+          if [[ -z "${deploy_sha}" || "${deploy_sha}" == "null" ]]; then
+            echo "Unable to resolve deployment SHA" >&2
+            exit 1
+          fi
+
+          checked_out_sha="$(git rev-parse HEAD)"
+          if [[ "${checked_out_sha}" != "${deploy_sha}" ]]; then
+            echo "Checked-out SHA ${checked_out_sha} does not match deployment SHA ${deploy_sha}" >&2
+            exit 1
+          fi
+
+          echo "deploy_sha=${deploy_sha}" >> "${GITHUB_OUTPUT}"
+          echo "archive_path=${RUNNER_TEMP}/paradiced-${deploy_sha}.tar.gz" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify module files
+        run: go mod verify
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build packages
+        shell: bash
+        run: |
+          go build $(go list ./... | grep -v '/cmd/paradiced-server')
+          go build -o ./build/pdcli ./cmd/pdcli
+
+      - name: Create source archive
+        shell: bash
+        run: git archive --format=tar.gz --output "${{ steps.deploy.outputs.archive_path }}" "${{ steps.deploy.outputs.deploy_sha }}"
+
+      - name: Configure SSH
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          if [[ -z "${DEPLOY_HOST}" || -z "${DEPLOY_PORT}" || -z "${DEPLOY_USER}" || -z "${DEPLOY_SSH_KEY}" || -z "${DEPLOY_KNOWN_HOSTS}" ]]; then
+            echo "Missing deployment SSH configuration" >&2
+            exit 1
+          fi
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${DEPLOY_SSH_KEY}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "${DEPLOY_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload archive
+        id: upload
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SHA: ${{ steps.deploy.outputs.deploy_sha }}
+          ARCHIVE_PATH: ${{ steps.deploy.outputs.archive_path }}
+        run: |
+          remote_archive="/opt/paradiced/incoming/${DEPLOY_SHA}.tar.gz"
+
+          ssh -i ~/.ssh/deploy_key -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "mkdir -p /opt/paradiced/incoming"
+          scp -i ~/.ssh/deploy_key -P "${DEPLOY_PORT}" "${ARCHIVE_PATH}" \
+            "${DEPLOY_USER}@${DEPLOY_HOST}:${remote_archive}"
+
+          echo "remote_archive=${remote_archive}" >> "${GITHUB_OUTPUT}"
+
+      - name: Activate deployment
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SHA: ${{ steps.deploy.outputs.deploy_sha }}
+          REMOTE_ARCHIVE: ${{ steps.upload.outputs.remote_archive }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "${DEPLOY_PORT}" \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "sudo -n /usr/local/sbin/paradiced-deploy-archive '${REMOTE_ARCHIVE}' '${DEPLOY_SHA}'"
