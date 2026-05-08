@@ -15,41 +15,41 @@ events:
     english_name: LuckyBubble
     name: 吹出幸运泡泡
     desc: 梦幻泡泡飘到你面前，藏着好运
-  relic:
+  relic: # bingo
     evaluation: very_good
     english_name: Relic
     name: 捡到勇士的圣遗物
     desc: 发现了古老圣遗物，获得一次道具抽奖机会
-  divine_bless:
+  divine_bless: # bingo
     evaluation: excellent
     english_name: DivineBless
     name: 受到天使眷顾
     desc: 天使的祝福降临，获得神眷Buff
-  exchange:
+  exchange: # noneed
     evaluation: neutral
     english_name: Exchange
     name: 交换
     desc: 命运之手将你与另一位玩家交换位置
-  hidden_buff:
+  hidden_buff: # bingo
     evaluation: good
     english_name: HiddenBuff
-    name: 麻了
-    desc: 身体麻木，获得隐匿Buff
+    name: 隐匿
+    desc: 遁入异次元空间，获得隐匿Buff
   taste_test:
     evaluation: mixed
     english_name: TasteTest
     name: 这是什么？尝一口
     desc: 发现神秘物质，尝试后获得随机效果
-  mosquito:
+  mosquito: # bingo
     evaluation: mild_bad
     english_name: Mosquito
     name: 被蚊虫叮咬
-    desc: 丛林中的蚊虫叮咬了你
-  ghost_hit:
+    desc: 丛林中的“蚊虫”叮咬了你
+  ghost_hit: # bingo
     evaluation: mild_bad
     english_name: GhostHit
     name: 偶遇孤魂野鬼
-    desc: 被野鬼打了一闷棍
+    desc: 你被野鬼打了一闷棍
   dog_poop:
     evaluation: mild_bad
     english_name: DogPoop
@@ -65,7 +65,7 @@ events:
     english_name: SkullGaze
     name: 恶魔之眼
     desc: 你注视了恶魔的眼睛，获得诅咒Buff
-  lost_way:
+  lost_way: # bingo
     evaluation: mild_bad
     english_name: LostWay
     name: 迷途
