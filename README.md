@@ -1,69 +1,82 @@
 # ParaDiced 游戏后端
 
 本项目后端由以下组件组成：
+
 - CockroachDB（游戏数据存储）
-- Nakama（网关与实时服务）
-- Paradiced Go 插件（权威 Match 逻辑，Match 名称：paradiced_match）
+- Nakama（HTTP API / WebSocket 网关）
+- Paradiced Go 插件（权威 Match 逻辑，Match 名称：`paradiced_match`）
 
 ## 前置要求
 
-- Linux / macOS
+- Linux / macOS，或 Windows 上的 Git Bash / WSL 风格 shell
 - Docker（建议 24+）
-- Docker Compose V2（命令是 docker compose）
+- Docker Compose V2（命令是 `docker compose`）
 
 说明：
 
-- 不需要本机安装特定 Go 版本来构建插件。
-- 插件构建已通过 Makefile 固定使用 heroiclabs/nakama-pluginbuilder:3.22.0。
+- 不需要本机安装特定 Go 版本来构建 Nakama 插件。
+- 插件构建已通过 `Makefile` 固定使用 `heroiclabs/nakama-pluginbuilder:3.22.0`。
 
-## 启动流程
+## 本地启动流程
 
-1) 构建 Paradiced 插件
+1. 构建 Paradiced 插件。
+
    ```shell
-    make build-plugin
+   make build-plugin
    ```
 
-2) 启动数据库和 Nakama
-    ```shell
-    docker compose up --build -d
-    ```
+2. 启动数据库和 Nakama。
 
-3) 查看服务状态
-    ```shell
-    docker compose ps
-    ```
+   ```shell
+   docker compose up --build -d
+   ```
 
-4) 查看 Nakama 实时日志
-    ```shell
-    docker compose logs -f nakama
-    ```
+3. 查看服务状态。
 
-5) 查看自动落盘日志文件（宿主机）
-    ```shell
-    tail -f ./logs/nakama.log
-    ```
+   ```shell
+   docker compose ps
+   ```
 
-说明：
+4. 查看 Nakama 实时日志。
 
-- `docker-compose.yml` 已挂载 `./logs:/nakama/logs`。
-- Nakama 启动时会自动将运行日志追加写入 `./logs/nakama.log`。
-- 同时仍可使用 `docker compose logs` 进行查看。
+   ```shell
+   docker compose logs -f nakama
+   ```
 
-## 连接
+5. 查看自动落盘日志文件（宿主机）。
 
-- HTTP / WebSocket: http://localhost:7350
-- gRPC: localhost:7349
-- Nakama Console: http://localhost:7351
-- CockroachDB SQL: localhost:26257
-- CockroachDB Admin UI: http://localhost:8080
+   ```shell
+   tail -f ./logs/nakama.log
+   ```
 
-Nakama Console 默认账号（开发环境）：
+## 本地连接
 
-- 用户名：admin
-- 密码：password123
+`docker-compose.yml` 只把 Nakama HTTP / WebSocket 绑定到宿主机 loopback，供本机客户端或宿主机 nginx 访问：
+
+| 入口 | 地址 | 说明 |
+|---|---|---|
+| Nakama HTTP API | `http://127.0.0.1:17350/v2/...` | 本机开发 / nginx upstream |
+| Nakama WebSocket | `ws://127.0.0.1:17350/ws` | 本机开发 / nginx upstream |
+| CockroachDB SQL | `localhost:26257` | 本地数据库调试 |
+| CockroachDB Admin UI | `http://localhost:8080` | 本地数据库调试 |
+
+Nakama gRPC `7349` 和 Console `7351` 不发布到宿主机端口。Console 默认账号 `admin` / `password123` 只适用于开发环境，不应作为生产公网入口。
+
+## 生产入口
+
+生产环境由宿主机 nginx 统一终止 HTTPS，并反代到本机 upstream：
+
+| 用途 | 生产地址 | upstream |
+|---|---|---|
+| HTTP API | `https://bitaction.cn/v2/...` | `127.0.0.1:17350` |
+| WebSocket | `wss://bitaction.cn/ws` | `127.0.0.1:17350` |
+
+生产不公网暴露 `7349`、`7350`、`7351`。后端发布由 GitHub Actions 上传 source archive 到 `/opt/paradiced/incoming/`，服务器通过受控 sudo wrapper `/usr/local/sbin/paradiced-deploy-archive` 调用 root-owned 固定部署实现 `/usr/local/lib/paradiced/deploy-archive.sh`，同步到固定实际目录 `/opt/paradiced/current`，再用固定 pluginbuilder / `docker compose up -d --no-deps --force-recreate nakama cron-cleanup` 流程激活，确保首次迁移也会更新 Docker bind mount 与端口发布。
 
 ## 停止与清理
 
 ```shell
 docker compose down
 ```
+
+不要在生产环境执行会删除数据卷的清理命令，除非已经完成备份并得到明确批准。
