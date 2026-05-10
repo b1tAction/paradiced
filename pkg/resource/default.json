@@ -38,7 +38,7 @@
     },
     {
       "index": 3,
-      "cell_type": "fragile",
+      "cell_type": "normal",
       "is_broken": false,
       "event_id": "",
       "fog_active": false,
@@ -104,7 +104,7 @@
     },
     {
       "index": 9,
-      "cell_type": "fragile",
+      "cell_type": "normal",
       "is_broken": false,
       "event_id": "",
       "fog_active": false,
@@ -170,7 +170,7 @@
     },
     {
       "index": 15,
-      "cell_type": "fragile",
+      "cell_type": "normal",
       "is_broken": false,
       "event_id": "",
       "fog_active": false,
