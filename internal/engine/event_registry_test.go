@@ -49,7 +49,7 @@ func TestEventDefinitionsFields(t *testing.T) {
 		{constants.EventTypeDivineBless, constants.EvaluationExcellent, "DivineBless", "受到天使眷顾"},
 		// Neutral Events
 		{constants.EventTypeExchange, constants.EvaluationNeutral, "Exchange", "交换"},
-		{constants.EventTypeHiddenBuff, constants.EvaluationGood, "HiddenBuff", "麻了"},
+		{constants.EventTypeHiddenBuff, constants.EvaluationGood, "HiddenBuff", "隐匿"},
 		{constants.EventTypeTasteTest, constants.EvaluationMixed, "TasteTest", "这是什么？尝一口"},
 		// Bad Events
 		{constants.EventTypeMosquito, constants.EvaluationMildBad, "Mosquito", "被蚊虫叮咬"},
