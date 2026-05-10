@@ -41,14 +41,15 @@ Nakama gRPC `7349` 和 Console `7351` 只在容器内部暴露，不发布为宿
 
 ### 生产环境
 
-生产环境的公网入口只经过宿主机 nginx：
+生产环境的公网入口只经过宿主机 nginx，并统一放在 Paradice 游戏命名空间下：
 
 | 用途 | 公网地址 | nginx upstream |
 |---|---|---|
-| HTTP API | `https://bitaction.cn/v2/...` | `127.0.0.1:17350` |
-| WebSocket | `wss://bitaction.cn/ws` | `127.0.0.1:17350` |
+| 游戏前端 | `https://bitaction.cn/game/paradice/` | `/var/www/paraweb/current` |
+| HTTP API | `https://bitaction.cn/game/paradice/api/v2/...` | `127.0.0.1:17350`，转发为 Nakama 原生 `/v2/...` |
+| WebSocket | `wss://bitaction.cn/game/paradice/api/ws` | `127.0.0.1:17350`，转发为 Nakama 原生 `/ws` |
 
-生产不公网暴露 `7349`、`7350`、`7351`。如果需要排查 Nakama upstream，应在服务器本机访问 `127.0.0.1:17350`，不要临时开放公网业务端口作为常规排障方式。
+`https://bitaction.cn/game/` 直接 `308` 到 `https://bitaction.cn/game/paradice/`。旧 `/v2/...` 与 `/ws` 不保留生产兼容 proxy；切换后不再作为 Paradice 入口。生产不公网暴露 `7349`、`7350`、`7351`。如果需要排查 Nakama upstream，应在服务器本机访问 `127.0.0.1:17350`，不要临时开放公网业务端口作为常规排障方式。
 
 ## Web 控制台
 
@@ -60,8 +61,10 @@ CockroachDB Admin UI 可在本地通过 `http://localhost:8080` 查看数据库�
 
 ```text
 Internet
-  -> https://bitaction.cn/v2/... -> host nginx -> 127.0.0.1:17350 -> Nakama :7350
-  -> wss://bitaction.cn/ws       -> host nginx -> 127.0.0.1:17350 -> Nakama :7350
+  -> https://bitaction.cn/game/                      -> host nginx -> 308 /game/paradice/
+  -> https://bitaction.cn/game/paradice/             -> host nginx -> /var/www/paraweb/current
+  -> https://bitaction.cn/game/paradice/api/v2/...   -> host nginx -> 127.0.0.1:17350 -> Nakama /v2/... on :7350
+  -> wss://bitaction.cn/game/paradice/api/ws         -> host nginx -> 127.0.0.1:17350 -> Nakama /ws on :7350
 
 Docker internal network
   cron-cleanup -> nakama:7350
@@ -100,11 +103,17 @@ Docker internal network
 
 ## 客户端连接
 
-生产客户端应使用：
+生产客户端应使用单地址 endpoint：
 
 ```text
-HTTP API: https://bitaction.cn/v2/...
-WebSocket: wss://bitaction.cn/ws
+https://bitaction.cn/game/paradice/api
+```
+
+解析后对应：
+
+```text
+HTTP API: https://bitaction.cn/game/paradice/api/v2/...
+WebSocket: wss://bitaction.cn/game/paradice/api/ws
 ```
 
 本地客户端可使用单地址输入 `127.0.0.1:17350`，解析后对应：
