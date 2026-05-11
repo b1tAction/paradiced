@@ -47,7 +47,7 @@ services:
     expose:
       - "7350"
     ports:
-      - "127.0.0.1:17350:7350"   # HTTP / WebSocket via host nginx upstream
+      - "0.0.0.0:17350:7350"   # HTTP / WebSocket via host nginx upstream
     healthcheck:
       test: ["CMD", "/nakama/nakama", "healthcheck"]
       interval: 10s
