@@ -218,6 +218,11 @@ func TestScenarioFaction_QingLong_ChargeOnTurnEnd(t *testing.T) {
 // with 2 players completes successfully, with correct turn order
 // and basic state transitions.
 func TestScenarioFullRound_2Players(t *testing.T) {
+	// Setup: temporarily add a frontend type to the pool so mini-game phase works without provider
+	origPool := constants.AllMiniGameTypes
+	constants.AllMiniGameTypes = []constants.MiniGameType{constants.MiniGameTypeDiceRace}
+	defer func() { constants.AllMiniGameTypes = origPool }()
+
 	harness := NewGameTestHarness(&HarnessConfig{
 		Seed:        42,
 		PlayerCount: 2,
@@ -251,6 +256,11 @@ func TestScenarioFullRound_2Players(t *testing.T) {
 // TestScenarioFullRound_4Players_AllFactions verifies a full round
 // with all 4 factions to ensure each faction's passive works.
 func TestScenarioFullRound_4Players_AllFactions(t *testing.T) {
+	// Setup: temporarily add a frontend type to the pool so mini-game phase works without provider
+	origPool := constants.AllMiniGameTypes
+	constants.AllMiniGameTypes = []constants.MiniGameType{constants.MiniGameTypeDiceRace}
+	defer func() { constants.AllMiniGameTypes = origPool }()
+
 	harness := NewGameTestHarness(&HarnessConfig{
 		Seed:        42,
 		PlayerCount: 4,
