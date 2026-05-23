@@ -165,6 +165,74 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 		}
 	}
 
+	// Handle online mini-game results received via MatchSignal (from Colyseus RPC callback).
+	// Rankings are stored in handler.pendingMiniGameResults by MatchSignal handler.
+	if globalStateID == hsm.StateRoundMiniGame && len(h.pendingMiniGameResults) > 0 {
+		globalState := h.hsm.GetGlobalState()
+		miniGameState, ok := globalState.(*hsm.RoundMiniGameState)
+		if ok && miniGameState.GetMode() == constants.MiniGameModeRPC {
+			if h.logger != nil {
+				h.logger.Info("MatchLoop: applying pending mini-game results",
+					"results_count", len(h.pendingMiniGameResults),
+					"game_type", miniGameState.GetGameType())
+			}
+			for playerID, rank := range h.pendingMiniGameResults {
+				miniGameState.OnMiniGameResult(ctx, playerID, rank)
+			}
+			h.pendingMiniGameResults = nil // Clear after applying
+
+			// If all results received, destroy Colyseus room
+			if miniGameState.GetResultsReceived() >= miniGameState.GetTotalPlayers() {
+				conn := miniGameState.GetConnection()
+				prov := miniGameState.GetProvider()
+				if conn != nil && prov != nil {
+					if err := prov.DestroyRoom(conn.RoomID); err != nil {
+						if h.logger != nil {
+							h.logger.Warn("MatchLoop: failed to destroy Colyseus room",
+								"room_id", conn.RoomID, "error", err)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Check timeout for online mini-game (RPC mode)
+	if globalStateID == hsm.StateRoundMiniGame && h.provider != nil {
+		globalState := h.hsm.GetGlobalState()
+		miniGameState, ok := globalState.(*hsm.RoundMiniGameState)
+		if ok && miniGameState.GetMode() == constants.MiniGameModeRPC && !miniGameState.GetRoomCreatedAt().IsZero() {
+			timeout := miniGameState.GetProvider().GetTimeout(miniGameState.GetGameType())
+			if time.Since(miniGameState.GetRoomCreatedAt()) > timeout && miniGameState.GetResultsReceived() < miniGameState.GetTotalPlayers() {
+				if h.logger != nil {
+					h.logger.Warn("MatchLoop: online mini-game timeout, assigning default rankings",
+						"game_type", miniGameState.GetGameType(),
+						"results_received", miniGameState.GetResultsReceived(),
+						"total_players", miniGameState.GetTotalPlayers())
+				}
+				// Assign default rankings for missing players (lowest rank)
+				game := h.hsm.GetGame()
+				if game != nil {
+					for _, p := range game.Players {
+						if p.ID.IsBoss() {
+							continue
+						}
+						rank := ctx.GetMiniGameRank(p.ID.UUID())
+						if rank <= 0 {
+							// Assign worst rank to players without results
+							miniGameState.OnMiniGameResult(ctx, p.ID.UUID(), miniGameState.GetTotalPlayers())
+						}
+					}
+				}
+				// Destroy room on timeout
+				conn := miniGameState.GetConnection()
+				if conn != nil {
+					miniGameState.GetProvider().DestroyRoom(conn.RoomID)
+				}
+			}
+		}
+	}
+
 	// Update HSM
 	if h.logger != nil {
 		h.logger.Debug("MatchLoop: updating HSM")

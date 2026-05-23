@@ -39,6 +39,10 @@ services:
     depends_on:
       cockroachdb:
         condition: service_healthy
+    environment:
+      - COLYSEUS_SECRET=${COLYSEUS_SECRET:-change_me_in_production}
+      - COLYSEUS_PUBLIC_WS_URL=${COLYSEUS_PUBLIC_WS_URL:-ws://127.0.0.1:2567}
+      - NAKAMA_RPC_URL=http://nakama:7350/v2/rpc/minigame_result_callback
     volumes:
       - nakama_data:/nakama/data
       - ./modules:/nakama/modules
@@ -79,6 +83,33 @@ services:
           sleep 86400;
         done
 
+  # Colyseus mini-game server for online mini-games (e.g. dilemma_race).
+  # Communicates with Nakama via:
+  # - WebSocket/matchmaker: Players joinOrCreate rooms with HMAC auth tokens
+  # - RPC callback: Colyseus sends rankings to Nakama after game ends
+  colyseus:
+    build:
+      context: ./minigame-server
+      target: dev
+    restart: unless-stopped
+    depends_on:
+      nakama:
+        condition: service_healthy
+    environment:
+      - NAKAMA_RPC_URL=http://nakama:7350/v2/rpc/minigame_result_callback
+      - NAKAMA_HTTP_KEY=defaultkey
+      - COLYSEUS_SECRET=${COLYSEUS_SECRET:-change_me_in_production}
+      - PORT=2567
+    volumes:
+      - ./minigame-server/src:/app/src
+      - ./minigame-server/tsconfig.json:/app/tsconfig.json
+      - colyseus_node_modules:/app/node_modules
+    expose:
+      - "2567"
+    ports:
+      - "2567:2567"
+
 volumes:
   cockroach_data:
   nakama_data:
+  colyseus_node_modules:

@@ -13,6 +13,7 @@ import (
 	pkgerrors "github.com/b1tAction/paradiced/pkg/errors"
 	"github.com/b1tAction/paradiced/pkg/id"
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
+	"github.com/b1tAction/paradiced/pkg/protocol"
 	"github.com/b1tAction/paradiced/pkg/resource"
 	"github.com/b1tAction/paradiced/pkg/rng"
 	"github.com/heroiclabs/nakama-common/runtime"
@@ -49,6 +50,10 @@ type NakamaMatchHandler struct {
 
 	// Map configuration (stored for StartGameAck broadcast)
 	mapConfig *pkgnet.MapConfig
+
+	// Online mini-game integration
+	provider               protocol.OnlineMiniGameProvider // Colyseus provider for online mini-games (nil for frontend-only)
+	pendingMiniGameResults map[string]int                 // playerID -> rank, populated by MatchSignal, consumed by MatchLoop
 
 	// Configuration
 	maxPlayers int    // Maximum players (default: 4)
@@ -107,6 +112,12 @@ func (h *NakamaMatchHandler) WithLogger(logger runtime.Logger) *NakamaMatchHandl
 	return h
 }
 
+// WithProvider sets the online mini-game provider for RPC mode mini-games.
+func (h *NakamaMatchHandler) WithProvider(provider protocol.OnlineMiniGameProvider) *NakamaMatchHandler {
+	h.provider = provider
+	return h
+}
+
 // logDebug logs a debug message if logger is available.
 func (h *NakamaMatchHandler) logDebug(msg string, keysAndValues ...interface{}) {
 	if h.logger != nil {
@@ -162,9 +173,15 @@ func (h *NakamaMatchHandler) initializeGame() error {
 	// Build MapEngine from loaded configuration
 	h.mapEngine = resource.BuildMapEngineFromConfig(mapConfig)
 
-	// Register all states
-	if err := hsm.RegisterGlobalStates(h.hsm); err != nil {
-		return pkgerrors.Wrap(err, "NakamaHandler", "initializeGame.RegisterGlobalStates")
+	// Register all states (inject online mini-game provider if configured)
+	if h.provider != nil {
+		if err := hsm.RegisterGlobalStatesWithProvider(h.hsm, h.provider); err != nil {
+			return pkgerrors.Wrap(err, "NakamaHandler", "initializeGame.RegisterGlobalStatesWithProvider")
+		}
+	} else {
+		if err := hsm.RegisterGlobalStates(h.hsm); err != nil {
+			return pkgerrors.Wrap(err, "NakamaHandler", "initializeGame.RegisterGlobalStates")
+		}
 	}
 	if err := hsm.RegisterTurnStates(h.hsm); err != nil {
 		return pkgerrors.Wrap(err, "NakamaHandler", "initializeGame.RegisterTurnStates")

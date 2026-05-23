@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
+	"github.com/b1tAction/paradiced/internal/engine/minigame"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
+	"github.com/b1tAction/paradiced/pkg/protocol"
 	"github.com/b1tAction/paradiced/pkg/util"
 	"github.com/heroiclabs/nakama-common/runtime"
 )
@@ -30,6 +32,8 @@ type NakamaMatchHandlerAdapter struct {
 	db           *sql.DB
 	nk           runtime.NakamaModule
 	joinMetadata map[string]*util.Metadata
+	provider     protocol.OnlineMiniGameProvider // Stored for injection into handler during MatchInit
+	colyseusConfig *minigame.ColyseusProviderConfig // Stored for provider creation in MatchInit with real match ID
 }
 
 // NewNakamaMatchHandlerAdapter creates a new adapter with optional config.
@@ -37,6 +41,22 @@ func NewNakamaMatchHandlerAdapter() *NakamaMatchHandlerAdapter {
 	return &NakamaMatchHandlerAdapter{
 		joinMetadata: make(map[string]*util.Metadata),
 	}
+}
+
+// WithProvider sets the online mini-game provider to be injected into the handler
+// during MatchInit. Must be called before MatchInit.
+func (a *NakamaMatchHandlerAdapter) WithProvider(provider protocol.OnlineMiniGameProvider) *NakamaMatchHandlerAdapter {
+	a.provider = provider
+	return a
+}
+
+// WithColyseusConfig sets the Colyseus provider configuration for deferred provider
+// creation during MatchInit. The real Nakama runtime match ID is extracted from
+// the MatchInit context and used to create a per-match ColyseusProvider.
+// This approach ensures the result callback (nk.MatchSignal) uses the correct match ID.
+func (a *NakamaMatchHandlerAdapter) WithColyseusConfig(cfg *minigame.ColyseusProviderConfig) *NakamaMatchHandlerAdapter {
+	a.colyseusConfig = cfg
+	return a
 }
 
 // MatchInit implements runtime.Match.MatchInit.
@@ -86,6 +106,27 @@ func (a *NakamaMatchHandlerAdapter) MatchInit(ctx context.Context, logger runtim
 	a.handler = NewNakamaMatchHandler(matchID, seed, maxPlayers, mapLength)
 	a.handler.WithLogger(logger)
 	a.handler.lobbyName = lobbyName
+
+	// Inject online mini-game provider if configured
+	// If a pre-created provider exists (legacy), inject it directly.
+	// If colyseusConfig is set, create a per-match provider using the real Nakama
+	// runtime match ID from the context. This fixes the empty match ID bug where
+	// Colyseus result callbacks couldn't reach the correct match via MatchSignal.
+	if a.provider != nil {
+		a.handler.WithProvider(a.provider)
+	} else if a.colyseusConfig != nil {
+		// Extract real Nakama runtime match ID from context
+		nakamaRuntimeMatchID := ""
+		if mid, ok := ctx.Value(runtime.RUNTIME_CTX_MATCH_ID).(string); ok && mid != "" {
+			nakamaRuntimeMatchID = mid
+		}
+		// Create per-match provider with real match ID
+		cfg := *a.colyseusConfig // Copy config to avoid mutating shared state
+		cfg.NakamaMatchID = nakamaRuntimeMatchID
+		provider := minigame.NewColyseusProvider(cfg)
+		a.handler.WithProvider(provider)
+		logger.Info("Colyseus provider created with real match ID: nakama_runtime_match_id=%s", nakamaRuntimeMatchID)
+	}
 
 	// Build match label (JSON format for match queries)
 	label := matchLabel{
@@ -359,14 +400,34 @@ func cleanupPlayerStorage(ctx context.Context, deleter storageDeleter, handler *
 }
 
 // MatchSignal implements runtime.Match.MatchSignal.
-// Called when a signal is received (e.g., from server admin).
+// Called when a signal is received (e.g., from server admin or mini-game RPC callback).
+// Signal types:
+// - "minigame_result": Online mini-game rankings received from Colyseus RPC callback.
+//   Stores rankings in handler.pendingMiniGameResults for MatchLoop to consume.
 func (a *NakamaMatchHandlerAdapter) MatchSignal(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, data string) (interface{}, string) {
-	// Handle signal data
 	var signal struct {
-		Type string `json:"type"`
+		Type     string `json:"type"`
+		MatchID  string `json:"match_id"`
+		RoomID   string `json:"room_id"`
+		GameType string `json:"game_type"`
+		Rankings []struct {
+			PlayerID string `json:"player_id"`
+			Rank     int    `json:"rank"`
+		} `json:"rankings"`
 	}
 	if err := json.Unmarshal([]byte(data), &signal); err == nil {
 		switch signal.Type {
+		case "minigame_result":
+			// Store rankings in handler for next MatchLoop tick to consume
+			if a.handler.pendingMiniGameResults == nil {
+				a.handler.pendingMiniGameResults = make(map[string]int)
+			}
+			for _, r := range signal.Rankings {
+				a.handler.pendingMiniGameResults[r.PlayerID] = r.Rank
+			}
+			a.logger.Info("MiniGame result signal received: match_id=%s, room_id=%s, game_type=%s, rankings_count=%d",
+				signal.MatchID, signal.RoomID, signal.GameType, len(signal.Rankings))
+			return state, ""
 		case "pause":
 			// Pause match logic if needed
 			a.logger.Debug("Received pause signal")
