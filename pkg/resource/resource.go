@@ -64,11 +64,12 @@ func BuildMapEngineFromConfig(m *pkgnet.MapConfig) *gamemap.MapEngine {
 
 // ========== Definition Loading ==========
 
-// DefinitionSet holds all parsed event/buff/item definitions from YAML.
+// DefinitionSet holds all parsed event/buff/item/mini_game definitions from YAML.
 type DefinitionSet struct {
-	Events map[constants.EventType]*constants.EventDefinition
-	Buffs  map[constants.BuffType]*constants.BuffDefinition
-	Items  map[constants.ItemType]*constants.ItemDefinition
+	Events    map[constants.EventType]*constants.EventDefinition
+	Buffs     map[constants.BuffType]*constants.BuffDefinition
+	Items     map[constants.ItemType]*constants.ItemDefinition
+	MiniGames map[constants.MiniGameType]*constants.MiniGameDefinition
 }
 
 // GlobalDefinitionSet is the globally loaded definition set, populated at init time.
@@ -80,6 +81,7 @@ func init() {
 		panic(fmt.Sprintf("failed to load definitions: %v", err))
 	}
 	GlobalDefinitionSet = set
+	initMiniGamePools()
 }
 
 // LoadDefinitions parses paradiced.yml and returns a DefinitionSet.
@@ -152,10 +154,35 @@ func LoadDefinitionsFromYAML(data []byte) (*DefinitionSet, error) {
 		}
 	}
 
+	miniGames := make(map[constants.MiniGameType]*constants.MiniGameDefinition, len(raw.MiniGames))
+	for key, def := range raw.MiniGames {
+		mt := constants.ParseMiniGameType(key)
+		if mt == constants.MiniGameTypeNone {
+			return nil, fmt.Errorf("mini_game %s: unknown mini-game type", key)
+		}
+		parsedMode := constants.ParseMiniGameMode(def.Mode)
+		// Validate: YAML mode must match Go IsOnline() behavioral check
+		if parsedMode == constants.MiniGameModeRPC && !mt.IsOnline() {
+			return nil, fmt.Errorf("mini_game %s: YAML mode=online but Go IsOnline()=false (inconsistent)", key)
+		}
+		if parsedMode == constants.MiniGameModeFrontend && mt.IsOnline() {
+			return nil, fmt.Errorf("mini_game %s: YAML mode=frontend but Go IsOnline()=true (inconsistent)", key)
+		}
+		miniGames[mt] = &constants.MiniGameDefinition{
+			Type:        mt,
+			Mode:        parsedMode,
+			Available:   def.Available,
+			EnglishName: def.EnglishName,
+			Name:        def.Name,
+			Desc:        def.Desc,
+		}
+	}
+
 	return &DefinitionSet{
-		Events: events,
-		Buffs:  buffs,
-		Items:  items,
+		Events:    events,
+		Buffs:     buffs,
+		Items:     items,
+		MiniGames: miniGames,
 	}, nil
 }
 
@@ -199,9 +226,10 @@ func parseEvaluation(s string) (constants.Evaluation, error) {
 // ========== YAML Intermediate Structs ==========
 
 type yamlDefinitions struct {
-	Events map[string]yamlEventDef `yaml:"events"`
-	Buffs  map[string]yamlBuffDef  `yaml:"buffs"`
-	Items  map[string]yamlItemDef  `yaml:"items"`
+	Events    map[string]yamlEventDef    `yaml:"events"`
+	Buffs     map[string]yamlBuffDef     `yaml:"buffs"`
+	Items     map[string]yamlItemDef     `yaml:"items"`
+	MiniGames map[string]yamlMiniGameDef `yaml:"mini_games"`
 }
 
 type yamlEventDef struct {
@@ -224,4 +252,29 @@ type yamlItemDef struct {
 	EnglishName string `yaml:"english_name"`
 	Name        string `yaml:"name"`
 	Desc        string `yaml:"desc"`
+}
+
+type yamlMiniGameDef struct {
+	Mode        string `yaml:"mode"`
+	Available   bool   `yaml:"available"`
+	EnglishName string `yaml:"english_name"`
+	Name        string `yaml:"name"`
+	Desc        string `yaml:"desc"`
+}
+
+// initMiniGamePools populates constants.AllMiniGameTypes and constants.AllOnlineMiniGameTypes
+// from loaded GlobalDefinitionSet. Only types with Available=true are included in pools.
+func initMiniGamePools() {
+	pool := make([]constants.MiniGameType, 0, len(GlobalDefinitionSet.MiniGames))
+	onlinePool := make([]constants.MiniGameType, 0)
+	for _, def := range GlobalDefinitionSet.MiniGames {
+		if def.Available {
+			pool = append(pool, def.Type)
+			if def.Mode == constants.MiniGameModeRPC {
+				onlinePool = append(onlinePool, def.Type)
+			}
+		}
+	}
+	constants.AllMiniGameTypes = pool
+	constants.AllOnlineMiniGameTypes = onlinePool
 }

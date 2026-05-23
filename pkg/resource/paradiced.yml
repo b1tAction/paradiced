@@ -187,3 +187,49 @@ items:
   # 名刀司命(抵挡一次致命伤害)
   # 贤者的庇护(原地复活，不回到检查点)
   # 贪、嗔、痴之戒(永久改变自己的属性与属性上限)
+
+# ========== Mini Game Definitions ==========
+
+mini_games:
+  dice_race:
+    mode: frontend            # frontend or online
+    available: false            # Whether available for random selection pool
+    english_name: DiceRace
+    name: 骰子竞速
+    desc: 掷骰子比大小，按分数排名
+  coin_flip:
+    mode: frontend
+    available: false           # Not yet implemented, excluded from pool
+    english_name: CoinFlip
+    name: 翻硬币
+    desc: 翻硬币比运气
+  count_seconds:
+    mode: frontend
+    available: false
+    english_name: CountSeconds
+    name: 数秒
+    desc: 尽可能准确地数出5秒
+  math_calc:
+    mode: frontend
+    available: false
+    english_name: MathCalc
+    name: 心算挑战
+    desc: 心算数学题，比准确率和速度
+  rainbow_memory:
+    mode: frontend
+    available: false
+    english_name: RainbowMemory
+    name: 彩虹记忆
+    desc: 记忆彩虹颜色顺序
+  vernier:
+    mode: frontend
+    available: false
+    english_name: Vernier
+    name: 游标卡尺
+    desc: 精确读取游标卡尺刻度
+  dilemma_race:
+    mode: online               # Requires Colyseus mini-game service
+    available: true
+    english_name: DilemmaRace
+    name: 博弈论竞速
+    desc: 选择步数博弈，相同步数则互相阻挡
