@@ -160,19 +160,21 @@ func (a *NakamaBroadcastAdapter) BroadcastMiniGameResult(result *net.MiniGameRes
 	return a.handler.dispatcher.BroadcastMessage(int64(net.OpMiniGameResult), data)
 }
 
-// BroadcastGameOver broadcasts game end notification.
+// BroadcastGameOver broadcasts game end notification with score rankings.
 func (a *NakamaBroadcastAdapter) BroadcastGameOver(over *net.GameOver) error {
 	if a.handler.dispatcher == nil {
 		return nil // No dispatcher set
 	}
 
-	// Inject DisplayName for winner and stats without overwriting UUID identifiers.
+	// Inject DisplayName for Rankings and Stats without overwriting UUID identifiers.
 	if over != nil && a.handler != nil {
-		// Inject WinnerDisplayName from player metadata
-		for userID, player := range a.handler.players {
-			if player != nil && player.ID.UUID() == over.WinnerID {
-				over.WinnerDisplayName = player.Metadata.GetStringOrDefault("display_name", userID)
-				break
+		// Inject DisplayName for Rankings
+		for i := range over.Rankings {
+			for userID, player := range a.handler.players {
+				if player != nil && player.ID.UUID() == over.Rankings[i].PlayerID {
+					over.Rankings[i].DisplayName = player.Metadata.GetStringOrDefault("display_name", userID)
+					break
+				}
 			}
 		}
 

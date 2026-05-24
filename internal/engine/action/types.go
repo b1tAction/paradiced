@@ -922,6 +922,10 @@ func (a *DeathAction) Execute(ctx *ActionContext) error {
 	if ctx.GetBuffDuration == nil {
 		return errors.NewActionExecutionError("death", a.targetPlayer.ID.UUID(), "GetBuffDuration callback is nil", nil)
 	}
+
+	// Increment death count for survivor achievement tracking
+	a.targetPlayer.IncrementDeathCount()
+
 	duration := ctx.GetBuffDuration(constants.BuffTypeDeathMark)
 	deathMark := core.NewBuff(constants.BuffTypeDeathMark, duration)
 	if ctx.Game != nil {

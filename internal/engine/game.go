@@ -19,19 +19,20 @@ import (
 // Round/Turn state is managed by HSM (single source of truth).
 // Game only stores data, not state.
 type Game struct {
-	ID           id.GameID            `json:"id"`
-	Bus          *event.EventBus      `json:"bus"`
-	Players      []*core.Player       `json:"players"`
-	RNG          *rand.Rand           `json:"-"`   // Game unique random source
-	Draw         *rng.DrawEngine      `json:"-"`   // Draw engine for random draws
-	Log          *gamelog.GameLog     `json:"log"` // Global game log for playback
-	DebugLog     *gamelog.GameLogger  `json:"-"`   // Debug logger for engine diagnostics
-	RoundData    *util.Metadata       `json:"-"`   // Round-level persistent data (cleared each round)
-	EventPool    []*rng.EvaluatedItem `json:"-"`   // Event pool for DrawEventAction (all events)
-	ItemPool     []*rng.EvaluatedItem `json:"-"`   // Item pool for DrawItemAction (all items)
-	BuffPool     []*rng.EvaluatedItem `json:"-"`   // Buff pool for DrawBuffAction (drawable buffs)
+	ID            id.GameID            `json:"id"`
+	Bus           *event.EventBus      `json:"bus"`
+	Players       []*core.Player       `json:"players"`
+	RNG           *rand.Rand           `json:"-"`   // Game unique random source
+	Draw          *rng.DrawEngine      `json:"-"`   // Draw engine for random draws
+	Log           *gamelog.GameLog     `json:"log"` // Global game log for playback
+	DebugLog      *gamelog.GameLogger  `json:"-"`   // Debug logger for engine diagnostics
+	RoundData     *util.Metadata       `json:"-"`   // Round-level persistent data (cleared each round)
+	Metadata      *util.Metadata       `json:"-"`   // Game-level persistent data (NOT cleared per round)
+	EventPool     []*rng.EvaluatedItem `json:"-"`   // Event pool for DrawEventAction (all events)
+	ItemPool      []*rng.EvaluatedItem `json:"-"`   // Item pool for DrawItemAction (all items)
+	BuffPool      []*rng.EvaluatedItem `json:"-"`   // Buff pool for DrawBuffAction (drawable buffs)
 	BossSkillPool []*rng.EvaluatedItem `json:"-"` // Boss skill pool for random draw
-	mutex        sync.RWMutex
+	mutex         sync.RWMutex
 }
 
 // NewGame creates a new game instance.
@@ -53,6 +54,7 @@ func NewGame(gameID id.GameID, seed int64) *Game {
 		Log:       gamelog.NewGameLog(),
 		DebugLog:  gamelog.NewGameLogger(),
 		RoundData: util.NewMetadata(),
+		Metadata:  util.NewMetadata(),
 	}
 }
 
@@ -365,6 +367,87 @@ func (g *Game) RemoveBuffFromPlayer(player *core.Player, buff *core.Buff) bool {
 
 	g.DebugLog.Info("RemoveBuffFromPlayer", "player_id", player.ID.UUID(), "buff_type", buff.Type, "removed", result)
 	return result
+}
+
+// ========== Score & Achievement Management ==========
+
+// AddScoreToPlayer adds score points to a player and records the ScoreReason for UI rendering.
+// This is the central method for all score additions in the game.
+func (g *Game) AddScoreToPlayer(player *core.Player, category constants.ScoreCategory, points int, reason string, round int) {
+	if player == nil {
+		return
+	}
+	player.AddScore(category, points)
+	player.AppendScoreReason(constants.ScoreReason{
+		Category: string(category),
+		Reason:   reason,
+		Points:   points,
+		Round:    round,
+	})
+	g.DebugLog.Info("AddScoreToPlayer", "player_id", player.ID.UUID(), "category", category, "points", points, "reason", reason, "round", round)
+}
+
+// GrantAchievementToPlayer grants an achievement to a player and unsubscribes the achievement handler.
+// Achievements can only be earned once per game per player.
+func (g *Game) GrantAchievementToPlayer(player *core.Player, achievementType constants.AchievementType) {
+	if player == nil || player.HasAchievement(achievementType) {
+		return
+	}
+	player.GrantAchievement(achievementType)
+
+	// Unsubscribe the achievement's EventBus handler to prevent repeated triggers.
+	// SourceID format: "achievement_" + achievementType string (e.g., "achievement_triple_one")
+	sourceID := "achievement_" + string(achievementType)
+	g.Bus.UnsubscribeBySource(sourceID)
+
+	g.DebugLog.Info("GrantAchievementToPlayer", "player_id", player.ID.UUID(), "achievement_type", achievementType)
+}
+
+// InitializePlayerAchievements subscribes achievement handlers via EventBus for a player.
+// Called during WaitingForHost.Exit() after faction buff initialization.
+// Only subscribes EventBus-based achievements (triple_one, triple_six, boss_kill_shot, boss_damage_ten, item_collector).
+// HSM-direct achievements (survivor, luck_master, first_to_boss, mini_game_winner_three) are NOT subscribed here.
+func (g *Game) InitializePlayerAchievements(player *core.Player) {
+	if player == nil || player.ID.IsBoss() {
+		return
+	}
+	EnsureAchievementRegistryInitialized()
+
+	for _, achievementType := range GlobalAchievementRegistry.EventBusAchievementTypes() {
+		config := GlobalAchievementRegistry.GetConfig(achievementType)
+		if config == nil {
+			continue
+		}
+
+		// Achievements always use AutoDecision (no user confirmation needed)
+		sourceID := "achievement_" + string(achievementType)
+
+		for _, phase := range config.GetPhases() {
+			if !phase.NeedsSubscription() {
+				continue
+			}
+
+			// Create handler closure that delegates to config.Handler
+			action := func(ctx *event.Context) error {
+				// Inject Game reference into context for handler access
+				ctx.Set("game", g)
+				if config.Handler != nil {
+					return config.Handler(phase, ctx)
+				}
+				return nil
+			}
+
+			decision := event.NewAutoDecision(
+				string(achievementType),
+				[]event.Option{{ID: "grant", Label: "自动检测"}},
+			).WithPriority(config.Priority)
+			decision.Options[0].Action = action
+
+			g.Bus.Subscribe(phase, player.ID, sourceID, "achievement", decision)
+		}
+	}
+
+	g.DebugLog.Info("InitializePlayerAchievements", "player_id", player.ID.UUID())
 }
 
 // ========== Helper Methods ==========

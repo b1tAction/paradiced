@@ -287,7 +287,7 @@ func TestBroadcastGameOver(t *testing.T) {
 	broadcastAdapter := NewNakamaBroadcastAdapter(handler)
 
 	over := &net.GameOver{
-		WinnerID: "player-001",
+		Rankings: []net.PlayerRanking{{PlayerID: "player-001", Rank: 1, DisplayName: ""}},
 		Stats:    []net.PlayerStats{},
 	}
 
@@ -313,8 +313,8 @@ func TestBroadcastGameOver(t *testing.T) {
 		t.Fatalf("ParseBroadcastData error: %v", err)
 	}
 
-	if parsed.WinnerID != "player-001" {
-		t.Errorf("parsed.WinnerID = %s, want player-001", parsed.WinnerID)
+	if parsed.Rankings[0].PlayerID != "player-001" {
+		t.Errorf("parsed.Rankings[0].PlayerID = %s, want player-001", parsed.Rankings[0].PlayerID)
 	}
 }
 
@@ -340,8 +340,10 @@ func TestBroadcastGameOverWithDisplayName(t *testing.T) {
 	p2.IncrementEventsDrawn()
 
 	over := &net.GameOver{
-		WinnerID: p1.ID.UUID(),
-		WinnerDisplayName: "",
+		Rankings: []net.PlayerRanking{
+			{PlayerID: p1.ID.UUID(), DisplayName: "", Rank: 1},
+			{PlayerID: p2.ID.UUID(), DisplayName: "", Rank: 2},
+		},
 		Stats: []net.PlayerStats{
 			{PlayerID: p1.ID.UUID(), DisplayName: "", RoundsWon: p1.GetRoundsWon(), EventsDrawn: p1.GetEventsDrawn(), ItemsUsed: p1.GetItemsUsed()},
 			{PlayerID: p2.ID.UUID(), DisplayName: "", RoundsWon: p2.GetRoundsWon(), EventsDrawn: p2.GetEventsDrawn(), ItemsUsed: p2.GetItemsUsed()},
@@ -353,12 +355,12 @@ func TestBroadcastGameOverWithDisplayName(t *testing.T) {
 		t.Fatalf("BroadcastGameOver error: %v", err)
 	}
 
-	// Verify DisplayName injection into dedicated fields (NOT overwriting UUIDs)
-	if over.WinnerID != p1.ID.UUID() {
-		t.Errorf("WinnerID should remain UUID, got %s", over.WinnerID)
+	// Verify DisplayName injection into Rankings and Stats (NOT overwriting UUIDs)
+	if over.Rankings[0].PlayerID != p1.ID.UUID() {
+		t.Errorf("Rankings[0].PlayerID should remain UUID, got %s", over.Rankings[0].PlayerID)
 	}
-	if over.WinnerDisplayName != "Alice" {
-		t.Errorf("WinnerDisplayName should be 'Alice', got %s", over.WinnerDisplayName)
+	if over.Rankings[0].DisplayName != "Alice" {
+		t.Errorf("Rankings[0].DisplayName should be 'Alice', got %s", over.Rankings[0].DisplayName)
 	}
 	if over.Stats[0].PlayerID != p1.ID.UUID() {
 		t.Errorf("Stats[0].PlayerID should remain UUID, got %s", over.Stats[0].PlayerID)

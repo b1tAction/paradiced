@@ -148,7 +148,7 @@ func TestMockBroadcastAdapterGameOver(t *testing.T) {
 	mock := NewMockBroadcastAdapter()
 
 	over := &GameOver{
-		WinnerID: "player-001",
+		Rankings: []PlayerRanking{{PlayerID: "player-001", Rank: 1}},
 		Stats:    []PlayerStats{},
 	}
 
@@ -159,8 +159,8 @@ func TestMockBroadcastAdapterGameOver(t *testing.T) {
 	if len(mock.GameOvers) != 1 {
 		t.Errorf("len(mock.GameOvers) = %d, want 1", len(mock.GameOvers))
 	}
-	if mock.GameOvers[0].WinnerID != "player-001" {
-		t.Errorf("mock.GameOvers[0].WinnerID = %s, want player-001", mock.GameOvers[0].WinnerID)
+	if mock.GameOvers[0].Rankings[0].PlayerID != "player-001" {
+		t.Errorf("mock.GameOvers[0].Rankings[0].PlayerID = %s, want player-001", mock.GameOvers[0].Rankings[0].PlayerID)
 	}
 }
 
