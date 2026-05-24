@@ -403,8 +403,9 @@ func TestMiniGameResult(t *testing.T) {
 
 func TestGameOver(t *testing.T) {
 	over := GameOver{
-		WinnerID:          "player-001",
-		WinnerDisplayName: "Alice",
+		Rankings: []PlayerRanking{
+			{PlayerID: "player-001", DisplayName: "Alice", Rank: 1, TotalScore: 50},
+		},
 		Stats: []PlayerStats{
 			{PlayerID: "player-001", DisplayName: "Alice", RoundsWon: 3, EventsDrawn: 5, ItemsUsed: 2},
 		},
@@ -420,11 +421,11 @@ func TestGameOver(t *testing.T) {
 	if err != nil {
 		t.Fatalf("json.Unmarshal() error: %v", err)
 	}
-	if parsed.WinnerID != "player-001" {
-		t.Errorf("parsed.WinnerID = %s, want player-001", parsed.WinnerID)
+	if parsed.Rankings[0].PlayerID != "player-001" {
+		t.Errorf("parsed.Rankings[0].PlayerID = %s, want player-001", parsed.Rankings[0].PlayerID)
 	}
-	if parsed.WinnerDisplayName != "Alice" {
-		t.Errorf("parsed.WinnerDisplayName = %s, want Alice", parsed.WinnerDisplayName)
+	if parsed.Rankings[0].DisplayName != "Alice" {
+		t.Errorf("parsed.Rankings[0].DisplayName = %s, want Alice", parsed.Rankings[0].DisplayName)
 	}
 	if parsed.Stats[0].DisplayName != "Alice" {
 		t.Errorf("parsed.Stats[0].DisplayName = %s, want Alice", parsed.Stats[0].DisplayName)
@@ -433,7 +434,9 @@ func TestGameOver(t *testing.T) {
 
 func TestGameOverWithEmptyDisplayName(t *testing.T) {
 	over := GameOver{
-		WinnerID: "player-001",
+		Rankings: []PlayerRanking{
+			{PlayerID: "player-001", Rank: 1},
+		},
 		Stats: []PlayerStats{
 			{PlayerID: "player-001", RoundsWon: 3, EventsDrawn: 5, ItemsUsed: 2},
 		},
@@ -449,13 +452,13 @@ func TestGameOverWithEmptyDisplayName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("json.Unmarshal() error: %v", err)
 	}
-	// WinnerID should remain intact (not overwritten)
-	if parsed.WinnerID != "player-001" {
-		t.Errorf("parsed.WinnerID = %s, want player-001", parsed.WinnerID)
+	// Rankings PlayerID should remain intact (not overwritten)
+	if parsed.Rankings[0].PlayerID != "player-001" {
+		t.Errorf("parsed.Rankings[0].PlayerID = %s, want player-001", parsed.Rankings[0].PlayerID)
 	}
 	// DisplayName fields should be empty strings (default)
-	if parsed.WinnerDisplayName != "" {
-		t.Errorf("parsed.WinnerDisplayName = %s, want empty string", parsed.WinnerDisplayName)
+	if parsed.Rankings[0].DisplayName != "" {
+		t.Errorf("parsed.Rankings[0].DisplayName = %s, want empty string", parsed.Rankings[0].DisplayName)
 	}
 	if parsed.Stats[0].DisplayName != "" {
 		t.Errorf("parsed.Stats[0].DisplayName = %s, want empty string", parsed.Stats[0].DisplayName)
@@ -468,8 +471,10 @@ func TestGameOverWithEmptyDisplayName(t *testing.T) {
 
 func TestGameOverJSONContainsDisplayNameFields(t *testing.T) {
 	over := GameOver{
-		WinnerID:          "player-001",
-		WinnerDisplayName: "Alice",
+		Rankings: []PlayerRanking{
+			{PlayerID: "player-001", DisplayName: "Alice", Rank: 1, TotalScore: 50},
+			{PlayerID: "player-002", DisplayName: "Bob", Rank: 2, TotalScore: 30},
+		},
 		Stats: []PlayerStats{
 			{PlayerID: "player-001", DisplayName: "Alice", RoundsWon: 3, EventsDrawn: 5, ItemsUsed: 2},
 			{PlayerID: "player-002", DisplayName: "Bob", RoundsWon: 1, EventsDrawn: 4, ItemsUsed: 1},
@@ -483,14 +488,11 @@ func TestGameOverJSONContainsDisplayNameFields(t *testing.T) {
 
 	// Verify JSON contains both ID and DisplayName fields
 	jsonStr := string(jsonBytes)
-	if !strings.Contains(jsonStr, `"winner_id":"player-001"`) {
-		t.Error("JSON should contain winner_id field with UUID value")
-	}
-	if !strings.Contains(jsonStr, `"winner_display_name":"Alice"`) {
-		t.Error("JSON should contain winner_display_name field")
-	}
 	if !strings.Contains(jsonStr, `"player_id":"player-001"`) {
 		t.Error("JSON should contain player_id field with UUID value")
+	}
+	if !strings.Contains(jsonStr, `"display_name":"Alice"`) {
+		t.Error("JSON should contain display_name field in PlayerRanking")
 	}
 	if !strings.Contains(jsonStr, `"display_name":"Alice"`) {
 		t.Error("JSON should contain display_name field in PlayerStats")

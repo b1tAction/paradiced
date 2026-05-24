@@ -253,18 +253,49 @@ type RankingEntry struct {
 	GameData map[string]interface{} `json:"game_data,omitempty"`
 }
 
-// GameOver represents game end notification.
+// GameOver represents game end notification with score-based rankings.
+// Rankings are ordered by total score (descending). The first entry is the champion.
 type GameOver struct {
-	// WinnerID is the winning player's game internal ID.
-	// Matches core.Player.ID.UUID() format.
-	WinnerID string `json:"winner_id"`
-
-	// WinnerDisplayName is the winning player's display name for client UI.
-	// Falls back to WinnerID (UUID) if not provided.
-	WinnerDisplayName string `json:"winner_display_name"`
+	// Rankings contains all players ranked by total score.
+	// rankings[0] is the champion (highest total score).
+	Rankings []PlayerRanking `json:"rankings"`
 
 	// Stats contains end-game statistics for all players.
 	Stats []PlayerStats `json:"stats"`
+}
+
+// PlayerRanking contains ranking position + score breakdown + score reasons for UI rendering.
+type PlayerRanking struct {
+	// PlayerID is the player's game internal ID.
+	PlayerID string `json:"player_id"`
+
+	// DisplayName is the user-provided display name for client UI.
+	DisplayName string `json:"display_name"`
+
+	// Rank is the player's position (1 = champion).
+	Rank int `json:"rank"`
+
+	// TotalScore is the sum of all score categories.
+	TotalScore int `json:"total_score"`
+
+	// MiniGameScore is cumulative mini-game ranking score.
+	MiniGameScore int `json:"mini_game_score"`
+
+	// BossScore is cumulative boss battle score (damage + kill shot + crit).
+	BossScore int `json:"boss_score"`
+
+	// ItemScore is cumulative item score (acquired + used + dice upgrade).
+	ItemScore int `json:"item_score"`
+
+	// AchievementScore is cumulative achievement bonus score.
+	AchievementScore int `json:"achievement_score"`
+
+	// Achievements lists earned achievement types (e.g., "triple_one", "survivor").
+	Achievements []string `json:"achievements"`
+
+	// ScoreReasons provides detailed score breakdown for UI rendering.
+	// Each reason explains why the player received points.
+	ScoreReasons []constants.ScoreReason `json:"score_reasons"`
 }
 
 // PlayerStats represents a player's end-game statistics.
@@ -285,6 +316,18 @@ type PlayerStats struct {
 
 	// ItemsUsed is the number of items consumed.
 	ItemsUsed int `json:"items_used"`
+
+	// BossDamageDealt is cumulative damage dealt to Boss.
+	BossDamageDealt int `json:"boss_damage_dealt"`
+
+	// Achievements lists earned achievement types.
+	Achievements []string `json:"achievements"`
+
+	// TotalScore is the player's total accumulated score.
+	TotalScore int `json:"total_score"`
+
+	// ScoreBreakdown maps score category to points (mini_game, boss, item, achievement).
+	ScoreBreakdown map[string]int `json:"score_breakdown"`
 }
 
 // ActionRejected notifies client that their action was rejected.

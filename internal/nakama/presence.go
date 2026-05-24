@@ -235,7 +235,7 @@ func (h *NakamaMatchHandler) HandlePresenceLeave(userID string) error {
 		if h.dispatcher != nil {
 			broadcast := NewNakamaBroadcastAdapter(h)
 			_ = broadcast.BroadcastGameOver(&pkgnet.GameOver{
-				WinnerID: "",
+				Rankings: []pkgnet.PlayerRanking{},
 				Stats:    []pkgnet.PlayerStats{},
 			})
 		}
