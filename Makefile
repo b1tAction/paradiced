@@ -61,7 +61,7 @@ prepare-modules:
 
 # Start Nakama server with Docker (CockroachDB + Nakama)
 docker-up:
-	docker compose up -d
+	docker compose up --build -d
 
 # Stop Nakama server
 docker-down:
@@ -106,6 +106,13 @@ dev-logs: dev docker-logs
 # Rebuild plugin and restart Nakama (hot reload)
 rebuild: build-plugin
 	docker compose restart nakama
+
+start: build-plugin
+	docker compose up --build -d
+
+restart: build-plugin
+	docker compose down && \
+	docker compose up --build -d
 
 # Check service status
 status:

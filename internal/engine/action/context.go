@@ -96,6 +96,11 @@ const maxQueueProcessingDepth = 50
 // 8. Process any derived actions in queue
 // Returns first error from handlers or action execution.
 func (ctx *ActionContext) ExecuteAction(action Action) error {
+	// Log action execution (nil-safe: GetDebugLog returns nil-safe GameLogger)
+	if ctx.Game != nil {
+		ctx.Game.GetDebugLog().Debug("Action.ExecuteAction", "type", action.Type(), "target", action.Target(), "source", action.Source())
+	}
+
 	// Step 0: PhasePreAction - interception for relevant players
 	// DeathMark blocks actions on dead players, Dominance amplifies from actor,
 	// RobLuck redirects beneficial actions to BaiHu player.
@@ -134,6 +139,10 @@ func (ctx *ActionContext) ExecuteAction(action Action) error {
 
 			// Check if action was blocked (DeathMark, RobLuck)
 			if preCtx.GetBoolOrDefault("action_blocked", false) {
+				if ctx.Game != nil {
+					blockReason := preCtx.GetStringOrDefault("blocked_by", "unknown")
+					ctx.Game.GetDebugLog().Info("Action.ExecuteAction.blocked", "phase", "PhasePreAction", "action_type", action.Type(), "target", action.Target(), "player_id", player.ID.UUID(), "blocked_by", blockReason)
+				}
 				return nil // Action blocked, derived actions already pushed above
 			}
 		}
@@ -162,6 +171,10 @@ func (ctx *ActionContext) ExecuteAction(action Action) error {
 
 		// Check if action was blocked
 		if triggerCtx.GetBoolOrDefault("action_blocked", false) {
+			if ctx.Game != nil {
+				blockReason := triggerCtx.GetStringOrDefault("blocked_by", "unknown")
+				ctx.Game.GetDebugLog().Info("Action.ExecuteAction.blocked", "phase", prePhase, "action_type", action.Type(), "target", action.Target(), "blocked_by", blockReason)
+			}
 			// Action blocked, but still process any derived actions from the interceptor
 			for _, derived := range triggerCtx.GetDerivedActions() {
 				if execAction, ok := derived.(Action); ok {

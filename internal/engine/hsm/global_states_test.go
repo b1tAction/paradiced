@@ -3,6 +3,7 @@ package hsm
 import (
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/engine"
@@ -40,7 +41,19 @@ func TestStateMatchInit(t *testing.T) {
 	}
 }
 
+// setupMiniGamePoolWithFrontendType temporarily replaces AllMiniGameTypes
+// with a frontend type (DiceRace) so mini-game tests work without an online provider.
+// Returns a cleanup function that restores the original pool.
+func setupMiniGamePoolWithFrontendType() func() {
+	origPool := constants.AllMiniGameTypes
+	constants.AllMiniGameTypes = []constants.MiniGameType{constants.MiniGameTypeDiceRace}
+	return func() { constants.AllMiniGameTypes = origPool }
+}
+
 func TestStateRoundMiniGame(t *testing.T) {
+	origPool := setupMiniGamePoolWithFrontendType()
+	defer origPool()
+
 	state := NewRoundMiniGameState()
 
 	if state.ID() != StateRoundMiniGame {
@@ -87,6 +100,9 @@ func TestStateRoundMiniGame(t *testing.T) {
 }
 
 func TestStateRoundMiniGame_ExitBroadcastsResult(t *testing.T) {
+	origPool := setupMiniGamePoolWithFrontendType()
+	defer origPool()
+
 	state := NewRoundMiniGameState()
 
 	game := engine.NewGame(id.NewGameID(), 0)
@@ -498,6 +514,9 @@ func TestRoundEndWaitState_CanTransitionTo(t *testing.T) {
 // ========== RoundMiniGameState MiniGameDataSubmit Tests ==========
 
 func TestRoundMiniGameState_GameTypeRandomSelection(t *testing.T) {
+	origPool := setupMiniGamePoolWithFrontendType()
+	defer origPool()
+
 	state := NewRoundMiniGameState()
 
 	game := engine.NewGame(id.NewGameID(), 42) // Fixed seed for deterministic test
@@ -542,6 +561,9 @@ func TestRoundMiniGameState_GameTypeDeterministic(t *testing.T) {
 }
 
 func TestRoundMiniGameState_OnMiniGameDataSubmit(t *testing.T) {
+	origPool := setupMiniGamePoolWithFrontendType()
+	defer origPool()
+
 	state := NewRoundMiniGameState()
 
 	// Use seed 42 which deterministically selects dice_race game type,
@@ -603,6 +625,9 @@ func TestRoundMiniGameState_OnMiniGameDataSubmit(t *testing.T) {
 }
 
 func TestRoundMiniGameState_OnMiniGameDataSubmit_GameTypeMismatch(t *testing.T) {
+	origPool := setupMiniGamePoolWithFrontendType()
+	defer origPool()
+
 	state := NewRoundMiniGameState()
 
 	game := engine.NewGame(id.NewGameID(), 0)
@@ -629,14 +654,20 @@ func TestRoundMiniGameState_OnMiniGameDataSubmit_GameTypeMismatch(t *testing.T) 
 }
 
 func TestRoundMiniGameState_OnMiniGameDataSubmit_RPCMode(t *testing.T) {
-	state := NewRoundMiniGameState().WithMode(constants.MiniGameModeRPC)
+	// Create a mock online provider that returns a connection
+	mockProvider := &mockOnlineProvider{}
+	state := NewRoundMiniGameState().WithProvider(mockProvider)
 
 	game := engine.NewGame(id.NewGameID(), 0)
 	p1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	game.AddPlayer(p1)
 
+	// Force an online game type by setting gameType directly
+	// (Enter() will select based on provider availability)
+	state.gameType = constants.MiniGameTypeDilemmaRace
+	state.mode = constants.MiniGameModeRPC
+
 	ctx := NewStateContext().WithHSM(NewHSM(game))
-	state.Enter(ctx)
 
 	// In RPC mode, OnMiniGameDataSubmit should return false (not applicable)
 	allReceived := state.OnMiniGameDataSubmit(ctx, p1.ID.UUID(), state.GetGameType(), map[string]interface{}{
@@ -648,6 +679,9 @@ func TestRoundMiniGameState_OnMiniGameDataSubmit_RPCMode(t *testing.T) {
 }
 
 func TestRoundMiniGameState_WithCustomRankCalculator(t *testing.T) {
+	origPool := setupMiniGamePoolWithFrontendType()
+	defer origPool()
+
 	// Create a mock RankCalculator that reverses rankings
 	mockCalc := &mockRankCalculator{}
 	state := NewRoundMiniGameState().WithRankCalculator(mockCalc)
@@ -702,7 +736,39 @@ func (m *mockRankCalculator) Calculate(gameType constants.MiniGameType, submissi
 	return ranks
 }
 
+// mockOnlineProvider implements protocol.OnlineMiniGameProvider for testing.
+type mockOnlineProvider struct {
+	createRoomErr  error
+	destroyRoomErr error
+}
+
+func (m *mockOnlineProvider) CreateRoom(gameType constants.MiniGameType, playerIDs []string) (*pkgnet.MiniGameConn, error) {
+	if m.createRoomErr != nil {
+		return nil, m.createRoomErr
+	}
+	tokens := make(map[string]string)
+	for _, pid := range playerIDs {
+		tokens[pid] = "mock_token_" + pid
+	}
+	return &pkgnet.MiniGameConn{
+		URL:          "ws://mock-colyseus:2567",
+		RoomID:       "mock_room_id",
+		PlayerTokens: tokens,
+	}, nil
+}
+
+func (m *mockOnlineProvider) DestroyRoom(roomID string) error {
+	return m.destroyRoomErr
+}
+
+func (m *mockOnlineProvider) GetTimeout(gameType constants.MiniGameType) time.Duration {
+	return 60 * time.Second
+}
+
 func TestStateRoundMiniGame_ExitBroadcastsResultWithGameData(t *testing.T) {
+	origPool := setupMiniGamePoolWithFrontendType()
+	defer origPool()
+
 	state := NewRoundMiniGameState()
 
 	game := engine.NewGame(id.NewGameID(), 0)
@@ -800,6 +866,9 @@ func TestStateRoundMiniGame_ExitBroadcastsResultWithGameData(t *testing.T) {
 }
 
 func TestStateRoundMiniGame_ExitBroadcastsResultWithDisplayNameOnly(t *testing.T) {
+	origPool := setupMiniGamePoolWithFrontendType()
+	defer origPool()
+
 	// RPC mode: OnMiniGameResult sets rank directly, no gameData stored
 	state := NewRoundMiniGameState()
 
@@ -884,5 +953,87 @@ func TestGameOverStateEnterStopsHSM(t *testing.T) {
 	// After GameOverState.Enter(), HSM should be stopped
 	if hsmInst.IsRunning() {
 		t.Error("HSM should not be running after GameOverState.Enter() stops it")
+	}
+}
+
+// ========== RoundMiniGameState Skip Tests ==========
+
+func TestRoundMiniGameState_SkipWhenNoAvailable(t *testing.T) {
+	// When all available types are online and no provider exists,
+	// MiniGameTypeNone should be returned and the mini-game phase should skip.
+	origPool := constants.AllMiniGameTypes
+	constants.AllMiniGameTypes = []constants.MiniGameType{constants.MiniGameTypeDilemmaRace}
+	defer func() { constants.AllMiniGameTypes = origPool }()
+
+	state := NewRoundMiniGameState()
+
+	game := engine.NewGame(id.NewGameID(), 0)
+	p1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	p2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(p1)
+	game.AddPlayer(p2)
+
+	ctx := NewStateContext().WithHSM(NewHSM(game))
+	mockBroadcast := pkgnet.NewMockBroadcastAdapter()
+	ctx.Broadcast = mockBroadcast
+
+	state.Enter(ctx)
+
+	// gameType should be MiniGameTypeNone (no provider, all pool types are online)
+	if state.gameType != constants.MiniGameTypeNone {
+		t.Errorf("gameType = %s, want MiniGameTypeNone", state.gameType)
+	}
+
+	// mini_game_started should be false (skipped)
+	if ctx.GetBoolOrDefault(KeyMiniGameStarted, false) {
+		t.Error("mini_game_started should be false when no mini-game available")
+	}
+
+	// No MiniGameStart broadcast should have been sent
+	if len(mockBroadcast.MiniGameStarts) != 0 {
+		t.Errorf("MiniGameStarts count = %d, want 0 (skipped)", len(mockBroadcast.MiniGameStarts))
+	}
+
+	// Update should transition to RoundPrep immediately
+	nextID := state.Update(ctx)
+	if nextID != StateRoundPrep {
+		t.Errorf("Update should return StateRoundPrep when no mini-game available, got %s", nextID.String())
+	}
+}
+
+func TestRoundMiniGameState_OnlineWithProvider(t *testing.T) {
+	// When provider is available and online type is in pool, mini-game should proceed normally.
+	origPool := constants.AllMiniGameTypes
+	constants.AllMiniGameTypes = []constants.MiniGameType{constants.MiniGameTypeDilemmaRace}
+	defer func() { constants.AllMiniGameTypes = origPool }()
+
+	mockProvider := &mockOnlineProvider{}
+	state := NewRoundMiniGameState().WithProvider(mockProvider)
+
+	game := engine.NewGame(id.NewGameID(), 0)
+	p1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	p2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(p1)
+	game.AddPlayer(p2)
+
+	ctx := NewStateContext().WithHSM(NewHSM(game))
+	mockBroadcast := pkgnet.NewMockBroadcastAdapter()
+	ctx.Broadcast = mockBroadcast
+
+	state.Enter(ctx)
+
+	// gameType should be dilemma_race (provider available, online type eligible)
+	if state.gameType != constants.MiniGameTypeDilemmaRace {
+		t.Errorf("gameType = %s, want dilemma_race", state.gameType)
+	}
+
+	// mini_game_started should be true
+	if !ctx.GetBoolOrDefault(KeyMiniGameStarted, false) {
+		t.Error("mini_game_started should be true when mini-game is available")
+	}
+
+	// MiniGameStart broadcast should have been sent
+	if len(mockBroadcast.MiniGameStarts) != 1 {
+		t.Errorf("MiniGameStarts count = %d, want 1", len(mockBroadcast.MiniGameStarts))
 	}
 }

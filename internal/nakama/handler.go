@@ -3,7 +3,9 @@
 package nakama
 
 import (
+	"fmt"
 	"math/rand"
+	"strings"
 
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/engine"
@@ -13,6 +15,7 @@ import (
 	pkgerrors "github.com/b1tAction/paradiced/pkg/errors"
 	"github.com/b1tAction/paradiced/pkg/id"
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
+	"github.com/b1tAction/paradiced/pkg/protocol"
 	"github.com/b1tAction/paradiced/pkg/resource"
 	"github.com/b1tAction/paradiced/pkg/rng"
 	"github.com/heroiclabs/nakama-common/runtime"
@@ -49,6 +52,10 @@ type NakamaMatchHandler struct {
 
 	// Map configuration (stored for StartGameAck broadcast)
 	mapConfig *pkgnet.MapConfig
+
+	// Online mini-game integration
+	provider               protocol.OnlineMiniGameProvider // Colyseus provider for online mini-games (nil for frontend-only)
+	pendingMiniGameResults map[string]int                 // playerID -> rank, populated by MatchSignal, consumed by MatchLoop
 
 	// Configuration
 	maxPlayers int    // Maximum players (default: 4)
@@ -107,32 +114,72 @@ func (h *NakamaMatchHandler) WithLogger(logger runtime.Logger) *NakamaMatchHandl
 	return h
 }
 
+// WithProvider sets the online mini-game provider for RPC mode mini-games.
+func (h *NakamaMatchHandler) WithProvider(provider protocol.OnlineMiniGameProvider) *NakamaMatchHandler {
+	h.provider = provider
+	return h
+}
+
 // logDebug logs a debug message if logger is available.
+// Uses WithFields for structured data to avoid Printf-style %!(EXTRA) errors.
 func (h *NakamaMatchHandler) logDebug(msg string, keysAndValues ...interface{}) {
 	if h.logger != nil {
-		h.logger.Debug(msg, keysAndValues...)
+		fields := kvToFields(keysAndValues)
+		h.logger.WithFields(fields).Debug(msg)
 	}
 }
 
 // logInfo logs an info message if logger is available.
 func (h *NakamaMatchHandler) logInfo(msg string, keysAndValues ...interface{}) {
 	if h.logger != nil {
-		h.logger.Info(msg, keysAndValues...)
+		fields := kvToFields(keysAndValues)
+		h.logger.WithFields(fields).Info(msg)
 	}
 }
 
 // logWarn logs a warn message if logger is available.
 func (h *NakamaMatchHandler) logWarn(msg string, keysAndValues ...interface{}) {
 	if h.logger != nil {
-		h.logger.Warn(msg, keysAndValues...)
+		fields := kvToFields(keysAndValues)
+		h.logger.WithFields(fields).Warn(msg)
 	}
 }
 
 // logError logs an error message if logger is available.
 func (h *NakamaMatchHandler) logError(msg string, keysAndValues ...interface{}) {
 	if h.logger != nil {
-		h.logger.Error(msg, keysAndValues...)
+		fields := kvToFields(keysAndValues)
+		h.logger.WithFields(fields).Error(msg)
 	}
+}
+
+// formatKVs formats key-value pairs into a single string for runtime.Logger Printf-style calls.
+// runtime.Logger's Info/Warn/Error/Debug use Printf format, so kv pairs must be
+// pre-formatted into the msg string to avoid %!(EXTRA ...) errors.
+func formatKVs(msg string, kv []interface{}) string {
+	if len(kv) == 0 {
+		return msg
+	}
+	pairs := make([]string, 0, len(kv)/2)
+	for i := 0; i+1 < len(kv); i += 2 {
+		pairs = append(pairs, fmt.Sprintf("%s=%v", kv[i], kv[i+1]))
+	}
+	if len(kv)%2 == 1 {
+		pairs = append(pairs, fmt.Sprintf("extra=%v", kv[len(kv)-1]))
+	}
+	return msg + " " + strings.Join(pairs, " ")
+}
+
+// kvToFields converts alternating key-value pairs into a map for runtime.Logger.WithFields.
+func kvToFields(kv []interface{}) map[string]interface{} {
+	fields := make(map[string]interface{}, len(kv)/2)
+	for i := 0; i+1 < len(kv); i += 2 {
+		key, ok := kv[i].(string)
+		if ok {
+			fields[key] = kv[i+1]
+		}
+	}
+	return fields
 }
 
 // initializeGame creates the Game instance and HSM.
@@ -141,6 +188,30 @@ func (h *NakamaMatchHandler) initializeGame() error {
 	// Create Game instance
 	gameID := id.NewGameID()
 	game := engine.NewGame(gameID, h.randomSeed)
+
+	// Bridge Game's DebugLog to Nakama runtime.Logger.
+	// runtime.Logger uses Printf-style (format string + format args), not structured key-value.
+	// We must format kv pairs into the msg string before passing to runtime.Logger,
+	// otherwise extra args produce %!(EXTRA ...) formatting errors.
+	if h.logger != nil {
+		game.DebugLog.WithWriter(func(msg string, kv ...interface{}) {
+			formattedMsg := formatKVs(msg, kv)
+			// Route to appropriate runtime.Logger level based on GameLogger prefix.
+			// config.yml level:"info" allows Info+ to pass through naturally.
+			if len(msg) >= 5 && msg[:5] == "DEBUG" {
+				h.logger.Debug(formattedMsg)
+			} else if len(msg) >= 4 && msg[:4] == "INFO" {
+				h.logger.Info(formattedMsg)
+			} else if len(msg) >= 4 && msg[:4] == "WARN" {
+				h.logger.Warn(formattedMsg)
+			} else {
+				h.logger.Error(formattedMsg)
+			}
+		})
+	}
+
+	// Share Game's DebugLog with EventBus
+	game.Bus.DebugLog = game.DebugLog
 
 	// Initialize event, item, and buff pools from Registry definitions
 	game.EventPool = engine.BuildEventPool()
@@ -162,9 +233,15 @@ func (h *NakamaMatchHandler) initializeGame() error {
 	// Build MapEngine from loaded configuration
 	h.mapEngine = resource.BuildMapEngineFromConfig(mapConfig)
 
-	// Register all states
-	if err := hsm.RegisterGlobalStates(h.hsm); err != nil {
-		return pkgerrors.Wrap(err, "NakamaHandler", "initializeGame.RegisterGlobalStates")
+	// Register all states (inject online mini-game provider if configured)
+	if h.provider != nil {
+		if err := hsm.RegisterGlobalStatesWithProvider(h.hsm, h.provider); err != nil {
+			return pkgerrors.Wrap(err, "NakamaHandler", "initializeGame.RegisterGlobalStatesWithProvider")
+		}
+	} else {
+		if err := hsm.RegisterGlobalStates(h.hsm); err != nil {
+			return pkgerrors.Wrap(err, "NakamaHandler", "initializeGame.RegisterGlobalStates")
+		}
 	}
 	if err := hsm.RegisterTurnStates(h.hsm); err != nil {
 		return pkgerrors.Wrap(err, "NakamaHandler", "initializeGame.RegisterTurnStates")

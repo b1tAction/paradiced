@@ -64,6 +64,9 @@ func (a *DamageAction) PostTriggerPhase() constants.Phase {
 
 func (a *DamageAction) Execute(ctx *ActionContext) error {
 	if a.Amount <= 0 {
+		if ctx.Game != nil {
+			ctx.Game.GetDebugLog().Debug("DamageAction.Execute", "target", a.Target(), "amount", a.Amount, "reason", "blocked_or_zero")
+		}
 		return nil // Already blocked by interception
 	}
 	if a.targetPlayer == nil {
@@ -74,6 +77,9 @@ func (a *DamageAction) Execute(ctx *ActionContext) error {
 	}
 	// Derive DeathAction if player died from this damage
 	if a.targetPlayer.IsDead {
+		if ctx.Game != nil {
+			ctx.Game.GetDebugLog().Info("DamageAction.Execute.player_died", "player_id", a.targetPlayer.ID.UUID(), "damage", a.Amount, "source", a.SourceID, "position", a.targetPlayer.Position)
+		}
 		ctx.PushDerivedAction(NewDeathAction(a.targetPlayer, a.SourceID, a.targetPlayer.Position))
 	}
 	return nil
@@ -352,11 +358,17 @@ func (a *AddBuffAction) Execute(ctx *ActionContext) error {
 		}
 		// Mark as duration-extend so ExecuteAction skips PostTrigger
 		ctx.SetBool("buff_duration_extended", true)
+		if ctx.Game != nil {
+			ctx.Game.GetDebugLog().Info("AddBuffAction.Execute.duration_extend", "player_id", a.targetPlayer.ID.UUID(), "buff_type", a.BuffType, "duration", duration)
+		}
 		return nil
 	}
 
 	// New buff: full lifecycle (add + subscribe + PhasePostBuffApplied)
 	newBuff := core.NewBuff(a.BuffType, duration)
+	if ctx.Game != nil {
+		ctx.Game.GetDebugLog().Info("AddBuffAction.Execute.new_buff", "player_id", a.targetPlayer.ID.UUID(), "buff_type", a.BuffType, "duration", duration)
+	}
 	ctx.OnAddBuff(a.targetPlayer, newBuff)
 	return nil
 }
@@ -633,6 +645,10 @@ func (a *DrawEventAction) Execute(ctx *ActionContext) error {
 		a.DrawnType = constants.EventTypeNone
 	}
 
+	if ctx.Game != nil {
+		ctx.Game.GetDebugLog().Info("DrawEventAction.Execute", "player_id", a.targetPlayer.ID.UUID(), "drawn_type", a.DrawnType, "player_lp", a.targetPlayer.LP)
+	}
+
 	return nil
 }
 
@@ -712,6 +728,10 @@ func (a *DrawItemAction) Execute(ctx *ActionContext) error {
 		a.DrawnType = constants.ItemTypeNone
 	}
 
+	if ctx.Game != nil {
+		ctx.Game.GetDebugLog().Info("DrawItemAction.Execute", "player_id", a.targetPlayer.ID.UUID(), "drawn_type", a.DrawnType, "player_lp", a.targetPlayer.LP)
+	}
+
 	// Push AddItemAction as DerivedAction for full item lifecycle (EventBus subscription)
 	if a.DrawnType != constants.ItemTypeNone && a.DrawnType.IsValid() {
 		ctx.PushDerivedAction(NewAddItemAction(a.targetPlayer, a.DrawnType, a.SourceID))
@@ -773,6 +793,9 @@ func (a *RespawnAction) Execute(ctx *ActionContext) error {
 	}
 	if err := a.targetPlayer.Respawn(a.CheckpointPos); err != nil {
 		return errors.NewActionExecutionError("respawn", a.targetPlayer.ID.UUID(), "failed to respawn", err)
+	}
+	if ctx.Game != nil {
+		ctx.Game.GetDebugLog().Info("RespawnAction.Execute", "player_id", a.targetPlayer.ID.UUID(), "checkpoint_pos", a.CheckpointPos, "source", a.SourceID)
 	}
 	return nil
 }
@@ -901,6 +924,9 @@ func (a *DeathAction) Execute(ctx *ActionContext) error {
 	}
 	duration := ctx.GetBuffDuration(constants.BuffTypeDeathMark)
 	deathMark := core.NewBuff(constants.BuffTypeDeathMark, duration)
+	if ctx.Game != nil {
+		ctx.Game.GetDebugLog().Info("DeathAction.Execute", "player_id", a.targetPlayer.ID.UUID(), "position", a.Position, "source", a.SourceID, "death_mark_duration", duration)
+	}
 	ctx.OnAddBuff(a.targetPlayer, deathMark)
 	return nil
 }
@@ -983,6 +1009,10 @@ func (a *BossDamageAction) Execute(ctx *ActionContext) error {
 	// Apply damage to boss player
 	if err := a.targetPlayer.ApplyDamage(a.Damage); err != nil {
 		return errors.NewActionExecutionError("boss_damage", a.targetPlayer.ID.UUID(), "failed to apply damage to boss", err)
+	}
+
+	if ctx.Game != nil {
+		ctx.Game.GetDebugLog().Info("BossDamageAction.Execute", "attacker", a.SourcePlayer.ID.UUID(), "boss_hp", a.targetPlayer.HP, "damage", a.Damage, "is_crit", a.IsCrit, "boss_remaining_hp", a.targetPlayer.HP)
 	}
 
 	// Thorns reflect is handled by BuffThorns handler via EventBus (PhasePreDamage).
@@ -1383,6 +1413,10 @@ func (a *DrawBuffAction) Execute(ctx *ActionContext) error {
 		a.DrawnType = constants.ParseBuffType(result.Item.Type)
 	} else {
 		a.DrawnType = constants.BuffTypeNone
+	}
+
+	if ctx.Game != nil {
+		ctx.Game.GetDebugLog().Info("DrawBuffAction.Execute", "player_id", a.targetPlayer.ID.UUID(), "drawn_type", a.DrawnType, "player_lp", a.targetPlayer.LP)
 	}
 
 	// Push AddBuffAction as DerivedAction for full buff lifecycle

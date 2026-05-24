@@ -381,9 +381,26 @@ func BuildDefinitionsConfig() pkgnet.DefinitionsConfig {
 		}
 	}
 
+	miniGames := make(map[string]pkgnet.MiniGameDefinitionConfig, len(defs.MiniGames))
+	for key, def := range defs.MiniGames {
+		modeStr := "frontend"
+		if def.Mode == constants.MiniGameModeRPC {
+			modeStr = "online"
+		}
+		miniGames[string(key)] = pkgnet.MiniGameDefinitionConfig{
+			Type:        string(def.Type),
+			Mode:        modeStr,
+			Available:   def.Available,
+			EnglishName: def.EnglishName,
+			Name:        def.Name,
+			Desc:        def.Desc,
+		}
+	}
+
 	return pkgnet.DefinitionsConfig{
-		Events: events,
-		Buffs:  buffs,
-		Items:  items,
+		Events:    events,
+		Buffs:     buffs,
+		Items:     items,
+		MiniGames: miniGames,
 	}
 }

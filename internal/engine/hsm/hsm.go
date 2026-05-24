@@ -264,14 +264,17 @@ func (hsm *HSM) TransitionTo(targetID StateID, ctx *StateContext) error {
 	}
 
 	// Log state transition
+	fromID := hsm.GetCurrentStateID()
+	playerID := ""
+	if hsm.turnPlayer != nil {
+		playerID = hsm.turnPlayer.ID.UUID()
+	}
 	if hsm.game != nil && hsm.game.Log != nil {
-		fromID := hsm.GetCurrentStateID()
-		playerID := ""
-		if hsm.turnPlayer != nil {
-			playerID = hsm.turnPlayer.ID.UUID()
-		}
 		hsm.game.Log.LogStateTransition(fromID.String(), targetID.String(), playerID)
 	}
+
+	// Debug log for state transition
+	hsm.game.DebugLog.Info("HSM.TransitionTo", "from", fromID.String(), "to", targetID.String(), "player_id", playerID, "layer", targetID.Layer())
 
 	// Determine layer and handle transition
 	switch targetID.Layer() {
@@ -403,6 +406,7 @@ func (hsm *HSM) transitionInterrupt(target State, ctx *StateContext) error {
 
 // PushInterrupt pushes current state onto stack and enters WaitDecision.
 func (hsm *HSM) PushInterrupt(currentState State, ctx *StateContext) error {
+	hsm.game.DebugLog.Debug("HSM.PushInterrupt", "current_state", currentState.ID().String(), "decisions", len(ctx.Decisions))
 	// Push current state onto stack
 	if err := hsm.stack.Push(currentState, ctx); err != nil {
 		return err
@@ -426,6 +430,7 @@ func (hsm *HSM) PushInterrupt(currentState State, ctx *StateContext) error {
 
 // PopInterrupt pops state from stack and resumes execution.
 func (hsm *HSM) PopInterrupt(ctx *StateContext) error {
+	hsm.game.DebugLog.Debug("HSM.PopInterrupt", "stack_depth", hsm.stack.Depth())
 	// Pop from stack
 	entry, err := hsm.stack.Pop()
 	if err != nil {
@@ -569,6 +574,8 @@ func (hsm *HSM) OnUserChoice(choice int, ctx *StateContext) error {
 		return errors.New("no pending decision")
 	}
 
+	hsm.game.DebugLog.Info("HSM.OnUserChoice", "choice", choice, "player_id", hsm.turnPlayer.ID.UUID())
+
 	// Execute decision action
 	if ctx == nil {
 		ctx = NewStateContext().WithHSM(hsm).WithPlayer(hsm.turnPlayer)
@@ -678,6 +685,8 @@ func (hsm *HSM) OnRollDice(ctx *StateContext) error {
 		return errors.New("OnRollDice requires MainAction state")
 	}
 
+	hsm.game.DebugLog.Info("HSM.OnRollDice", "player_id", hsm.turnPlayer.ID.UUID(), "state", hsm.turnStateID.String())
+
 	// Create context if not provided
 	if ctx == nil {
 		ctx = NewStateContext().WithHSM(hsm).WithPlayer(hsm.turnPlayer)
@@ -705,6 +714,8 @@ func (hsm *HSM) OnUseItem(itemID string, ctx *StateContext) error {
 	if hsm.turnStateID != StateMainAction {
 		return errors.New("OnUseItem requires MainAction state")
 	}
+
+	hsm.game.DebugLog.Info("HSM.OnUseItem", "player_id", hsm.turnPlayer.ID.UUID(), "item_id", itemID)
 
 	// Create context if not provided
 	if ctx == nil {
@@ -748,6 +759,8 @@ func (hsm *HSM) OnUseSkill(ctx *StateContext) error {
 	if hsm.turnStateID != StateMainAction {
 		return errors.New("OnUseSkill requires MainAction state")
 	}
+
+	hsm.game.DebugLog.Info("HSM.OnUseSkill", "player_id", hsm.turnPlayer.ID.UUID(), "faction", hsm.turnPlayer.GetFaction())
 
 	// Create context if not provided
 	if ctx == nil {

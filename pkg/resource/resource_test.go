@@ -513,4 +513,145 @@ func TestGlobalDefinitionSetInitialized(t *testing.T) {
 	if len(GlobalDefinitionSet.Items) == 0 {
 		t.Error("GlobalDefinitionSet.Items should not be empty")
 	}
+	if len(GlobalDefinitionSet.MiniGames) == 0 {
+		t.Error("GlobalDefinitionSet.MiniGames should not be empty")
+	}
+}
+
+func TestLoadDefinitionsMiniGameFields(t *testing.T) {
+	defs, err := LoadDefinitions()
+	if err != nil {
+		t.Fatalf("LoadDefinitions failed: %v", err)
+	}
+
+	// Verify all expected mini-game types are loaded
+	expectedMiniGames := []constants.MiniGameType{
+		constants.MiniGameTypeDiceRace, constants.MiniGameTypeCoinFlip,
+		constants.MiniGameTypeCountSeconds, constants.MiniGameTypeMathCalc,
+		constants.MiniGameTypeRainbowMemory, constants.MiniGameTypeVernier,
+		constants.MiniGameTypeDilemmaRace,
+	}
+	if len(defs.MiniGames) != len(expectedMiniGames) {
+		t.Errorf("len(defs.MiniGames) = %d, want %d", len(defs.MiniGames), len(expectedMiniGames))
+	}
+	for _, mt := range expectedMiniGames {
+		if _, ok := defs.MiniGames[mt]; !ok {
+			t.Errorf("missing mini-game definition for %s", mt)
+		}
+	}
+
+	// Spot-check: dice_race is a frontend type (behavioral invariant)
+	diceRace := defs.MiniGames[constants.MiniGameTypeDiceRace]
+	if diceRace == nil {
+		t.Fatal("missing dice_race mini-game")
+	}
+	if diceRace.Mode != constants.MiniGameModeFrontend {
+		t.Errorf("dice_race.Mode = %d, want %d (frontend)", diceRace.Mode, constants.MiniGameModeFrontend)
+	}
+	if diceRace.EnglishName != "DiceRace" {
+		t.Errorf("dice_race.EnglishName = %s, want DiceRace", diceRace.EnglishName)
+	}
+	if diceRace.Name != "骰子竞速" {
+		t.Errorf("dice_race.Name = %s, want 骰子竞速", diceRace.Name)
+	}
+
+	// Spot-check: coin_flip is loaded (available is config-dependent, not asserted)
+	coinFlip := defs.MiniGames[constants.MiniGameTypeCoinFlip]
+	if coinFlip == nil {
+		t.Fatal("missing coin_flip mini-game")
+	}
+
+	// Spot-check: dilemma_race is an online type (behavioral invariant)
+	dilemmaRace := defs.MiniGames[constants.MiniGameTypeDilemmaRace]
+	if dilemmaRace == nil {
+		t.Fatal("missing dilemma_race mini-game")
+	}
+	if dilemmaRace.Mode != constants.MiniGameModeRPC {
+		t.Errorf("dilemma_race.Mode = %d, want %d (RPC)", dilemmaRace.Mode, constants.MiniGameModeRPC)
+	}
+}
+
+func TestInitMiniGamePools(t *testing.T) {
+	// After init, AllMiniGameTypes should not be empty
+	if len(constants.AllMiniGameTypes) == 0 {
+		t.Error("AllMiniGameTypes should not be empty (populated by initMiniGamePools)")
+	}
+
+	// Verify that unavailable types are not in the pool
+	for _, mt := range constants.AllMiniGameTypes {
+		def := GlobalDefinitionSet.MiniGames[mt]
+		if def == nil {
+			t.Errorf("AllMiniGameTypes contains type without definition: %s", mt)
+		}
+		if !def.Available {
+			t.Errorf("AllMiniGameTypes contains unavailable type: %s", mt)
+		}
+	}
+
+	// AllOnlineMiniGameTypes should only contain online types
+	if len(constants.AllOnlineMiniGameTypes) == 0 {
+		t.Error("AllOnlineMiniGameTypes should not be empty")
+	}
+	for _, mt := range constants.AllOnlineMiniGameTypes {
+		if !mt.IsOnline() {
+			t.Errorf("AllOnlineMiniGameTypes contains non-online type: %s", mt)
+		}
+	}
+}
+
+func TestLoadDefinitionsFromYAMLUnknownMiniGameType(t *testing.T) {
+	yaml := []byte(`
+events: {}
+buffs: {}
+items: {}
+mini_games:
+  unknown_game:
+    mode: frontend
+    available: true
+    english_name: Unknown
+    name: Unknown
+    desc: Test
+`)
+	_, err := LoadDefinitionsFromYAML(yaml)
+	if err == nil {
+		t.Error("LoadDefinitionsFromYAML with unknown mini-game type should return error")
+	}
+}
+
+func TestLoadDefinitionsFromYAMLInconsistentModeOnline(t *testing.T) {
+	yaml := []byte(`
+events: {}
+buffs: {}
+items: {}
+mini_games:
+  dice_race:
+    mode: online
+    available: true
+    english_name: DiceRace
+    name: Test
+    desc: Test
+`)
+	_, err := LoadDefinitionsFromYAML(yaml)
+	if err == nil {
+		t.Error("LoadDefinitionsFromYAML with mode=online for dice_race (not online in Go) should return error")
+	}
+}
+
+func TestLoadDefinitionsFromYAMLInconsistentModeFrontend(t *testing.T) {
+	yaml := []byte(`
+events: {}
+buffs: {}
+items: {}
+mini_games:
+  dilemma_race:
+    mode: frontend
+    available: true
+    english_name: DilemmaRace
+    name: Test
+    desc: Test
+`)
+	_, err := LoadDefinitionsFromYAML(yaml)
+	if err == nil {
+		t.Error("LoadDefinitionsFromYAML with mode=frontend for dilemma_race (online in Go) should return error")
+	}
 }

@@ -8,8 +8,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
+	"github.com/b1tAction/paradiced/internal/engine/minigame"
 	"github.com/b1tAction/paradiced/internal/nakama"
 	"github.com/heroiclabs/nakama-common/runtime"
 )
@@ -19,6 +21,19 @@ const deviceIDPrefix = "paradiced_"
 
 // Stale account threshold: accounts inactive for more than 7 days will be cleaned up.
 const staleThresholdDays = 7
+
+// Shared secret for Colyseus mini-game service authentication.
+// Used for: (1) HMAC token generation for player room join auth,
+// (2) RPC callback validation from Colyseus to Nakama.
+// In production, this should be set via environment variable.
+var colyseusSecret = os.Getenv("COLYSEUS_SECRET")
+
+// Colyseus server public WebSocket URL (browser-accessible).
+// Default: "ws://127.0.0.1:2567" (for local dev/docker-compose).
+var colyseusPublicWSURL = os.Getenv("COLYSEUS_PUBLIC_WS_URL")
+
+// Nakama RPC URL that Colyseus calls back with mini-game results.
+var nakamaRPCURL = os.Getenv("NAKAMA_RPC_URL")
 
 // InitModule is the entry point called by Nakama when the module is loaded.
 // This function registers all match handlers and hooks.
@@ -172,7 +187,31 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 	// while using the same handler. Each unique name triggers a fresh MatchInit call.
 	err = initializer.RegisterMatch("paradiced_match_*", func(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule) (runtime.Match, error) {
 		// Create a new match handler adapter
-		return nakama.NewNakamaMatchHandlerAdapter(), nil
+		adapter := nakama.NewNakamaMatchHandlerAdapter()
+
+		// Inject Colyseus config if configured (enables online mini-game mode)
+		// Provider creation is deferred to adapter.MatchInit where the real Nakama match ID
+		// is available via runtime.RUNTIME_CTX_MATCH_ID context value.
+		if colyseusSecret != "" && colyseusPublicWSURL != "" {
+			// Set defaults for docker-compose / local dev
+			if colyseusPublicWSURL == "" {
+				colyseusPublicWSURL = "ws://127.0.0.1:2567"
+			}
+			if nakamaRPCURL == "" {
+				nakamaRPCURL = "http://nakama:7350/v2/rpc/minigame_result_callback"
+			}
+			adapter.WithColyseusConfig(&minigame.ColyseusProviderConfig{
+				PublicWSURL:   colyseusPublicWSURL,
+				NakamaRPCURL:  nakamaRPCURL,
+				Secret:        colyseusSecret,
+				NakamaMatchID: "", // Will be set in MatchInit from runtime context
+			})
+			logger.Info("Colyseus mini-game config set: public_ws_url=%s", colyseusPublicWSURL)
+		} else {
+			logger.Info("No Colyseus mini-game config set - online mini-games disabled")
+		}
+
+		return adapter, nil
 	})
 
 	if err != nil {
@@ -180,8 +219,18 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		return err
 	}
 
+	// Register RPC for mini-game result callback (called by Colyseus after game ends)
+	if colyseusSecret != "" {
+		err = nakama.RegisterMiniGameResultRPC(initializer, colyseusSecret)
+		if err != nil {
+			logger.Error("Failed to register minigame_result_callback RPC: %v", err)
+			return err
+		}
+		logger.Info("MiniGame result callback RPC registered")
+	}
+
 	logger.Info("Paradiced match handler registered successfully")
-	log.Printf("[Paradiced] Module initialized - RPC, match handler, matchmaker callback, and cleanup RPC registered")
+	log.Printf("[Paradiced] Module initialized - RPC, match handler, matchmaker callback, mini-game RPC, and cleanup RPC registered")
 
 	return nil
 }

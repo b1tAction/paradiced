@@ -16,7 +16,7 @@ import (
 // Called by Nakama when a new match is created.
 func (h *NakamaMatchHandler) MatchInit() error {
 	if h.logger != nil {
-		h.logger.Info("MatchInit: initializing match", "match_id", h.matchID)
+		h.logger.WithFields(map[string]interface{}{"match_id": h.matchID}).Info("MatchInit: initializing match")
 	}
 
 	// Initialize game instance
@@ -25,12 +25,12 @@ func (h *NakamaMatchHandler) MatchInit() error {
 	}
 	if err := h.initializeGame(); err != nil {
 		if h.logger != nil {
-			h.logger.Error("MatchInit: failed to initialize game", "error", err)
+			h.logger.WithFields(map[string]interface{}{"error": err}).Error("MatchInit: failed to initialize game")
 		}
 		return err
 	}
 	if h.logger != nil {
-		h.logger.Debug("MatchInit: game initialized", "game_id", h.hsm.GetGame().ID)
+		h.logger.WithFields(map[string]interface{}{"game_id": h.hsm.GetGame().ID}).Debug("MatchInit: game initialized")
 	}
 
 	// Create broadcast adapter
@@ -54,9 +54,10 @@ func (h *NakamaMatchHandler) MatchInit() error {
 	// Check state execution error
 	if ctx.Error != nil {
 		if h.logger != nil {
-			h.logger.Error("MatchInit: state execution failed",
-				"state", hsm.StateMatchInit.String(),
-				"error", ctx.Error.Error())
+			h.logger.WithFields(map[string]interface{}{
+				"state": hsm.StateMatchInit.String(),
+				"error": ctx.Error.Error(),
+			}).Error("MatchInit: state execution failed")
 		}
 		errCode := ErrorCodeForError(ctx.Error)
 		return h.sendActionRejectedWithCode("", pkgnet.OpStateSync, errCode, ctx.Error.Error())
@@ -64,7 +65,7 @@ func (h *NakamaMatchHandler) MatchInit() error {
 
 	if h.logger != nil {
 		h.logger.Debug("MatchInit: starting HSM")
-		h.logger.Info("MatchInit: HSM started", "initial_state", hsm.StateMatchInit.String())
+		h.logger.WithFields(map[string]interface{}{"initial_state": hsm.StateMatchInit.String()}).Info("MatchInit: HSM started")
 	}
 
 	return nil
@@ -103,15 +104,16 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 	turnStateID := h.hsm.GetTurnStateID()
 
 	if h.logger != nil {
-		h.logger.Debug("MatchLoop: tick",
-			"global_state", globalStateID.String(),
-			"turn_state", turnStateID.String(),
-			"current_player", func() string {
+		h.logger.WithFields(map[string]interface{}{
+			"global_state":  globalStateID.String(),
+			"turn_state":    turnStateID.String(),
+			"current_player": func() string {
 				if currentPlayer != nil {
 					return currentPlayer.ID.UUID()
 				}
 				return "none"
-			}())
+			}(),
+		}).Debug("MatchLoop: tick")
 	}
 
 	// Handle TurnEnd state - trigger next turn or round
@@ -153,13 +155,85 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 				nextState := turnLoopState.StartPlayerTurn(ctx)
 				if nextState != hsm.StateNone {
 					if h.logger != nil {
-						h.logger.Debug("MatchLoop: starting next player turn", "next_state", nextState.String())
-					}
+					h.logger.WithFields(map[string]interface{}{"next_state": nextState.String()}).Debug("MatchLoop: starting next player turn")
+				}
 					h.hsm.TransitionTo(nextState, ctx)
 
 					// Re-get current player after turn change
 					currentPlayer = h.getCurrentPlayer()
 					ctx.Player = currentPlayer
+				}
+			}
+		}
+	}
+
+	// Handle online mini-game results received via MatchSignal (from Colyseus RPC callback).
+	// Rankings are stored in handler.pendingMiniGameResults by MatchSignal handler.
+	if globalStateID == hsm.StateRoundMiniGame && len(h.pendingMiniGameResults) > 0 {
+		globalState := h.hsm.GetGlobalState()
+		miniGameState, ok := globalState.(*hsm.RoundMiniGameState)
+		if ok && miniGameState.GetMode() == constants.MiniGameModeRPC {
+			if h.logger != nil {
+				h.logger.WithFields(map[string]interface{}{
+					"results_count": len(h.pendingMiniGameResults),
+					"game_type":     miniGameState.GetGameType(),
+				}).Info("MatchLoop: applying pending mini-game results")
+			}
+			for playerID, rank := range h.pendingMiniGameResults {
+				miniGameState.OnMiniGameResult(ctx, playerID, rank)
+			}
+			h.pendingMiniGameResults = nil // Clear after applying
+
+			// If all results received, destroy Colyseus room
+			if miniGameState.GetResultsReceived() >= miniGameState.GetTotalPlayers() {
+				conn := miniGameState.GetConnection()
+				prov := miniGameState.GetProvider()
+				if conn != nil && prov != nil {
+					if err := prov.DestroyRoom(conn.RoomID); err != nil {
+						if h.logger != nil {
+						h.logger.WithFields(map[string]interface{}{
+							"room_id": conn.RoomID,
+							"error":   err,
+						}).Warn("MatchLoop: failed to destroy Colyseus room")
+					}
+					}
+				}
+			}
+		}
+	}
+
+	// Check timeout for online mini-game (RPC mode)
+	if globalStateID == hsm.StateRoundMiniGame && h.provider != nil {
+		globalState := h.hsm.GetGlobalState()
+		miniGameState, ok := globalState.(*hsm.RoundMiniGameState)
+		if ok && miniGameState.GetMode() == constants.MiniGameModeRPC && !miniGameState.GetRoomCreatedAt().IsZero() {
+			timeout := miniGameState.GetProvider().GetTimeout(miniGameState.GetGameType())
+			if time.Since(miniGameState.GetRoomCreatedAt()) > timeout && miniGameState.GetResultsReceived() < miniGameState.GetTotalPlayers() {
+				if h.logger != nil {
+				h.logger.WithFields(map[string]interface{}{
+					"game_type":       miniGameState.GetGameType(),
+					"results_received": miniGameState.GetResultsReceived(),
+					"total_players":   miniGameState.GetTotalPlayers(),
+				}).Warn("MatchLoop: online mini-game timeout, assigning default rankings")
+			}
+				// Assign default rankings for missing players (lowest rank)
+				game := h.hsm.GetGame()
+				if game != nil {
+					for _, p := range game.Players {
+						if p.ID.IsBoss() {
+							continue
+						}
+						rank := ctx.GetMiniGameRank(p.ID.UUID())
+						if rank <= 0 {
+							// Assign worst rank to players without results
+							miniGameState.OnMiniGameResult(ctx, p.ID.UUID(), miniGameState.GetTotalPlayers())
+						}
+					}
+				}
+				// Destroy room on timeout
+				conn := miniGameState.GetConnection()
+				if conn != nil {
+					miniGameState.GetProvider().DestroyRoom(conn.RoomID)
 				}
 			}
 		}
@@ -172,7 +246,7 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 	_, err := h.hsm.Update(ctx)
 	if err != nil {
 		if h.logger != nil {
-			h.logger.Error("MatchLoop: HSM update failed", "error", err)
+			h.logger.WithFields(map[string]interface{}{"error": err}).Error("MatchLoop: HSM update failed")
 		}
 		return err
 	}
@@ -180,10 +254,11 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 	// Check state execution error
 	if ctx.Error != nil {
 		if h.logger != nil {
-			h.logger.Error("MatchLoop: state execution failed",
-				"global_state", globalStateID.String(),
-				"turn_state", turnStateID.String(),
-				"error", ctx.Error.Error())
+			h.logger.WithFields(map[string]interface{}{
+				"global_state": globalStateID.String(),
+				"turn_state":   turnStateID.String(),
+				"error":        ctx.Error.Error(),
+			}).Error("MatchLoop: state execution failed")
 		}
 		errCode := ErrorCodeForError(ctx.Error)
 		return h.broadcastErrorState(errCode, ctx.Error.Error())
@@ -209,9 +284,10 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 				h.lastDecisionID = decisionUUID
 
 				if h.logger != nil {
-					h.logger.Debug("MatchLoop: sending decision request",
-						"decision_id", decisionUUID,
-						"player_id", currentPlayer.ID.UUID())
+					h.logger.WithFields(map[string]interface{}{
+						"decision_id": decisionUUID,
+						"player_id":   currentPlayer.ID.UUID(),
+					}).Debug("MatchLoop: sending decision request")
 				}
 
 				// Build decision request
@@ -238,7 +314,7 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 // Called by Nakama when match ends.
 func (h *NakamaMatchHandler) MatchStop() error {
 	if h.logger != nil {
-		h.logger.Info("MatchStop: terminating match", "match_id", h.matchID)
+		h.logger.WithFields(map[string]interface{}{"match_id": h.matchID}).Info("MatchStop: terminating match")
 	}
 
 	// Create final state context
@@ -252,9 +328,10 @@ func (h *NakamaMatchHandler) MatchStop() error {
 
 	// Clear resources
 	if h.logger != nil {
-		h.logger.Debug("MatchStop: clearing player data",
-			"players_count", len(h.players),
-			"player_list_len", len(h.playerList))
+		h.logger.WithFields(map[string]interface{}{
+			"players_count":   len(h.players),
+			"player_list_len": len(h.playerList),
+		}).Debug("MatchStop: clearing player data")
 	}
 	h.players = make(map[string]*core.Player)
 	h.playerList = make([]string, 0)
@@ -323,12 +400,13 @@ func (h *NakamaMatchHandler) addPlayer(userID string, faction constants.Faction,
 	h.playerList = append(h.playerList, userID)
 
 	if h.logger != nil {
-		h.logger.Debug("Player added to match",
-			"user_id", userID,
-			"player_id", playerID.UUID(),
-			"faction", faction,
-			"display_name", displayName,
-			"total_players", len(h.playerList))
+		h.logger.WithFields(map[string]interface{}{
+			"user_id":        userID,
+			"player_id":     playerID.UUID(),
+			"faction":       faction,
+			"display_name":  displayName,
+			"total_players": len(h.playerList),
+		}).Debug("Player added to match")
 	}
 
 	return player
@@ -350,9 +428,10 @@ func (h *NakamaMatchHandler) assignFactions() {
 func (h *NakamaMatchHandler) broadcastErrorState(errCode constants.ErrorCode, message string) error {
 	// Log error for debugging
 	if h.logger != nil {
-		h.logger.Error("MatchLoop: state execution error",
-			"error_code", errCode,
-			"message", message)
+		h.logger.WithFields(map[string]interface{}{
+			"error_code": errCode,
+			"message":    message,
+		}).Error("MatchLoop: state execution error")
 	}
 
 	// Broadcast current state sync to all connected players

@@ -2,6 +2,7 @@ package hsm
 
 import (
 	"sort"
+	"time"
 
 	"github.com/b1tAction/paradiced/internal/core"
 	"github.com/b1tAction/paradiced/internal/engine/minigame"
@@ -9,6 +10,7 @@ import (
 	"github.com/b1tAction/paradiced/pkg/errors"
 	"github.com/b1tAction/paradiced/pkg/id"
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
+	"github.com/b1tAction/paradiced/pkg/protocol"
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
@@ -55,6 +57,8 @@ func (s *MatchInitState) Enter(ctx *StateContext) {
 			"MatchInit", 1, "Enter", "game instance is nil")
 		return
 	}
+
+	game.DebugLog.Info("HSM.MatchInitState.Enter", "players", len(game.Players))
 
 	// Map is already initialized by the caller (Nakama handler loads from
 	// pkg/resource/default.json via BuildMapEngine). MatchInitState should
@@ -151,12 +155,15 @@ func (s *WaitingForHostState) Exit(ctx *StateContext) {
 
 type RoundMiniGameState struct {
 	BaseGlobalState
-	resultsReceived int
-	totalPlayers    int
-	gameType        constants.MiniGameType                      // Current round mini-game type (server-selected)
-	mode            constants.MiniGameMode                      // Frontend-driven or RPC-driven
-	gameData        map[string]map[string]interface{}           // playerID -> game_data (frontend mode storage)
-	rankCalculator  minigame.RankCalculator
+	resultsReceived  int
+	totalPlayers     int
+	gameType         constants.MiniGameType                      // Current round mini-game type (server-selected)
+	mode             constants.MiniGameMode                      // Frontend-driven or RPC-driven
+	gameData         map[string]map[string]interface{}           // playerID -> game_data (frontend mode storage)
+	rankCalculator   minigame.RankCalculator
+	provider         protocol.OnlineMiniGameProvider             // Online mini-game service provider (nil for frontend-only)
+	connection       *pkgnet.MiniGameConn                        // Connection info for online mode (nil for frontend mode)
+	roomCreatedAt    time.Time                                   // Timestamp when online room was created, for timeout check
 }
 
 // NewRoundMiniGameState creates a new RoundMiniGame state with default frontend-driven mode.
@@ -184,53 +191,136 @@ func (s *RoundMiniGameState) WithRankCalculator(calc minigame.RankCalculator) *R
 	return s
 }
 
+// WithProvider sets the online mini-game provider for RPC mode.
+// When set, online MiniGameTypes will use CreateRoom to establish
+// an external game session instead of frontend-driven mode.
+func (s *RoundMiniGameState) WithProvider(provider protocol.OnlineMiniGameProvider) *RoundMiniGameState {
+	s.provider = provider
+	return s
+}
+
 // GetGameType returns the current round's mini-game type.
 func (s *RoundMiniGameState) GetGameType() constants.MiniGameType {
 	return s.gameType
 }
 
+// GetMode returns the current mini-game execution mode.
+func (s *RoundMiniGameState) GetMode() constants.MiniGameMode {
+	return s.mode
+}
+
+// GetResultsReceived returns the count of received mini-game results.
+func (s *RoundMiniGameState) GetResultsReceived() int {
+	return s.resultsReceived
+}
+
+// GetTotalPlayers returns the total number of players participating in mini-game.
+func (s *RoundMiniGameState) GetTotalPlayers() int {
+	return s.totalPlayers
+}
+
+// GetConnection returns the online mini-game connection info (nil for frontend mode).
+func (s *RoundMiniGameState) GetConnection() *pkgnet.MiniGameConn {
+	return s.connection
+}
+
+// GetProvider returns the online mini-game provider (nil for frontend-only).
+func (s *RoundMiniGameState) GetProvider() protocol.OnlineMiniGameProvider {
+	return s.provider
+}
+
+// GetRoomCreatedAt returns the timestamp when the online room was created.
+func (s *RoundMiniGameState) GetRoomCreatedAt() time.Time {
+	return s.roomCreatedAt
+}
+
 func (s *RoundMiniGameState) Enter(ctx *StateContext) {
 	// Start mini-game phase
 	game := ctx.GetGame()
-	// Clear round-level persistent data for new round
 	if game != nil && game.RoundData != nil {
 		game.RoundData.Clear()
 	}
 
 	// Count non-Boss players (Boss doesn't participate in MiniGame)
 	nonBossPlayers := 0
+	playerIDs := make([]string, 0)
 	for _, p := range game.Players {
 		if !p.ID.IsBoss() {
 			nonBossPlayers++
+			playerIDs = append(playerIDs, p.ID.UUID())
 		}
 	}
 	s.totalPlayers = nonBossPlayers
 	s.resultsReceived = 0
 	s.gameData = make(map[string]map[string]interface{}, nonBossPlayers)
 
-	// Select mini-game type using game RNG for deterministic replay
-	s.gameType = minigame.SelectMiniGameType(game.RNG)
+	// Select mini-game type using game RNG for deterministic replay.
+	// Online types are only selectable when provider is available.
+	s.gameType = minigame.SelectMiniGameTypeWithProvider(game.RNG, s.provider != nil)
+
+	game.DebugLog.Info("HSM.RoundMiniGameState.Enter.selected", "game_type", s.gameType, "has_provider", s.provider != nil, "total_players", s.totalPlayers)
+
+	// No eligible mini-game available: skip mini-game phase entirely.
+	if s.gameType == constants.MiniGameTypeNone {
+		game.DebugLog.Warn("HSM.RoundMiniGameState.Enter.no_game_available", "reason", "no_eligible_mini_game_type")
+		ctx.SetBool(KeyMiniGameStarted, false)
+		return
+	}
+
+	// Mode determination based on game type and provider availability
+	if s.gameType.IsOnline() && s.provider != nil {
+		s.mode = constants.MiniGameModeRPC
+		game.DebugLog.Info("HSM.RoundMiniGameState.Enter.rpc_mode", "game_type", s.gameType, "mode", s.mode)
+		// Create room on mini-game service
+		conn, err := s.provider.CreateRoom(s.gameType, playerIDs)
+		if err != nil {
+			// Room creation failed - try fallback to frontend-compatible type.
+			// This is a recoverable condition, NOT a fatal error.
+			// Do NOT set ctx.Error to avoid killing the game.
+			game.DebugLog.Warn("HSM.RoundMiniGameState.Enter.room_creation_failed", "game_type", s.gameType, "error", err.Error(), "fallback", "frontend_mode")
+			frontendPool := minigame.FrontendMiniGamePool()
+			if len(frontendPool) > 0 {
+				s.gameType = minigame.SelectFromPool(game.RNG, frontendPool)
+				s.mode = constants.MiniGameModeFrontend
+				s.connection = nil
+				game.DebugLog.Info("HSM.RoundMiniGameState.Enter.fallback_success", "fallback_game_type", s.gameType, "mode", s.mode)
+			} else {
+				// No frontend types available, skip mini-game entirely
+				game.DebugLog.Warn("HSM.RoundMiniGameState.Enter.no_frontend_fallback", "reason", "empty_frontend_pool")
+				s.gameType = constants.MiniGameTypeNone
+				ctx.SetBool(KeyMiniGameStarted, false)
+				return
+			}
+		} else {
+			s.connection = conn
+			s.roomCreatedAt = time.Now()
+			game.DebugLog.Info("HSM.RoundMiniGameState.Enter.room_created", "game_type", s.gameType, "room_id", conn.RoomID)
+		}
+	} else {
+		s.mode = constants.MiniGameModeFrontend
+		s.connection = nil
+		game.DebugLog.Info("HSM.RoundMiniGameState.Enter.frontend_mode", "game_type", s.gameType, "mode", s.mode)
+	}
 
 	ctx.SetBool(KeyMiniGameStarted, true)
 	ctx.SetBool(KeyWaitingForResults, true)
 
 	// Broadcast MiniGameStart to all clients (excluding Boss)
 	if ctx.Broadcast != nil {
-		playerIDs := make([]string, 0, nonBossPlayers)
-		for _, p := range game.Players {
-			if !p.ID.IsBoss() {
-				playerIDs = append(playerIDs, p.ID.UUID())
-			}
-		}
 		start := &pkgnet.MiniGameStart{
-			GameType: string(s.gameType),
-			Players:  playerIDs,
+			GameType:   string(s.gameType),
+			Players:    playerIDs,
+			Connection: s.connection, // nil for frontend mode, populated for RPC mode
 		}
 		ctx.Broadcast.BroadcastMiniGameStart(start)
 	}
 }
 
 func (s *RoundMiniGameState) Update(ctx *StateContext) StateID {
+	// No mini-game available: skip to RoundPrep
+	if s.gameType == constants.MiniGameTypeNone {
+		return StateRoundPrep
+	}
 	// Check if all results received
 	// In actual implementation, this would check for incoming messages
 	if s.resultsReceived >= s.totalPlayers {
@@ -351,12 +441,8 @@ func NewRoundPrepState() *RoundPrepState {
 
 func (s *RoundPrepState) Enter(ctx *StateContext) {
 	// Assign dice based on mini-game rankings
-	// Rank 1 -> Gold dice (weighted toward high numbers)
-	// Rank 2 -> Silver dice
-	// Rank 3 -> Copper dice
-	// Rank 4 -> Wood dice (uniform distribution)
-
 	game := ctx.GetGame()
+	game.DebugLog.Info("HSM.RoundPrepState.Enter", "round", ctx.GetRound(), "players", len(game.Players))
 	players := game.Players
 
 	// Reorder players by mini-game rank (lower rank goes first).
@@ -438,6 +524,7 @@ func NewTurnLoopState() *TurnLoopState {
 
 func (s *TurnLoopState) Enter(ctx *StateContext) {
 	game := ctx.GetGame()
+	game.DebugLog.Info("HSM.TurnLoopState.Enter", "round", ctx.GetRound(), "players", len(game.Players))
 	players := game.Players
 
 	// Reset state
@@ -639,6 +726,7 @@ func (s *GameOverState) Enter(ctx *StateContext) {
 	game := ctx.GetGame()
 
 	winnerID := ctx.GetStringOrDefault(KeyWinner, "")
+	game.DebugLog.Info("HSM.GameOverState.Enter", "winner_id", winnerID)
 	if winnerID != "" {
 		parsedID, err := id.ParsePlayerID(winnerID)
 		if err == nil {
@@ -698,7 +786,15 @@ func (s *GameOverState) CanTransitionTo(target StateID) bool {
 // ========== Factory for Global States ==========
 
 // GlobalStateFactory creates global layer states.
-type GlobalStateFactory struct{}
+// If provider is set, RoundMiniGameState will use it for online mini-game room creation.
+type GlobalStateFactory struct {
+	provider protocol.OnlineMiniGameProvider
+}
+
+// NewGlobalStateFactory creates a factory with optional online mini-game provider.
+func NewGlobalStateFactory(provider protocol.OnlineMiniGameProvider) *GlobalStateFactory {
+	return &GlobalStateFactory{provider: provider}
+}
 
 // CreateState creates a global state by ID.
 func (f *GlobalStateFactory) CreateState(id StateID) State {
@@ -708,7 +804,11 @@ func (f *GlobalStateFactory) CreateState(id StateID) State {
 	case StateWaitingForHost:
 		return NewWaitingForHostState()
 	case StateRoundMiniGame:
-		return NewRoundMiniGameState()
+		state := NewRoundMiniGameState()
+		if f.provider != nil {
+			state.WithProvider(f.provider)
+		}
+		return state
 	case StateRoundPrep:
 		return NewRoundPrepState()
 	case StateTurnLoop:
@@ -725,6 +825,22 @@ func (f *GlobalStateFactory) CreateState(id StateID) State {
 // RegisterGlobalStates registers all global states with HSM.
 func RegisterGlobalStates(hsm *HSM) error {
 	factory := &GlobalStateFactory{}
+	states := []State{
+		factory.CreateState(StateMatchInit),
+		factory.CreateState(StateWaitingForHost),
+		factory.CreateState(StateRoundMiniGame),
+		factory.CreateState(StateRoundPrep),
+		factory.CreateState(StateTurnLoop),
+		factory.CreateState(StateRoundEndWait),
+		factory.CreateState(StateGameOver),
+	}
+	return hsm.RegisterStates(states)
+}
+
+// RegisterGlobalStatesWithProvider registers all global states with HSM,
+// injecting the online mini-game provider into RoundMiniGameState.
+func RegisterGlobalStatesWithProvider(hsm *HSM, provider protocol.OnlineMiniGameProvider) error {
+	factory := NewGlobalStateFactory(provider)
 	states := []State{
 		factory.CreateState(StateMatchInit),
 		factory.CreateState(StateWaitingForHost),

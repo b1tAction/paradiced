@@ -190,10 +190,32 @@ type MiniGameConn struct {
 	URL string `json:"url"`
 
 	// RoomID is the Colyseus room ID.
-	RoomID string `json:"room_id"`
+	// In WebSocket/matchmaker mode, this is initially empty and populated after client joins.
+	RoomID string `json:"room_id,omitempty"`
 
-	// Token is the authentication token for MiniGame Service.
-	Token string `json:"token"`
+	// RoomName is the Colyseus room name (e.g. "dilemma_race").
+	// Used by client for joinOrCreate instead of joinById.
+	RoomName string `json:"room_name"`
+
+	// NakamaMatchID is the Nakama runtime match ID for result callback routing.
+	NakamaMatchID string `json:"nakama_match_id"`
+
+	// MiniGameInstanceID is a unique ID for this mini-game session.
+	// Used as filterBy key to ensure all players enter the same Colyseus room.
+	MiniGameInstanceID string `json:"minigame_instance_id"`
+
+	// CreatorPlayerID is the player responsible for creating the Colyseus room.
+	// In joinOrCreate mode, all players can joinOrCreate, but this field
+	// indicates who the designated first player is for fallback coordination.
+	CreatorPlayerID string `json:"creator_player_id"`
+
+	// Token is the shared authentication token for MiniGame Service.
+	// Deprecated: use PlayerTokens for per-player authentication.
+	Token string `json:"token,omitempty"`
+
+	// PlayerTokens maps playerID to their individual authentication token.
+	// Each player receives their own HMAC token for joining the Colyseus room.
+	PlayerTokens map[string]string `json:"player_tokens,omitempty"`
 }
 
 // MiniGameDataSubmit represents client mini-game data submission.
@@ -400,6 +422,9 @@ type DefinitionsConfig struct {
 
 	// Items maps item type keys to their definition configs.
 	Items map[string]ItemDefinitionConfig `json:"items"`
+
+	// MiniGames maps mini-game type keys to their definition configs.
+	MiniGames map[string]MiniGameDefinitionConfig `json:"mini_games"`
 }
 
 // EventDefinitionConfig represents an event definition for client rendering.
@@ -437,6 +462,16 @@ type ItemDefinitionConfig struct {
 	EnglishName string `json:"english_name"`
 	Name        string `json:"name"`         // Chinese display name
 	Desc        string `json:"desc"`         // Chinese description
+}
+
+// MiniGameDefinitionConfig represents a mini-game definition for client rendering.
+type MiniGameDefinitionConfig struct {
+	Type        string `json:"type"`
+	Mode        string `json:"mode"`          // "frontend" or "online"
+	Available   bool   `json:"available"`     // Whether in random selection pool
+	EnglishName string `json:"english_name"`
+	Name        string `json:"name"`          // Chinese display name
+	Desc        string `json:"desc"`          // Chinese description
 }
 
 // KickPlayerRequest represents a host kick player request from client.
