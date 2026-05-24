@@ -16,11 +16,16 @@ import (
 
 // mockGame implements protocol.Game for testing
 type mockGame struct {
-	log *gamelog.GameLog
+	log      *gamelog.GameLog
+	debugLog *gamelog.GameLogger
 }
 
 func (m *mockGame) GetGameLog() *gamelog.GameLog {
 	return m.log
+}
+
+func (m *mockGame) GetDebugLog() *gamelog.GameLogger {
+	return m.debugLog
 }
 
 func (m *mockGame) GetPlayerInterface(playerID id.PlayerID) interface{} {
