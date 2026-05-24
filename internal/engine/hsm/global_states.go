@@ -1,14 +1,15 @@
 package hsm
 
 import (
+	"fmt"
 	"sort"
 	"time"
 
 	"github.com/b1tAction/paradiced/internal/core"
+	"github.com/b1tAction/paradiced/internal/engine"
 	"github.com/b1tAction/paradiced/internal/engine/minigame"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/errors"
-	"github.com/b1tAction/paradiced/pkg/id"
 	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/b1tAction/paradiced/pkg/protocol"
 	"github.com/b1tAction/paradiced/pkg/rng"
@@ -133,6 +134,8 @@ func (s *WaitingForHostState) Exit(ctx *StateContext) {
 	if game != nil {
 		for _, player := range game.Players {
 			game.InitializePlayerFactionBuffs(player)
+			// Initialize achievement handlers via EventBus (PhasePreAction subscriptions)
+			game.InitializePlayerAchievements(player)
 		}
 	}
 
@@ -330,9 +333,18 @@ func (s *RoundMiniGameState) Update(ctx *StateContext) StateID {
 }
 
 func (s *RoundMiniGameState) Exit(ctx *StateContext) {
-	// Track rounds won stat for rank 1 players
+	// Track rounds won stat and add mini-game score for all players
 	game := ctx.GetGame()
+	round := ctx.GetRound()
 	if game != nil {
+		totalNonBossPlayers := 0
+		for _, p := range game.Players {
+			if p.ID.IsBoss() {
+				continue
+			}
+			totalNonBossPlayers++
+		}
+
 		for _, p := range game.Players {
 			if p.ID.IsBoss() {
 				continue
@@ -340,6 +352,22 @@ func (s *RoundMiniGameState) Exit(ctx *StateContext) {
 			rank := ctx.GetMiniGameRank(p.ID.UUID())
 			if rank == 1 {
 				p.IncrementRoundsWon()
+			}
+
+			// Add mini-game ranking score
+			if rank > 0 && totalNonBossPlayers >= 2 {
+				score := constants.MiniGameRankToScore(rank, totalNonBossPlayers)
+				reason := "小游戏第" + fmt.Sprintf("%d", rank) + "名"
+				game.AddScoreToPlayer(p, constants.ScoreCategoryMiniGame, score, reason, round)
+			}
+
+			// mini_game_winner_three achievement: won mini-game rank 1 for 3+ rounds
+			if !p.HasAchievement(constants.AchievementMiniGameWinnerThree) && p.GetRoundsWon() >= 3 {
+				game.GrantAchievementToPlayer(p, constants.AchievementMiniGameWinnerThree)
+				def := engine.GlobalAchievementRegistry.GetDefinition(constants.AchievementMiniGameWinnerThree)
+				if def != nil {
+					game.AddScoreToPlayer(p, constants.ScoreCategoryAchievement, def.Points, def.Name, 0)
+				}
 			}
 		}
 	}
@@ -711,7 +739,6 @@ func (s *RoundEndWaitState) OnRoundReady(ctx *StateContext, playerID string) {
 
 type GameOverState struct {
 	BaseGlobalState
-	winner *core.Player
 }
 
 // NewGameOverState creates a new GameOver state.
@@ -722,42 +749,92 @@ func NewGameOverState() *GameOverState {
 }
 
 func (s *GameOverState) Enter(ctx *StateContext) {
-	// Broadcast winner and perform final data settlement
+	// Score-based ranking settlement: detect HSM-direct achievements, rank by total score
 	game := ctx.GetGame()
+	ctx.SetBool(KeyGameOver, true)
 
-	winnerID := ctx.GetStringOrDefault(KeyWinner, "")
-	game.DebugLog.Info("HSM.GameOverState.Enter", "winner_id", winnerID)
-	if winnerID != "" {
-		parsedID, err := id.ParsePlayerID(winnerID)
-		if err == nil {
-			s.winner = game.GetPlayer(parsedID)
+	// Step 1: Detect HSM-direct achievements (survivor, luck_master)
+	engine.EnsureAchievementRegistryInitialized()
+	for _, p := range game.Players {
+		if p.ID.IsBoss() {
+			continue
+		}
+		// survivor achievement: never died during the game
+		if !p.HasAchievement(constants.AchievementSurvivor) && p.GetDeathCount() == 0 {
+			game.GrantAchievementToPlayer(p, constants.AchievementSurvivor)
+			def := engine.GlobalAchievementRegistry.GetDefinition(constants.AchievementSurvivor)
+			if def != nil {
+				game.AddScoreToPlayer(p, constants.ScoreCategoryAchievement, def.Points, def.Name, 0)
+			}
+		}
+		// luck_master achievement: LP at maximum when game ends
+		if !p.HasAchievement(constants.AchievementLuckMaster) && p.LP == p.MaxLP {
+			game.GrantAchievementToPlayer(p, constants.AchievementLuckMaster)
+			def := engine.GlobalAchievementRegistry.GetDefinition(constants.AchievementLuckMaster)
+			if def != nil {
+				game.AddScoreToPlayer(p, constants.ScoreCategoryAchievement, def.Points, def.Name, 0)
+			}
 		}
 	}
 
-	ctx.SetBool(KeyGameOver, true)
+	// Step 2: Build rankings from all non-Boss players, sorted by total score descending
+	rankings := make([]pkgnet.PlayerRanking, 0)
+	for _, p := range game.Players {
+		if p.ID.IsBoss() {
+			continue
+		}
+		rankings = append(rankings, pkgnet.PlayerRanking{
+			PlayerID:         p.ID.UUID(),
+			DisplayName:      p.Metadata.GetStringOrDefault("display_name", p.ID.UUID()),
+			TotalScore:       p.GetTotalScore(),
+			MiniGameScore:    p.GetScoreByCategory(constants.ScoreCategoryMiniGame),
+			BossScore:        p.GetScoreByCategory(constants.ScoreCategoryBoss),
+			ItemScore:        p.GetScoreByCategory(constants.ScoreCategoryItem),
+			AchievementScore: p.GetScoreByCategory(constants.ScoreCategoryAchievement),
+			Achievements:     achievementTypesToStrings(p.GetAchievements()),
+			ScoreReasons:     p.GetScoreReasons(),
+		})
+	}
+	sort.SliceStable(rankings, func(i, j int) bool {
+		if rankings[i].TotalScore != rankings[j].TotalScore {
+			return rankings[i].TotalScore > rankings[j].TotalScore
+		}
+		return rankings[i].PlayerID < rankings[j].PlayerID
+	})
+	// Assign rank positions (1 = champion)
+	for i := range rankings {
+		rankings[i].Rank = i + 1
+	}
 
-	// Broadcast GameOver to all clients
+	game.DebugLog.Info("HSM.GameOverState.Enter", "champion_id", rankings[0].PlayerID, "champion_score", rankings[0].TotalScore)
+
+	// Step 3: Build stats for all players (including Boss)
+	stats := make([]pkgnet.PlayerStats, 0)
+	for _, p := range game.Players {
+		scoreBreakdown := map[string]int{
+			string(constants.ScoreCategoryMiniGame):    p.GetScoreByCategory(constants.ScoreCategoryMiniGame),
+			string(constants.ScoreCategoryBoss):        p.GetScoreByCategory(constants.ScoreCategoryBoss),
+			string(constants.ScoreCategoryItem):        p.GetScoreByCategory(constants.ScoreCategoryItem),
+			string(constants.ScoreCategoryAchievement): p.GetScoreByCategory(constants.ScoreCategoryAchievement),
+		}
+		stats = append(stats, pkgnet.PlayerStats{
+			PlayerID:        p.ID.UUID(),
+			DisplayName:     p.Metadata.GetStringOrDefault("display_name", p.ID.UUID()),
+			RoundsWon:       p.GetRoundsWon(),
+			EventsDrawn:     p.GetEventsDrawn(),
+			ItemsUsed:       p.GetItemsUsed(),
+			BossDamageDealt: p.GetBossDamageDealt(),
+			Achievements:    achievementTypesToStrings(p.GetAchievements()),
+			TotalScore:      p.GetTotalScore(),
+			ScoreBreakdown:  scoreBreakdown,
+		})
+	}
+
+	// Step 4: Broadcast GameOver with rankings + stats
 	if ctx.Broadcast != nil {
-		stats := make([]pkgnet.PlayerStats, len(game.Players))
-		for i, p := range game.Players {
-			stats[i] = pkgnet.PlayerStats{
-				PlayerID:    p.ID.UUID(),
-				DisplayName: p.Metadata.GetStringOrDefault("display_name", p.ID.UUID()),
-				RoundsWon:   p.GetRoundsWon(),
-				EventsDrawn: p.GetEventsDrawn(),
-				ItemsUsed:   p.GetItemsUsed(),
-			}
-		}
-
-		winnerDisplayName := winnerID
-		if s.winner != nil {
-			winnerDisplayName = s.winner.Metadata.GetStringOrDefault("display_name", winnerID)
-		}
-
 		over := &pkgnet.GameOver{
-			WinnerID:          winnerID,
-			WinnerDisplayName: winnerDisplayName,
-			Stats:             stats,
+			Rankings: rankings,
+			Stats:    stats,
 		}
 		ctx.Broadcast.BroadcastGameOver(over)
 	}
@@ -775,12 +852,22 @@ func (s *GameOverState) Update(ctx *StateContext) StateID {
 
 func (s *GameOverState) Exit(ctx *StateContext) {
 	// Final cleanup
-	s.winner = nil
 }
 
 // CanTransitionTo - GameOver is terminal, cannot transition.
 func (s *GameOverState) CanTransitionTo(target StateID) bool {
 	return false // Terminal state
+}
+
+// ========== Helper Functions ==========
+
+// achievementTypesToStrings converts AchievementType slice to string slice for protocol.
+func achievementTypesToStrings(types []constants.AchievementType) []string {
+	result := make([]string, len(types))
+	for i, t := range types {
+		result[i] = string(t)
+	}
+	return result
 }
 
 // ========== Factory for Global States ==========

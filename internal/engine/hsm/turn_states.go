@@ -449,6 +449,11 @@ func (s *MainActionState) OnUseItem(ctx *StateContext, itemID string) {
 	upgradeTo := s.actionCtx.GetStringOrDefault("dice_upgrade_to", "")
 	if upgradedPlayer != "" && upgradeTo != "" {
 		ctx.SetDiceType(upgradedPlayer, rng.DiceTypeFromString(upgradeTo))
+		// Dice upgrade score bonus
+		game := ctx.GetGame()
+		if game != nil && upgradedPlayer == player.ID.UUID() {
+			game.AddScoreToPlayer(player, constants.ScoreCategoryItem, constants.ScoreDiceUpgrade, "骰子升级", ctx.GetRound())
+		}
 	}
 
 	// Consume the item after handler execution (RemoveItemAction handles EventBus unsubscription)
@@ -461,8 +466,12 @@ func (s *MainActionState) OnUseItem(ctx *StateContext, itemID string) {
 				err, "MainAction", 2, "OnUseItem", "item consumption failed")
 			return
 		}
-		// Track items used stat
+		// Track items used stat + item used score
 		player.IncrementItemsUsed()
+		game := ctx.GetGame()
+		if game != nil {
+			game.AddScoreToPlayer(player, constants.ScoreCategoryItem, constants.ScoreItemUsed, "使用道具", ctx.GetRound())
+		}
 	}
 
 	// Broadcast updated state and resend available actions so the client can continue
@@ -1298,6 +1307,20 @@ func (s *TurnBossBattleState) Enter(ctx *StateContext) {
 	)
 
 	if s.isPlayerBranch {
+		// first_to_boss achievement: first non-Boss player to enter Boss battle
+		// Uses game.Metadata (persistent across rounds, NOT cleared per round like RoundData)
+		if !game.Metadata.GetBoolOrDefault(KeyFirstToBossSet, false) {
+			game.Metadata.SetBool(KeyFirstToBossSet, true)
+			game.Metadata.SetString(KeyFirstToBossPlayer, player.ID.UUID())
+			if !player.HasAchievement(constants.AchievementFirstToBoss) {
+				game.GrantAchievementToPlayer(player, constants.AchievementFirstToBoss)
+				def := engine.GlobalAchievementRegistry.GetDefinition(constants.AchievementFirstToBoss)
+				if def != nil {
+					game.AddScoreToPlayer(player, constants.ScoreCategoryAchievement, def.Points, def.Name, 0)
+				}
+			}
+			game.DebugLog.Info("HSM.TurnBossBattleState.first_to_boss", "player_id", player.ID.UUID())
+		}
 		s.enterPlayerBranch(ctx, player, game)
 	} else {
 		s.enterBossBranch(ctx, player, game, mapEngine)
@@ -1357,6 +1380,8 @@ func (s *TurnBossBattleState) enterPlayerBranch(ctx *StateContext, player *core.
 	// PreTrigger publishes PhasePreDamage to BossPlayer (Thorns handler).
 	// Thorns handler pushes derived PiercingDamageAction for reflect damage.
 	// ExecuteAction internally calls ProcessQueue to handle derived actions.
+	// Boss damage score and achievement detection are handled by EventBus PhasePreAction
+	// handlers (boss_damage_ten, boss_kill_shot) in achievement_registry.go.
 	if err := s.actionCtx.ExecuteAction(bossDamageAction); err != nil {
 		ctx.Error = errors.WrapHSMError(
 			err, "TurnBossBattle", 2, "Enter", "boss damage action failed")

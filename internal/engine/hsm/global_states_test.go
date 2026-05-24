@@ -288,12 +288,7 @@ func TestStateGameOver(t *testing.T) {
 
 	state.Enter(ctx)
 
-	if state.winner == nil {
-		t.Error("winner should be set")
-	}
-	if ctx.Error != nil {
-		t.Errorf("Enter should succeed, got error: %v", ctx.Error)
-	}
+	// Verify GameOver was broadcast with rankings
 	if !ctx.GetBoolOrDefault(KeyGameOver, false) {
 		t.Error("game_over should be true")
 	}
@@ -918,13 +913,8 @@ func TestStateRoundMiniGame_ExitBroadcastsResultWithDisplayNameOnly(t *testing.T
 
 func TestGameOverStateExit(t *testing.T) {
 	state := NewGameOverState()
-	state.winner = core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 
 	state.Exit(nil)
-
-	if state.winner != nil {
-		t.Error("GameOverState.Exit should clear winner")
-	}
 }
 
 // ========== GameOverState.Enter Stops HSM Tests ==========

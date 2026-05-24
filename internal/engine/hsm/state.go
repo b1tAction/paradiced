@@ -28,6 +28,8 @@ const (
 	KeyBossDefeated   = "boss_defeated"        // Boss defeated flag
 	KeyBossDefeatedBy = "boss_defeated_by"     // Player ID who defeated the Boss
 	KeyWinner         = "winner_id"            // Winner player ID
+	KeyFirstToBossSet    = "first_to_boss_set"    // First player reached Boss cell flag
+	KeyFirstToBossPlayer = "first_to_boss_player" // Player ID who first reached Boss
 
 	// State flow markers
 	KeyInitialized       = "initialized"         // Match initialized flag
