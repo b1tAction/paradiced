@@ -70,6 +70,8 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 		return
 	}
 
+	ctx.GetGame().DebugLog.Info("HSM.TurnUpkeepState.Enter", "player_id", player.ID.UUID(), "round", ctx.GetRound(), "turn", ctx.GetTurn())
+
 	// Start turn log segment
 	game := ctx.GetGame()
 	if game != nil && game.Log != nil {
@@ -87,6 +89,7 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 
 	// Boss player: skip BeforeTurn effects (no Buffs/Items)
 	if player.ID.IsBoss() {
+		game.DebugLog.Info("HSM.TurnUpkeepState.Enter.boss_skip", "player_id", player.ID.UUID(), "reason", "boss_player_no_buffs")
 		s.broadcastStateSync(ctx)
 		return
 	}
@@ -102,6 +105,7 @@ func (s *TurnUpkeepState) Enter(ctx *StateContext) {
 		player.SkipTurn = false // Clear flag
 		s.skipTurn = true
 		ctx.SetSkipTurn(true)
+		game.DebugLog.Info("HSM.TurnUpkeepState.Enter.skip_turn", "player_id", player.ID.UUID(), "reason", "skip_turn_flag_set")
 		// Broadcast StateSync even when skipping
 		s.broadcastStateSync(ctx)
 		return // Skip all BeforeTurn effects
@@ -246,6 +250,8 @@ func (s *MainActionState) Enter(ctx *StateContext) {
 			"MainAction", 2, "Enter", "player is nil")
 		return
 	}
+
+	ctx.GetGame().DebugLog.Info("HSM.MainActionState.Enter", "player_id", player.ID.UUID(), "position", player.Position)
 
 	// Initialize action context
 	game := ctx.GetGame()
@@ -615,6 +621,8 @@ func (s *TurnMovingState) Enter(ctx *StateContext) {
 		return
 	}
 
+	ctx.GetGame().DebugLog.Info("HSM.TurnMovingState.Enter", "player_id", player.ID.UUID())
+
 	// Get dice steps (from dice or remaining steps from TurnCheckpoint re-entry)
 	s.Steps = ctx.GetDiceSteps()
 	if s.Steps == 0 {
@@ -792,6 +800,8 @@ func (s *TurnCheckpointState) Enter(ctx *StateContext) {
 		return
 	}
 
+	ctx.GetGame().DebugLog.Info("HSM.TurnCheckpointState.Enter", "player_id", player.ID.UUID())
+
 	// Create ActionContext for DrawItem
 	game := ctx.GetGame()
 	mapEngine := ctx.GetMapEngine()
@@ -962,6 +972,8 @@ func (s *TurnLandedState) Enter(ctx *StateContext) {
 			"TurnLanded", 2, "Enter", "player is nil")
 		return
 	}
+
+	ctx.GetGame().DebugLog.Info("HSM.TurnLandedState.Enter", "player_id", player.ID.UUID(), "position", player.Position)
 
 	// Create ActionContext
 	game := ctx.GetGame()
@@ -1147,6 +1159,8 @@ func (s *TurnDrawState) Enter(ctx *StateContext) {
 		return
 	}
 
+	ctx.GetGame().DebugLog.Info("HSM.TurnDrawState.Enter", "player_id", player.ID.UUID(), "draw_type", s.drawType, "prob_good", s.probGood, "prob_neutral", s.probNeutral, "prob_bad", s.probBad)
+
 	// Create ActionContext
 	game := ctx.GetGame()
 	mapEngine := ctx.GetMapEngine()
@@ -1268,8 +1282,11 @@ func (s *TurnBossBattleState) Enter(ctx *StateContext) {
 		return
 	}
 
+	game.DebugLog.Info("HSM.TurnBossBattleState.Enter", "player_id", player.ID.UUID(), "player_position", player.Position)
+
 	// Determine branch: player vs Boss
 	s.isPlayerBranch = !player.ID.IsBoss()
+	game.DebugLog.Info("HSM.TurnBossBattleState.branch", "is_player_branch", s.isPlayerBranch, "player_id", player.ID.UUID(), "player_is_boss", player.ID.IsBoss())
 
 	// Create ActionContext
 	mapEngine := ctx.GetMapEngine()
@@ -1356,6 +1373,7 @@ func (s *TurnBossBattleState) enterPlayerBranch(ctx *StateContext, player *core.
 	// Check if Boss was defeated
 	if bossPlayer.IsDead {
 		s.bossDefeated = true
+		game.DebugLog.Info("HSM.TurnBossBattleState.boss_defeated", "defeated_by", player.ID.UUID(), "boss_remaining_hp", bossPlayer.HP)
 		// Store in both StateContext (for same-tick access) and Game.RoundData (for cross-tick persistence)
 		ctx.SetBool(KeyBossDefeated, true)
 		ctx.SetString(KeyBossDefeatedBy, player.ID.UUID())
@@ -1368,6 +1386,7 @@ func (s *TurnBossBattleState) enterPlayerBranch(ctx *StateContext, player *core.
 		drawTriggerProbability := float64(player.LP) / float64(player.MaxLP)
 		if game.RNG != nil && game.RNG.Float64() < drawTriggerProbability {
 			s.shouldDraw = true
+			game.DebugLog.Info("HSM.TurnBossBattleState.draw_triggered", "player_id", player.ID.UUID(), "draw_probability", drawTriggerProbability, "draw_type", s.drawType, "lp", player.LP, "max_lp", player.MaxLP)
 			// Fixed probabilities for Boss battle draw (DrawEngine handles LP internally)
 			s.probGood = 0.5
 			s.probNeutral = 0.3
@@ -1401,6 +1420,8 @@ func (s *TurnBossBattleState) enterBossBranch(ctx *StateContext, bossPlayer *cor
 
 	// Determine Boss attack type based on avgLP and Boss HP
 	attackResult := rng.CalcBossAttackType(game.RNG, avgLP, bossPlayer.HP, bossPlayer.MaxHP, game.BossSkillPool)
+
+	game.DebugLog.Info("HSM.TurnBossBattleState.boss_branch", "attack_type", attackResult.AttackType, "avg_lp", avgLP, "boss_hp", bossPlayer.HP, "boss_max_hp", bossPlayer.MaxHP, "boss_cell_players", len(bossCellPlayers))
 
 	switch attackResult.AttackType {
 	case "normal", "crit":
@@ -1600,6 +1621,8 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 		return
 	}
 
+	ctx.GetGame().DebugLog.Info("HSM.TurnEndState.Enter", "player_id", player.ID.UUID())
+
 	// Create ActionContext
 	game := ctx.GetGame()
 	mapEngine := ctx.GetMapEngine()
@@ -1638,6 +1661,7 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 	// Boss defeated during this turn: skip AfterTurn effects
 	// Game will end immediately after this TurnEnd
 	if game != nil && game.RoundData != nil && game.RoundData.GetBoolOrDefault(KeyBossDefeated, false) {
+		game.DebugLog.Info("HSM.TurnEndState.Enter.boss_defeated_skip", "player_id", player.ID.UUID(), "reason", "boss_defeated_skip_after_turn")
 		// Broadcast StateSync (final state with all entries before Boss game-over)
 		// Must be called BEFORE EndTurn.
 		s.broadcastStateSync(ctx)
@@ -1692,6 +1716,7 @@ func (s *TurnEndState) Enter(ctx *StateContext) {
 
 	// Check IsDead after AfterTurn effects -> cleanup DeathMark -> RespawnAction
 	if player.IsDead {
+		game.DebugLog.Info("HSM.TurnEndState.Enter.player_dead_respawn", "player_id", player.ID.UUID(), "position", player.Position, "reason", "after_turn_death")
 		// Respawn at checkpoint
 		if mapEngine != nil {
 			checkpoint := mapEngine.GetLastCheckpoint(player.Position)

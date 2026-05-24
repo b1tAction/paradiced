@@ -58,6 +58,8 @@ func (s *MatchInitState) Enter(ctx *StateContext) {
 		return
 	}
 
+	game.DebugLog.Info("HSM.MatchInitState.Enter", "players", len(game.Players))
+
 	// Map is already initialized by the caller (Nakama handler loads from
 	// pkg/resource/default.json via BuildMapEngine). MatchInitState should
 	// NOT regenerate the map, as that would overwrite DrawType, ProbGood,
@@ -235,7 +237,6 @@ func (s *RoundMiniGameState) GetRoomCreatedAt() time.Time {
 func (s *RoundMiniGameState) Enter(ctx *StateContext) {
 	// Start mini-game phase
 	game := ctx.GetGame()
-	// Clear round-level persistent data for new round
 	if game != nil && game.RoundData != nil {
 		game.RoundData.Clear()
 	}
@@ -257,8 +258,11 @@ func (s *RoundMiniGameState) Enter(ctx *StateContext) {
 	// Online types are only selectable when provider is available.
 	s.gameType = minigame.SelectMiniGameTypeWithProvider(game.RNG, s.provider != nil)
 
+	game.DebugLog.Info("HSM.RoundMiniGameState.Enter.selected", "game_type", s.gameType, "has_provider", s.provider != nil, "total_players", s.totalPlayers)
+
 	// No eligible mini-game available: skip mini-game phase entirely.
 	if s.gameType == constants.MiniGameTypeNone {
+		game.DebugLog.Warn("HSM.RoundMiniGameState.Enter.no_game_available", "reason", "no_eligible_mini_game_type")
 		ctx.SetBool(KeyMiniGameStarted, false)
 		return
 	}
@@ -266,19 +270,23 @@ func (s *RoundMiniGameState) Enter(ctx *StateContext) {
 	// Mode determination based on game type and provider availability
 	if s.gameType.IsOnline() && s.provider != nil {
 		s.mode = constants.MiniGameModeRPC
+		game.DebugLog.Info("HSM.RoundMiniGameState.Enter.rpc_mode", "game_type", s.gameType, "mode", s.mode)
 		// Create room on mini-game service
 		conn, err := s.provider.CreateRoom(s.gameType, playerIDs)
 		if err != nil {
 			// Room creation failed - try fallback to frontend-compatible type.
 			// This is a recoverable condition, NOT a fatal error.
 			// Do NOT set ctx.Error to avoid killing the game.
+			game.DebugLog.Warn("HSM.RoundMiniGameState.Enter.room_creation_failed", "game_type", s.gameType, "error", err.Error(), "fallback", "frontend_mode")
 			frontendPool := minigame.FrontendMiniGamePool()
 			if len(frontendPool) > 0 {
 				s.gameType = minigame.SelectFromPool(game.RNG, frontendPool)
 				s.mode = constants.MiniGameModeFrontend
 				s.connection = nil
+				game.DebugLog.Info("HSM.RoundMiniGameState.Enter.fallback_success", "fallback_game_type", s.gameType, "mode", s.mode)
 			} else {
 				// No frontend types available, skip mini-game entirely
+				game.DebugLog.Warn("HSM.RoundMiniGameState.Enter.no_frontend_fallback", "reason", "empty_frontend_pool")
 				s.gameType = constants.MiniGameTypeNone
 				ctx.SetBool(KeyMiniGameStarted, false)
 				return
@@ -286,10 +294,12 @@ func (s *RoundMiniGameState) Enter(ctx *StateContext) {
 		} else {
 			s.connection = conn
 			s.roomCreatedAt = time.Now()
+			game.DebugLog.Info("HSM.RoundMiniGameState.Enter.room_created", "game_type", s.gameType, "room_id", conn.RoomID)
 		}
 	} else {
 		s.mode = constants.MiniGameModeFrontend
 		s.connection = nil
+		game.DebugLog.Info("HSM.RoundMiniGameState.Enter.frontend_mode", "game_type", s.gameType, "mode", s.mode)
 	}
 
 	ctx.SetBool(KeyMiniGameStarted, true)
@@ -431,12 +441,8 @@ func NewRoundPrepState() *RoundPrepState {
 
 func (s *RoundPrepState) Enter(ctx *StateContext) {
 	// Assign dice based on mini-game rankings
-	// Rank 1 -> Gold dice (weighted toward high numbers)
-	// Rank 2 -> Silver dice
-	// Rank 3 -> Copper dice
-	// Rank 4 -> Wood dice (uniform distribution)
-
 	game := ctx.GetGame()
+	game.DebugLog.Info("HSM.RoundPrepState.Enter", "round", ctx.GetRound(), "players", len(game.Players))
 	players := game.Players
 
 	// Reorder players by mini-game rank (lower rank goes first).
@@ -518,6 +524,7 @@ func NewTurnLoopState() *TurnLoopState {
 
 func (s *TurnLoopState) Enter(ctx *StateContext) {
 	game := ctx.GetGame()
+	game.DebugLog.Info("HSM.TurnLoopState.Enter", "round", ctx.GetRound(), "players", len(game.Players))
 	players := game.Players
 
 	// Reset state
@@ -719,6 +726,7 @@ func (s *GameOverState) Enter(ctx *StateContext) {
 	game := ctx.GetGame()
 
 	winnerID := ctx.GetStringOrDefault(KeyWinner, "")
+	game.DebugLog.Info("HSM.GameOverState.Enter", "winner_id", winnerID)
 	if winnerID != "" {
 		parsedID, err := id.ParsePlayerID(winnerID)
 		if err == nil {
