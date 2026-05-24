@@ -13,6 +13,24 @@ import (
 	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
+// logHandlerResult logs buff handler execution results via ActionContext's Game.DebugLog.
+// Nil-safe: silently returns if ActionContext or Game is nil.
+func logHandlerResult(handlerName string, eventCtx *event.Context, result string, extraKeysAndValues ...interface{}) {
+	if eventCtx == nil {
+		return
+	}
+	actionCtx, err := getActionCtxFromEventCtx(eventCtx)
+	if err != nil || actionCtx == nil || actionCtx.Game == nil {
+		return
+	}
+	kv := []interface{}{"handler", handlerName, "result", result, "player_id", ""}
+	if eventCtx.Player != nil {
+		kv[4] = eventCtx.Player.ID.UUID()
+	}
+	kv = append(kv, extraKeysAndValues...)
+	actionCtx.Game.GetDebugLog().Info("BuffHandler", kv...)
+}
+
 // EffectHandler defines the handler signature for Buff/Item/Event effects.
 // Returns error to propagate failures up to HSM layer.
 // Defined in engine layer to maintain correct dependency direction.
@@ -485,6 +503,7 @@ func handleHiddenImmune(phase constants.Phase, ctx *event.Context) error {
 
 	ctx.SetBool("action_blocked", true)
 	ctx.SetString("blocked_by", string(constants.SourceBuffHidden))
+	logHandlerResult("Hidden", ctx, "blocked_buff", "phase", phase)
 	return nil
 }
 
@@ -523,16 +542,19 @@ func handleDeathMarkBlock(phase constants.Phase, ctx *event.Context) error {
 	if !ok {
 		// No action info, block by default
 		ctx.SetBool("action_blocked", true)
+		logHandlerResult("DeathMark", ctx, "blocked_no_action_info")
 		return nil
 	}
 	action, ok := raw.(engineaction.Action)
 	if !ok {
 		ctx.SetBool("action_blocked", true)
+		logHandlerResult("DeathMark", ctx, "blocked_invalid_action_type")
 		return nil
 	}
 
 	// RespawnAction must execute even for dead players
 	if _, isRespawn := action.(*engineaction.RespawnAction); isRespawn {
+		logHandlerResult("DeathMark", ctx, "skip_respawn_allowed")
 		return nil // Don't block respawn
 	}
 
@@ -540,12 +562,14 @@ func handleDeathMarkBlock(phase constants.Phase, ctx *event.Context) error {
 	// (removing own DeathMark should not block itself)
 	if removeAction, isRemove := action.(*engineaction.RemoveBuffAction); isRemove {
 		if removeAction.BuffType == constants.BuffTypeDeathMark {
+			logHandlerResult("DeathMark", ctx, "skip_death_mark_removal_allowed")
 			return nil // Don't block DeathMark removal
 		}
 	}
 
 	// Block all other actions for dead players
 	ctx.SetBool("action_blocked", true)
+	logHandlerResult("DeathMark", ctx, "blocked", "action_type", action.Type(), "player_id", ctx.Player.ID.UUID())
 	return nil
 }
 
@@ -655,6 +679,7 @@ func handleThornsReflect(phase constants.Phase, ctx *event.Context) error {
 		string(constants.SourceBuffThornsReflect),
 	)
 	ctx.AddDerivedAction(reflectAction)
+	logHandlerResult("Thorns", ctx, "reflect_damage", "original_damage", bossDamageAction.Damage, "reflect_damage", reflectDamage, "attacker", bossDamageAction.SourcePlayer.ID.UUID())
 	return nil
 }
 
@@ -719,6 +744,7 @@ func handleDominanceAmplify(phase constants.Phase, ctx *event.Context) error {
 		ctx.AddDerivedAction(engineaction.NewBossDamageAction(
 			a.SourcePlayer, a.TargetPlayer(), a.Damage, false, source,
 		))
+		logHandlerResult("Dominance", ctx, "amplified_boss_damage", "damage", a.Damage, "attacker", a.SourcePlayer.ID.UUID())
 
 	case *engineaction.HealAction:
 		// Only amplify heal targeting Dominance holder
@@ -726,6 +752,7 @@ func handleDominanceAmplify(phase constants.Phase, ctx *event.Context) error {
 			return nil
 		}
 		ctx.AddDerivedAction(engineaction.NewHealAction(ctx.Player, a.Amount, source))
+		logHandlerResult("Dominance", ctx, "amplified_heal", "amount", a.Amount)
 
 	case *engineaction.ModifyLPAction:
 		// Only amplify positive LP targeting Dominance holder
@@ -733,6 +760,7 @@ func handleDominanceAmplify(phase constants.Phase, ctx *event.Context) error {
 			return nil
 		}
 		ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, a.Amount, source))
+		logHandlerResult("Dominance", ctx, "amplified_modify_lp", "amount", a.Amount)
 	}
 
 	return nil
@@ -801,6 +829,7 @@ func handleRobLuckRedirect(phase constants.Phase, ctx *event.Context) error {
 				ctx.SetBool("action_blocked", true)
 				ctx.SetString("blocked_by", source)
 				ctx.AddDerivedAction(engineaction.NewHealAction(baiHuPlayer, a.Amount, source))
+				logHandlerResult("RobLuck", ctx, "redirected_heal", "amount", a.Amount, "baihu_player", baiHuPlayer.ID.UUID())
 			}
 
 		case *engineaction.ModifyLPAction:
@@ -808,6 +837,7 @@ func handleRobLuckRedirect(phase constants.Phase, ctx *event.Context) error {
 				ctx.SetBool("action_blocked", true)
 				ctx.SetString("blocked_by", source)
 				ctx.AddDerivedAction(engineaction.NewModifyLPAction(baiHuPlayer, a.Amount, source))
+				logHandlerResult("RobLuck", ctx, "redirected_modify_lp", "amount", a.Amount, "baihu_player", baiHuPlayer.ID.UUID())
 			}
 
 		case *engineaction.AddItemAction:
@@ -815,6 +845,7 @@ func handleRobLuckRedirect(phase constants.Phase, ctx *event.Context) error {
 				ctx.SetBool("action_blocked", true)
 				ctx.SetString("blocked_by", source)
 				ctx.AddDerivedAction(engineaction.NewAddItemAction(baiHuPlayer, a.ItemType, source))
+				logHandlerResult("RobLuck", ctx, "redirected_add_item", "item_type", a.ItemType, "baihu_player", baiHuPlayer.ID.UUID())
 			}
 		}
 
@@ -825,6 +856,7 @@ func handleRobLuckRedirect(phase constants.Phase, ctx *event.Context) error {
 				ctx.SetBool("action_blocked", true)
 				ctx.SetString("blocked_by", source)
 				ctx.AddDerivedAction(engineaction.NewAddBuffAction(baiHuPlayer, buffType, source))
+				logHandlerResult("RobLuck", ctx, "redirected_buff", "buff_type", buffType, "baihu_player", baiHuPlayer.ID.UUID())
 			}
 		}
 	}
@@ -851,6 +883,7 @@ func handleSuppressImmune(phase constants.Phase, ctx *event.Context) error {
 			if eval.IsBad() {
 				ctx.SetBool("action_blocked", true)
 				ctx.SetString("blocked_by", source)
+				logHandlerResult("Suppress", ctx, "blocked_bad_event", "phase", phase, "evaluation", eval)
 			}
 		}
 
@@ -861,6 +894,7 @@ func handleSuppressImmune(phase constants.Phase, ctx *event.Context) error {
 			if buffType.IsNegative() {
 				ctx.SetBool("action_blocked", true)
 				ctx.SetString("blocked_by", source)
+				logHandlerResult("Suppress", ctx, "blocked_negative_buff", "phase", phase, "buff_type", buffType)
 			}
 		}
 	}
