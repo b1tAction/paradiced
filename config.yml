@@ -25,6 +25,8 @@ socket:
   ping_period_ms: 15000
   pong_wait_ms: 25000
   outgoing_queue_size: 64
+  cors_allowed_origins:
+    - "*"
 
 # Session configuration
 session:
