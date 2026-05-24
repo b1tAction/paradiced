@@ -42,5 +42,5 @@ match:
   
 # Logging configuration
 logger:
-  level: "debug"
+  level: "info"    # Allow game plugin Info logs to pass through naturally
   format: "json"

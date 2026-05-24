@@ -43,6 +43,7 @@ services:
       - COLYSEUS_SECRET=${COLYSEUS_SECRET:-change_me_in_production}
       - COLYSEUS_PUBLIC_WS_URL=${COLYSEUS_PUBLIC_WS_URL:-ws://127.0.0.1:2567}
       - NAKAMA_RPC_URL=http://nakama:7350/v2/rpc/minigame_result_callback
+      - PD_LOG_LEVEL=${PD_LOG_LEVEL:-info}
     volumes:
       - nakama_data:/nakama/data
       - ./modules:/nakama/modules
