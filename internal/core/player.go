@@ -401,6 +401,187 @@ func (p *Player) IncrementRoundsWon() int {
 	return p.IncrementInt("rounds_won", 1)
 }
 
+// ========== Score Tracking Methods (using Metadata) ==========
+
+// GetTotalScore returns the player's total accumulated score across all categories.
+func (p *Player) GetTotalScore() int {
+	return p.GetIntOrDefault("total_score", 0)
+}
+
+// AddScore adds score points for a given category.
+// Accumulates into total_score and category-specific keys.
+func (p *Player) AddScore(category constants.ScoreCategory, points int) {
+	p.IncrementInt("total_score", points)
+	p.IncrementInt("score_"+string(category), points)
+}
+
+// GetScoreByCategory returns the score accumulated for a specific category.
+func (p *Player) GetScoreByCategory(category constants.ScoreCategory) int {
+	return p.GetIntOrDefault("score_"+string(category), 0)
+}
+
+// ========== Boss Damage Tracking Methods (using Metadata) ==========
+
+// GetBossDamageDealt returns the cumulative boss damage dealt by this player.
+func (p *Player) GetBossDamageDealt() int {
+	return p.GetIntOrDefault("boss_damage_dealt", 0)
+}
+
+// AddBossDamageDealt adds to the cumulative boss damage dealt, returns new total.
+func (p *Player) AddBossDamageDealt(amount int) int {
+	return p.IncrementInt("boss_damage_dealt", amount)
+}
+
+// ========== Achievement Tracking Methods (using Metadata) ==========
+
+// GetAchievements returns all achievements earned by this player.
+func (p *Player) GetAchievements() []constants.AchievementType {
+	raw, ok := p.Get("achievements")
+	if !ok {
+		return nil
+	}
+	switch v := raw.(type) {
+	case []string:
+		result := make([]constants.AchievementType, 0, len(v))
+		for _, s := range v {
+			at := constants.ParseAchievementType(s)
+			if at.IsValid() {
+				result = append(result, at)
+			}
+		}
+		return result
+	case []interface{}:
+		result := make([]constants.AchievementType, 0, len(v))
+		for _, item := range v {
+			if s, ok := item.(string); ok {
+				at := constants.ParseAchievementType(s)
+				if at.IsValid() {
+					result = append(result, at)
+				}
+			}
+		}
+		return result
+	default:
+		return nil
+	}
+}
+
+// HasAchievement checks if the player has earned a specific achievement.
+func (p *Player) HasAchievement(achievementType constants.AchievementType) bool {
+	for _, at := range p.GetAchievements() {
+		if at == achievementType {
+			return true
+		}
+	}
+	return false
+}
+
+// GrantAchievement awards an achievement to the player.
+// Each achievement can only be earned once; duplicate grants are ignored.
+func (p *Player) GrantAchievement(achievementType constants.AchievementType) {
+	if p.HasAchievement(achievementType) {
+		return // Already earned, skip
+	}
+	existing := p.GetAchievements()
+	strSlice := make([]string, 0, len(existing)+1)
+	for _, at := range existing {
+		strSlice = append(strSlice, string(at))
+	}
+	strSlice = append(strSlice, string(achievementType))
+	p.Set("achievements", strSlice)
+}
+
+// ========== Dice Roll Tracking Methods (using Metadata) ==========
+
+// GetLastDiceResults returns the last 3 dice roll results for triple detection.
+func (p *Player) GetLastDiceResults() []int {
+	return p.GetIntSliceOrDefault("last_dice_results", nil)
+}
+
+// PushDiceResult adds a dice roll result, keeping only the last 3 results.
+func (p *Player) PushDiceResult(result int) {
+	existing := p.GetIntSliceOrDefault("last_dice_results", nil)
+	existing = append(existing, result)
+	// Keep only the last 3 results
+	if len(existing) > 3 {
+		existing = existing[len(existing)-3:]
+	}
+	p.Set("last_dice_results", existing)
+}
+
+// ========== Death Tracking Methods (using Metadata) ==========
+
+// GetDeathCount returns the number of times this player has died.
+func (p *Player) GetDeathCount() int {
+	return p.GetIntOrDefault("death_count", 0)
+}
+
+// IncrementDeathCount increments the death count, returns new value.
+func (p *Player) IncrementDeathCount() int {
+	return p.IncrementInt("death_count", 1)
+}
+
+// ========== Score Reason Tracking Methods (using Metadata) ==========
+
+// GetScoreReasons returns all score reasons recorded for this player.
+func (p *Player) GetScoreReasons() []constants.ScoreReason {
+	raw, ok := p.Get("score_reasons")
+	if !ok {
+		return nil
+	}
+	switch v := raw.(type) {
+	case []constants.ScoreReason:
+		return v
+	case []interface{}:
+		result := make([]constants.ScoreReason, 0, len(v))
+		for _, item := range v {
+			// ScoreReason stored as map via JSON round-trip
+			if m, ok := item.(map[string]interface{}); ok {
+				reason := constants.ScoreReason{
+					Category: getStringFromMap(m, "category"),
+					Reason:   getStringFromMap(m, "reason"),
+					Points:   getIntFromMap(m, "points"),
+					Round:    getIntFromMap(m, "round"),
+				}
+				result = append(result, reason)
+			}
+		}
+		return result
+	default:
+		return nil
+	}
+}
+
+// AppendScoreReason adds a score reason to the player's history.
+func (p *Player) AppendScoreReason(reason constants.ScoreReason) {
+	existing := p.GetScoreReasons()
+	existing = append(existing, reason)
+	p.Set("score_reasons", existing)
+}
+
+// getStringFromMap helper for extracting string from map[string]interface{}.
+func getStringFromMap(m map[string]interface{}, key string) string {
+	if v, ok := m[key]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+// getIntFromMap helper for extracting int from map[string]interface{}.
+func getIntFromMap(m map[string]interface{}, key string) int {
+	if v, ok := m[key]; ok {
+		if i, ok := v.(int); ok {
+			return i
+		}
+		if f, ok := v.(float64); ok {
+			return int(f)
+		}
+	}
+	return 0
+}
+
 // ========== Helper Methods ==========
 
 // Clone clones the player (used for testing).
