@@ -13,5 +13,6 @@ import (
 type Game interface {
 	GetPlayerInterface(id id.PlayerID) interface{}
 	GetPlayersInterface() []interface{}
-	GetGameLog() *gamelog.GameLog // Get the global game log for playback
+	GetGameLog() *gamelog.GameLog   // Get the global game log for playback
+	GetDebugLog() *gamelog.GameLogger // Get the debug logger for engine diagnostics
 }

@@ -25,6 +25,7 @@ type Game struct {
 	RNG          *rand.Rand           `json:"-"`   // Game unique random source
 	Draw         *rng.DrawEngine      `json:"-"`   // Draw engine for random draws
 	Log          *gamelog.GameLog     `json:"log"` // Global game log for playback
+	DebugLog     *gamelog.GameLogger  `json:"-"`   // Debug logger for engine diagnostics
 	RoundData    *util.Metadata       `json:"-"`   // Round-level persistent data (cleared each round)
 	EventPool    []*rng.EvaluatedItem `json:"-"`   // Event pool for DrawEventAction (all events)
 	ItemPool     []*rng.EvaluatedItem `json:"-"`   // Item pool for DrawItemAction (all items)
@@ -50,6 +51,7 @@ func NewGame(gameID id.GameID, seed int64) *Game {
 		RNG:       rngInst,
 		Draw:      rng.NewDrawEngine(rngInst),
 		Log:       gamelog.NewGameLog(),
+		DebugLog:  gamelog.NewGameLogger(),
 		RoundData: util.NewMetadata(),
 	}
 }
@@ -116,6 +118,12 @@ func (g *Game) GetPlayers() []*core.Player {
 // Implements protocol.Game interface.
 func (g *Game) GetGameLog() *gamelog.GameLog {
 	return g.Log
+}
+
+// GetDebugLog returns the debug logger for engine diagnostics.
+// Implements protocol.Game interface.
+func (g *Game) GetDebugLog() *gamelog.GameLogger {
+	return g.DebugLog
 }
 
 // subscribePlayerEffects subscribes player's Buff and Item effects.
@@ -276,6 +284,7 @@ func (g *Game) ApplyItemToPlayer(player *core.Player, item *core.Item) error {
 	// 2. Subscribe to EventBus
 	g.SubscribeItem(player, item)
 
+	g.DebugLog.Info("ApplyItemToPlayer", "player_id", player.ID.UUID(), "item_type", item.Type)
 	return nil
 }
 
@@ -294,6 +303,7 @@ func (g *Game) RemoveItemFromPlayer(player *core.Player, item *core.Item) bool {
 	if err != nil {
 		return false
 	}
+	g.DebugLog.Info("RemoveItemFromPlayer", "player_id", player.ID.UUID(), "item_type", item.Type, "removed", removed != nil)
 	return removed != nil
 }
 
@@ -314,6 +324,7 @@ func (g *Game) InitializePlayerFactionBuffs(player *core.Player) {
 		fireBuff := core.NewBuff(constants.BuffTypeFire, -1)
 		g.ApplyBuffToPlayer(player, fireBuff)
 	}
+	g.DebugLog.Info("InitializePlayerFactionBuffs", "player_id", player.ID.UUID(), "faction", faction)
 }
 
 // ========== Buff Lifecycle Management ==========
@@ -334,6 +345,7 @@ func (g *Game) ApplyBuffToPlayer(player *core.Player, buff *core.Buff) error {
 	// 2. Subscribe to EventBus
 	g.SubscribeBuff(player, buff)
 
+	g.DebugLog.Info("ApplyBuffToPlayer", "player_id", player.ID.UUID(), "buff_type", buff.Type, "duration", buff.Duration)
 	return nil
 }
 
@@ -349,7 +361,10 @@ func (g *Game) RemoveBuffFromPlayer(player *core.Player, buff *core.Buff) bool {
 	g.UnsubscribeBuff(buff)
 
 	// 2. Underlying data remove
-	return player.RemoveBuff(buff.Type)
+	result := player.RemoveBuff(buff.Type)
+
+	g.DebugLog.Info("RemoveBuffFromPlayer", "player_id", player.ID.UUID(), "buff_type", buff.Type, "removed", result)
+	return result
 }
 
 // ========== Helper Methods ==========
@@ -410,6 +425,8 @@ func (g *Game) InitializeBoss(mapEndIndex int) *core.Player {
 
 	// Build Boss skill pool from registry
 	g.BossSkillPool = GlobalBossRegistry.BuildBossSkillPool()
+
+	g.DebugLog.Info("InitializeBoss", "boss_id", bossID.UUID(), "boss_hp", bossDef.MaxHP, "position", mapEndIndex, "skill_pool_size", len(g.BossSkillPool))
 
 	return bossPlayer
 }

@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/gamelog"
 	"github.com/b1tAction/paradiced/pkg/id"
 )
 
@@ -25,7 +26,8 @@ type Subscription struct {
 type EventBus struct {
 	subscriptions map[constants.Phase][]*Subscription
 	mutex         sync.RWMutex
-	GameID        string `json:"game_id"`
+	GameID        string             `json:"game_id"`
+	DebugLog      *gamelog.GameLogger `json:"-"` // Debug logger (nil-safe)
 }
 
 // NewEventBus creates a new event bus.
@@ -53,6 +55,8 @@ func (bus *EventBus) Subscribe(phase constants.Phase, ownerID id.PlayerID, sourc
 	}
 
 	bus.subscriptions[phase] = append(bus.subscriptions[phase], sub)
+
+	bus.DebugLog.Debug("EventBus.Subscribe", "phase", phase, "owner_id", ownerID.UUID(), "source_id", sourceID, "source_type", sourceType, "priority", decision.Priority)
 	return subID
 }
 
@@ -89,6 +93,7 @@ func (bus *EventBus) UnsubscribeBySource(sourceID string) int {
 		}
 		bus.subscriptions[phase] = newSubs
 	}
+	bus.DebugLog.Debug("EventBus.UnsubscribeBySource", "source_id", sourceID, "count", count)
 	return count
 }
 
@@ -148,6 +153,7 @@ func (bus *EventBus) Publish(phase constants.Phase, ownerID string, ctx *Context
 		}
 	}
 
+	bus.DebugLog.Debug("EventBus.Publish", "phase", phase, "owner_id", ownerID, "total_subs", len(subs), "owner_subs", len(ownerSubs), "decisions", len(decisions), "auto_exec", len(ownerSubs)-len(decisions))
 	return decisions
 }
 
