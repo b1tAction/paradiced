@@ -718,7 +718,7 @@ func TestBuildDefinitionsConfigBuffClassification(t *testing.T) {
 		}
 	}
 
-	// Test IsHidden: only DeathMark is hidden
+	// Test IsHidden: DeathMark and RobLuck are hidden
 	if _, ok := defs.Buffs["death_mark"]; !ok {
 		t.Fatal("missing death_mark buff in DefinitionsConfig")
 	}
@@ -727,9 +727,17 @@ func TestBuildDefinitionsConfigBuffClassification(t *testing.T) {
 		t.Error("death_mark.IsHidden should be true")
 	}
 
+	if _, ok := defs.Buffs["rob_luck"]; !ok {
+		t.Fatal("missing rob_luck buff in DefinitionsConfig")
+	}
+	robLuck := defs.Buffs["rob_luck"]
+	if !robLuck.IsHidden {
+		t.Error("rob_luck.IsHidden should be true")
+	}
+
 	// Verify hidden is false for other buffs
 	for key, buff := range defs.Buffs {
-		if key == "death_mark" {
+		if key == "death_mark" || key == "rob_luck" {
 			continue
 		}
 		if buff.IsHidden {

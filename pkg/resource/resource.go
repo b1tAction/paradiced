@@ -13,6 +13,7 @@ import (
 
 	"github.com/b1tAction/paradiced/internal/gamemap"
 	"github.com/b1tAction/paradiced/pkg/constants"
+	"github.com/b1tAction/paradiced/pkg/rng"
 )
 
 //go:embed default.json
@@ -64,12 +65,14 @@ func BuildMapEngineFromConfig(m *pkgnet.MapConfig) *gamemap.MapEngine {
 
 // ========== Definition Loading ==========
 
-// DefinitionSet holds all parsed event/buff/item/mini_game definitions from YAML.
+// DefinitionSet holds all parsed event/buff/item/mini_game/faction/dice definitions from YAML.
 type DefinitionSet struct {
 	Events    map[constants.EventType]*constants.EventDefinition
 	Buffs     map[constants.BuffType]*constants.BuffDefinition
 	Items     map[constants.ItemType]*constants.ItemDefinition
 	MiniGames map[constants.MiniGameType]*constants.MiniGameDefinition
+	Factions  map[constants.Faction]*constants.FactionDefinition
+	Dice      map[rng.DiceType]*rng.DiceDefinition
 }
 
 // GlobalDefinitionSet is the globally loaded definition set, populated at init time.
@@ -178,11 +181,43 @@ func LoadDefinitionsFromYAML(data []byte) (*DefinitionSet, error) {
 		}
 	}
 
+	factions := make(map[constants.Faction]*constants.FactionDefinition, len(raw.Factions))
+	for key, def := range raw.Factions {
+		ft := constants.ParseFaction(key)
+		if ft == constants.FactionNone {
+			return nil, fmt.Errorf("faction %s: unknown faction type", key)
+		}
+		factions[ft] = &constants.FactionDefinition{
+			Type:        ft,
+			EnglishName: def.EnglishName,
+			Name:        def.Name,
+			SkillName:   def.SkillName,
+			SkillDesc:   def.SkillDesc,
+		}
+	}
+
+	dice := make(map[rng.DiceType]*rng.DiceDefinition, len(raw.Dice))
+	for key, def := range raw.Dice {
+		dt := rng.DiceTypeFromString(key)
+		if dt == rng.DiceTypeNone {
+			return nil, fmt.Errorf("dice %s: unknown dice type", key)
+		}
+		dice[dt] = &rng.DiceDefinition{
+			Type:        dt,
+			EnglishName: def.EnglishName,
+			Name:        def.Name,
+			Desc:        def.Desc,
+			Rank:        def.Rank,
+		}
+	}
+
 	return &DefinitionSet{
 		Events:    events,
 		Buffs:     buffs,
 		Items:     items,
 		MiniGames: miniGames,
+		Factions:  factions,
+		Dice:      dice,
 	}, nil
 }
 
@@ -230,6 +265,8 @@ type yamlDefinitions struct {
 	Buffs     map[string]yamlBuffDef     `yaml:"buffs"`
 	Items     map[string]yamlItemDef     `yaml:"items"`
 	MiniGames map[string]yamlMiniGameDef `yaml:"mini_games"`
+	Factions  map[string]yamlFactionDef  `yaml:"factions"`
+	Dice      map[string]yamlDiceDef     `yaml:"dice"`
 }
 
 type yamlEventDef struct {
@@ -260,6 +297,20 @@ type yamlMiniGameDef struct {
 	EnglishName string `yaml:"english_name"`
 	Name        string `yaml:"name"`
 	Desc        string `yaml:"desc"`
+}
+
+type yamlFactionDef struct {
+	EnglishName string `yaml:"english_name"`
+	Name        string `yaml:"name"`
+	SkillName   string `yaml:"skill_name"`
+	SkillDesc   string `yaml:"skill_desc"`
+}
+
+type yamlDiceDef struct {
+	EnglishName string `yaml:"english_name"`
+	Name        string `yaml:"name"`
+	Desc        string `yaml:"desc"`
+	Rank        int    `yaml:"rank"`
 }
 
 // initMiniGamePools populates constants.AllMiniGameTypes and constants.AllOnlineMiniGameTypes

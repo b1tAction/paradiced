@@ -84,3 +84,15 @@ func (f Faction) GetSkillDesc() string {
 	}
 	return "未知"
 }
+
+// ========== Faction Definition (Static Metadata) ==========
+
+// FactionDefinition contains static metadata for Faction display.
+// Effect logic is managed by engine layer's faction skill handlers.
+type FactionDefinition struct {
+	Type        Faction `json:"type"`
+	EnglishName string  `json:"english_name"` // e.g. "QingLong"
+	Name        string  `json:"name"`         // Chinese display name e.g. "青龙"
+	SkillName   string  `json:"skill_name"`   // e.g. "威势"
+	SkillDesc   string  `json:"skill_desc"`   // Faction skill description
+}
