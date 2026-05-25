@@ -158,6 +158,7 @@ buffs:
     name: 劫运
     desc: 白虎阵营增益，抢夺目标好运
     duration: 1
+    hidden: true
   suppress:
     evaluation: good
     english_name: Suppress
@@ -187,6 +188,59 @@ items:
   # 名刀司命(抵挡一次致命伤害)
   # 贤者的庇护(原地复活，不回到检查点)
   # 贪、嗔、痴之戒(永久改变自己的属性与属性上限)
+
+# ========== Faction Definitions ==========
+
+factions:
+  qing_long:
+    english_name: QingLong
+    name: 青龙
+    skill_name: 威势
+    skill_desc: 每2回合获得充能，使用后1回合内增益效果翻倍(威势)
+  zhu_que:
+    english_name: ZhuQue
+    name: 朱雀
+    skill_name: 离火
+    skill_desc: 每3回合幸运值+1，最高不超过8点
+  bai_hu:
+    english_name: BaiHu
+    name: 白虎
+    skill_name: 劫运
+    skill_desc: 每2回合获得充能，指定目标玩家，使其增益效果改向自身(劫运)
+  xuan_wu:
+    english_name: XuanWu
+    name: 玄武
+    skill_name: 鎮厄
+    skill_desc: 每2回合获得充能，使用后1回合免疫恶性事件和负面Buff(鎮厄)
+
+# ========== Dice Definitions ==========
+
+dice:
+  gold:
+    english_name: Gold
+    name: 金骰子
+    desc: 大幅提升大数概率 (1-2:10%, 3-4:20%, 5-6:70%)
+    rank: 1
+  silver:
+    english_name: Silver
+    name: 银骰子
+    desc: 提升大数概率 (1-2:20%, 3-4:30%, 5-6:50%)
+    rank: 2
+  copper:
+    english_name: Copper
+    name: 铜骰子
+    desc: 略微提升大数概率 (1-2:30%, 3-4:30%, 5-6:40%)
+    rank: 3
+  wood:
+    english_name: Wood
+    name: 木骰子
+    desc: 均匀分布 (1-6各16.67%)
+    rank: 4
+  normal:
+    english_name: Normal
+    name: 普通骰子
+    desc: 均匀分布 (1-6各16.67%)
+    rank: 0
 
 # ========== Mini Game Definitions ==========
 

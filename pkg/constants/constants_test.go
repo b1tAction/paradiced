@@ -87,7 +87,7 @@ func TestBuffTypeIsBoss(t *testing.T) {
 }
 
 func TestBuffTypeIsHidden(t *testing.T) {
-	hiddenTypes := []BuffType{BuffTypeDeathMark}
+	hiddenTypes := []BuffType{BuffTypeDeathMark, BuffTypeRobLuck}
 	for _, bt := range hiddenTypes {
 		if !bt.IsHidden() {
 			t.Errorf("BuffType(%s).IsHidden() should be true", bt)
@@ -97,7 +97,7 @@ func TestBuffTypeIsHidden(t *testing.T) {
 	visibleTypes := []BuffType{
 		BuffTypeCurse, BuffTypeLost, BuffTypeCorrupt, BuffTypePoison,
 		BuffTypeHidden, BuffTypeDivine, BuffTypeRain, BuffTypeExorcism, BuffTypeFire,
-		BuffTypeThorns,
+		BuffTypeThorns, BuffTypeDominance, BuffTypeSuppress,
 	}
 	for _, bt := range visibleTypes {
 		if bt.IsHidden() {

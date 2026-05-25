@@ -240,6 +240,17 @@ func DiceTypeToRank(dt DiceType) int {
 	}
 }
 
+// ========== Dice Definition (Static Metadata) ==========
+
+// DiceDefinition contains static metadata for Dice display.
+type DiceDefinition struct {
+	Type        DiceType `json:"type"`
+	EnglishName string   `json:"english_name"` // e.g. "Gold"
+	Name        string   `json:"name"`         // Chinese display name e.g. "金骰子"
+	Desc        string   `json:"desc"`         // Description e.g. "1-2(10%), 3-4(20%), 5-6(70%)"
+	Rank        int      `json:"rank"`         // Mini-game rank that earns this dice
+}
+
 // String returns a formatted description of the dice type.
 func (d *Dice) String() string {
 	return fmt.Sprintf("Dice{type=%s}", d.Type.String())

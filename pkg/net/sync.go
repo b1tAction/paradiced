@@ -468,6 +468,12 @@ type DefinitionsConfig struct {
 
 	// MiniGames maps mini-game type keys to their definition configs.
 	MiniGames map[string]MiniGameDefinitionConfig `json:"mini_games"`
+
+	// Factions maps faction keys to their definition configs.
+	Factions map[string]FactionDefinitionConfig `json:"factions"`
+
+	// Dice maps dice type keys to their definition configs.
+	Dice map[string]DiceDefinitionConfig `json:"dice"`
 }
 
 // EventDefinitionConfig represents an event definition for client rendering.
@@ -515,6 +521,24 @@ type MiniGameDefinitionConfig struct {
 	EnglishName string `json:"english_name"`
 	Name        string `json:"name"`          // Chinese display name
 	Desc        string `json:"desc"`          // Chinese description
+}
+
+// FactionDefinitionConfig represents a faction definition for client rendering.
+type FactionDefinitionConfig struct {
+	Type        string `json:"type"`
+	EnglishName string `json:"english_name"`
+	Name        string `json:"name"`         // Chinese display name e.g. "青龙"
+	SkillName   string `json:"skill_name"`   // Faction skill Chinese name e.g. "威势"
+	SkillDesc   string `json:"skill_desc"`   // Faction skill description
+}
+
+// DiceDefinitionConfig represents a dice definition for client rendering.
+type DiceDefinitionConfig struct {
+	Type        string `json:"type"`
+	EnglishName string `json:"english_name"`
+	Name        string `json:"name"`  // Chinese display name e.g. "金骰子"
+	Desc        string `json:"desc"`  // Description
+	Rank        int    `json:"rank"`  // Mini-game rank that earns this dice
 }
 
 // KickPlayerRequest represents a host kick player request from client.

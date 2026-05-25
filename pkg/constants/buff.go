@@ -62,7 +62,7 @@ func (bt BuffType) IsNegative() bool {
 
 // IsHidden checks if the Buff is hidden (internal mechanism, not visible to player).
 func (bt BuffType) IsHidden() bool {
-	return bt == BuffTypeDeathMark
+	return bt == BuffTypeDeathMark || bt == BuffTypeRobLuck
 }
 
 // IsBoss checks if the Buff is given by Boss skills or game mechanics (not drawn from lottery pool).

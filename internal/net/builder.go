@@ -397,10 +397,34 @@ func BuildDefinitionsConfig() pkgnet.DefinitionsConfig {
 		}
 	}
 
+	factions := make(map[string]pkgnet.FactionDefinitionConfig, len(defs.Factions))
+	for key, def := range defs.Factions {
+		factions[string(key)] = pkgnet.FactionDefinitionConfig{
+			Type:        string(def.Type),
+			EnglishName: def.EnglishName,
+			Name:        def.Name,
+			SkillName:   def.SkillName,
+			SkillDesc:   def.SkillDesc,
+		}
+	}
+
+	dice := make(map[string]pkgnet.DiceDefinitionConfig, len(defs.Dice))
+	for key, def := range defs.Dice {
+		dice[key.String()] = pkgnet.DiceDefinitionConfig{
+			Type:        key.String(),
+			EnglishName: def.EnglishName,
+			Name:        def.Name,
+			Desc:        def.Desc,
+			Rank:        def.Rank,
+		}
+	}
+
 	return pkgnet.DefinitionsConfig{
 		Events:    events,
 		Buffs:     buffs,
 		Items:     items,
 		MiniGames: miniGames,
+		Factions:  factions,
+		Dice:      dice,
 	}
 }
