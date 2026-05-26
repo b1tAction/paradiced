@@ -229,6 +229,14 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		logger.Info("MiniGame result callback RPC registered")
 	}
 
+	// Register RPC for mini-game debug request (judge mode + online trigger)
+	err = nakama.RegisterMiniGameRequestRPC(initializer)
+	if err != nil {
+		logger.Error("Failed to register minigame_request RPC: %v", err)
+		return err
+	}
+	logger.Info("MiniGame request RPC registered")
+
 	logger.Info("Paradiced match handler registered successfully")
 	log.Printf("[Paradiced] Module initialized - RPC, match handler, matchmaker callback, mini-game RPC, and cleanup RPC registered")
 

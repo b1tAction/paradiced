@@ -428,6 +428,13 @@ func (a *NakamaMatchHandlerAdapter) MatchSignal(ctx context.Context, logger runt
 			a.logger.Info("MiniGame result signal received: match_id=%s, room_id=%s, game_type=%s, rankings_count=%d",
 				signal.MatchID, signal.RoomID, signal.GameType, len(signal.Rankings))
 			return state, ""
+		case "trigger_minigame":
+			// Debug signal: force mini-game start with specified game_type
+			// Set flag for MatchLoop to trigger RoundMiniGame state transition
+			a.handler.pendingTriggerMinigame = signal.GameType
+			a.logger.Info("MiniGame trigger signal received: match_id=%s, game_type=%s",
+				signal.MatchID, signal.GameType)
+			return state, ""
 		case "pause":
 			// Pause match logic if needed
 			a.logger.Debug("Received pause signal")
