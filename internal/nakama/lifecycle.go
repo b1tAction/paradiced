@@ -239,6 +239,26 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 		}
 	}
 
+	// Handle debug trigger: force mini-game start via MatchSignal
+	// The trigger forces a transition to RoundMiniGame state.
+	// Game type is selected by the server's MiniGameTypeSelector in RoundMiniGameState.Enter().
+	if h.pendingTriggerMinigame != "" && globalStateID != hsm.StateRoundMiniGame {
+		h.pendingTriggerMinigame = "" // Clear flag immediately
+
+		if h.logger != nil {
+			h.logger.Info("MatchLoop: triggering mini-game via debug signal, current_state=%s",
+				globalStateID.String())
+		}
+
+		// Force HSM transition to RoundMiniGame state
+		miniGameCtx := hsm.NewStateContext().WithHSM(h.hsm)
+		if err := h.hsm.TransitionTo(hsm.StateRoundMiniGame, miniGameCtx); err != nil {
+			if h.logger != nil {
+				h.logger.Error("MatchLoop: failed to transition to RoundMiniGame: %v", err)
+			}
+		}
+	}
+
 	// Update HSM
 	if h.logger != nil {
 		h.logger.Debug("MatchLoop: updating HSM")

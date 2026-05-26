@@ -57,6 +57,9 @@ type NakamaMatchHandler struct {
 	provider               protocol.OnlineMiniGameProvider // Colyseus provider for online mini-games (nil for frontend-only)
 	pendingMiniGameResults map[string]int                 // playerID -> rank, populated by MatchSignal, consumed by MatchLoop
 
+	// Debug mini-game trigger (populated by MatchSignal, consumed by MatchLoop)
+	pendingTriggerMinigame string // Game type to force trigger, empty = no trigger pending
+
 	// Configuration
 	maxPlayers int    // Maximum players (default: 4)
 	mapLength  int    // Map length (default: 100)
