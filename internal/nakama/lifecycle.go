@@ -105,8 +105,8 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 
 	if h.logger != nil {
 		h.logger.WithFields(map[string]interface{}{
-			"global_state":  globalStateID.String(),
-			"turn_state":    turnStateID.String(),
+			"global_state": globalStateID.String(),
+			"turn_state":   turnStateID.String(),
 			"current_player": func() string {
 				if currentPlayer != nil {
 					return currentPlayer.ID.UUID()
@@ -155,8 +155,8 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 				nextState := turnLoopState.StartPlayerTurn(ctx)
 				if nextState != hsm.StateNone {
 					if h.logger != nil {
-					h.logger.WithFields(map[string]interface{}{"next_state": nextState.String()}).Debug("MatchLoop: starting next player turn")
-				}
+						h.logger.WithFields(map[string]interface{}{"next_state": nextState.String()}).Debug("MatchLoop: starting next player turn")
+					}
 					h.hsm.TransitionTo(nextState, ctx)
 
 					// Re-get current player after turn change
@@ -179,8 +179,11 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 					"game_type":     miniGameState.GetGameType(),
 				}).Info("MatchLoop: applying pending mini-game results")
 			}
-			for playerID, rank := range h.pendingMiniGameResults {
-				miniGameState.OnMiniGameResult(ctx, playerID, rank)
+			for playerID, entry := range h.pendingMiniGameResults {
+				miniGameState.OnMiniGameResult(ctx, playerID, entry.Rank)
+				if entry.GameData != nil {
+					miniGameState.OnMiniGameGameData(playerID, entry.GameData)
+				}
 			}
 			h.pendingMiniGameResults = nil // Clear after applying
 
@@ -191,31 +194,32 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 				if conn != nil && prov != nil {
 					if err := prov.DestroyRoom(conn.RoomID); err != nil {
 						if h.logger != nil {
-						h.logger.WithFields(map[string]interface{}{
-							"room_id": conn.RoomID,
-							"error":   err,
-						}).Warn("MatchLoop: failed to destroy Colyseus room")
-					}
+							h.logger.WithFields(map[string]interface{}{
+								"room_id": conn.RoomID,
+								"error":   err,
+							}).Warn("MatchLoop: failed to destroy Colyseus room")
+						}
 					}
 				}
 			}
 		}
 	}
 
-	// Check timeout for online mini-game (RPC mode)
+	// Check timeout for online mini-game (RPC mode). A non-positive timeout disables
+	// the Nakama-side fallback and lets the online mini-game service finish itself.
 	if globalStateID == hsm.StateRoundMiniGame && h.provider != nil {
 		globalState := h.hsm.GetGlobalState()
 		miniGameState, ok := globalState.(*hsm.RoundMiniGameState)
 		if ok && miniGameState.GetMode() == constants.MiniGameModeRPC && !miniGameState.GetRoomCreatedAt().IsZero() {
 			timeout := miniGameState.GetProvider().GetTimeout(miniGameState.GetGameType())
-			if time.Since(miniGameState.GetRoomCreatedAt()) > timeout && miniGameState.GetResultsReceived() < miniGameState.GetTotalPlayers() {
+			if timeout > 0 && time.Since(miniGameState.GetRoomCreatedAt()) > timeout && miniGameState.GetResultsReceived() < miniGameState.GetTotalPlayers() {
 				if h.logger != nil {
-				h.logger.WithFields(map[string]interface{}{
-					"game_type":       miniGameState.GetGameType(),
-					"results_received": miniGameState.GetResultsReceived(),
-					"total_players":   miniGameState.GetTotalPlayers(),
-				}).Warn("MatchLoop: online mini-game timeout, assigning default rankings")
-			}
+					h.logger.WithFields(map[string]interface{}{
+						"game_type":        miniGameState.GetGameType(),
+						"results_received": miniGameState.GetResultsReceived(),
+						"total_players":    miniGameState.GetTotalPlayers(),
+					}).Warn("MatchLoop: online mini-game timeout, assigning default rankings")
+				}
 				// Assign default rankings for missing players (lowest rank)
 				game := h.hsm.GetGame()
 				if game != nil {
@@ -239,10 +243,10 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 		}
 	}
 
-	// Handle debug trigger: force mini-game start via MatchSignal
-	// The trigger forces a transition to RoundMiniGame state.
-	// Game type is selected by the server's MiniGameTypeSelector in RoundMiniGameState.Enter().
+	// Handle debug trigger: force mini-game start via MatchSignal.
+	// The requested game type is passed to RoundMiniGameState.Enter().
 	if h.pendingTriggerMinigame != "" && globalStateID != hsm.StateRoundMiniGame {
+		forcedGameType := h.pendingTriggerMinigame
 		h.pendingTriggerMinigame = "" // Clear flag immediately
 
 		if h.logger != nil {
@@ -251,8 +255,7 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 		}
 
 		// Force HSM transition to RoundMiniGame state
-		miniGameCtx := hsm.NewStateContext().WithHSM(h.hsm)
-		if err := h.hsm.TransitionTo(hsm.StateRoundMiniGame, miniGameCtx); err != nil {
+		if err := h.triggerMiniGameFromDebugSignal(ctx, globalStateID, forcedGameType); err != nil {
 			if h.logger != nil {
 				h.logger.Error("MatchLoop: failed to transition to RoundMiniGame: %v", err)
 			}
@@ -328,6 +331,23 @@ func (h *NakamaMatchHandler) MatchLoop(delta time.Duration) error {
 	_ = delta // Delta time not currently used
 
 	return nil
+}
+
+func (h *NakamaMatchHandler) triggerMiniGameFromDebugSignal(ctx *hsm.StateContext, currentState hsm.StateID, forcedGameType string) error {
+	ctx.SetString(hsm.KeyForcedMiniGameType, forcedGameType)
+
+	current := h.hsm.GetGlobalState()
+	if current != nil && !current.CanTransitionTo(hsm.StateRoundMiniGame) && current.CanTransitionTo(hsm.StateRoundEndWait) {
+		if h.logger != nil {
+			h.logger.Info("MatchLoop: routing debug mini-game trigger via RoundEndWait, current_state=%s",
+				currentState.String())
+		}
+		if err := h.hsm.TransitionTo(hsm.StateRoundEndWait, ctx); err != nil {
+			return err
+		}
+	}
+
+	return h.hsm.TransitionTo(hsm.StateRoundMiniGame, ctx)
 }
 
 // MatchStop terminates the match.
@@ -421,7 +441,7 @@ func (h *NakamaMatchHandler) addPlayer(userID string, faction constants.Faction,
 
 	if h.logger != nil {
 		h.logger.WithFields(map[string]interface{}{
-			"user_id":        userID,
+			"user_id":       userID,
 			"player_id":     playerID.UUID(),
 			"faction":       faction,
 			"display_name":  displayName,

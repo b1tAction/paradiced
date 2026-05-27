@@ -22,8 +22,9 @@ type minigameResultPayload struct {
 	GameType string `json:"game_type"`  // Mini-game type (e.g. "dilemma_race")
 	Secret   string `json:"secret"`     // Shared secret for authentication
 	Rankings []struct {
-		PlayerID string `json:"player_id"` // Nakama player UUID
-		Rank     int    `json:"rank"`      // Player ranking (1-4)
+		PlayerID string                 `json:"player_id"` // Nakama player UUID
+		Rank     int                    `json:"rank"`      // Player ranking (1-4)
+		GameData map[string]interface{} `json:"game_data,omitempty"` // Mini-game data for ranking rendering
 	} `json:"rankings"`
 }
 

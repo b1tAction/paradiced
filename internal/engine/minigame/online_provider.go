@@ -78,14 +78,9 @@ func (p *ColyseusProvider) DestroyRoom(roomID string) error {
 }
 
 // GetTimeout returns the maximum wait duration for a mini-game type.
-// Default: 60 seconds for all online games.
+// A non-positive duration disables the Nakama-side fallback timeout.
 func (p *ColyseusProvider) GetTimeout(gameType constants.MiniGameType) time.Duration {
-	switch gameType {
-	case constants.MiniGameTypeDilemmaRace:
-		return 90 * time.Second // Dilemma race needs more time (up to 20 rounds)
-	default:
-		return 60 * time.Second
-	}
+	return 0
 }
 
 // generateToken creates an HMAC-SHA256 token for a player.

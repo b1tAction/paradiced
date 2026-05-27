@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/b1tAction/paradiced/internal/engine/hsm"
+	internalnet "github.com/b1tAction/paradiced/internal/net"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
+	pkgnet "github.com/b1tAction/paradiced/pkg/net"
 	"github.com/heroiclabs/nakama-common/runtime"
 )
 
@@ -78,6 +80,147 @@ func TestMatchLoop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MatchLoop error: %v", err)
 	}
+}
+
+func TestMatchLoopDebugTriggerBroadcastsMiniGameStart(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	mockDispatcher := NewMockDispatcherAdapter()
+	handler.WithDispatcher(mockDispatcher)
+	handler.WithProvider(&debugTriggerMiniGameProvider{})
+
+	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, "Alice")
+	handler.addPlayer(id.TestUUID(2), constants.FactionZhuQue, "Bob")
+	handler.addPlayer(id.TestUUID(3), constants.FactionBaiHu, "Carol")
+	handler.addPlayer(id.TestUUID(4), constants.FactionXuanWu, "Dave")
+
+	if err := handler.MatchInit(); err != nil {
+		t.Fatalf("MatchInit error: %v", err)
+	}
+
+	mockDispatcher.Clear()
+	handler.pendingTriggerMinigame = string(constants.MiniGameTypeDilemmaRace)
+
+	if err := handler.MatchLoop(100 * time.Millisecond); err != nil {
+		t.Fatalf("MatchLoop error: %v", err)
+	}
+
+	if handler.hsm.GetGlobalStateID() != hsm.StateRoundMiniGame {
+		t.Fatalf("global state = %s, want RoundMiniGame", handler.hsm.GetGlobalStateID())
+	}
+
+	var start pkgnet.MiniGameStart
+	found := false
+	for index, broadcast := range mockDispatcher.GetBroadcasts() {
+		if broadcast.OpCode != int64(pkgnet.OpMiniGameStart) {
+			continue
+		}
+		if err := mockDispatcher.ParseBroadcastData(index, &start); err != nil {
+			t.Fatalf("ParseBroadcastData error: %v", err)
+		}
+		found = true
+		break
+	}
+
+	if !found {
+		t.Fatal("expected OpMiniGameStart broadcast after debug mini-game trigger")
+	}
+	if start.GameType != string(constants.MiniGameTypeDilemmaRace) {
+		t.Errorf("GameType = %s, want %s", start.GameType, constants.MiniGameTypeDilemmaRace)
+	}
+	if start.Connection == nil {
+		t.Fatal("Connection should be present for dilemma_race")
+	}
+	if start.Connection.RoomName != string(constants.MiniGameTypeDilemmaRace) {
+		t.Errorf("RoomName = %s, want %s", start.Connection.RoomName, constants.MiniGameTypeDilemmaRace)
+	}
+}
+
+func TestMatchLoopDebugTriggerCanRestartFromTurnLoop(t *testing.T) {
+	handler := NewNakamaMatchHandler("match-001", 12345, 4, 100)
+	mockDispatcher := NewMockDispatcherAdapter()
+	handler.WithDispatcher(mockDispatcher)
+	handler.WithProvider(&debugTriggerMiniGameProvider{})
+
+	handler.addPlayer(id.TestUUID(1), constants.FactionQingLong, "Alice")
+	handler.addPlayer(id.TestUUID(2), constants.FactionZhuQue, "Bob")
+	handler.addPlayer(id.TestUUID(3), constants.FactionBaiHu, "Carol")
+	handler.addPlayer(id.TestUUID(4), constants.FactionXuanWu, "Dave")
+
+	if err := handler.MatchInit(); err != nil {
+		t.Fatalf("MatchInit error: %v", err)
+	}
+
+	handler.pendingTriggerMinigame = string(constants.MiniGameTypeDilemmaRace)
+	if err := handler.MatchLoop(100 * time.Millisecond); err != nil {
+		t.Fatalf("first MatchLoop error: %v", err)
+	}
+
+	miniGameState, ok := handler.hsm.GetGlobalState().(*hsm.RoundMiniGameState)
+	if !ok {
+		t.Fatalf("global state = %T, want *RoundMiniGameState", handler.hsm.GetGlobalState())
+	}
+
+	ctx := hsm.NewStateContext().
+		WithHSM(handler.hsm).
+		WithBroadcast(NewNakamaBroadcastAdapter(handler)).
+		WithBuilder(internalnet.NewBuilder(handler.hsm))
+	for index, playerID := range handler.playerList {
+		miniGameState.OnMiniGameResult(ctx, playerID, index+1)
+	}
+
+	if err := handler.MatchLoop(100 * time.Millisecond); err != nil {
+		t.Fatalf("settlement MatchLoop error: %v", err)
+	}
+	if handler.hsm.GetGlobalStateID() != hsm.StateTurnLoop {
+		t.Fatalf("global state = %s, want TurnLoop", handler.hsm.GetGlobalStateID())
+	}
+
+	mockDispatcher.Clear()
+	handler.pendingTriggerMinigame = string(constants.MiniGameTypeDilemmaRace)
+	if err := handler.MatchLoop(100 * time.Millisecond); err != nil {
+		t.Fatalf("second trigger MatchLoop error: %v", err)
+	}
+
+	if handler.hsm.GetGlobalStateID() != hsm.StateRoundMiniGame {
+		t.Fatalf("global state = %s, want RoundMiniGame", handler.hsm.GetGlobalStateID())
+	}
+
+	found := false
+	for _, broadcast := range mockDispatcher.GetBroadcasts() {
+		if broadcast.OpCode == int64(pkgnet.OpMiniGameStart) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected OpMiniGameStart broadcast when debug trigger restarts from TurnLoop")
+	}
+}
+
+type debugTriggerMiniGameProvider struct{}
+
+func (p *debugTriggerMiniGameProvider) CreateRoom(gameType constants.MiniGameType, playerIDs []string) (*pkgnet.MiniGameConn, error) {
+	tokens := make(map[string]string, len(playerIDs))
+	for _, playerID := range playerIDs {
+		tokens[playerID] = "token_" + playerID
+	}
+
+	return &pkgnet.MiniGameConn{
+		URL:                "ws://mock-colyseus:2567",
+		RoomName:           string(gameType),
+		NakamaMatchID:      "match-001",
+		MiniGameInstanceID: "mini-game-instance-001",
+		CreatorPlayerID:    playerIDs[0],
+		PlayerTokens:       tokens,
+	}, nil
+}
+
+func (p *debugTriggerMiniGameProvider) DestroyRoom(roomID string) error {
+	return nil
+}
+
+func (p *debugTriggerMiniGameProvider) GetTimeout(gameType constants.MiniGameType) time.Duration {
+	return time.Minute
 }
 
 func TestMatchStop(t *testing.T) {

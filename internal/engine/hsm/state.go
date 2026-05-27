@@ -16,29 +16,30 @@ import (
 // Context key constants for commonly used state markers.
 // These keys are stored in the embedded Metadata for type-safe access.
 const (
-	KeySkipTurn     = "skip_turn"           // Mark to skip remaining turn
-	KeyFellDown     = "fell_down"           // Mark for Fragile cell fall
-	KeyReachedEnd   = "reached_end"         // Mark for reaching Boss cell
-	KeyDiceSteps    = "dice_steps"          // Dice roll result for movement
-	KeyTargetPos    = "target_pos"          // Target position after movement
-	KeyDamage       = "damage"              // Damage amount
-	KeyMiniGameRank = "mini_game_rank"      // Mini-game ranking result prefix (used as "result_{playerID}")
-	KeyDiceType     = "dice_type"           // Dice type prefix (used as "dice_{playerID}")
-	KeyBossTrigger    = "boss_trigger_player" // Player who triggered boss battle
-	KeyBossDefeated   = "boss_defeated"        // Boss defeated flag
-	KeyBossDefeatedBy = "boss_defeated_by"     // Player ID who defeated the Boss
-	KeyWinner         = "winner_id"            // Winner player ID
+	KeySkipTurn          = "skip_turn"            // Mark to skip remaining turn
+	KeyFellDown          = "fell_down"            // Mark for Fragile cell fall
+	KeyReachedEnd        = "reached_end"          // Mark for reaching Boss cell
+	KeyDiceSteps         = "dice_steps"           // Dice roll result for movement
+	KeyTargetPos         = "target_pos"           // Target position after movement
+	KeyDamage            = "damage"               // Damage amount
+	KeyMiniGameRank      = "mini_game_rank"       // Mini-game ranking result prefix (used as "result_{playerID}")
+	KeyDiceType          = "dice_type"            // Dice type prefix (used as "dice_{playerID}")
+	KeyBossTrigger       = "boss_trigger_player"  // Player who triggered boss battle
+	KeyBossDefeated      = "boss_defeated"        // Boss defeated flag
+	KeyBossDefeatedBy    = "boss_defeated_by"     // Player ID who defeated the Boss
+	KeyWinner            = "winner_id"            // Winner player ID
 	KeyFirstToBossSet    = "first_to_boss_set"    // First player reached Boss cell flag
 	KeyFirstToBossPlayer = "first_to_boss_player" // Player ID who first reached Boss
 
 	// State flow markers
-	KeyInitialized       = "initialized"         // Match initialized flag
-	KeyMiniGameStarted   = "mini_game_started"   // Mini-game phase started
-	KeyWaitingForResults = "waiting_for_results" // Waiting for mini-game results
-	KeyTurnLoopActive    = "turn_loop_active"    // Turn loop active flag
-	KeyBossBattleActive  = "boss_battle_active"  // Boss battle active flag
-	KeyGameOver          = "game_over"           // Game over flag
-	KeyRoundEndWaiting   = "round_end_waiting"   // Round end wait phase flag
+	KeyInitialized        = "initialized"           // Match initialized flag
+	KeyMiniGameStarted    = "mini_game_started"     // Mini-game phase started
+	KeyWaitingForResults  = "waiting_for_results"   // Waiting for mini-game results
+	KeyTurnLoopActive     = "turn_loop_active"      // Turn loop active flag
+	KeyBossBattleActive   = "boss_battle_active"    // Boss battle active flag
+	KeyGameOver           = "game_over"             // Game over flag
+	KeyRoundEndWaiting    = "round_end_waiting"     // Round end wait phase flag
+	KeyForcedMiniGameType = "forced_mini_game_type" // Debug-triggered mini-game type
 )
 
 // State defines the interface for all states in the HSM.
