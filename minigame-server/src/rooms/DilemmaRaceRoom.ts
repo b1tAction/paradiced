@@ -84,6 +84,9 @@ export class DilemmaRaceRoom extends Room<GameState> {
   // Round timer reference
   private roundTimerRef: any = null;
 
+  // Result callback is sent exactly once per room.
+  private resultSent = false;
+
   override async onCreate(options: {
     player_id: string;
     nakama_match_id: string;
@@ -117,8 +120,10 @@ export class DilemmaRaceRoom extends Room<GameState> {
     // Set patch rate for state synchronization
     this.setPatchRate(50); // 50ms
 
-    // Safety timeout: force finish after max duration
-    this.clock.setTimeout(() => this.forceFinish(), config.maxGameDuration);
+    // Optional safety timeout: force finish after max duration when enabled.
+    if (config.maxGameDuration > 0) {
+      this.clock.setTimeout(() => this.forceFinish(), config.maxGameDuration);
+    }
 
     // Register message handler for player choices (Colyseus v0.15 pattern)
     this.onMessage('choice', (client, message: { choice: number }) => {
@@ -138,6 +143,8 @@ export class DilemmaRaceRoom extends Room<GameState> {
 
       if ([1, 3, 5].includes(message.choice)) {
         player.choice = message.choice;
+        // No early resolve: players can adjust their choice within the 10s timer.
+        // resolveRound() is triggered by the round timer expiry in startRound().
       }
     });
 
@@ -199,6 +206,11 @@ export class DilemmaRaceRoom extends Room<GameState> {
 
   // Start a new round
   private startRound(): void {
+    if (this.state.phase === 'finished') {
+      return;
+    }
+
+    this.clearRoundTimer();
     this.state.round++;
     this.state.phase = 'choosing';
     this.state.roundTimer = config.roundDuration / 1000;
@@ -219,7 +231,13 @@ export class DilemmaRaceRoom extends Room<GameState> {
 
   // Resolve the current round
   private resolveRound(): void {
+    if (this.state.phase === 'finished') {
+      return;
+    }
+
+    this.clearRoundTimer();
     this.state.phase = 'resolving';
+    this.state.roundTimer = 0;
 
     // Collect choices per step value
     const choiceCounts: Map<number, string[]> = new Map();
@@ -259,6 +277,14 @@ export class DilemmaRaceRoom extends Room<GameState> {
     const maxRoundsReached = this.state.round >= 20;
 
     if (finishedPlayers.length > 0 || maxRoundsReached) {
+      console.log(
+        'DilemmaRace finished: match_id=%s, room_id=%s, round=%d, finished_players=%d, max_rounds=%s',
+        this.nakamaMatchId,
+        this.roomId,
+        this.state.round,
+        finishedPlayers.length,
+        maxRoundsReached,
+      );
       this.finishGame();
     } else {
       // Brief pause then next round
@@ -268,13 +294,20 @@ export class DilemmaRaceRoom extends Room<GameState> {
 
   // Finish the game and send results to Nakama
   private finishGame(): void {
+    if (this.resultSent || this.state.phase === 'finished') {
+      return;
+    }
+
+    this.clearRoundTimer();
+    this.resultSent = true;
     this.state.phase = 'finished';
+    this.state.roundTimer = 0;
 
     // Calculate rankings by position descending
     const sorted = [...this.state.players.values()].sort((a, b) => b.position - a.position);
 
     // Assign ranks (tie-breaking: same position = same rank)
-    const rankings: { player_id: string; rank: number }[] = [];
+    const rankings: { player_id: string; rank: number; game_data?: Record<string, any> }[] = [];
     let currentRank = 1;
     for (let i = 0; i < sorted.length; i++) {
       // Tie-breaking: if same position as previous, same rank
@@ -285,6 +318,10 @@ export class DilemmaRaceRoom extends Room<GameState> {
       rankings.push({
         player_id: sorted[i].playerId,
         rank: currentRank,
+        game_data: {
+          position: sorted[i].position,
+          finished: sorted[i].finished,
+        },
       });
     }
 
@@ -292,11 +329,28 @@ export class DilemmaRaceRoom extends Room<GameState> {
     this.sendResultToNakama(rankings);
   }
 
+  private allActivePlayersChose(): boolean {
+    for (const [, player] of this.state.players) {
+      if (!player.finished && player.choice === 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private clearRoundTimer(): void {
+    if (this.roundTimerRef) {
+      this.roundTimerRef.clear();
+      this.roundTimerRef = null;
+    }
+  }
+
   // Send game result to Nakama RPC endpoint
-  private async sendResultToNakama(rankings: { player_id: string; rank: number }[]): Promise<void> {
+  private async sendResultToNakama(rankings: { player_id: string; rank: number; game_data?: Record<string, any> }[]): Promise<void> {
     try {
-      // Nakama RPC requires http_key as query parameter for server-to-server auth
-      const rpcUrl = `${this.nakamaCallbackUrl}?http_key=${config.nakamaHttpKey}`;
+      // Nakama HTTP RPC needs unwrap=true so the raw JSON body is passed as the RPC payload.
+      const separator = this.nakamaCallbackUrl.includes('?') ? '&' : '?';
+      const rpcUrl = `${this.nakamaCallbackUrl}${separator}http_key=${encodeURIComponent(config.nakamaHttpKey)}&unwrap=true`;
       const response = await fetch(rpcUrl, {
         method: 'POST',
         headers: {
@@ -320,8 +374,8 @@ export class DilemmaRaceRoom extends Room<GameState> {
       console.error('Failed to send result to Nakama:', e);
     }
 
-    // Auto-dispose room after result sent
-    this.disconnect();
+    // Give clients one patch tick to receive final ranks before disposing.
+    this.clock.setTimeout(() => this.disconnect(), 1_000);
   }
 
   // Force finish - safety timeout handler

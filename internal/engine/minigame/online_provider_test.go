@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"testing"
-	"time"
 
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
@@ -129,16 +128,15 @@ func TestColyseusProviderGetTimeout(t *testing.T) {
 		Secret:      "test_secret",
 	})
 
-	// Dilemma race should have longer timeout
+	// Online games rely on the Colyseus room to finish and report results.
 	timeout := provider.GetTimeout(constants.MiniGameTypeDilemmaRace)
-	if timeout != 90*time.Second {
-		t.Errorf("expected 90s timeout for dilemma_race, got %v", timeout)
+	if timeout != 0 {
+		t.Errorf("expected disabled Nakama-side timeout for dilemma_race, got %v", timeout)
 	}
 
-	// Other online games default to 60s
 	timeout = provider.GetTimeout(constants.MiniGameType("some_other_online"))
-	if timeout != 60*time.Second {
-		t.Errorf("expected 60s default timeout, got %v", timeout)
+	if timeout != 0 {
+		t.Errorf("expected disabled Nakama-side timeout by default, got %v", timeout)
 	}
 }
 

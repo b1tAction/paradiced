@@ -158,15 +158,15 @@ func (s *WaitingForHostState) Exit(ctx *StateContext) {
 
 type RoundMiniGameState struct {
 	BaseGlobalState
-	resultsReceived  int
-	totalPlayers     int
-	gameType         constants.MiniGameType                      // Current round mini-game type (server-selected)
-	mode             constants.MiniGameMode                      // Frontend-driven or RPC-driven
-	gameData         map[string]map[string]interface{}           // playerID -> game_data (frontend mode storage)
-	rankCalculator   minigame.RankCalculator
-	provider         protocol.OnlineMiniGameProvider             // Online mini-game service provider (nil for frontend-only)
-	connection       *pkgnet.MiniGameConn                        // Connection info for online mode (nil for frontend mode)
-	roomCreatedAt    time.Time                                   // Timestamp when online room was created, for timeout check
+	resultsReceived int
+	totalPlayers    int
+	gameType        constants.MiniGameType            // Current round mini-game type (server-selected)
+	mode            constants.MiniGameMode            // Frontend-driven or RPC-driven
+	gameData        map[string]map[string]interface{} // playerID -> game_data (frontend mode storage)
+	rankCalculator  minigame.RankCalculator
+	provider        protocol.OnlineMiniGameProvider // Online mini-game service provider (nil for frontend-only)
+	connection      *pkgnet.MiniGameConn            // Connection info for online mode (nil for frontend mode)
+	roomCreatedAt   time.Time                       // Timestamp when online room was created, for timeout check
 }
 
 // NewRoundMiniGameState creates a new RoundMiniGame state with default frontend-driven mode.
@@ -257,11 +257,16 @@ func (s *RoundMiniGameState) Enter(ctx *StateContext) {
 	s.resultsReceived = 0
 	s.gameData = make(map[string]map[string]interface{}, nonBossPlayers)
 
-	// Select mini-game type using game RNG for deterministic replay.
-	// Online types are only selectable when provider is available.
-	s.gameType = minigame.SelectMiniGameTypeWithProvider(game.RNG, s.provider != nil)
+	// Select mini-game type using game RNG for deterministic replay unless a
+	// debug trigger explicitly forced a valid type.
+	forcedType := constants.ParseMiniGameType(ctx.GetStringOrDefault(KeyForcedMiniGameType, ""))
+	if forcedType != constants.MiniGameTypeNone && (!forcedType.IsOnline() || s.provider != nil) {
+		s.gameType = forcedType
+	} else {
+		s.gameType = minigame.SelectMiniGameTypeWithProvider(game.RNG, s.provider != nil)
+	}
 
-	game.DebugLog.Info("HSM.RoundMiniGameState.Enter.selected", "game_type", s.gameType, "has_provider", s.provider != nil, "total_players", s.totalPlayers)
+	game.DebugLog.Info("HSM.RoundMiniGameState.Enter.selected", "game_type", s.gameType, "forced_game_type", forcedType, "has_provider", s.provider != nil, "total_players", s.totalPlayers)
 
 	// No eligible mini-game available: skip mini-game phase entirely.
 	if s.gameType == constants.MiniGameTypeNone {
@@ -449,6 +454,14 @@ func (s *RoundMiniGameState) OnMiniGameDataSubmit(ctx *StateContext, playerID st
 func (s *RoundMiniGameState) OnMiniGameResult(ctx *StateContext, playerID string, rank int) {
 	s.resultsReceived++
 	ctx.SetMiniGameRank(playerID, rank)
+}
+
+// OnMiniGameGameData stores game_data for RPC mode ranking rendering.
+// Called by MatchLoop after OnMiniGameResult when game_data is present.
+// This data is used in Exit() to populate RankingEntry.GameData,
+// enabling identical ranking rendering for both Frontend and RPC modes.
+func (s *RoundMiniGameState) OnMiniGameGameData(playerID string, gameData map[string]interface{}) {
+	s.gameData[playerID] = gameData
 }
 
 // RoundPrepState - Round Preparation State

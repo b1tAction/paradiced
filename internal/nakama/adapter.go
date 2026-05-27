@@ -411,8 +411,9 @@ func (a *NakamaMatchHandlerAdapter) MatchSignal(ctx context.Context, logger runt
 		RoomID   string `json:"room_id"`
 		GameType string `json:"game_type"`
 		Rankings []struct {
-			PlayerID string `json:"player_id"`
-			Rank     int    `json:"rank"`
+			PlayerID string                 `json:"player_id"`
+			Rank     int                    `json:"rank"`
+			GameData map[string]interface{} `json:"game_data,omitempty"`
 		} `json:"rankings"`
 	}
 	if err := json.Unmarshal([]byte(data), &signal); err == nil {
@@ -420,10 +421,13 @@ func (a *NakamaMatchHandlerAdapter) MatchSignal(ctx context.Context, logger runt
 		case "minigame_result":
 			// Store rankings in handler for next MatchLoop tick to consume
 			if a.handler.pendingMiniGameResults == nil {
-				a.handler.pendingMiniGameResults = make(map[string]int)
+				a.handler.pendingMiniGameResults = make(map[string]*pendingMiniGameResultEntry)
 			}
 			for _, r := range signal.Rankings {
-				a.handler.pendingMiniGameResults[r.PlayerID] = r.Rank
+				a.handler.pendingMiniGameResults[r.PlayerID] = &pendingMiniGameResultEntry{
+					Rank:     r.Rank,
+					GameData: r.GameData,
+				}
 			}
 			a.logger.Info("MiniGame result signal received: match_id=%s, room_id=%s, game_type=%s, rankings_count=%d",
 				signal.MatchID, signal.RoomID, signal.GameType, len(signal.Rankings))

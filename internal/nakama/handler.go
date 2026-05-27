@@ -21,6 +21,12 @@ import (
 	"github.com/heroiclabs/nakama-common/runtime"
 )
 
+// pendingMiniGameResultEntry stores rank + game_data for RPC mini-game results.
+type pendingMiniGameResultEntry struct {
+	Rank     int
+	GameData map[string]interface{}
+}
+
 // NakamaMatchHandler implements the authoritative match handler for Paradiced.
 // It manages game state, HSM execution, and client communication.
 // HSM is the single source of truth - Game is accessed via hsm.GetGame().
@@ -55,7 +61,7 @@ type NakamaMatchHandler struct {
 
 	// Online mini-game integration
 	provider               protocol.OnlineMiniGameProvider // Colyseus provider for online mini-games (nil for frontend-only)
-	pendingMiniGameResults map[string]int                 // playerID -> rank, populated by MatchSignal, consumed by MatchLoop
+	pendingMiniGameResults map[string]*pendingMiniGameResultEntry // playerID -> result entry, populated by MatchSignal, consumed by MatchLoop
 
 	// Debug mini-game trigger (populated by MatchSignal, consumed by MatchLoop)
 	pendingTriggerMinigame string // Game type to force trigger, empty = no trigger pending

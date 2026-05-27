@@ -909,6 +909,86 @@ func TestStateRoundMiniGame_ExitBroadcastsResultWithDisplayNameOnly(t *testing.T
 	}
 }
 
+func TestStateRoundMiniGame_ExitBroadcastsResultWithGameDataRPC(t *testing.T) {
+	origPool := setupMiniGamePoolWithFrontendType()
+	defer origPool()
+
+	// RPC mode with game_data: OnMiniGameResult + OnMiniGameGameData
+	state := NewRoundMiniGameState()
+
+	game := engine.NewGame(id.NewGameID(), 0)
+	p1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	p2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(p1)
+	game.AddPlayer(p2)
+
+	ctx := NewStateContext().WithHSM(NewHSM(game))
+	mockBroadcast := pkgnet.NewMockBroadcastAdapter()
+	ctx.Broadcast = mockBroadcast
+
+	state.Enter(ctx)
+
+	// RPC mode: set rank AND game_data
+	state.OnMiniGameResult(ctx, p1.ID.UUID(), 1)
+	state.OnMiniGameGameData(p1.ID.UUID(), map[string]interface{}{
+		"position": 15,
+		"finished": true,
+	})
+	state.OnMiniGameResult(ctx, p2.ID.UUID(), 2)
+	state.OnMiniGameGameData(p2.ID.UUID(), map[string]interface{}{
+		"position": 8,
+		"finished": false,
+	})
+
+	state.Exit(ctx)
+
+	if len(mockBroadcast.MiniGameResults) != 1 {
+		t.Fatalf("MiniGameResults broadcast count = %d, want 1", len(mockBroadcast.MiniGameResults))
+	}
+
+	result := mockBroadcast.MiniGameResults[0]
+	if len(result.Rankings) != 2 {
+		t.Fatalf("rankings length = %d, want 2", len(result.Rankings))
+	}
+
+	// Find ranking for p1 (rank 1)
+	var r1, r2 *pkgnet.RankingEntry
+	for i := range result.Rankings {
+		if result.Rankings[i].PlayerID == p1.ID.UUID() {
+			r1 = &result.Rankings[i]
+		}
+		if result.Rankings[i].PlayerID == p2.ID.UUID() {
+			r2 = &result.Rankings[i]
+		}
+	}
+
+	if r1 == nil || r2 == nil {
+		t.Fatal("expected rankings for both players")
+	}
+
+	// Verify game_data for p1
+	if r1.GameData == nil {
+		t.Errorf("RankingEntry.GameData should not be nil for player %s (RPC mode with game_data)", r1.PlayerID)
+	}
+	if r1.GameData["position"] != 15 {
+		t.Errorf("r1.GameData[position] = %v, want 15", r1.GameData["position"])
+	}
+	if r1.GameData["finished"] != true {
+		t.Errorf("r1.GameData[finished] = %v, want true", r1.GameData["finished"])
+	}
+
+	// Verify game_data for p2
+	if r2.GameData == nil {
+		t.Errorf("RankingEntry.GameData should not be nil for player %s (RPC mode with game_data)", r2.PlayerID)
+	}
+	if r2.GameData["position"] != 8 {
+		t.Errorf("r2.GameData[position] = %v, want 8", r2.GameData["position"])
+	}
+	if r2.GameData["finished"] != false {
+		t.Errorf("r2.GameData[finished] = %v, want false", r2.GameData["finished"])
+	}
+}
+
 // ========== GameOverState.Exit Tests ==========
 
 func TestGameOverStateExit(t *testing.T) {
@@ -1025,5 +1105,95 @@ func TestRoundMiniGameState_OnlineWithProvider(t *testing.T) {
 	// MiniGameStart broadcast should have been sent
 	if len(mockBroadcast.MiniGameStarts) != 1 {
 		t.Errorf("MiniGameStarts count = %d, want 1", len(mockBroadcast.MiniGameStarts))
+	}
+}
+
+func TestRoundMiniGameState_ForcedFrontendTypeOverridesSelection(t *testing.T) {
+	// Debug triggers should use the requested frontend type even when the
+	// random selection pool would otherwise contain a different type.
+	origPool := constants.AllMiniGameTypes
+	constants.AllMiniGameTypes = []constants.MiniGameType{constants.MiniGameTypeDiceRace}
+	defer func() { constants.AllMiniGameTypes = origPool }()
+
+	state := NewRoundMiniGameState()
+
+	game := engine.NewGame(id.NewGameID(), 0)
+	p1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	p2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(p1)
+	game.AddPlayer(p2)
+
+	ctx := NewStateContext().WithHSM(NewHSM(game))
+	ctx.SetString(KeyForcedMiniGameType, string(constants.MiniGameTypeRainbowMemory))
+	mockBroadcast := pkgnet.NewMockBroadcastAdapter()
+	ctx.Broadcast = mockBroadcast
+
+	state.Enter(ctx)
+
+	if state.gameType != constants.MiniGameTypeRainbowMemory {
+		t.Errorf("gameType = %s, want rainbow_memory", state.gameType)
+	}
+	if state.mode != constants.MiniGameModeFrontend {
+		t.Errorf("mode = %d, want frontend", state.mode)
+	}
+	if !ctx.GetBoolOrDefault(KeyMiniGameStarted, false) {
+		t.Error("mini_game_started should be true for forced frontend type")
+	}
+	if len(mockBroadcast.MiniGameStarts) != 1 {
+		t.Fatalf("MiniGameStarts count = %d, want 1", len(mockBroadcast.MiniGameStarts))
+	}
+	start := mockBroadcast.MiniGameStarts[0]
+	if start.GameType != string(constants.MiniGameTypeRainbowMemory) {
+		t.Errorf("MiniGameStart.GameType = %s, want rainbow_memory", start.GameType)
+	}
+	if start.Connection != nil {
+		t.Error("forced frontend type should not include online connection")
+	}
+}
+
+func TestRoundMiniGameState_ForcedOnlineTypeWithProvider(t *testing.T) {
+	// Debug triggers should also be able to force online games when an online
+	// provider is available, regardless of the random selection pool.
+	origPool := constants.AllMiniGameTypes
+	constants.AllMiniGameTypes = []constants.MiniGameType{constants.MiniGameTypeDiceRace}
+	defer func() { constants.AllMiniGameTypes = origPool }()
+
+	mockProvider := &mockOnlineProvider{}
+	state := NewRoundMiniGameState().WithProvider(mockProvider)
+
+	game := engine.NewGame(id.NewGameID(), 0)
+	p1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	p2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(p1)
+	game.AddPlayer(p2)
+
+	ctx := NewStateContext().WithHSM(NewHSM(game))
+	ctx.SetString(KeyForcedMiniGameType, string(constants.MiniGameTypeDilemmaRace))
+	mockBroadcast := pkgnet.NewMockBroadcastAdapter()
+	ctx.Broadcast = mockBroadcast
+
+	state.Enter(ctx)
+
+	if state.gameType != constants.MiniGameTypeDilemmaRace {
+		t.Errorf("gameType = %s, want dilemma_race", state.gameType)
+	}
+	if state.mode != constants.MiniGameModeRPC {
+		t.Errorf("mode = %d, want rpc", state.mode)
+	}
+	if !ctx.GetBoolOrDefault(KeyMiniGameStarted, false) {
+		t.Error("mini_game_started should be true for forced online type")
+	}
+	if len(mockBroadcast.MiniGameStarts) != 1 {
+		t.Fatalf("MiniGameStarts count = %d, want 1", len(mockBroadcast.MiniGameStarts))
+	}
+	start := mockBroadcast.MiniGameStarts[0]
+	if start.GameType != string(constants.MiniGameTypeDilemmaRace) {
+		t.Errorf("MiniGameStart.GameType = %s, want dilemma_race", start.GameType)
+	}
+	if start.Connection == nil {
+		t.Fatal("forced online type should include online connection")
+	}
+	if len(start.Connection.PlayerTokens) != 2 {
+		t.Errorf("PlayerTokens count = %d, want 2", len(start.Connection.PlayerTokens))
 	}
 }

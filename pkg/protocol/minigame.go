@@ -30,5 +30,6 @@ type OnlineMiniGameProvider interface {
 
 	// GetTimeout returns the maximum wait duration for this mini-game type.
 	// Used by MatchLoop for fallback if no result received within timeout.
+	// Return a non-positive duration to disable the Nakama-side fallback timeout.
 	GetTimeout(gameType constants.MiniGameType) time.Duration
 }
