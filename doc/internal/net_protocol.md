@@ -252,6 +252,7 @@ type RankingEntry struct {
 |-----------|------|----------------|----------|
 | `dice_race` | 投骰比大小 | `{ dice1: int, dice2: int, score: dice1+dice2 }` | score 降序（越大越好） |
 | `count_seconds` | 计秒小游戏 | `{ elapsed: float64, deviation: |elapsed-5.0| }` | deviation 升序（越接近5秒越好） |
+| `dilemma_race` | 博弈论竞速（Online/RPC） | `{ position: int, finished: bool }` | position 降序（越大越好） |
 | `coin_flip` | 翻硬币 | 未实现，暂不可用 | - |
 
 **MiniGameStart.Connection 说明**：
