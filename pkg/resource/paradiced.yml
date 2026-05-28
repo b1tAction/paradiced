@@ -287,3 +287,9 @@ mini_games:
     english_name: DilemmaRace
     name: 博弈论竞速
     desc: 选择步数博弈，相同步数则互相阻挡
+  trust_dilemma:
+    mode: online               # Requires Colyseus mini-game service
+    available: true
+    english_name: TrustDilemma
+    name: 信任博弈
+    desc: 合作与竞争的经典博弈，4人或3人对局
