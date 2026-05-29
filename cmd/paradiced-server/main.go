@@ -192,7 +192,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		// Inject Colyseus config if configured (enables online mini-game mode)
 		// Provider creation is deferred to adapter.MatchInit where the real Nakama match ID
 		// is available via runtime.RUNTIME_CTX_MATCH_ID context value.
-		if colyseusSecret != "" && colyseusPublicWSURL != "" {
+		if colyseusSecret != "" {
 			// Set defaults for docker-compose / local dev
 			if colyseusPublicWSURL == "" {
 				colyseusPublicWSURL = "ws://127.0.0.1:2567"

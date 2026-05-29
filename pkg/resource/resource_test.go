@@ -529,7 +529,8 @@ func TestLoadDefinitionsMiniGameFields(t *testing.T) {
 		constants.MiniGameTypeDiceRace, constants.MiniGameTypeCoinFlip,
 		constants.MiniGameTypeCountSeconds, constants.MiniGameTypeMathCalc,
 		constants.MiniGameTypeRainbowMemory, constants.MiniGameTypeVernier,
-		constants.MiniGameTypeDilemmaRace,
+		constants.MiniGameTypeDilemmaRace, constants.MiniGameTypeTrustDilemma,
+		constants.MiniGameTypeCakeCutting, constants.MiniGameTypeTypingSpeed,
 	}
 	if len(defs.MiniGames) != len(expectedMiniGames) {
 		t.Errorf("len(defs.MiniGames) = %d, want %d", len(defs.MiniGames), len(expectedMiniGames))

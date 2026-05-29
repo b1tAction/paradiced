@@ -260,10 +260,29 @@ func (s *RoundMiniGameState) Enter(ctx *StateContext) {
 	// Select mini-game type using game RNG for deterministic replay unless a
 	// debug trigger explicitly forced a valid type.
 	forcedType := constants.ParseMiniGameType(ctx.GetStringOrDefault(KeyForcedMiniGameType, ""))
-	if forcedType != constants.MiniGameTypeNone && (!forcedType.IsOnline() || s.provider != nil) {
+	if forcedType != constants.MiniGameTypeNone {
 		s.gameType = forcedType
+		if forcedType.IsOnline() && s.provider == nil {
+			game.DebugLog.Warn("HSM.RoundMiniGameState.Enter.forced_online_without_provider", "game_type", forcedType)
+		}
 	} else {
 		s.gameType = minigame.SelectMiniGameTypeWithProvider(game.RNG, s.provider != nil)
+	}
+
+	// 限制人数：如果抽到的是信任博弈且玩家人数少于或等于2人，并且没有通过 Debug 调试面板强制选择，则重新抽取其他游戏
+	if s.gameType == constants.MiniGameTypeTrustDilemma && s.totalPlayers <= 2 && forcedType != constants.MiniGameTypeTrustDilemma {
+		pool := make([]constants.MiniGameType, 0)
+		for _, mt := range constants.AllMiniGameTypes {
+			if mt != constants.MiniGameTypeTrustDilemma && (!mt.IsOnline() || s.provider != nil) {
+				pool = append(pool, mt)
+			}
+		}
+		if len(pool) > 0 {
+			idx := game.RNG.Intn(len(pool))
+			s.gameType = pool[idx]
+		} else {
+			s.gameType = constants.MiniGameTypeNone
+		}
 	}
 
 	game.DebugLog.Info("HSM.RoundMiniGameState.Enter.selected", "game_type", s.gameType, "forced_game_type", forcedType, "has_provider", s.provider != nil, "total_players", s.totalPlayers)
