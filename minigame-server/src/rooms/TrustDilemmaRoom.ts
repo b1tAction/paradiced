@@ -38,7 +38,7 @@ class GameState extends Schema {
   players: MapSchema<PlayerState> = new MapSchema<PlayerState>();
   round: number = 0;
   roundTimer: number = 10;
-  phase: string = 'choosing'; // choosing / resolving / finished
+  phase: string = 'rules'; // rules / choosing / resolving / finished
   nakamaMatchId: string = '';       // For result callback
   minigameInstanceId: string = '';  // For filterBy matching
 }
@@ -142,8 +142,33 @@ export class TrustDilemmaRoom extends Room<GameState> {
       }
     });
 
-    // Start first round
-    this.startRound();
+    // Register message handler for rule confirmations
+    this.onMessage('confirm_rules', (client) => {
+      if (this.state.phase !== 'rules') {
+        return;
+      }
+
+      const playerId = client.auth?.playerId;
+      if (!playerId) {
+        return;
+      }
+
+      const player = this.state.players.get(playerId);
+      if (!player) {
+        return;
+      }
+
+      player.isReady = true;
+      console.log(`[TrustDilemma] Player ${playerId} confirmed rules.`);
+
+      // Early start: if all players confirmed, start the first round early
+      if (this.allPlayersConfirmedRules()) {
+        this.startRound();
+      }
+    });
+
+    // Start rules presentation phase
+    this.startRulesPhase();
   }
 
   // onAuth validates HMAC token before allowing a client to join.
@@ -184,6 +209,39 @@ export class TrustDilemmaRoom extends Room<GameState> {
 
   override onLeave(client: Client, consented: boolean): void {
     console.log(`[TrustDilemma] Player left: ${client.sessionId}, consented: ${consented}`);
+  }
+
+  // Start the rules presentation phase
+  private startRulesPhase(): void {
+    this.clearRoundTimer();
+    this.state.round = 0;
+    this.state.phase = 'rules';
+    this.state.roundTimer = 15; // 15 seconds to read rules
+
+    // Reset choices and ready states for all players
+    for (const [, player] of this.state.players) {
+      player.choice = 0;
+      player.roundScore = 0;
+      player.isReady = false;
+    }
+
+    // Tick the timer every second for client sync
+    this.roundTimerRef = this.clock.setInterval(() => {
+      if (this.state.roundTimer > 0) {
+        this.state.roundTimer--;
+      } else {
+        this.startRound();
+      }
+    }, 1000);
+  }
+
+  private allPlayersConfirmedRules(): boolean {
+    for (const [, player] of this.state.players) {
+      if (!player.isReady) {
+        return false;
+      }
+    }
+    return true;
   }
 
   // Start a new round
