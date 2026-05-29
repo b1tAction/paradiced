@@ -293,3 +293,9 @@ mini_games:
     english_name: TrustDilemma
     name: 信任博弈
     desc: 合作与竞争的经典博弈，4人或3人对局
+  cake_cutting:
+    mode: online               # Requires Colyseus mini-game service
+    available: true
+    english_name: CakeCutting
+    name: 切蛋糕
+    desc: 轮流切蛋糕，保留较小一部分，切不中则出局，存活至最后获胜
