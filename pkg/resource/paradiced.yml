@@ -284,15 +284,15 @@ mini_games:
   dilemma_race:
     mode: online               # Requires Colyseus mini-game service
     available: true
-    english_name: DilemmaRace
-    name: 博弈论竞速
-    desc: 选择步数博弈，相同步数则互相阻挡
+    english_name: StepCollision
+    name: 步步为营
+    desc: 猜测对手步数，选出唯一数字即可前行，撞车则原地不动！
   trust_dilemma:
     mode: online               # Requires Colyseus mini-game service
     available: true
-    english_name: TrustDilemma
-    name: 信任博弈
-    desc: 合作与竞争的经典博弈，4人或3人对局
+    english_name: TrustTest
+    name: 信任考验
+    desc: 经典多玩家囚徒困境，选择合作还是背叛？共赢还是掠夺由你决定！
   cake_cutting:
     mode: online               # Requires Colyseus mini-game service
     available: true
