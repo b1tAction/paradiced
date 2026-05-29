@@ -12,6 +12,7 @@ import { WebSocketTransport } from '@colyseus/ws-transport';
 import { DilemmaRaceRoom } from './rooms/DilemmaRaceRoom';
 import { TrustDilemmaRoom } from './rooms/TrustDilemmaRoom';
 import { CakeCuttingRoom } from './rooms/CakeCuttingRoom';
+import { TypingSpeedRoom } from './rooms/TypingSpeedRoom';
 import { config } from './config';
 
 const transport = new WebSocketTransport();
@@ -27,6 +28,9 @@ server.define('trust_dilemma', TrustDilemmaRoom)
   .filterBy(['minigame_instance_id']);
 
 server.define('cake_cutting', CakeCuttingRoom)
+  .filterBy(['minigame_instance_id']);
+
+server.define('typing_speed', TypingSpeedRoom)
   .filterBy(['minigame_instance_id']);
 
 // Start the server

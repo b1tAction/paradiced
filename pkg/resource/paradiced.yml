@@ -299,3 +299,9 @@ mini_games:
     english_name: CakeCutting
     name: 切蛋糕
     desc: 轮流切蛋糕，保留较小一部分，切不中则出局，存活至最后获胜
+  typing_speed:
+    mode: online               # Requires Colyseus mini-game service
+    available: true
+    english_name: TypingSpeed
+    name: 打字速度
+    desc: 快速输入屏幕上朱自清《春》的经典句子，字字必争！

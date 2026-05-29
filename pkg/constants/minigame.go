@@ -38,6 +38,7 @@ const (
 	MiniGameTypeDilemmaRace  MiniGameType = "dilemma_race"  // Dilemma race (博弈论) - Online: requires MiniGame Service
 	MiniGameTypeTrustDilemma MiniGameType = "trust_dilemma" // Trust dilemma (经典博弈) - Online: requires MiniGame Service
 	MiniGameTypeCakeCutting  MiniGameType = "cake_cutting"  // Cake cutting (切蛋糕) - Online: requires MiniGame Service
+	MiniGameTypeTypingSpeed  MiniGameType = "typing_speed"  // Typing speed (打字速度) - Online: requires MiniGame Service
 )
 
 // IsValid checks if MiniGameType corresponds to a known type constant.
@@ -47,7 +48,8 @@ func (mt MiniGameType) IsValid() bool {
 	switch mt {
 	case MiniGameTypeDiceRace, MiniGameTypeCoinFlip, MiniGameTypeCountSeconds,
 		MiniGameTypeMathCalc, MiniGameTypeRainbowMemory, MiniGameTypeVernier,
-		MiniGameTypeDilemmaRace, MiniGameTypeTrustDilemma, MiniGameTypeCakeCutting:
+		MiniGameTypeDilemmaRace, MiniGameTypeTrustDilemma, MiniGameTypeCakeCutting,
+		MiniGameTypeTypingSpeed:
 		return true
 	default:
 		return false
@@ -60,7 +62,7 @@ func (mt MiniGameType) IsValid() bool {
 // YAML mode field should match this for consistency (validated at load time).
 func (mt MiniGameType) IsOnline() bool {
 	switch mt {
-	case MiniGameTypeDilemmaRace, MiniGameTypeTrustDilemma, MiniGameTypeCakeCutting:
+	case MiniGameTypeDilemmaRace, MiniGameTypeTrustDilemma, MiniGameTypeCakeCutting, MiniGameTypeTypingSpeed:
 		return true
 	default:
 		return false
@@ -89,6 +91,8 @@ func ParseMiniGameType(s string) MiniGameType {
 		return MiniGameTypeTrustDilemma
 	case "cake_cutting":
 		return MiniGameTypeCakeCutting
+	case "typing_speed":
+		return MiniGameTypeTypingSpeed
 	default:
 		return MiniGameTypeNone
 	}
@@ -101,6 +105,7 @@ var AllMiniGameTypes = []MiniGameType{
 	MiniGameTypeDilemmaRace,
 	MiniGameTypeTrustDilemma,
 	MiniGameTypeCakeCutting,
+	MiniGameTypeTypingSpeed,
 }
 
 // AllOnlineMiniGameTypes is the pool of mini-game types that require an online service.
@@ -110,6 +115,7 @@ var AllOnlineMiniGameTypes = []MiniGameType{
 	MiniGameTypeDilemmaRace,
 	MiniGameTypeTrustDilemma,
 	MiniGameTypeCakeCutting,
+	MiniGameTypeTypingSpeed,
 }
 
 // ========== Mini Game Definition (Static Metadata) ==========
