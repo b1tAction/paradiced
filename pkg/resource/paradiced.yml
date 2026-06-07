@@ -165,6 +165,52 @@ buffs:
     name: 鎮厄
     desc: 玄武阵营增益，1回合免疫恶性事件和负面Buff
     duration: 1
+  sinking:
+    evaluation: bad
+    english_name: Sinking
+    name: 沉沦
+    desc: 接下来2回合与某人共享恶性的Action
+    duration: 2
+    hidden: true    # Not drawable, only triggered by MagicFlute item
+  eternal:
+    evaluation: good
+    english_name: Eternal
+    name: 永恒
+    desc: 接下来2回合与某人共享良性的Action
+    duration: 2
+    hidden: true    # Not drawable, only triggered by CupidArrow item
+  fearless:
+    evaluation: mild_bad
+    english_name: Fearless
+    name: 无畏
+    desc: 血量立刻减至1点，3回合内血量保持不变
+    duration: 3
+  golden_body:
+    evaluation: good
+    english_name: GoldenBody
+    name: 金身
+    desc: 接下来2回合受到的伤害减半
+    duration: 2
+  wrath:
+    evaluation: mild_good
+    english_name: Wrath
+    name: 嗔怒
+    desc: 接下来2回合造成的伤害+1
+    duration: 2
+  savior:
+    evaluation: neutral
+    english_name: Savior
+    name: 庇护
+    desc: 抵挡一次致命伤害
+    duration: -1
+    hidden: true
+  sage_protection:
+    evaluation: neutral
+    english_name: SageProtection
+    name: 贤者的庇护
+    desc: 原地复活，不回到检查点
+    duration: -1
+    hidden: true
 
 # ========== Item Definitions ==========
 
@@ -184,10 +230,61 @@ items:
     english_name: DiceUpgrade
     name: 骰子升级卡
     desc: 将当前骰子升级为更高等级
-  # TODO: 添加更多道具
-  # 名刀司命(抵挡一次致命伤害)
-  # 贤者的庇护(原地复活，不回到检查点)
-  # 贪、嗔、痴之戒(永久改变自己的属性与属性上限)
+  magic_flute:
+    evaluation: mild_bad
+    english_name: MagicFlute
+    name: 魔笛
+    desc: 与某人共同获得沉沦Buff，共享恶性Action
+  cupid_arrow:
+    evaluation: mild_good
+    english_name: CupidArrow
+    name: 丘比特之箭
+    desc: 与某人共同获得永恒Buff，共享良性Action
+  crimson_blade:
+    evaluation: mixed
+    english_name: CrimsonBlade
+    name: 猩红之刃
+    desc: 损失一半血量，对目标造成等量伤害
+  wisdom_ring:
+    evaluation: good
+    english_name: WisdomRing
+    name: 智慧玄戒
+    desc: 获得神眷Buff
+  meditation_ring:
+    evaluation: good
+    english_name: MeditationRing
+    name: 禅定玄戒
+    desc: 获得甘霖Buff
+  discipline_ring:
+    evaluation: good
+    english_name: DisciplineRing
+    name: 持戒玄戒
+    desc: 获得金身Buff
+  foolish_ring:
+    evaluation: mixed
+    english_name: FoolishRing
+    name: 痴愚煞戒
+    desc: HP+1，LP-1
+  greedy_ring:
+    evaluation: mixed
+    english_name: GreedyRing
+    name: 贪婪煞戒
+    desc: LP+1，HP-1
+  wrath_ring:
+    evaluation: mild_bad
+    english_name: WrathRing
+    name: 嗔恨煞戒
+    desc: HP-1，获得嗔怒Buff
+  named_blade:
+    evaluation: very_good
+    english_name: NamedBlade
+    name: 名刀司命
+    desc: 抵挡一次致命伤害
+  sage_protection:
+    evaluation: good
+    english_name: SageProtection
+    name: 贤者的庇护
+    desc: 原地复活
 
 # ========== Faction Definitions ==========
 

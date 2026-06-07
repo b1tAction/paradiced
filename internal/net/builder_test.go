@@ -737,7 +737,7 @@ func TestBuildDefinitionsConfigBuffClassification(t *testing.T) {
 
 	// Verify hidden is false for other buffs
 	for key, buff := range defs.Buffs {
-		if key == "death_mark" || key == "rob_luck" {
+		if key == "death_mark" || key == "rob_luck" || key == "savior" || key == "sage_protection" {
 			continue
 		}
 		if buff.IsHidden {
@@ -830,13 +830,13 @@ func TestBuildDefinitionsConfigCompleteness(t *testing.T) {
 	if len(defs.Events) != 14 {
 		t.Errorf("len(defs.Events) = %d, want 14", len(defs.Events))
 	}
-	// Verify all 14 buffs present (11 original + 3 new faction buffs)
-	if len(defs.Buffs) != 14 {
-		t.Errorf("len(defs.Buffs) = %d, want 14", len(defs.Buffs))
+	// Verify all 21 buffs present
+	if len(defs.Buffs) != 21 {
+		t.Errorf("len(defs.Buffs) = %d, want 21", len(defs.Buffs))
 	}
-	// Verify all 3 items present
-	if len(defs.Items) != 3 {
-		t.Errorf("len(defs.Items) = %d, want 3", len(defs.Items))
+	// Verify all 14 items present
+	if len(defs.Items) != 14 {
+		t.Errorf("len(defs.Items) = %d, want 14", len(defs.Items))
 	}
 
 	// Verify all entries have required fields populated

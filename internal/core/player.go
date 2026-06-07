@@ -141,6 +141,19 @@ func (p *Player) Heal(amount int) error {
 	return nil
 }
 
+// SetHP sets the player's HP directly, clamped to [0, MaxHP],
+// and updates the IsDead flag accordingly.
+func (p *Player) SetHP(hp int) {
+	if hp < 0 {
+		hp = 0
+	}
+	if hp > p.MaxHP {
+		hp = p.MaxHP
+	}
+	p.HP = hp
+	p.IsDead = p.HP <= 0
+}
+
 // ModifyLP modifies luck points with range limit (0~8).
 func (p *Player) ModifyLP(amount int) {
 	p.LP += amount

@@ -411,3 +411,431 @@ func TestDiceUpgradeHandlerNoCurrentDice(t *testing.T) {
 		t.Error("DiceUpgrade handler should not produce actions without current_dice_type")
 	}
 }
+
+// ========== New Item Handler Tests ==========
+
+func TestMagicFluteHandlerBehavior(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	target := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+	game.AddPlayer(target)
+
+	handler := GetItemHandlerConfig(constants.ItemTypeMagicFlute).Handler
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("target_player", target)
+
+	handler(constants.PhaseItemUsed, ctx)
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 2 {
+		t.Fatalf("expected 2 derived actions (Sinking for self and target), got %d", len(derived))
+	}
+
+	// First: AddBuffActionWithMetadata for self
+	selfBuff, ok := derived[0].(*engineaction.AddBuffAction)
+	if !ok {
+		t.Fatalf("expected AddBuffAction, got %T", derived[0])
+	}
+	if selfBuff.BuffType != constants.BuffTypeSinking {
+		t.Errorf("self buff type = %s, expected sinking", selfBuff.BuffType)
+	}
+	if selfBuff.TargetPlayer() != player {
+		t.Error("self buff should target self")
+	}
+
+	// Second: AddBuffActionWithMetadata for target
+	targetBuff, ok := derived[1].(*engineaction.AddBuffAction)
+	if !ok {
+		t.Fatalf("expected AddBuffAction, got %T", derived[1])
+	}
+	if targetBuff.BuffType != constants.BuffTypeSinking {
+		t.Errorf("target buff type = %s, expected sinking", targetBuff.BuffType)
+	}
+	if targetBuff.TargetPlayer() != target {
+		t.Error("target buff should target target player")
+	}
+}
+
+func TestCupidArrowHandlerBehavior(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	target := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+	game.AddPlayer(target)
+
+	handler := GetItemHandlerConfig(constants.ItemTypeCupidArrow).Handler
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("target_player", target)
+
+	handler(constants.PhaseItemUsed, ctx)
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 2 {
+		t.Fatalf("expected 2 derived actions, got %d", len(derived))
+	}
+
+	selfBuff, ok := derived[0].(*engineaction.AddBuffAction)
+	if !ok {
+		t.Fatalf("expected AddBuffAction, got %T", derived[0])
+	}
+	if selfBuff.BuffType != constants.BuffTypeEternal {
+		t.Errorf("self buff type = %s, expected eternal", selfBuff.BuffType)
+	}
+
+	targetBuff, ok := derived[1].(*engineaction.AddBuffAction)
+	if !ok {
+		t.Fatalf("expected AddBuffAction, got %T", derived[1])
+	}
+	if targetBuff.BuffType != constants.BuffTypeEternal {
+		t.Errorf("target buff type = %s, expected eternal", targetBuff.BuffType)
+	}
+	if targetBuff.TargetPlayer() != target {
+		t.Error("target buff should target target player")
+	}
+}
+
+func TestCrimsonBladeHandlerBehavior(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	player.HP = 6
+	target := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	game.AddPlayer(player)
+	game.AddPlayer(target)
+
+	handler := GetItemHandlerConfig(constants.ItemTypeCrimsonBlade).Handler
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("target_player", target)
+
+	handler(constants.PhaseItemUsed, ctx)
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 2 {
+		t.Fatalf("expected 2 derived actions, got %d", len(derived))
+	}
+
+	// First: PiercingDamageAction to self (sacrifice half HP)
+	selfDamage, ok := derived[0].(*engineaction.DamageAction)
+	if !ok {
+		t.Fatalf("expected DamageAction, got %T", derived[0])
+	}
+	if !selfDamage.IsPiercing {
+		t.Error("self damage should be piercing")
+	}
+	if selfDamage.Amount != 3 {
+		t.Errorf("self damage = %d, expected 3 (HP/2)", selfDamage.Amount)
+	}
+	if selfDamage.Source() != string(constants.SourceItemCrimsonBlade) {
+		t.Errorf("self damage source = %s, expected %s", selfDamage.Source(), string(constants.SourceItemCrimsonBlade))
+	}
+
+	// Second: DamageActionWithSource to target
+	targetDamage, ok := derived[1].(*engineaction.DamageAction)
+	if !ok {
+		t.Fatalf("expected DamageAction, got %T", derived[1])
+	}
+	if targetDamage.Amount != 3 {
+		t.Errorf("target damage = %d, expected 3", targetDamage.Amount)
+	}
+	if targetDamage.TargetPlayer() != target {
+		t.Error("target damage should target target player")
+	}
+}
+
+func TestCrimsonBladeZeroDamage(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	player.HP = 1
+	target := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	game.AddPlayer(player)
+	game.AddPlayer(target)
+
+	handler := GetItemHandlerConfig(constants.ItemTypeCrimsonBlade).Handler
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("target_player", target)
+
+	handler(constants.PhaseItemUsed, ctx)
+
+	// HP=1, damageAmount = 1/2 = 0 → no derived actions
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("CrimsonBlade should produce no actions when HP=1 (damageAmount=0)")
+	}
+}
+
+func TestWisdomRingHandlerBehavior(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	handler := GetItemHandlerConfig(constants.ItemTypeWisdomRing).Handler
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
+	handler(constants.PhaseItemUsed, ctx)
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
+	}
+	addBuff, ok := derived[0].(*engineaction.AddBuffAction)
+	if !ok {
+		t.Fatalf("expected AddBuffAction, got %T", derived[0])
+	}
+	if addBuff.BuffType != constants.BuffTypeDivine {
+		t.Errorf("buff type = %s, expected divine", addBuff.BuffType)
+	}
+	if addBuff.Source() != string(constants.SourceItemWisdomRingBuff) {
+		t.Errorf("source = %s, expected %s", addBuff.Source(), string(constants.SourceItemWisdomRingBuff))
+	}
+}
+
+func TestMeditationRingHandlerBehavior(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	handler := GetItemHandlerConfig(constants.ItemTypeMeditationRing).Handler
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
+	handler(constants.PhaseItemUsed, ctx)
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
+	}
+	addBuff, ok := derived[0].(*engineaction.AddBuffAction)
+	if !ok {
+		t.Fatalf("expected AddBuffAction, got %T", derived[0])
+	}
+	if addBuff.BuffType != constants.BuffTypeRain {
+		t.Errorf("buff type = %s, expected rain", addBuff.BuffType)
+	}
+}
+
+func TestDisciplineRingHandlerBehavior(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	handler := GetItemHandlerConfig(constants.ItemTypeDisciplineRing).Handler
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
+	handler(constants.PhaseItemUsed, ctx)
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
+	}
+	addBuff, ok := derived[0].(*engineaction.AddBuffAction)
+	if !ok {
+		t.Fatalf("expected AddBuffAction, got %T", derived[0])
+	}
+	if addBuff.BuffType != constants.BuffTypeGoldenBody {
+		t.Errorf("buff type = %s, expected golden_body", addBuff.BuffType)
+	}
+}
+
+func TestFoolishRingHandlerBehavior(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	handler := GetItemHandlerConfig(constants.ItemTypeFoolishRing).Handler
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
+	handler(constants.PhaseItemUsed, ctx)
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 2 {
+		t.Fatalf("expected 2 derived actions, got %d", len(derived))
+	}
+
+	healAction, ok := derived[0].(*engineaction.HealAction)
+	if !ok {
+		t.Fatalf("expected HealAction, got %T", derived[0])
+	}
+	if healAction.Amount != 1 {
+		t.Errorf("heal amount = %d, expected 1", healAction.Amount)
+	}
+	if healAction.Source() != string(constants.SourceItemFoolishRing) {
+		t.Errorf("heal source = %s, expected %s", healAction.Source(), string(constants.SourceItemFoolishRing))
+	}
+
+	lpAction, ok := derived[1].(*engineaction.ModifyLPAction)
+	if !ok {
+		t.Fatalf("expected ModifyLPAction, got %T", derived[1])
+	}
+	if lpAction.Amount != -1 {
+		t.Errorf("LP change = %d, expected -1", lpAction.Amount)
+	}
+}
+
+func TestGreedyRingHandlerBehavior(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	handler := GetItemHandlerConfig(constants.ItemTypeGreedyRing).Handler
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
+	handler(constants.PhaseItemUsed, ctx)
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 2 {
+		t.Fatalf("expected 2 derived actions, got %d", len(derived))
+	}
+
+	lpAction, ok := derived[0].(*engineaction.ModifyLPAction)
+	if !ok {
+		t.Fatalf("expected ModifyLPAction, got %T", derived[0])
+	}
+	if lpAction.Amount != 1 {
+		t.Errorf("LP change = %d, expected 1", lpAction.Amount)
+	}
+
+	damageAction, ok := derived[1].(*engineaction.DamageAction)
+	if !ok {
+		t.Fatalf("expected DamageAction, got %T", derived[1])
+	}
+	if damageAction.Amount != 1 {
+		t.Errorf("damage = %d, expected 1", damageAction.Amount)
+	}
+}
+
+func TestWrathRingHandlerBehavior(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	handler := GetItemHandlerConfig(constants.ItemTypeWrathRing).Handler
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
+	handler(constants.PhaseItemUsed, ctx)
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 2 {
+		t.Fatalf("expected 2 derived actions, got %d", len(derived))
+	}
+
+	damageAction, ok := derived[0].(*engineaction.DamageAction)
+	if !ok {
+		t.Fatalf("expected DamageAction, got %T", derived[0])
+	}
+	if damageAction.Amount != 1 {
+		t.Errorf("damage = %d, expected 1", damageAction.Amount)
+	}
+	if damageAction.Source() != string(constants.SourceItemWrathRing) {
+		t.Errorf("damage source = %s, expected %s", damageAction.Source(), string(constants.SourceItemWrathRing))
+	}
+
+	addBuff, ok := derived[1].(*engineaction.AddBuffAction)
+	if !ok {
+		t.Fatalf("expected AddBuffAction, got %T", derived[1])
+	}
+	if addBuff.BuffType != constants.BuffTypeWrath {
+		t.Errorf("buff type = %s, expected wrath", addBuff.BuffType)
+	}
+}
+
+func TestNamedBladeHandlerBehavior(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	handler := GetItemHandlerConfig(constants.ItemTypeNamedBlade).Handler
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
+	handler(constants.PhaseItemUsed, ctx)
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
+	}
+	addBuff, ok := derived[0].(*engineaction.AddBuffAction)
+	if !ok {
+		t.Fatalf("expected AddBuffAction, got %T", derived[0])
+	}
+	if addBuff.BuffType != constants.BuffTypeSavior {
+		t.Errorf("buff type = %s, expected savior", addBuff.BuffType)
+	}
+}
+
+func TestSageProtectionItemHandlerBehavior(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	handler := GetItemHandlerConfig(constants.ItemTypeSageProtection).Handler
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+
+	handler(constants.PhaseItemUsed, ctx)
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
+	}
+	addBuff, ok := derived[0].(*engineaction.AddBuffAction)
+	if !ok {
+		t.Fatalf("expected AddBuffAction, got %T", derived[0])
+	}
+	if addBuff.BuffType != constants.BuffTypeSageProtection {
+		t.Errorf("buff type = %s, expected sage_protection", addBuff.BuffType)
+	}
+}
+
+func TestMagicFluteNilTargetPlayer(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+	// No target_player set
+
+	handler := GetItemHandlerConfig(constants.ItemTypeMagicFlute).Handler
+	err := handler(constants.PhaseItemUsed, ctx)
+	if err == nil {
+		t.Error("MagicFlute should return error without target_player")
+	}
+}
+
+func TestCupidArrowNilTargetPlayer(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+
+	handler := GetItemHandlerConfig(constants.ItemTypeCupidArrow).Handler
+	err := handler(constants.PhaseItemUsed, ctx)
+	if err == nil {
+		t.Error("CupidArrow should return error without target_player")
+	}
+}
+
+func TestCrimsonBladeNilTargetPlayer(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+
+	handler := GetItemHandlerConfig(constants.ItemTypeCrimsonBlade).Handler
+	err := handler(constants.PhaseItemUsed, ctx)
+	if err == nil {
+		t.Error("CrimsonBlade should return error without target_player")
+	}
+}

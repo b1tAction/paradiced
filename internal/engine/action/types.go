@@ -18,11 +18,12 @@ import (
 // DamageAction represents HP reduction.
 // Can be intercepted at PhasePreDamage to reduce or block damage amount.
 type DamageAction struct {
-	targetPlayer *core.Player // Player receiving damage
-	SourceID     string       // Source identifier (e.g., "Buff_Curse", "Event_Trap")
-	Amount       int          // Damage amount (can be modified by interceptors)
-	IsPiercing   bool         // True if ignores shields (cannot be intercepted)
-	BlockedBy    string       // Set by interceptor to identify blocking source
+	targetPlayer  *core.Player // Player receiving damage
+	SourcePlayer  *core.Player // Optional: player originating the damage (for ActorPlayerer)
+	SourceID      string       // Source identifier (e.g., "Buff_Curse", "Event_Trap")
+	Amount        int          // Damage amount (can be modified by interceptors)
+	IsPiercing    bool         // True if ignores shields (cannot be intercepted)
+	BlockedBy     string       // Set by interceptor to identify blocking source
 }
 
 // NewDamageAction creates a new DamageAction.
@@ -45,11 +46,35 @@ func NewPiercingDamageAction(target *core.Player, amount int, sourceID string) *
 	}
 }
 
+// NewDamageActionWithSource creates a DamageAction with an explicit source player.
+// Used when PhasePreAction must be published to both target and source players
+// (e.g., Dominance buff on source player needs to intercept/amplify damage).
+func NewDamageActionWithSource(target *core.Player, amount int, sourcePlayer *core.Player, sourceID string) *DamageAction {
+	return &DamageAction{
+		targetPlayer: target,
+		SourcePlayer: sourcePlayer,
+		SourceID:     sourceID,
+		Amount:       amount,
+		IsPiercing:   false,
+	}
+}
+
 func (a *DamageAction) Type() constants.ActionType { return constants.ActionDamage }
 func (a *DamageAction) CanModify() bool            { return !a.IsPiercing && a.Amount > 0 }
 func (a *DamageAction) Source() string             { return a.SourceID }
 func (a *DamageAction) Target() string             { return a.targetPlayer.ID.UUID() }
 func (a *DamageAction) TargetPlayer() *core.Player { return a.targetPlayer }
+
+// ActorPlayers returns players that should receive PhasePreAction publication.
+// When SourcePlayer is set, both target and source receive the publication
+// (e.g., Dominance buff on source player needs to intercept/amplify beneficial damage).
+// Without SourcePlayer, defaults to [targetPlayer] only (backward compatible).
+func (a *DamageAction) ActorPlayers() []*core.Player {
+	if a.SourcePlayer != nil {
+		return []*core.Player{a.targetPlayer, a.SourcePlayer}
+	}
+	return []*core.Player{a.targetPlayer}
+}
 func (a *DamageAction) PreTriggerPhase() constants.Phase {
 	if a.IsPiercing {
 		return constants.PhaseAnyTime // Piercing damage cannot be intercepted
@@ -308,6 +333,8 @@ type AddBuffAction struct {
 	SourceID     string             // Source identifier
 	// Internal field populated during Execute() (for LogEntry)
 	duration int
+	// Initial metadata to merge into the buff before EventBus subscription
+	initialMetadata *util.Metadata
 }
 
 // NewAddBuffAction creates a new AddBuffAction.
@@ -316,6 +343,18 @@ func NewAddBuffAction(target *core.Player, buffType constants.BuffType, sourceID
 		targetPlayer: target,
 		BuffType:     buffType,
 		SourceID:     sourceID,
+	}
+}
+
+// NewAddBuffActionWithMetadata creates a new AddBuffAction with initial metadata.
+// The metadata is merged into the buff before EventBus subscription,
+// so PhasePostBuffApplied handlers can see it.
+func NewAddBuffActionWithMetadata(target *core.Player, buffType constants.BuffType, sourceID string, initialMetadata *util.Metadata) *AddBuffAction {
+	return &AddBuffAction{
+		targetPlayer:    target,
+		BuffType:        buffType,
+		SourceID:        sourceID,
+		initialMetadata: initialMetadata,
 	}
 }
 
@@ -356,6 +395,13 @@ func (a *AddBuffAction) Execute(ctx *ActionContext) error {
 		if err := a.targetPlayer.AddBuff(newBuff); err != nil {
 			return errors.NewActionExecutionError("add_buff", a.targetPlayer.ID.UUID(), "failed to extend buff duration", err)
 		}
+		// Merge initial metadata into existing buff during duration extend
+		if a.initialMetadata != nil {
+			existingBuff := a.targetPlayer.GetBuff(a.BuffType)
+			if existingBuff != nil {
+				existingBuff.Metadata.Merge(a.initialMetadata)
+			}
+		}
 		// Mark as duration-extend so ExecuteAction skips PostTrigger
 		ctx.SetBool("buff_duration_extended", true)
 		if ctx.Game != nil {
@@ -366,6 +412,10 @@ func (a *AddBuffAction) Execute(ctx *ActionContext) error {
 
 	// New buff: full lifecycle (add + subscribe + PhasePostBuffApplied)
 	newBuff := core.NewBuff(a.BuffType, duration)
+	// Merge initial metadata before EventBus subscription so handlers see it
+	if a.initialMetadata != nil {
+		newBuff.Metadata.Merge(a.initialMetadata)
+	}
 	if ctx.Game != nil {
 		ctx.Game.GetDebugLog().Info("AddBuffAction.Execute.new_buff", "player_id", a.targetPlayer.ID.UUID(), "buff_type", a.BuffType, "duration", duration)
 	}

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math"
 
-	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/internal/core"
+	engineaction "github.com/b1tAction/paradiced/internal/engine/action"
 	"github.com/b1tAction/paradiced/internal/event"
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/id"
@@ -345,6 +345,62 @@ func registerAllBuffs() {
 		Priority:    90,
 		NeedConfirm: false,
 		Handler:     handleSuppressImmune,
+	})
+
+	// Sinking: share negative actions/buffs with linked player
+	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeSinking], &BuffHandlerConfig{
+		Phases:      []constants.Phase{constants.PhasePreAction, constants.PhasePreBuffApplied},
+		Priority:    60,
+		NeedConfirm: false,
+		Handler:     handleSinkingShare,
+	})
+
+	// Eternal: share positive actions/buffs with linked player
+	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeEternal], &BuffHandlerConfig{
+		Phases:      []constants.Phase{constants.PhasePreAction, constants.PhasePreBuffApplied},
+		Priority:    60,
+		NeedConfirm: false,
+		Handler:     handleEternalShare,
+	})
+
+	// Fearless: HP locked at 1 for duration, blocks damage/heal at PreAction, sets HP=1 at PostBuffApplied
+	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeFearless], &BuffHandlerConfig{
+		Phases:      []constants.Phase{constants.PhasePreAction, constants.PhasePostBuffApplied},
+		Priority:    200,
+		NeedConfirm: false,
+		Handler:     handleFearless,
+	})
+
+	// GoldenBody: damage reduced to floor(damage/2)+1
+	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeGoldenBody], &BuffHandlerConfig{
+		Phases:      []constants.Phase{constants.PhasePreDamage},
+		Priority:    70,
+		NeedConfirm: false,
+		Handler:     handleGoldenBodyReduce,
+	})
+
+	// Wrath: outgoing damage +1
+	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeWrath], &BuffHandlerConfig{
+		Phases:      []constants.Phase{constants.PhasePreAction},
+		Priority:    60,
+		NeedConfirm: false,
+		Handler:     handleWrathAmplify,
+	})
+
+	// Savior: block one fatal damage, then remove Savior buff
+	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeSavior], &BuffHandlerConfig{
+		Phases:      []constants.Phase{constants.PhasePreDamage},
+		Priority:    999,
+		NeedConfirm: false,
+		Handler:     handleSaviorBlock,
+	})
+
+	// SageProtection: respawn in-place (death location) instead of checkpoint
+	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeSageProtection], &BuffHandlerConfig{
+		Phases:      []constants.Phase{constants.PhasePreRespawn},
+		Priority:    50,
+		NeedConfirm: false,
+		Handler:     handleSageProtectionRespawn,
 	})
 }
 
@@ -898,6 +954,387 @@ func handleSuppressImmune(phase constants.Phase, ctx *event.Context) error {
 			}
 		}
 	}
+
+	return nil
+}
+
+// ========== New Buff Handlers ==========
+
+// resolveLinkedPlayer finds a player by UUID from the game's player list.
+// Used by Sinking and Eternal handlers to find their linked player.
+func resolveLinkedPlayer(actionCtx *engineaction.ActionContext, linkedPlayerUUID string) *core.Player {
+	if actionCtx == nil || actionCtx.Game == nil || linkedPlayerUUID == "" {
+		return nil
+	}
+	game, ok := actionCtx.Game.(*Game)
+	if !ok {
+		return nil // Cannot access game players (e.g. mock in tests)
+	}
+	for _, p := range game.Players {
+		if p.ID.UUID() == linkedPlayerUUID {
+			return p
+		}
+	}
+	return nil
+}
+
+// handleSinkingShare shares negative actions/buffs with linked player.
+// PhasePreAction: share DamageAction and negative ModifyLPAction targeting Sinking holder with linked player.
+// PhasePreBuffApplied: share negative buffs (excluding Boss and Hidden) targeting Sinking holder with linked player.
+func handleSinkingShare(phase constants.Phase, ctx *event.Context) error {
+	if ctx == nil || ctx.Player == nil {
+		return nil
+	}
+
+	// Skip if this action was already shared by Sinking (prevents infinite loops)
+	if raw, ok := ctx.Get("current_action"); ok {
+		action, ok := raw.(engineaction.Action)
+		if ok && action != nil && action.Source() == string(constants.SourceBuffSinking) {
+			return nil
+		}
+	}
+
+	// Resolve linked player from buff metadata
+	linkedPlayerUUID := ""
+	sinkingBuff := ctx.Player.GetBuff(constants.BuffTypeSinking)
+	if sinkingBuff != nil {
+		linkedPlayerUUID = sinkingBuff.Metadata.GetStringOrDefault("sinking_linked_player", "")
+	}
+	if linkedPlayerUUID == "" {
+		return nil // No linked player, skip
+	}
+
+	actionCtx, err := getActionCtxFromEventCtx(ctx)
+	if err != nil {
+		return err
+	}
+	linkedPlayer := resolveLinkedPlayer(actionCtx, linkedPlayerUUID)
+	if linkedPlayer == nil {
+		return nil // Linked player not found
+	}
+
+	source := string(constants.SourceBuffSinking)
+
+	switch phase {
+	case constants.PhasePreAction:
+		raw, ok := ctx.Get("current_action")
+		if !ok {
+			return nil
+		}
+		action, ok := raw.(engineaction.Action)
+		if !ok || action == nil {
+			return nil
+		}
+
+		switch a := action.(type) {
+		case *engineaction.DamageAction:
+			// Share damage with linked player if targeting Sinking holder
+			if a.TargetPlayer() == ctx.Player {
+				ctx.AddDerivedAction(engineaction.NewDamageAction(linkedPlayer, a.Amount, source))
+				logHandlerResult("Sinking", ctx, "shared_damage", "amount", a.Amount, "linked_player", linkedPlayer.ID.UUID())
+			}
+
+		case *engineaction.ModifyLPAction:
+			// Share negative LP modification with linked player if targeting Sinking holder
+			if a.Amount < 0 && a.TargetPlayer() == ctx.Player {
+				ctx.AddDerivedAction(engineaction.NewModifyLPAction(linkedPlayer, a.Amount, source))
+				logHandlerResult("Sinking", ctx, "shared_negative_modify_lp", "amount", a.Amount, "linked_player", linkedPlayer.ID.UUID())
+			}
+		}
+
+	case constants.PhasePreBuffApplied:
+		if raw, ok := ctx.Get("applied_buff_type"); ok {
+			buffType := constants.BuffType(raw.(string))
+			// Share negative buffs (excluding Boss and Hidden)
+			if buffType.IsNegative() && !buffType.IsBoss() && !buffType.IsHidden() {
+				ctx.AddDerivedAction(engineaction.NewAddBuffAction(linkedPlayer, buffType, source))
+				logHandlerResult("Sinking", ctx, "shared_buff", "buff_type", buffType, "linked_player", linkedPlayer.ID.UUID())
+			}
+		}
+	}
+
+	return nil
+}
+
+// handleEternalShare shares positive actions/buffs with linked player.
+// PhasePreAction: share HealAction and positive ModifyLPAction targeting Eternal holder with linked player.
+// PhasePreBuffApplied: share positive buffs (excluding Boss, Hidden, Faction) targeting Eternal holder with linked player.
+func handleEternalShare(phase constants.Phase, ctx *event.Context) error {
+	if ctx == nil || ctx.Player == nil {
+		return nil
+	}
+
+	// Skip if this action was already shared by Eternal (prevents infinite loops)
+	if raw, ok := ctx.Get("current_action"); ok {
+		action, ok := raw.(engineaction.Action)
+		if ok && action != nil && action.Source() == string(constants.SourceBuffEternal) {
+			return nil
+		}
+	}
+
+	// Resolve linked player from buff metadata
+	linkedPlayerUUID := ""
+	eternalBuff := ctx.Player.GetBuff(constants.BuffTypeEternal)
+	if eternalBuff != nil {
+		linkedPlayerUUID = eternalBuff.Metadata.GetStringOrDefault("eternal_linked_player", "")
+	}
+	if linkedPlayerUUID == "" {
+		return nil // No linked player, skip
+	}
+
+	actionCtx, err := getActionCtxFromEventCtx(ctx)
+	if err != nil {
+		return err
+	}
+	linkedPlayer := resolveLinkedPlayer(actionCtx, linkedPlayerUUID)
+	if linkedPlayer == nil {
+		return nil // Linked player not found
+	}
+
+	source := string(constants.SourceBuffEternal)
+
+	switch phase {
+	case constants.PhasePreAction:
+		raw, ok := ctx.Get("current_action")
+		if !ok {
+			return nil
+		}
+		action, ok := raw.(engineaction.Action)
+		if !ok || action == nil {
+			return nil
+		}
+
+		switch a := action.(type) {
+		case *engineaction.HealAction:
+			// Share healing with linked player if targeting Eternal holder
+			if a.Amount > 0 && a.TargetPlayer() == ctx.Player {
+				ctx.AddDerivedAction(engineaction.NewHealAction(linkedPlayer, a.Amount, source))
+				logHandlerResult("Eternal", ctx, "shared_heal", "amount", a.Amount, "linked_player", linkedPlayer.ID.UUID())
+			}
+
+		case *engineaction.ModifyLPAction:
+			if a.Amount > 0 && a.TargetPlayer() == ctx.Player {
+				ctx.AddDerivedAction(engineaction.NewModifyLPAction(linkedPlayer, a.Amount, source))
+				logHandlerResult("Eternal", ctx, "shared_positive_modify_lp", "amount", a.Amount, "linked_player", linkedPlayer.ID.UUID())
+			}
+
+		case *engineaction.AddItemAction:
+			if a.TargetPlayer() == ctx.Player {
+				ctx.AddDerivedAction(engineaction.NewAddItemAction(linkedPlayer, a.ItemType, source))
+				logHandlerResult("Eternal", ctx, "shared_add_item", "item_type", a.ItemType, "linked_player", linkedPlayer.ID.UUID())
+			}
+		}
+
+	case constants.PhasePreBuffApplied:
+		if raw, ok := ctx.Get("applied_buff_type"); ok {
+			buffType := constants.BuffType(raw.(string))
+			// Share positive buffs (excluding Boss, Hidden, Faction)
+			if buffType.IsPositive() && !buffType.IsBoss() && !buffType.IsHidden() && !buffType.IsFaction() {
+				ctx.AddDerivedAction(engineaction.NewAddBuffAction(linkedPlayer, buffType, source))
+				logHandlerResult("Eternal", ctx, "shared_buff", "buff_type", buffType, "linked_player", linkedPlayer.ID.UUID())
+			}
+		}
+	}
+
+	return nil
+}
+
+// handleFearless blocks damage/heal and maintains HP at 1.
+// PhasePreAction: block DamageAction/HealAction targeting Fearless holder.
+// Allow self-damage from Fearless (source=buff_fearless) to pass through for HP reduction.
+// PhasePostBuffApplied: push PiercingDamageAction to reduce HP to 1 when Fearless is applied.
+func handleFearless(phase constants.Phase, ctx *event.Context) error {
+	if ctx == nil || ctx.Player == nil {
+		return nil
+	}
+
+	switch phase {
+	case constants.PhasePreAction:
+		raw, ok := ctx.Get("current_action")
+		if !ok {
+			return nil
+		}
+		action, ok := raw.(engineaction.Action)
+		if !ok || action == nil {
+			return nil
+		}
+
+		switch a := action.(type) {
+		case *engineaction.DamageAction:
+			if a.TargetPlayer() == ctx.Player {
+				// Allow Fearless's own HP-setting damage to pass through
+				if a.Source() == string(constants.SourceBuffFearless) {
+					return nil
+				}
+				ctx.SetBool("action_blocked", true)
+				ctx.SetString("blocked_by", string(constants.SourceBuffFearless))
+				logHandlerResult("Fearless", ctx, "blocked_damage", "amount", a.Amount)
+			}
+
+		case *engineaction.HealAction:
+			if a.TargetPlayer() == ctx.Player {
+				ctx.SetBool("action_blocked", true)
+				ctx.SetString("blocked_by", string(constants.SourceBuffFearless))
+				logHandlerResult("Fearless", ctx, "blocked_heal", "amount", a.Amount)
+			}
+
+		default:
+			// Allow all other actions through (including RemoveBuffAction)
+		}
+
+	case constants.PhasePostBuffApplied:
+		if raw, ok := ctx.Get("applied_buff_type"); ok {
+			if constants.BuffType(raw.(string)) == constants.BuffTypeFearless {
+				damageAmount := ctx.Player.HP - 1
+				if damageAmount > 0 {
+					ctx.AddDerivedAction(engineaction.NewPiercingDamageAction(ctx.Player, damageAmount, string(constants.SourceBuffFearless)))
+				}
+				logHandlerResult("Fearless", ctx, "reduce_hp_to_1", "damage_amount", damageAmount)
+			}
+		}
+	}
+
+	return nil
+}
+
+// handleGoldenBodyReduce reduces incoming non-piercing damage to floor(damage/2)+1.
+// PhasePreDamage: modify DamageAction.Amount in-place.
+// Minimum result is 1 (damage=1: 0+1=1, damage=3: 1+1=2, damage=5: 2+1=3).
+func handleGoldenBodyReduce(phase constants.Phase, ctx *event.Context) error {
+	if phase != constants.PhasePreDamage {
+		return nil
+	}
+	if ctx == nil || ctx.Player == nil {
+		return nil
+	}
+
+	raw, ok := ctx.Get("current_action")
+	if !ok {
+		return nil
+	}
+	damageAction, ok := raw.(*engineaction.DamageAction)
+	if !ok || damageAction == nil {
+		return nil
+	}
+
+	// Skip piercing damage (cannot be intercepted)
+	if damageAction.IsPiercing {
+		return nil
+	}
+
+	// Reduce damage: floor(damage/2) + 1
+	originalAmount := damageAction.Amount
+	damageAction.Amount = damageAction.Amount/2 + 1
+	logHandlerResult("GoldenBody", ctx, "reduced_damage", "original_amount", originalAmount, "new_amount", damageAction.Amount)
+
+	return nil
+}
+
+// handleWrathAmplify adds +1 to outgoing damage from Wrath holder.
+// PhasePreAction: when Wrath holder is the source of DamageAction or BossDamageAction,
+// push derived action with +1 additional damage.
+func handleWrathAmplify(phase constants.Phase, ctx *event.Context) error {
+	if phase != constants.PhasePreAction {
+		return nil
+	}
+	if ctx == nil || ctx.Player == nil {
+		return nil
+	}
+
+	raw, ok := ctx.Get("current_action")
+	if !ok {
+		return nil
+	}
+	action, ok := raw.(engineaction.Action)
+	if !ok || action == nil {
+		return nil
+	}
+
+	// Skip if this action was already amplified by Wrath (prevents infinite loops)
+	if action.Source() == string(constants.SourceBuffWrath) {
+		return nil
+	}
+
+	source := string(constants.SourceBuffWrath)
+
+	switch a := action.(type) {
+	case *engineaction.DamageAction:
+		// Only amplify if Wrath holder is the source player of the damage
+		if a.SourcePlayer != nil && a.SourcePlayer == ctx.Player {
+			target := a.TargetPlayer()
+			ctx.AddDerivedAction(engineaction.NewDamageAction(target, 1, source))
+			logHandlerResult("Wrath", ctx, "amplified_damage", "target", target.ID.UUID())
+		}
+
+	case *engineaction.BossDamageAction:
+		// Only amplify if Wrath holder is the attacker (SourcePlayer)
+		if a.SourcePlayer == ctx.Player {
+			ctx.AddDerivedAction(engineaction.NewBossDamageAction(
+				a.SourcePlayer, a.TargetPlayer(), 1, false, source,
+			))
+			logHandlerResult("Wrath", ctx, "amplified_boss_damage", "attacker", a.SourcePlayer.ID.UUID())
+		}
+	}
+
+	return nil
+}
+
+// handleSaviorBlock blocks one fatal damage and removes Savior buff.
+// PhasePreDamage: if DamageAction would kill the player (HP - Amount <= 0),
+// block the action and remove Savior buff via derived RemoveBuffAction.
+func handleSaviorBlock(phase constants.Phase, ctx *event.Context) error {
+	if phase != constants.PhasePreDamage {
+		return nil
+	}
+	if ctx == nil || ctx.Player == nil {
+		return nil
+	}
+
+	raw, ok := ctx.Get("current_action")
+	if !ok {
+		return nil
+	}
+	damageAction, ok := raw.(*engineaction.DamageAction)
+	if !ok || damageAction == nil {
+		return nil
+	}
+
+	// Check if damage would be fatal (HP - Amount <= 0)
+	if ctx.Player.HP-damageAction.Amount <= 0 {
+		ctx.SetBool("action_blocked", true)
+		ctx.SetString("blocked_by", string(constants.SourceBuffSavior))
+		ctx.AddDerivedAction(engineaction.NewRemoveBuffAction(ctx.Player, constants.BuffTypeSavior, string(constants.SourceBuffSavior)))
+		logHandlerResult("Savior", ctx, "blocked_fatal_damage", "damage", damageAction.Amount, "player_hp", ctx.Player.HP)
+	}
+
+	return nil
+}
+
+// handleSageProtectionRespawn modifies respawn position to player's current location
+// (death location instead of checkpoint) and removes SageProtection buff.
+// PhasePreRespawn: modify RespawnAction.CheckpointPos to ctx.Player.Position,
+// then remove SageProtection buff via derived RemoveBuffAction.
+func handleSageProtectionRespawn(phase constants.Phase, ctx *event.Context) error {
+	if phase != constants.PhasePreRespawn {
+		return nil
+	}
+	if ctx == nil || ctx.Player == nil {
+		return nil
+	}
+
+	raw, ok := ctx.Get("current_action")
+	if !ok {
+		return nil
+	}
+	respawnAction, ok := raw.(*engineaction.RespawnAction)
+	if !ok || respawnAction == nil {
+		return nil
+	}
+
+	// Modify respawn position to player's current position (death location)
+	respawnAction.CheckpointPos = ctx.Player.Position
+	ctx.AddDerivedAction(engineaction.NewRemoveBuffAction(ctx.Player, constants.BuffTypeSageProtection, string(constants.SourceBuffSageProtection)))
+	logHandlerResult("SageProtection", ctx, "respawn_in_place", "position", ctx.Player.Position)
 
 	return nil
 }

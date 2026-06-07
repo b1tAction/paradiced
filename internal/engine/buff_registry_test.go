@@ -56,6 +56,17 @@ func TestBuffHandlerConfigPhases(t *testing.T) {
 		{constants.BuffTypePoison, constants.PhaseBeforeTurn, true, 30, false},
 		{constants.BuffTypeDeathMark, constants.PhasePreAction, true, 999, false},
 		{constants.BuffTypeThorns, constants.PhasePreDamage, true, 50, false},
+			// New buff handler configs
+			{constants.BuffTypeSinking, constants.PhasePreAction, true, 60, false},
+			{constants.BuffTypeSinking, constants.PhasePreBuffApplied, true, 60, false},
+			{constants.BuffTypeEternal, constants.PhasePreAction, true, 60, false},
+			{constants.BuffTypeEternal, constants.PhasePreBuffApplied, true, 60, false},
+			{constants.BuffTypeFearless, constants.PhasePreAction, true, 200, false},
+			{constants.BuffTypeFearless, constants.PhasePostBuffApplied, true, 200, false},
+			{constants.BuffTypeGoldenBody, constants.PhasePreDamage, true, 70, false},
+			{constants.BuffTypeWrath, constants.PhasePreAction, true, 60, false},
+			{constants.BuffTypeSavior, constants.PhasePreDamage, true, 999, false},
+			{constants.BuffTypeSageProtection, constants.PhasePreRespawn, true, 50, false},
 	}
 
 	for _, tt := range tests {
@@ -1425,5 +1436,1014 @@ func TestDominanceAmplifyBossDamageViaExecuteAction(t *testing.T) {
 	damageDealt := bossHPBefore - bossPlayer.HP
 	if damageDealt != 10 {
 		t.Errorf("Boss damage = %d, expected 10 (5 original + 5 Dominance amplified)", damageDealt)
+	}
+}
+// ========== Sinking Buff Handler Tests ==========
+
+func TestSinkingShareDamageAction(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player1)
+	game.AddPlayer(player2)
+
+	// Apply Sinking buff to player1, linked to player2
+	sinkingBuff := core.NewBuff(constants.BuffTypeSinking, 2)
+	sinkingBuff.Metadata.SetString("sinking_linked_player", player2.ID.UUID())
+	game.ApplyBuffToPlayer(player1, sinkingBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player1)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewDamageAction(player1, 3, "test_damage"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeSinking).Handler
+	handler(constants.PhasePreAction, ctx)
+
+	// Sinking shares but does NOT block the original action
+	if ctx.GetBoolOrDefault("action_blocked", false) {
+		t.Error("Sinking should NOT block original DamageAction (share semantics, unlike RobLuck)")
+	}
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
+	}
+	damageAction, ok := derived[0].(*engineaction.DamageAction)
+	if !ok {
+		t.Fatalf("expected DamageAction, got %T", derived[0])
+	}
+	if damageAction.TargetPlayer() != player2 {
+		t.Errorf("derived DamageAction should target linked player, got %s", damageAction.Target())
+	}
+	if damageAction.Amount != 3 {
+		t.Errorf("derived DamageAction amount = %d, expected 3", damageAction.Amount)
+	}
+	if damageAction.Source() != string(constants.SourceBuffSinking) {
+		t.Errorf("derived source = %s, expected %s", damageAction.Source(), string(constants.SourceBuffSinking))
+	}
+}
+
+func TestSinkingShareNegativeModifyLP(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxLP: 5})
+	player2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxLP: 5})
+	game.AddPlayer(player1)
+	game.AddPlayer(player2)
+
+	sinkingBuff := core.NewBuff(constants.BuffTypeSinking, 2)
+	sinkingBuff.Metadata.SetString("sinking_linked_player", player2.ID.UUID())
+	game.ApplyBuffToPlayer(player1, sinkingBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player1)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewModifyLPAction(player1, -1, "test"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeSinking).Handler
+	handler(constants.PhasePreAction, ctx)
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
+	}
+	lpAction, ok := derived[0].(*engineaction.ModifyLPAction)
+	if !ok {
+		t.Fatalf("expected ModifyLPAction, got %T", derived[0])
+	}
+	if lpAction.TargetPlayer() != player2 {
+		t.Error("derived ModifyLPAction should target linked player")
+	}
+	if lpAction.Amount != -1 {
+		t.Errorf("derived amount = %d, expected -1", lpAction.Amount)
+	}
+}
+
+func TestSinkingShareNegativeBuff(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player1)
+	game.AddPlayer(player2)
+
+	sinkingBuff := core.NewBuff(constants.BuffTypeSinking, 2)
+	sinkingBuff.Metadata.SetString("sinking_linked_player", player2.ID.UUID())
+	game.ApplyBuffToPlayer(player1, sinkingBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player1)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("applied_buff_type", string(constants.BuffTypeCurse))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeSinking).Handler
+	handler(constants.PhasePreBuffApplied, ctx)
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
+	}
+	addBuff, ok := derived[0].(*engineaction.AddBuffAction)
+	if !ok {
+		t.Fatalf("expected AddBuffAction, got %T", derived[0])
+	}
+	if addBuff.BuffType != constants.BuffTypeCurse {
+		t.Errorf("shared buff type = %s, expected curse", addBuff.BuffType)
+	}
+	if addBuff.TargetPlayer() != player2 {
+		t.Error("shared buff should target linked player")
+	}
+}
+
+func TestSinkingNotShareBossOrHiddenBuff(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player1)
+	game.AddPlayer(player2)
+
+	sinkingBuff := core.NewBuff(constants.BuffTypeSinking, 2)
+	sinkingBuff.Metadata.SetString("sinking_linked_player", player2.ID.UUID())
+	game.ApplyBuffToPlayer(player1, sinkingBuff)
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeSinking).Handler
+
+	for _, bt := range []constants.BuffType{constants.BuffTypeThorns, constants.BuffTypeDeathMark} {
+		ctx := event.NewContext(player1)
+		ctx.Set("action_context", engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw))
+		ctx.Set("applied_buff_type", string(bt))
+		handler(constants.PhasePreBuffApplied, ctx)
+		if len(ctx.GetDerivedActions()) > 0 {
+			t.Errorf("Sinking should NOT share Boss/Hidden buff type %s", bt)
+		}
+	}
+}
+
+func TestSinkingSkipAlreadyShared(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player1)
+	game.AddPlayer(player2)
+
+	sinkingBuff := core.NewBuff(constants.BuffTypeSinking, 2)
+	sinkingBuff.Metadata.SetString("sinking_linked_player", player2.ID.UUID())
+	game.ApplyBuffToPlayer(player1, sinkingBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player1)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewDamageAction(player2, 3, string(constants.SourceBuffSinking)))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeSinking).Handler
+	handler(constants.PhasePreAction, ctx)
+
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Sinking should skip already-shared action (source=buff_sinking)")
+	}
+}
+
+func TestSinkingNoLinkedPlayer(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player1)
+
+	sinkingBuff := core.NewBuff(constants.BuffTypeSinking, 2)
+	game.ApplyBuffToPlayer(player1, sinkingBuff)
+	// No linked_player metadata set
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player1)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewDamageAction(player1, 3, "test"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeSinking).Handler
+	handler(constants.PhasePreAction, ctx)
+
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Sinking should produce no actions without linked player")
+	}
+}
+
+func TestSinkingNotSharePositiveActions(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player1)
+	game.AddPlayer(player2)
+
+	sinkingBuff := core.NewBuff(constants.BuffTypeSinking, 2)
+	sinkingBuff.Metadata.SetString("sinking_linked_player", player2.ID.UUID())
+	game.ApplyBuffToPlayer(player1, sinkingBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player1)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewHealAction(player1, 3, "test"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeSinking).Handler
+	handler(constants.PhasePreAction, ctx)
+
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Sinking should NOT share positive HealAction")
+	}
+}
+
+// ========== Eternal Buff Handler Tests ==========
+
+func TestEternalShareHealAction(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player1)
+	game.AddPlayer(player2)
+
+	eternalBuff := core.NewBuff(constants.BuffTypeEternal, 2)
+	eternalBuff.Metadata.SetString("eternal_linked_player", player2.ID.UUID())
+	game.ApplyBuffToPlayer(player1, eternalBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player1)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewHealAction(player1, 3, "test_heal"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeEternal).Handler
+	handler(constants.PhasePreAction, ctx)
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
+	}
+	healAction, ok := derived[0].(*engineaction.HealAction)
+	if !ok {
+		t.Fatalf("expected HealAction, got %T", derived[0])
+	}
+	if healAction.TargetPlayer() != player2 {
+		t.Error("derived HealAction should target linked player")
+	}
+	if healAction.Amount != 3 {
+		t.Errorf("derived amount = %d, expected 3", healAction.Amount)
+	}
+	if healAction.Source() != string(constants.SourceBuffEternal) {
+		t.Errorf("derived source = %s, expected %s", healAction.Source(), string(constants.SourceBuffEternal))
+	}
+}
+
+func TestEternalSharePositiveModifyLP(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player1)
+	game.AddPlayer(player2)
+
+	eternalBuff := core.NewBuff(constants.BuffTypeEternal, 2)
+	eternalBuff.Metadata.SetString("eternal_linked_player", player2.ID.UUID())
+	game.ApplyBuffToPlayer(player1, eternalBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player1)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewModifyLPAction(player1, 1, "test"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeEternal).Handler
+	handler(constants.PhasePreAction, ctx)
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
+	}
+	lpAction, ok := derived[0].(*engineaction.ModifyLPAction)
+	if !ok {
+		t.Fatalf("expected ModifyLPAction, got %T", derived[0])
+	}
+	if lpAction.TargetPlayer() != player2 {
+		t.Error("derived ModifyLPAction should target linked player")
+	}
+	if lpAction.Amount != 1 {
+		t.Errorf("derived amount = %d, expected 1", lpAction.Amount)
+	}
+}
+
+func TestEternalShareAddItemAction(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player1)
+	game.AddPlayer(player2)
+
+	eternalBuff := core.NewBuff(constants.BuffTypeEternal, 2)
+	eternalBuff.Metadata.SetString("eternal_linked_player", player2.ID.UUID())
+	game.ApplyBuffToPlayer(player1, eternalBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player1)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewAddItemAction(player1, constants.ItemTypeAnyDoor, "test"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeEternal).Handler
+	handler(constants.PhasePreAction, ctx)
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived AddItemAction, got %d", len(derived))
+	}
+	addItem, ok := derived[0].(*engineaction.AddItemAction)
+	if !ok {
+		t.Fatalf("expected AddItemAction, got %T", derived[0])
+	}
+	if addItem.TargetPlayer() != player2 {
+		t.Error("derived AddItemAction should target linked player")
+	}
+	if addItem.ItemType != constants.ItemTypeAnyDoor {
+		t.Errorf("derived ItemType = %s, expected %s", addItem.ItemType, constants.ItemTypeAnyDoor)
+	}
+	if addItem.Source() != string(constants.SourceBuffEternal) {
+		t.Errorf("derived source = %s, expected %s", addItem.Source(), string(constants.SourceBuffEternal))
+	}
+}
+
+func TestEternalSharePositiveBuff(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player1)
+	game.AddPlayer(player2)
+
+	eternalBuff := core.NewBuff(constants.BuffTypeEternal, 2)
+	eternalBuff.Metadata.SetString("eternal_linked_player", player2.ID.UUID())
+	game.ApplyBuffToPlayer(player1, eternalBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player1)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("applied_buff_type", string(constants.BuffTypeDivine))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeEternal).Handler
+	handler(constants.PhasePreBuffApplied, ctx)
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived AddBuffAction, got %d", len(derived))
+	}
+	addBuff, ok := derived[0].(*engineaction.AddBuffAction)
+	if !ok {
+		t.Fatalf("expected AddBuffAction, got %T", derived[0])
+	}
+	if addBuff.BuffType != constants.BuffTypeDivine {
+		t.Errorf("shared buff type = %s, expected divine", addBuff.BuffType)
+	}
+	if addBuff.TargetPlayer() != player2 {
+		t.Error("shared buff should target linked player")
+	}
+}
+
+func TestEternalNotShareFactionBossHiddenBuff(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player1)
+	game.AddPlayer(player2)
+
+	eternalBuff := core.NewBuff(constants.BuffTypeEternal, 2)
+	eternalBuff.Metadata.SetString("eternal_linked_player", player2.ID.UUID())
+	game.ApplyBuffToPlayer(player1, eternalBuff)
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeEternal).Handler
+	for _, bt := range []constants.BuffType{constants.BuffTypeDominance, constants.BuffTypeThorns, constants.BuffTypeDeathMark} {
+		ctx := event.NewContext(player1)
+		ctx.Set("action_context", engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw))
+		ctx.Set("applied_buff_type", string(bt))
+		handler(constants.PhasePreBuffApplied, ctx)
+		if len(ctx.GetDerivedActions()) > 0 {
+			t.Errorf("Eternal should NOT share Faction/Boss/Hidden buff type %s", bt)
+		}
+	}
+}
+
+func TestEternalSkipAlreadyShared(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player1)
+	game.AddPlayer(player2)
+
+	eternalBuff := core.NewBuff(constants.BuffTypeEternal, 2)
+	eternalBuff.Metadata.SetString("eternal_linked_player", player2.ID.UUID())
+	game.ApplyBuffToPlayer(player1, eternalBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player1)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewHealAction(player2, 3, string(constants.SourceBuffEternal)))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeEternal).Handler
+	handler(constants.PhasePreAction, ctx)
+
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Eternal should skip already-shared action (source=buff_eternal)")
+	}
+}
+
+func TestEternalNoLinkedPlayer(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player1)
+
+	eternalBuff := core.NewBuff(constants.BuffTypeEternal, 2)
+	game.ApplyBuffToPlayer(player1, eternalBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player1)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewHealAction(player1, 3, "test"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeEternal).Handler
+	handler(constants.PhasePreAction, ctx)
+
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Eternal should produce no actions without linked player")
+	}
+}
+
+func TestEternalNotShareNegativeActions(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player1 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player2 := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player1)
+	game.AddPlayer(player2)
+
+	eternalBuff := core.NewBuff(constants.BuffTypeEternal, 2)
+	eternalBuff.Metadata.SetString("eternal_linked_player", player2.ID.UUID())
+	game.ApplyBuffToPlayer(player1, eternalBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player1)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewDamageAction(player1, 3, "test"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeEternal).Handler
+	handler(constants.PhasePreAction, ctx)
+
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Eternal should NOT share negative DamageAction")
+	}
+}
+
+// ========== Fearless Buff Handler Tests ==========
+
+func TestFearlessBlockDamage(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	game.AddPlayer(player)
+
+	fearlessBuff := core.NewBuff(constants.BuffTypeFearless, 3)
+	game.ApplyBuffToPlayer(player, fearlessBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewDamageAction(player, 5, "test_damage"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeFearless).Handler
+	handler(constants.PhasePreAction, ctx)
+
+	if !ctx.GetBoolOrDefault("action_blocked", false) {
+		t.Error("Fearless should block DamageAction")
+	}
+	blockedBy, _ := ctx.GetString("blocked_by")
+	if blockedBy != string(constants.SourceBuffFearless) {
+		t.Errorf("blocked_by = %s, expected %s", blockedBy, string(constants.SourceBuffFearless))
+	}
+}
+
+func TestFearlessBlockHeal(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	game.AddPlayer(player)
+
+	fearlessBuff := core.NewBuff(constants.BuffTypeFearless, 3)
+	game.ApplyBuffToPlayer(player, fearlessBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewHealAction(player, 3, "test_heal"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeFearless).Handler
+	handler(constants.PhasePreAction, ctx)
+
+	if !ctx.GetBoolOrDefault("action_blocked", false) {
+		t.Error("Fearless should block HealAction")
+	}
+}
+
+func TestFearlessAllowSelfDamage(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	game.AddPlayer(player)
+
+	fearlessBuff := core.NewBuff(constants.BuffTypeFearless, 3)
+	game.ApplyBuffToPlayer(player, fearlessBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewPiercingDamageAction(player, 5, string(constants.SourceBuffFearless)))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeFearless).Handler
+	handler(constants.PhasePreAction, ctx)
+
+	if ctx.GetBoolOrDefault("action_blocked", false) {
+		t.Error("Fearless should NOT block its own HP-setting damage (source=buff_fearless)")
+	}
+}
+
+func TestFearlessReduceHPTo1(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	player.HP = 6
+	game.AddPlayer(player)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("applied_buff_type", string(constants.BuffTypeFearless))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeFearless).Handler
+	handler(constants.PhasePostBuffApplied, ctx)
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 PiercingDamageAction, got %d", len(derived))
+	}
+	damageAction, ok := derived[0].(*engineaction.DamageAction)
+	if !ok {
+		t.Fatalf("expected DamageAction, got %T", derived[0])
+	}
+	if !damageAction.IsPiercing {
+		t.Error("Fearless HP reduction should be piercing (unblockable)")
+	}
+	if damageAction.Amount != 5 {
+		t.Errorf("damage amount = %d, expected 5 (HP-1=6-1)", damageAction.Amount)
+	}
+	if damageAction.Source() != string(constants.SourceBuffFearless) {
+		t.Errorf("source = %s, expected %s", damageAction.Source(), string(constants.SourceBuffFearless))
+	}
+}
+
+func TestFearlessReduceHPAlreadyAtOne(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	player.HP = 1
+	game.AddPlayer(player)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("applied_buff_type", string(constants.BuffTypeFearless))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeFearless).Handler
+	handler(constants.PhasePostBuffApplied, ctx)
+
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Fearless should produce no derived PiercingDamageAction when HP already at 1")
+	}
+}
+
+func TestFearlessWrongPhase(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeFearless).Handler
+	handler(constants.PhaseBeforeTurn, ctx)
+
+	if ctx.GetBoolOrDefault("action_blocked", false) {
+		t.Error("Fearless should not block on wrong phase")
+	}
+}
+
+func TestFearlessAllowRemoveBuffAction(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(player)
+
+	fearlessBuff := core.NewBuff(constants.BuffTypeFearless, 3)
+	game.ApplyBuffToPlayer(player, fearlessBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewRemoveBuffAction(player, constants.BuffTypeFearless, "test"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeFearless).Handler
+	handler(constants.PhasePreAction, ctx)
+
+	if ctx.GetBoolOrDefault("action_blocked", false) {
+		t.Error("Fearless should allow RemoveBuffAction(Fearless) through")
+	}
+}
+
+// ========== GoldenBody Buff Handler Tests ==========
+
+func TestGoldenBodyReduceDamage(t *testing.T) {
+	tests := []struct {
+		damage    int
+		expected  int
+	}{
+		{1, 1},  // floor(1/2)+1 = 0+1 = 1
+		{3, 2},  // floor(3/2)+1 = 1+1 = 2
+		{5, 3},  // floor(5/2)+1 = 2+1 = 3
+		{7, 4},  // floor(7/2)+1 = 3+1 = 4
+	}
+
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	game.AddPlayer(player)
+
+	goldenBuff := core.NewBuff(constants.BuffTypeGoldenBody, 2)
+	game.ApplyBuffToPlayer(player, goldenBuff)
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeGoldenBody).Handler
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("damage_%d", tt.damage), func(t *testing.T) {
+			damageAction := engineaction.NewDamageAction(player, tt.damage, "test")
+			ctx := event.NewContext(player)
+			ctx.Set("current_action", damageAction)
+			handler(constants.PhasePreDamage, ctx)
+			if damageAction.Amount != tt.expected {
+				t.Errorf("damage %d: reduced amount = %d, expected %d", tt.damage, damageAction.Amount, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGoldenBodySkipPiercing(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	game.AddPlayer(player)
+
+	goldenBuff := core.NewBuff(constants.BuffTypeGoldenBody, 2)
+	game.ApplyBuffToPlayer(player, goldenBuff)
+
+	piercingAction := engineaction.NewPiercingDamageAction(player, 5, "test_piercing")
+	ctx := event.NewContext(player)
+	ctx.Set("current_action", piercingAction)
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeGoldenBody).Handler
+	handler(constants.PhasePreDamage, ctx)
+
+	if piercingAction.Amount != 5 {
+		t.Errorf("piercing damage should not be reduced, got %d", piercingAction.Amount)
+	}
+}
+
+func TestGoldenBodyNotBossDamageAction(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	bossPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 50})
+	game.AddPlayer(player)
+	game.AddPlayer(bossPlayer)
+
+	goldenBuff := core.NewBuff(constants.BuffTypeGoldenBody, 2)
+	game.ApplyBuffToPlayer(player, goldenBuff)
+
+	bossDamageAction := engineaction.NewBossDamageAction(player, bossPlayer, 5, false, "test")
+	ctx := event.NewContext(player)
+	ctx.Set("current_action", bossDamageAction)
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeGoldenBody).Handler
+	handler(constants.PhasePreDamage, ctx)
+
+	// BossDamageAction should not be reduced (type assertion fails for *BossDamageAction)
+	if bossDamageAction.Damage != 5 {
+		t.Errorf("BossDamageAction should not be reduced by GoldenBody, got %d", bossDamageAction.Damage)
+	}
+}
+
+func TestGoldenBodyWrongPhase(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+	ctx.Set("current_action", engineaction.NewDamageAction(player, 5, "test"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeGoldenBody).Handler
+	handler(constants.PhaseBeforeTurn, ctx)
+
+	// Should not modify action on wrong phase
+}
+
+// ========== Wrath Buff Handler Tests ==========
+
+func TestWrathAmplifyOutgoingDamage(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	wrathPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	targetPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	game.AddPlayer(wrathPlayer)
+	game.AddPlayer(targetPlayer)
+
+	wrathBuff := core.NewBuff(constants.BuffTypeWrath, 2)
+	game.ApplyBuffToPlayer(wrathPlayer, wrathBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(wrathPlayer)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewDamageActionWithSource(targetPlayer, 3, wrathPlayer, "test"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeWrath).Handler
+	handler(constants.PhasePreAction, ctx)
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
+	}
+	damageAction, ok := derived[0].(*engineaction.DamageAction)
+	if !ok {
+		t.Fatalf("expected DamageAction, got %T", derived[0])
+	}
+	if damageAction.Amount != 1 {
+		t.Errorf("derived damage = %d, expected 1", damageAction.Amount)
+	}
+	if damageAction.TargetPlayer() != targetPlayer {
+		t.Error("derived damage should target same target")
+	}
+	if damageAction.Source() != string(constants.SourceBuffWrath) {
+		t.Errorf("derived source = %s, expected %s", damageAction.Source(), string(constants.SourceBuffWrath))
+	}
+}
+
+func TestWrathAmplifyOutgoingBossDamage(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	wrathPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	bossPlayer := game.InitializeBoss(19)
+	game.AddPlayer(wrathPlayer)
+
+	wrathBuff := core.NewBuff(constants.BuffTypeWrath, 2)
+	game.ApplyBuffToPlayer(wrathPlayer, wrathBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(wrathPlayer)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewBossDamageAction(wrathPlayer, bossPlayer, 4, false, "boss_damage"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeWrath).Handler
+	handler(constants.PhasePreAction, ctx)
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 derived action, got %d", len(derived))
+	}
+	bossDamage, ok := derived[0].(*engineaction.BossDamageAction)
+	if !ok {
+		t.Fatalf("expected BossDamageAction, got %T", derived[0])
+	}
+	if bossDamage.Damage != 1 {
+		t.Errorf("derived boss damage = %d, expected 1", bossDamage.Damage)
+	}
+	if bossDamage.Source() != string(constants.SourceBuffWrath) {
+		t.Errorf("derived source = %s, expected %s", bossDamage.Source(), string(constants.SourceBuffWrath))
+	}
+}
+
+func TestWrathSkipAlreadyAmplified(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	wrathPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	targetPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	game.AddPlayer(wrathPlayer)
+	game.AddPlayer(targetPlayer)
+
+	wrathBuff := core.NewBuff(constants.BuffTypeWrath, 2)
+	game.ApplyBuffToPlayer(wrathPlayer, wrathBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(wrathPlayer)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewDamageAction(targetPlayer, 1, string(constants.SourceBuffWrath)))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeWrath).Handler
+	handler(constants.PhasePreAction, ctx)
+
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Wrath should skip already-amplified action (source=buff_wrath)")
+	}
+}
+
+func TestWrathNotAmplifyNonSourcePlayer(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	wrathPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	otherPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	targetPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	game.AddPlayer(wrathPlayer)
+	game.AddPlayer(otherPlayer)
+	game.AddPlayer(targetPlayer)
+
+	wrathBuff := core.NewBuff(constants.BuffTypeWrath, 2)
+	game.ApplyBuffToPlayer(wrathPlayer, wrathBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(wrathPlayer)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewDamageActionWithSource(targetPlayer, 3, otherPlayer, "test"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeWrath).Handler
+	handler(constants.PhasePreAction, ctx)
+
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Wrath should NOT amplify damage where SourcePlayer != Wrath holder")
+	}
+}
+
+func TestWrathWrongPhase(t *testing.T) {
+	wrathPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(wrathPlayer)
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeWrath).Handler
+	handler(constants.PhaseBeforeTurn, ctx)
+
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Wrath should not amplify on wrong phase")
+	}
+}
+
+// ========== Savior Buff Handler Tests ==========
+
+func TestSaviorBlockFatalDamage(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	player.HP = 3
+	game.AddPlayer(player)
+
+	saviorBuff := core.NewBuff(constants.BuffTypeSavior, -1)
+	game.ApplyBuffToPlayer(player, saviorBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewDamageAction(player, 5, "test_fatal"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeSavior).Handler
+	handler(constants.PhasePreDamage, ctx)
+
+	if !ctx.GetBoolOrDefault("action_blocked", false) {
+		t.Error("Savior should block fatal damage (HP-5 <= 0)")
+	}
+	blockedBy, _ := ctx.GetString("blocked_by")
+	if blockedBy != string(constants.SourceBuffSavior) {
+		t.Errorf("blocked_by = %s, expected %s", blockedBy, string(constants.SourceBuffSavior))
+	}
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 RemoveBuffAction, got %d", len(derived))
+	}
+	removeBuff, ok := derived[0].(*engineaction.RemoveBuffAction)
+	if !ok {
+		t.Fatalf("expected RemoveBuffAction, got %T", derived[0])
+	}
+	if removeBuff.BuffType != constants.BuffTypeSavior {
+		t.Errorf("remove buff type = %s, expected %s", removeBuff.BuffType, constants.BuffTypeSavior)
+	}
+}
+
+func TestSaviorNotBlockNonFatalDamage(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	player.HP = 5
+	game.AddPlayer(player)
+
+	saviorBuff := core.NewBuff(constants.BuffTypeSavior, -1)
+	game.ApplyBuffToPlayer(player, saviorBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewDamageAction(player, 3, "test_non_fatal"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeSavior).Handler
+	handler(constants.PhasePreDamage, ctx)
+
+	if ctx.GetBoolOrDefault("action_blocked", false) {
+		t.Error("Savior should NOT block non-fatal damage (5-3 > 0)")
+	}
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("Savior should NOT remove itself for non-fatal damage")
+	}
+}
+
+func TestSaviorWrongPhase(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeSavior).Handler
+	handler(constants.PhaseBeforeTurn, ctx)
+
+	if ctx.GetBoolOrDefault("action_blocked", false) {
+		t.Error("Savior should not block on wrong phase")
+	}
+}
+
+func TestSaviorNotBossDamageAction(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 10})
+	player.HP = 1
+	bossPlayer := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), MaxHP: 50})
+	game.AddPlayer(player)
+	game.AddPlayer(bossPlayer)
+
+	saviorBuff := core.NewBuff(constants.BuffTypeSavior, -1)
+	game.ApplyBuffToPlayer(player, saviorBuff)
+
+	bossDamageAction := engineaction.NewBossDamageAction(bossPlayer, player, 5, false, "test")
+	ctx := event.NewContext(player)
+	ctx.Set("current_action", bossDamageAction)
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeSavior).Handler
+	handler(constants.PhasePreDamage, ctx)
+
+	// BossDamageAction should not be blocked by Savior (type assertion fails)
+	if ctx.GetBoolOrDefault("action_blocked", false) {
+		t.Error("Savior should not block BossDamageAction (different type)")
+	}
+}
+
+// ========== SageProtection Buff Handler Tests ==========
+
+func TestSageProtectionRespawnInPlace(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	player.Position = 15
+	game.AddPlayer(player)
+
+	sageProtBuff := core.NewBuff(constants.BuffTypeSageProtection, -1)
+	game.ApplyBuffToPlayer(player, sageProtBuff)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	ctx := event.NewContext(player)
+	ctx.Set("action_context", actionCtx)
+	ctx.Set("current_action", engineaction.NewRespawnAction(player, 30, "death_respawn"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeSageProtection).Handler
+	handler(constants.PhasePreRespawn, ctx)
+
+	raw, _ := ctx.Get("current_action"); respawnAction := raw.(*engineaction.RespawnAction)
+	if respawnAction.CheckpointPos != 15 {
+		t.Errorf("CheckpointPos = %d, expected 15 (player's death position)", respawnAction.CheckpointPos)
+	}
+
+	derived := ctx.GetDerivedActions()
+	if len(derived) != 1 {
+		t.Fatalf("expected 1 RemoveBuffAction, got %d", len(derived))
+	}
+	removeBuff, ok := derived[0].(*engineaction.RemoveBuffAction)
+	if !ok {
+		t.Fatalf("expected RemoveBuffAction, got %T", derived[0])
+	}
+	if removeBuff.BuffType != constants.BuffTypeSageProtection {
+		t.Errorf("remove buff type = %s, expected %s", removeBuff.BuffType, constants.BuffTypeSageProtection)
+	}
+}
+
+func TestSageProtectionNotRespawnAction(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+	ctx.Set("current_action", engineaction.NewDamageAction(player, 3, "test"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeSageProtection).Handler
+	handler(constants.PhasePreRespawn, ctx)
+
+	if len(ctx.GetDerivedActions()) > 0 {
+		t.Error("SageProtection should not produce actions for non-RespawnAction")
+	}
+}
+
+func TestSageProtectionWrongPhase(t *testing.T) {
+	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	ctx := event.NewContext(player)
+	ctx.Set("current_action", engineaction.NewRespawnAction(player, 30, "test"))
+
+	handler := GetBuffHandlerConfig(constants.BuffTypeSageProtection).Handler
+	handler(constants.PhaseBeforeTurn, ctx)
+
+	// Should not modify RespawnAction on wrong phase
+	raw, _ := ctx.Get("current_action"); respawnAction := raw.(*engineaction.RespawnAction)
+	if respawnAction.CheckpointPos != 30 {
+		t.Errorf("CheckpointPos should not be modified on wrong phase, got %d", respawnAction.CheckpointPos)
+	}
+}
+
+// ========== IsItemOnly Classification Tests ==========
+
+func TestBuffIsItemOnly(t *testing.T) {
+	itemOnlyBuffs := []constants.BuffType{
+		constants.BuffTypeSinking,
+		constants.BuffTypeEternal,
+		constants.BuffTypeSavior,
+		constants.BuffTypeSageProtection,
+	}
+	for _, bt := range itemOnlyBuffs {
+		if !bt.IsItemOnly() {
+			t.Errorf("BuffType(%s) should be IsItemOnly=true", bt)
+		}
+		if bt.IsDraw() {
+			t.Errorf("BuffType(%s) should be IsDraw=false (IsItemOnly buffs are not drawable)", bt)
+		}
 	}
 }

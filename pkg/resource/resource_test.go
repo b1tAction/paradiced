@@ -187,6 +187,9 @@ func TestLoadDefinitionsFromYAML(t *testing.T) {
 		constants.BuffTypeDivine, constants.BuffTypeRain, constants.BuffTypeExorcism,
 		constants.BuffTypeFire, constants.BuffTypeDeathMark,
 		constants.BuffTypeDominance, constants.BuffTypeRobLuck, constants.BuffTypeSuppress,
+		constants.BuffTypeSinking, constants.BuffTypeEternal, constants.BuffTypeFearless,
+		constants.BuffTypeGoldenBody, constants.BuffTypeWrath,
+		constants.BuffTypeSavior, constants.BuffTypeSageProtection,
 	}
 	if len(defs.Buffs) != len(expectedBuffs) {
 		t.Errorf("len(defs.Buffs) = %d, want %d", len(defs.Buffs), len(expectedBuffs))
@@ -200,6 +203,10 @@ func TestLoadDefinitionsFromYAML(t *testing.T) {
 	// Verify all expected items are loaded with typed keys
 	expectedItems := []constants.ItemType{
 		constants.ItemTypeReverseClock, constants.ItemTypeAnyDoor, constants.ItemTypeDiceUpgrade,
+		constants.ItemTypeMagicFlute, constants.ItemTypeCupidArrow, constants.ItemTypeCrimsonBlade,
+		constants.ItemTypeWisdomRing, constants.ItemTypeMeditationRing, constants.ItemTypeDisciplineRing,
+		constants.ItemTypeFoolishRing, constants.ItemTypeGreedyRing, constants.ItemTypeWrathRing,
+		constants.ItemTypeNamedBlade, constants.ItemTypeSageProtection,
 	}
 	if len(defs.Items) != len(expectedItems) {
 		t.Errorf("len(defs.Items) = %d, want %d", len(defs.Items), len(expectedItems))

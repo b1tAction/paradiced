@@ -9,6 +9,7 @@ import (
 	"github.com/b1tAction/paradiced/pkg/constants"
 	"github.com/b1tAction/paradiced/pkg/resource"
 	"github.com/b1tAction/paradiced/pkg/rng"
+	"github.com/b1tAction/paradiced/pkg/util"
 )
 
 // ItemHandlerConfig contains effect logic and execution configuration.
@@ -184,6 +185,94 @@ func registerAllItems() {
 		NeedConfirm: false,
 		Handler:     handleDiceUpgrade,
 	})
+
+	// MagicFlute: Give Sinking buff to self and target player
+	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeMagicFlute], &ItemHandlerConfig{
+		Phase:       constants.PhaseItemUsed,
+		Priority:    50,
+		NeedConfirm: false,
+		Handler:     handleMagicFlute,
+	})
+
+	// CupidArrow: Give Eternal buff to self and target player
+	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeCupidArrow], &ItemHandlerConfig{
+		Phase:       constants.PhaseItemUsed,
+		Priority:    50,
+		NeedConfirm: false,
+		Handler:     handleCupidArrow,
+	})
+
+	// CrimsonBlade: Sacrifice half HP, deal same amount as damage to target
+	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeCrimsonBlade], &ItemHandlerConfig{
+		Phase:       constants.PhaseItemUsed,
+		Priority:    50,
+		NeedConfirm: false,
+		Handler:     handleCrimsonBlade,
+	})
+
+	// WisdomRing: Give Divine buff to self
+	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeWisdomRing], &ItemHandlerConfig{
+		Phase:       constants.PhaseItemUsed,
+		Priority:    50,
+		NeedConfirm: false,
+		Handler:     createGiveBuffHandler(constants.BuffTypeDivine, constants.SourceItemWisdomRingBuff),
+	})
+
+	// MeditationRing: Give Rain buff to self
+	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeMeditationRing], &ItemHandlerConfig{
+		Phase:       constants.PhaseItemUsed,
+		Priority:    50,
+		NeedConfirm: false,
+		Handler:     createGiveBuffHandler(constants.BuffTypeRain, constants.SourceItemMeditationRingBuff),
+	})
+
+	// DisciplineRing: Give Golden Body buff to self
+	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeDisciplineRing], &ItemHandlerConfig{
+		Phase:       constants.PhaseItemUsed,
+		Priority:    50,
+		NeedConfirm: false,
+		Handler:     createGiveBuffHandler(constants.BuffTypeGoldenBody, constants.SourceItemDisciplineRingBuff),
+	})
+
+	// FoolishRing: HP+1, LP-1
+	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeFoolishRing], &ItemHandlerConfig{
+		Phase:       constants.PhaseItemUsed,
+		Priority:    50,
+		NeedConfirm: false,
+		Handler:     handleFoolishRing,
+	})
+
+	// GreedyRing: LP+1, HP-1
+	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeGreedyRing], &ItemHandlerConfig{
+		Phase:       constants.PhaseItemUsed,
+		Priority:    50,
+		NeedConfirm: false,
+		Handler:     handleGreedyRing,
+	})
+
+	// WrathRing: HP-1, gain Wrath buff
+	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeWrathRing], &ItemHandlerConfig{
+		Phase:       constants.PhaseItemUsed,
+		Priority:    50,
+		NeedConfirm: false,
+		Handler:     handleWrathRing,
+	})
+
+	// NamedBlade: Give Savior buff to self
+	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeNamedBlade], &ItemHandlerConfig{
+		Phase:       constants.PhaseItemUsed,
+		Priority:    50,
+		NeedConfirm: false,
+		Handler:     createGiveBuffHandler(constants.BuffTypeSavior, constants.SourceItemNamedBladeBuff),
+	})
+
+	// SageProtection: Give SageProtection buff to self
+	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeSageProtection], &ItemHandlerConfig{
+		Phase:       constants.PhaseItemUsed,
+		Priority:    50,
+		NeedConfirm: false,
+		Handler:     createGiveBuffHandler(constants.BuffTypeSageProtection, constants.SourceItemSageProtectionBuff),
+	})
 }
 
 // ========== Item Handler Helpers ==========
@@ -264,5 +353,183 @@ func handleDiceUpgrade(phase constants.Phase, ctx *event.Context) error {
 
 	fromDice := rng.DiceTypeFromString(currentDice)
 	ctx.AddDerivedAction(engineaction.NewDiceUpgradeAction(ctx.Player, string(constants.SourceItemDiceUpgrade), fromDice))
+	return nil
+}
+
+// ========== New Item Handlers ==========
+
+func handleMagicFlute(phase constants.Phase, ctx *event.Context) error {
+	if ctx == nil {
+		return fmt.Errorf("handler: event context is nil")
+	}
+	if ctx.Player == nil {
+		return fmt.Errorf("handler: player is nil in event context")
+	}
+
+	// Resolve target player (required for MagicFlute)
+	var targetPlayer *core.Player
+	if val, ok := ctx.Get("target_player"); ok {
+		if p, ok2 := val.(*core.Player); ok2 && p != nil {
+			targetPlayer = p
+		}
+	}
+	if targetPlayer == nil {
+		return fmt.Errorf("handler: 魔笛 requires a target player")
+	}
+
+	actionCtx, err := getActionCtxFromEventCtx(ctx)
+	if err != nil {
+		return err
+	}
+	_ = actionCtx
+
+	// Give Sinking buff to self, linked to target player
+	metaSelf := util.NewMetadata()
+	metaSelf.Set("sinking_linked_player", targetPlayer.ID.UUID())
+	ctx.AddDerivedAction(engineaction.NewAddBuffActionWithMetadata(ctx.Player, constants.BuffTypeSinking, string(constants.SourceItemMagicFluteBuff), metaSelf))
+
+	// Give Sinking buff to target, linked to self
+	metaTarget := util.NewMetadata()
+	metaTarget.Set("sinking_linked_player", ctx.Player.ID.UUID())
+	ctx.AddDerivedAction(engineaction.NewAddBuffActionWithMetadata(targetPlayer, constants.BuffTypeSinking, string(constants.SourceItemMagicFluteBuff), metaTarget))
+
+	return nil
+}
+
+func handleCupidArrow(phase constants.Phase, ctx *event.Context) error {
+	if ctx == nil {
+		return fmt.Errorf("handler: event context is nil")
+	}
+	if ctx.Player == nil {
+		return fmt.Errorf("handler: player is nil in event context")
+	}
+
+	// Resolve target player (required for CupidArrow)
+	var targetPlayer *core.Player
+	if val, ok := ctx.Get("target_player"); ok {
+		if p, ok2 := val.(*core.Player); ok2 && p != nil {
+			targetPlayer = p
+		}
+	}
+	if targetPlayer == nil {
+		return fmt.Errorf("handler: 丘比特之箭 requires a target player")
+	}
+
+	actionCtx, err := getActionCtxFromEventCtx(ctx)
+	if err != nil {
+		return err
+	}
+	_ = actionCtx
+
+	// Give Eternal buff to self, linked to target player
+	metaSelf := util.NewMetadata()
+	metaSelf.Set("eternal_linked_player", targetPlayer.ID.UUID())
+	ctx.AddDerivedAction(engineaction.NewAddBuffActionWithMetadata(ctx.Player, constants.BuffTypeEternal, string(constants.SourceItemCupidArrowBuff), metaSelf))
+
+	// Give Eternal buff to target, linked to self
+	metaTarget := util.NewMetadata()
+	metaTarget.Set("eternal_linked_player", ctx.Player.ID.UUID())
+	ctx.AddDerivedAction(engineaction.NewAddBuffActionWithMetadata(targetPlayer, constants.BuffTypeEternal, string(constants.SourceItemCupidArrowBuff), metaTarget))
+
+	return nil
+}
+
+func handleCrimsonBlade(phase constants.Phase, ctx *event.Context) error {
+	if ctx == nil {
+		return fmt.Errorf("handler: event context is nil")
+	}
+	if ctx.Player == nil {
+		return fmt.Errorf("handler: player is nil in event context")
+	}
+
+	// Resolve target player (required for CrimsonBlade)
+	var targetPlayer *core.Player
+	if val, ok := ctx.Get("target_player"); ok {
+		if p, ok2 := val.(*core.Player); ok2 && p != nil {
+			targetPlayer = p
+		}
+	}
+	if targetPlayer == nil {
+		return fmt.Errorf("handler: 猩红之刃 requires a target player")
+	}
+
+	actionCtx, err := getActionCtxFromEventCtx(ctx)
+	if err != nil {
+		return err
+	}
+	_ = actionCtx
+
+	// Sacrifice half HP as piercing damage to self, deal same amount to target
+	damageAmount := ctx.Player.HP / 2
+	if damageAmount <= 0 {
+		return nil // No damage if HP too low
+	}
+
+	ctx.AddDerivedAction(engineaction.NewPiercingDamageAction(ctx.Player, damageAmount, string(constants.SourceItemCrimsonBlade)))
+	ctx.AddDerivedAction(engineaction.NewDamageActionWithSource(targetPlayer, damageAmount, ctx.Player, string(constants.SourceItemCrimsonBlade)))
+
+	return nil
+}
+
+func handleFoolishRing(phase constants.Phase, ctx *event.Context) error {
+	if ctx == nil {
+		return fmt.Errorf("handler: event context is nil")
+	}
+	if ctx.Player == nil {
+		return fmt.Errorf("handler: player is nil in event context")
+	}
+
+	actionCtx, err := getActionCtxFromEventCtx(ctx)
+	if err != nil {
+		return err
+	}
+	_ = actionCtx
+
+	// HP+1, LP-1
+	ctx.AddDerivedAction(engineaction.NewHealAction(ctx.Player, 1, string(constants.SourceItemFoolishRing)))
+	ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, -1, string(constants.SourceItemFoolishRing)))
+
+	return nil
+}
+
+func handleGreedyRing(phase constants.Phase, ctx *event.Context) error {
+	if ctx == nil {
+		return fmt.Errorf("handler: event context is nil")
+	}
+	if ctx.Player == nil {
+		return fmt.Errorf("handler: player is nil in event context")
+	}
+
+	actionCtx, err := getActionCtxFromEventCtx(ctx)
+	if err != nil {
+		return err
+	}
+	_ = actionCtx
+
+	// LP+1, HP-1
+	ctx.AddDerivedAction(engineaction.NewModifyLPAction(ctx.Player, 1, string(constants.SourceItemGreedyRing)))
+	ctx.AddDerivedAction(engineaction.NewDamageAction(ctx.Player, 1, string(constants.SourceItemGreedyRing)))
+
+	return nil
+}
+
+func handleWrathRing(phase constants.Phase, ctx *event.Context) error {
+	if ctx == nil {
+		return fmt.Errorf("handler: event context is nil")
+	}
+	if ctx.Player == nil {
+		return fmt.Errorf("handler: player is nil in event context")
+	}
+
+	actionCtx, err := getActionCtxFromEventCtx(ctx)
+	if err != nil {
+		return err
+	}
+	_ = actionCtx
+
+	// HP-1, gain Wrath buff
+	ctx.AddDerivedAction(engineaction.NewDamageAction(ctx.Player, 1, string(constants.SourceItemWrathRing)))
+	ctx.AddDerivedAction(engineaction.NewAddBuffAction(ctx.Player, constants.BuffTypeWrath, string(constants.SourceItemWrathRingBuff)))
+
 	return nil
 }
