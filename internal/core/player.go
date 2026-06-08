@@ -200,7 +200,13 @@ func (p *Player) AddBuff(buffInstance *Buff) error {
 		WithContext("reason", "buff instance is nil")
 	}
 
-	// Check if player already has a buff of the same type
+	// Isolated buff types don't merge - each instance is independent
+	if buffInstance.Type.IsIsolated() {
+		p.ActiveBuffs = append(p.ActiveBuffs, buffInstance)
+		return nil
+	}
+
+	// Check if player already has a buff of the same type (non-isolated merge)
 	existing := p.GetBuff(buffInstance.Type)
 	if existing != nil {
 		// Extend duration: add the new buff's duration to the existing one
@@ -248,6 +254,29 @@ func (p *Player) GetBuff(buffType constants.BuffType) *Buff {
 		}
 	}
 	return nil
+}
+
+// GetBuffByUUID gets a buff by its UUID string.
+// Used for isolated buff instance matching in 亡语 handlers.
+func (p *Player) GetBuffByUUID(uuid string) *Buff {
+	for _, b := range p.ActiveBuffs {
+		if b.ID.UUID() == uuid {
+			return b
+		}
+	}
+	return nil
+}
+
+// RemoveBuffByUUID removes a buff by its UUID string.
+// Used for precise removal of isolated buff instances.
+func (p *Player) RemoveBuffByUUID(uuid string) bool {
+	for i, b := range p.ActiveBuffs {
+		if b.ID.UUID() == uuid {
+			p.ActiveBuffs = append(p.ActiveBuffs[:i], p.ActiveBuffs[i+1:]...)
+			return true
+		}
+	}
+	return false
 }
 
 // TickBuffs updates all buff durations, returns expired buffs.
@@ -315,6 +344,16 @@ func (p *Player) RemoveItem(itemID id.ItemID) (*Item, error) {
 func (p *Player) GetItem(itemID id.ItemID) *Item {
 	for _, it := range p.Inventory {
 		if it.ID.Equal(itemID.ID) {
+			return it
+		}
+	}
+	return nil
+}
+
+// GetItemByUUID gets an item by its UUID string.
+func (p *Player) GetItemByUUID(uuid string) *Item {
+	for _, it := range p.Inventory {
+		if it.ID.UUID() == uuid {
 			return it
 		}
 	}
@@ -611,11 +650,16 @@ func (p *Player) Clone() *Player {
 
 	buffs := make([]*Buff, len(p.ActiveBuffs))
 	for i, b := range p.ActiveBuffs {
+		var clonedMeta *util.Metadata
+		if b.Metadata != nil {
+			clonedMeta = b.Metadata.Clone()
+		}
 		buffs[i] = &Buff{
 			Type:         b.Type,
 			ID:           b.ID,
 			Duration:     b.Duration,
 			tickEligible: b.tickEligible,
+			Metadata:     clonedMeta,
 		}
 	}
 
