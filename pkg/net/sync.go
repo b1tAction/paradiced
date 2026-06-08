@@ -151,8 +151,12 @@ type Item struct {
 	Name string `json:"name"`
 
 	// Targetable indicates if this item requires a target player selection.
-	// True for ReverseClock (gives buff to target) and AnyDoor (teleport to target).
+	// Derived from ItemDefinition.Targetable (static config).
 	Targetable bool `json:"targetable,omitempty"`
+
+	// Triggerable indicates if the player can actively use this item.
+	// False for passive items (auto-trigger on acquire, use button disabled).
+	Triggerable bool `json:"triggerable,omitempty"`
 }
 
 // Available represents available actions for the current player.
@@ -511,6 +515,8 @@ type ItemDefinitionConfig struct {
 	EnglishName string `json:"english_name"`
 	Name        string `json:"name"`         // Chinese display name
 	Desc        string `json:"desc"`         // Chinese description
+	Triggerable bool   `json:"triggerable"`
+	Targetable  bool   `json:"targetable"`
 }
 
 // MiniGameDefinitionConfig represents a mini-game definition for client rendering.
