@@ -28,6 +28,7 @@ const (
 	PhasePostBuffApplied Phase = "post_buff_applied" // After buff applied
 	PhasePreBuffRemoved  Phase = "pre_buff_removed"  // Before buff removed
 	PhasePostBuffRemoved Phase = "post_buff_removed" // After buff removed
+	PhasePostItemAdded   Phase = "post_item_added"   // After item is added to inventory
 	PhasePreAction       Phase = "pre_action"        // Before any action execution (death mark interception)
 	PhasePreDiceRoll     Phase = "pre_dice_roll"     // Before dice roll result (interceptable, Buff can modify Steps)
 
@@ -42,7 +43,7 @@ func (p Phase) IsValid() bool {
 	return p == PhaseBeforeTurn || p == PhaseOnLand || p == PhaseAfterTurn ||
 		p == PhasePreDamage || p == PhasePreEvent || p == PhasePreMove ||
 		p == PhasePreRespawn || p == PhasePreBuffApplied || p == PhasePostBuffApplied ||
-		p == PhasePreBuffRemoved || p == PhasePostBuffRemoved ||
+		p == PhasePreBuffRemoved || p == PhasePostBuffRemoved || p == PhasePostItemAdded ||
 		p == PhasePreAction || p == PhasePreDiceRoll || p == PhaseAnyTime || p == PhaseItemUsed
 }
 

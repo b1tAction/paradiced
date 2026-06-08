@@ -94,6 +94,13 @@ func (bt BuffType) IsItemOnly() bool {
 		bt == BuffTypeSavior || bt == BuffTypeSageProtection
 }
 
+// IsIsolated checks if the Buff should not merge with same-type instances.
+// Isolated buffs (Savior, SageProtection) are independent per instance -
+// each gets its own EventBus subscription, metadata, and lifecycle.
+func (bt BuffType) IsIsolated() bool {
+	return bt == BuffTypeSavior || bt == BuffTypeSageProtection
+}
+
 // IsDraw checks if the Buff should participate in lottery pool draws.
 // Returns false for Boss buffs, hidden buffs, faction passive buffs, and item-only buffs.
 func (bt BuffType) IsDraw() bool {

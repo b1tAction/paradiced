@@ -148,12 +148,18 @@ func LoadDefinitionsFromYAML(data []byte) (*DefinitionSet, error) {
 		if it == constants.ItemTypeNone {
 			return nil, fmt.Errorf("item %s: unknown item type", key)
 		}
+		triggerable := true
+		if def.Triggerable != nil {
+			triggerable = *def.Triggerable
+		}
 		items[it] = &constants.ItemDefinition{
 			Type:        it,
 			Eval:        eval,
 			EnglishName: def.EnglishName,
 			Name:        def.Name,
 			Desc:        def.Desc,
+			Triggerable: triggerable,
+			Targetable:  def.Targetable,
 		}
 	}
 
@@ -289,6 +295,8 @@ type yamlItemDef struct {
 	EnglishName string `yaml:"english_name"`
 	Name        string `yaml:"name"`
 	Desc        string `yaml:"desc"`
+	Triggerable *bool  `yaml:"triggerable"` // nil → true (default)
+	Targetable  bool   `yaml:"targetable"`  // false (default)
 }
 
 type yamlMiniGameDef struct {

@@ -51,9 +51,9 @@ const (
 	SourceItemWrathRing          ActionSource = "item_wrath_ring"
 	SourceItemWrathRingBuff      ActionSource = "item_wrath_ring_buff"
 	SourceItemNamedBlade         ActionSource = "item_named_blade"
-	SourceItemNamedBladeBuff     ActionSource = "item_named_blade_buff"
+	SourceItemNamedBladePassive ActionSource = "item_named_blade_passive"
 	SourceItemSageProtection     ActionSource = "item_sage_protection"
-	SourceItemSageProtectionBuff ActionSource = "item_sage_protection_buff"
+	SourceItemSageProtectionPassive ActionSource = "item_sage_protection_passive"
 
 	// Event sources
 	SourceEventTrap        ActionSource = "event_trap"
