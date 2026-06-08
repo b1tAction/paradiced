@@ -330,7 +330,7 @@ func TestGameSubscribeItem(t *testing.T) {
 
 	// 验证订阅已创建
 	config := GetItemHandlerConfig(constants.ItemTypeDiceUpgrade)
-	if config.Phase.NeedsSubscription() {
+	if config.HasPhase(constants.PhaseItemUsed) {
 		if game.Bus.GetSubscriptionCount() != 1 {
 			t.Errorf("Subscription count = %d, expected 1", game.Bus.GetSubscriptionCount())
 		}
@@ -350,7 +350,8 @@ func TestGameSubscribeAnyTimeItem(t *testing.T) {
 
 	// AnyTime 道具不需要订阅（主动触发）
 	config := GetItemHandlerConfig(constants.ItemTypeReverseClock)
-	if config.Phase == constants.PhaseAnyTime {
+	// ReverseClock subscribes to PhaseItemUsed which needs subscription
+	if config.GetPhases()[0].NeedsSubscription() {
 		// Subscription managed by EventBus via sourceID
 	}
 }
