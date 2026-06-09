@@ -14,10 +14,25 @@ import (
 
 // ItemHandlerConfig contains effect logic and execution configuration.
 type ItemHandlerConfig struct {
-	Phase       constants.Phase `json:"phase"`
-	Priority    int             `json:"priority"`
-	NeedConfirm bool            `json:"need_confirm"`
-	Handler     EffectHandler   `json:"-"`
+	Phases      []constants.Phase `json:"phases"`
+	Priority    int               `json:"priority"`
+	NeedConfirm bool              `json:"need_confirm"`
+	Handler     EffectHandler     `json:"-"`
+}
+
+// GetPhases returns the Item's trigger phase list.
+func (c *ItemHandlerConfig) GetPhases() []constants.Phase {
+	return c.Phases
+}
+
+// HasPhase checks if the Item triggers at the specified Phase.
+func (c *ItemHandlerConfig) HasPhase(phase constants.Phase) bool {
+	for _, p := range c.Phases {
+		if p == phase {
+			return true
+		}
+	}
+	return false
 }
 
 // ItemRegistry is the registry for Item definitions and handler configs.
@@ -164,7 +179,7 @@ func registerAllItems() {
 
 	// ReverseClock: Give Lost buff to target player
 	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeReverseClock], &ItemHandlerConfig{
-		Phase:       constants.PhaseItemUsed,
+		Phases:      []constants.Phase{constants.PhaseItemUsed},
 		Priority:    50,
 		NeedConfirm: false,
 		Handler:     createGiveBuffHandler(constants.BuffTypeLost, constants.SourceItemReverseClockBuff),
@@ -172,7 +187,7 @@ func registerAllItems() {
 
 	// AnyDoor: Teleport to target player's position
 	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeAnyDoor], &ItemHandlerConfig{
-		Phase:       constants.PhaseItemUsed,
+		Phases:      []constants.Phase{constants.PhaseItemUsed},
 		Priority:    60,
 		NeedConfirm: false,
 		Handler:     handleTeleport,
@@ -180,7 +195,7 @@ func registerAllItems() {
 
 	// DiceUpgrade: Upgrade current dice level
 	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeDiceUpgrade], &ItemHandlerConfig{
-		Phase:       constants.PhaseItemUsed,
+		Phases:      []constants.Phase{constants.PhaseItemUsed},
 		Priority:    70,
 		NeedConfirm: false,
 		Handler:     handleDiceUpgrade,
@@ -188,7 +203,7 @@ func registerAllItems() {
 
 	// MagicFlute: Give Sinking buff to self and target player
 	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeMagicFlute], &ItemHandlerConfig{
-		Phase:       constants.PhaseItemUsed,
+		Phases:      []constants.Phase{constants.PhaseItemUsed},
 		Priority:    50,
 		NeedConfirm: false,
 		Handler:     handleMagicFlute,
@@ -196,7 +211,7 @@ func registerAllItems() {
 
 	// CupidArrow: Give Eternal buff to self and target player
 	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeCupidArrow], &ItemHandlerConfig{
-		Phase:       constants.PhaseItemUsed,
+		Phases:      []constants.Phase{constants.PhaseItemUsed},
 		Priority:    50,
 		NeedConfirm: false,
 		Handler:     handleCupidArrow,
@@ -204,7 +219,7 @@ func registerAllItems() {
 
 	// CrimsonBlade: Sacrifice half HP, deal same amount as damage to target
 	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeCrimsonBlade], &ItemHandlerConfig{
-		Phase:       constants.PhaseItemUsed,
+		Phases:      []constants.Phase{constants.PhaseItemUsed},
 		Priority:    50,
 		NeedConfirm: false,
 		Handler:     handleCrimsonBlade,
@@ -212,7 +227,7 @@ func registerAllItems() {
 
 	// WisdomRing: Give Divine buff to self
 	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeWisdomRing], &ItemHandlerConfig{
-		Phase:       constants.PhaseItemUsed,
+		Phases:      []constants.Phase{constants.PhaseItemUsed},
 		Priority:    50,
 		NeedConfirm: false,
 		Handler:     createGiveBuffHandler(constants.BuffTypeDivine, constants.SourceItemWisdomRingBuff),
@@ -220,7 +235,7 @@ func registerAllItems() {
 
 	// MeditationRing: Give Rain buff to self
 	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeMeditationRing], &ItemHandlerConfig{
-		Phase:       constants.PhaseItemUsed,
+		Phases:      []constants.Phase{constants.PhaseItemUsed},
 		Priority:    50,
 		NeedConfirm: false,
 		Handler:     createGiveBuffHandler(constants.BuffTypeRain, constants.SourceItemMeditationRingBuff),
@@ -228,7 +243,7 @@ func registerAllItems() {
 
 	// DisciplineRing: Give Golden Body buff to self
 	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeDisciplineRing], &ItemHandlerConfig{
-		Phase:       constants.PhaseItemUsed,
+		Phases:      []constants.Phase{constants.PhaseItemUsed},
 		Priority:    50,
 		NeedConfirm: false,
 		Handler:     createGiveBuffHandler(constants.BuffTypeGoldenBody, constants.SourceItemDisciplineRingBuff),
@@ -236,7 +251,7 @@ func registerAllItems() {
 
 	// FoolishRing: HP+1, LP-1
 	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeFoolishRing], &ItemHandlerConfig{
-		Phase:       constants.PhaseItemUsed,
+		Phases:      []constants.Phase{constants.PhaseItemUsed},
 		Priority:    50,
 		NeedConfirm: false,
 		Handler:     handleFoolishRing,
@@ -244,7 +259,7 @@ func registerAllItems() {
 
 	// GreedyRing: LP+1, HP-1
 	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeGreedyRing], &ItemHandlerConfig{
-		Phase:       constants.PhaseItemUsed,
+		Phases:      []constants.Phase{constants.PhaseItemUsed},
 		Priority:    50,
 		NeedConfirm: false,
 		Handler:     handleGreedyRing,
@@ -252,26 +267,26 @@ func registerAllItems() {
 
 	// WrathRing: HP-1, gain Wrath buff
 	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeWrathRing], &ItemHandlerConfig{
-		Phase:       constants.PhaseItemUsed,
+		Phases:      []constants.Phase{constants.PhaseItemUsed},
 		Priority:    50,
 		NeedConfirm: false,
 		Handler:     handleWrathRing,
 	})
 
-	// NamedBlade: Give Savior buff to self
+	// NamedBlade: Passive item - auto-grants Savior buff via PhasePostItemAdded handler
 	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeNamedBlade], &ItemHandlerConfig{
-		Phase:       constants.PhaseItemUsed,
+		Phases:      []constants.Phase{constants.PhasePostItemAdded},
 		Priority:    50,
 		NeedConfirm: false,
-		Handler:     createGiveBuffHandler(constants.BuffTypeSavior, constants.SourceItemNamedBladeBuff),
+		Handler:     handleNamedBladePassive,
 	})
 
-	// SageProtection: Give SageProtection buff to self
+	// SageProtection: Passive item - auto-grants SageProtection buff via PhasePostItemAdded handler
 	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeSageProtection], &ItemHandlerConfig{
-		Phase:       constants.PhaseItemUsed,
+		Phases:      []constants.Phase{constants.PhasePostItemAdded},
 		Priority:    50,
 		NeedConfirm: false,
-		Handler:     createGiveBuffHandler(constants.BuffTypeSageProtection, constants.SourceItemSageProtectionBuff),
+		Handler:     handleSageProtectionPassive,
 	})
 }
 
@@ -284,6 +299,13 @@ func createGiveBuffHandler(buffType constants.BuffType, source constants.ActionS
 		}
 		if ctx.Player == nil {
 			return fmt.Errorf("handler: player is nil in event context")
+		}
+
+		// Source item instance matching
+		sourceItemID, _ := ctx.GetString("source_item_id")
+		triggerItemID, _ := ctx.GetString("item_id")
+		if triggerItemID != "" && sourceItemID != "" && triggerItemID != sourceItemID {
+			return nil // Not this item instance
 		}
 
 		// Resolve target player: use target_player from context if set (targeted items like ReverseClock),
@@ -318,6 +340,14 @@ func handleTeleport(phase constants.Phase, ctx *event.Context) error {
 		return fmt.Errorf("handler: player is nil in event context")
 	}
 
+
+	// Source item instance matching
+	sourceItemID, _ := ctx.GetString("source_item_id")
+	triggerItemID, _ := ctx.GetString("item_id")
+	if triggerItemID != "" && sourceItemID != "" && triggerItemID != sourceItemID {
+		return nil // Not this item instance
+	}
+
 	// Resolve target player: use target_player from context if set (AnyDoor targets a player)
 	var targetPlayer *core.Player
 	if val, ok := ctx.Get("target_player"); ok {
@@ -338,6 +368,14 @@ func handleTeleport(phase constants.Phase, ctx *event.Context) error {
 func handleDiceUpgrade(phase constants.Phase, ctx *event.Context) error {
 	if ctx == nil || ctx.Player == nil {
 		return nil
+	}
+
+
+	// Source item instance matching
+	sourceItemID, _ := ctx.GetString("source_item_id")
+	triggerItemID, _ := ctx.GetString("item_id")
+	if triggerItemID != "" && sourceItemID != "" && triggerItemID != sourceItemID {
+		return nil // Not this item instance
 	}
 
 	actionCtx, err := getActionCtxFromEventCtx(ctx)
@@ -364,6 +402,14 @@ func handleMagicFlute(phase constants.Phase, ctx *event.Context) error {
 	}
 	if ctx.Player == nil {
 		return fmt.Errorf("handler: player is nil in event context")
+	}
+
+
+	// Source item instance matching
+	sourceItemID, _ := ctx.GetString("source_item_id")
+	triggerItemID, _ := ctx.GetString("item_id")
+	if triggerItemID != "" && sourceItemID != "" && triggerItemID != sourceItemID {
+		return nil // Not this item instance
 	}
 
 	// Resolve target player (required for MagicFlute)
@@ -404,6 +450,14 @@ func handleCupidArrow(phase constants.Phase, ctx *event.Context) error {
 		return fmt.Errorf("handler: player is nil in event context")
 	}
 
+
+	// Source item instance matching
+	sourceItemID, _ := ctx.GetString("source_item_id")
+	triggerItemID, _ := ctx.GetString("item_id")
+	if triggerItemID != "" && sourceItemID != "" && triggerItemID != sourceItemID {
+		return nil // Not this item instance
+	}
+
 	// Resolve target player (required for CupidArrow)
 	var targetPlayer *core.Player
 	if val, ok := ctx.Get("target_player"); ok {
@@ -440,6 +494,14 @@ func handleCrimsonBlade(phase constants.Phase, ctx *event.Context) error {
 	}
 	if ctx.Player == nil {
 		return fmt.Errorf("handler: player is nil in event context")
+	}
+
+
+	// Source item instance matching
+	sourceItemID, _ := ctx.GetString("source_item_id")
+	triggerItemID, _ := ctx.GetString("item_id")
+	if triggerItemID != "" && sourceItemID != "" && triggerItemID != sourceItemID {
+		return nil // Not this item instance
 	}
 
 	// Resolve target player (required for CrimsonBlade)
@@ -479,6 +541,14 @@ func handleFoolishRing(phase constants.Phase, ctx *event.Context) error {
 		return fmt.Errorf("handler: player is nil in event context")
 	}
 
+
+	// Source item instance matching
+	sourceItemID, _ := ctx.GetString("source_item_id")
+	triggerItemID, _ := ctx.GetString("item_id")
+	if triggerItemID != "" && sourceItemID != "" && triggerItemID != sourceItemID {
+		return nil // Not this item instance
+	}
+
 	actionCtx, err := getActionCtxFromEventCtx(ctx)
 	if err != nil {
 		return err
@@ -498,6 +568,14 @@ func handleGreedyRing(phase constants.Phase, ctx *event.Context) error {
 	}
 	if ctx.Player == nil {
 		return fmt.Errorf("handler: player is nil in event context")
+	}
+
+
+	// Source item instance matching
+	sourceItemID, _ := ctx.GetString("source_item_id")
+	triggerItemID, _ := ctx.GetString("item_id")
+	if triggerItemID != "" && sourceItemID != "" && triggerItemID != sourceItemID {
+		return nil // Not this item instance
 	}
 
 	actionCtx, err := getActionCtxFromEventCtx(ctx)
@@ -521,6 +599,14 @@ func handleWrathRing(phase constants.Phase, ctx *event.Context) error {
 		return fmt.Errorf("handler: player is nil in event context")
 	}
 
+
+	// Source item instance matching
+	sourceItemID, _ := ctx.GetString("source_item_id")
+	triggerItemID, _ := ctx.GetString("item_id")
+	if triggerItemID != "" && sourceItemID != "" && triggerItemID != sourceItemID {
+		return nil // Not this item instance
+	}
+
 	actionCtx, err := getActionCtxFromEventCtx(ctx)
 	if err != nil {
 		return err
@@ -531,5 +617,57 @@ func handleWrathRing(phase constants.Phase, ctx *event.Context) error {
 	ctx.AddDerivedAction(engineaction.NewDamageAction(ctx.Player, 1, string(constants.SourceItemWrathRing)))
 	ctx.AddDerivedAction(engineaction.NewAddBuffAction(ctx.Player, constants.BuffTypeWrath, string(constants.SourceItemWrathRingBuff)))
 
+	return nil
+}
+
+// ========== Passive Item Handlers ==========
+
+func handleNamedBladePassive(phase constants.Phase, ctx *event.Context) error {
+	if phase != constants.PhasePostItemAdded {
+		return nil
+	}
+	if ctx == nil || ctx.Player == nil {
+		return nil
+	}
+
+	// Source item instance matching
+	sourceItemID, _ := ctx.GetString("source_item_id")
+	triggerItemID, _ := ctx.GetString("item_id")
+	if triggerItemID != "" && sourceItemID != "" && triggerItemID != sourceItemID {
+		return nil // Not this item instance
+	}
+
+	meta := util.NewMetadata()
+	meta.SetString("source_item_id", triggerItemID)
+	meta.SetString("source_item_type", string(constants.ItemTypeNamedBlade))
+	ctx.AddDerivedAction(engineaction.NewAddBuffActionWithMetadata(
+		ctx.Player, constants.BuffTypeSavior,
+		string(constants.SourceItemNamedBladePassive), meta,
+	))
+	return nil
+}
+
+func handleSageProtectionPassive(phase constants.Phase, ctx *event.Context) error {
+	if phase != constants.PhasePostItemAdded {
+		return nil
+	}
+	if ctx == nil || ctx.Player == nil {
+		return nil
+	}
+
+	// Source item instance matching
+	sourceItemID, _ := ctx.GetString("source_item_id")
+	triggerItemID, _ := ctx.GetString("item_id")
+	if triggerItemID != "" && sourceItemID != "" && triggerItemID != sourceItemID {
+		return nil // Not this item instance
+	}
+
+	meta := util.NewMetadata()
+	meta.SetString("source_item_id", triggerItemID)
+	meta.SetString("source_item_type", string(constants.ItemTypeSageProtection))
+	ctx.AddDerivedAction(engineaction.NewAddBuffActionWithMetadata(
+		ctx.Player, constants.BuffTypeSageProtection,
+		string(constants.SourceItemSageProtectionPassive), meta,
+	))
 	return nil
 }

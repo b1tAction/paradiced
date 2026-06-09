@@ -174,17 +174,19 @@ func (b *Builder) BuildAvailable() *pkgnet.Available {
 // BuildAvailableForPlayer builds available actions for a specific player.
 // Used internally when player is already known.
 func (b *Builder) BuildAvailableForPlayer(player *core.Player) *pkgnet.Available {
-	usableItems := make([]pkgnet.Item, 0)
+	availableItems := make([]pkgnet.Item, 0)
 	for _, it := range player.Inventory {
-		if it.Usable {
-			handlerConfig := engine.GetItemHandlerConfig(it.Type)
-			usableItems = append(usableItems, pkgnet.Item{
-				ID:         it.ID.UUID(),
-				Type:       string(it.Type),
-				Name:       engine.GetItemName(it.Type),
-				Targetable: handlerConfig != nil && handlerConfig.NeedConfirm,
-			})
+		def := engine.GetItemDefinition(it.Type)
+		if def == nil {
+			continue
 		}
+		availableItems = append(availableItems, pkgnet.Item{
+			ID:          it.ID.UUID(),
+			Type:        string(it.Type),
+			Name:        engine.GetItemName(it.Type),
+			Targetable:  def.Targetable,
+			Triggerable: def.Triggerable,
+		})
 	}
 
 	canUseSkill := false
@@ -197,7 +199,7 @@ func (b *Builder) BuildAvailableForPlayer(player *core.Player) *pkgnet.Available
 	}
 
 	return &pkgnet.Available{
-		Items:       usableItems,
+		Items:       availableItems,
 		CanUseSkill: canUseSkill,
 		DiceType:    b.turnDiceType.String(),
 	}
@@ -378,6 +380,8 @@ func BuildDefinitionsConfig() pkgnet.DefinitionsConfig {
 			EnglishName: def.EnglishName,
 			Name:        def.Name,
 			Desc:        def.Desc,
+			Triggerable: def.Triggerable,
+			Targetable:  def.Targetable,
 		}
 	}
 

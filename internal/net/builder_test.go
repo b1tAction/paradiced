@@ -423,12 +423,12 @@ func TestBuildAvailableWithNonChargeFaction(t *testing.T) {
 	}
 }
 
-func TestBuildAvailableWithUnusableItem(t *testing.T) {
+func TestBuildAvailableWithPassiveItem(t *testing.T) {
 	builder, game, hsmInstance := newTestBuilder()
 
 	player := newTestPlayer(constants.FactionQingLong)
-	item := core.NewItem(constants.ItemTypeAnyDoor)
-	item.Usable = false // Mark item as unusable
+	// Passive item (triggerable=false) still appears in Available but with Triggerable=false
+	item := core.NewItem(constants.ItemTypeNamedBlade)
 	player.AddItem(item)
 	game.AddPlayer(player)
 	hsmInstance.SetTurnPlayer(player)
@@ -436,8 +436,11 @@ func TestBuildAvailableWithUnusableItem(t *testing.T) {
 	builder.SetDiceTypeFromRng(rng.DiceTypeGold)
 	available := builder.BuildAvailable()
 
-	if len(available.Items) != 0 {
-		t.Errorf("BuildAvailable with unusable item: len(Items) = %d, want 0", len(available.Items))
+	if len(available.Items) != 1 {
+		t.Errorf("BuildAvailable with passive item: len(Items) = %d, want 1", len(available.Items))
+	}
+	if available.Items[0].Triggerable != false {
+		t.Errorf("passive item Triggerable = %v, want false", available.Items[0].Triggerable)
 	}
 }
 

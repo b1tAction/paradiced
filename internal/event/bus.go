@@ -145,6 +145,13 @@ func (bus *EventBus) Publish(phase constants.Phase, ownerID string, ctx *Context
 
 	decisions := make([]*Decision, 0)
 	for _, sub := range ownerSubs {
+		// If action was blocked by a previous handler, stop processing
+		// subsequent handlers for this phase. This ensures interception phases
+		// (PhasePreDamage, PhasePreRespawn) only trigger one blocking handler.
+		if ctx.GetBoolOrDefault("action_blocked", false) {
+			break
+		}
+
 		if sub.Decision.ShouldAsk() {
 			decisions = append(decisions, sub.Decision)
 		} else {

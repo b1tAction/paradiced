@@ -176,13 +176,15 @@ func (g *Game) SubscribeBuff(player *core.Player, buff *core.Buff) {
 	}
 
 	// Create subscription for each Phase
+	buffUUID := buff.ID.UUID()
 	for _, phase := range config.GetPhases() {
 		if !phase.NeedsSubscription() {
 			continue
 		}
 
-		// Create handler closure - executes config.Handler
+		// Create handler closure - passes source_buff_id to handler via context
 		action := func(ctx *event.Context) error {
+			ctx.Set("source_buff_id", buffUUID)
 			if config.Handler != nil {
 				err := config.Handler(phase, ctx)
 				if err == nil {
@@ -221,31 +223,29 @@ func (g *Game) UnsubscribeBuff(buff *core.Buff) {
 }
 
 // SubscribeItem subscribes when player gets a new Item.
-// Uses ItemHandlerConfig for Phase/Priority/NeedConfirm.
-// The handler closure checks that the triggering item_id matches this item's UUID,
-// so Publish(PhaseItemUsed, ...) only executes the handler of the actually-used item.
+// Uses ItemHandlerConfig for Phases/Priority/NeedConfirm.
+// Iterates all configured phases, matching SubscribeBuff pattern.
 func (g *Game) SubscribeItem(player *core.Player, item *core.Item) {
 	def := GetItemDefinition(item.Type)
 	config := GetItemHandlerConfig(item.Type)
 	if def == nil || config == nil {
 		return
 	}
-	if config.Phase.NeedsSubscription() {
+
+	for _, phase := range config.GetPhases() {
+		if !phase.NeedsSubscription() {
+			continue
+		}
 		itemUUID := item.ID.UUID()
 		action := func(ctx *event.Context) error {
-			// Only execute if this item is the one being used
-			triggerItemID, _ := ctx.GetString("item_id")
-			if triggerItemID != itemUUID {
-				return nil
-			}
+			ctx.Set("source_item_id", itemUUID)
 			if config.Handler != nil {
-				return config.Handler(constants.PhaseItemUsed, ctx)
+				return config.Handler(phase, ctx)
 			}
 			return nil
 		}
 		decision := g.createItemDecisionWithAction(item, def, config, action)
-		// Register with EventBus using item.ID.UUID() as sourceID
-		g.Bus.Subscribe(config.Phase, player.ID, item.ID.UUID(), "item", decision)
+		g.Bus.Subscribe(phase, player.ID, item.ID.UUID(), "item", decision)
 	}
 }
 
@@ -354,7 +354,7 @@ func (g *Game) ApplyBuffToPlayer(player *core.Player, buff *core.Buff) error {
 // RemoveBuffFromPlayer removes Buff from player and handles complete lifecycle.
 // Process order:
 //  1. Unsubscribe (UnsubscribeBuff)
-//  2. Underlying data remove (player.RemoveBuff)
+//  2. Underlying data remove (player.RemoveBuffByUUID) - precise instance removal
 //
 // Note: Buff lifecycle Phases (PhasePostBuffApplied, PhasePreBuffRemoved) are
 // published by Action system (AddBuffAction/RemoveBuffAction) during execution.
@@ -362,10 +362,10 @@ func (g *Game) RemoveBuffFromPlayer(player *core.Player, buff *core.Buff) bool {
 	// 1. Unsubscribe
 	g.UnsubscribeBuff(buff)
 
-	// 2. Underlying data remove
-	result := player.RemoveBuff(buff.Type)
+	// 2. Underlying data remove - use UUID for precise instance removal
+	result := player.RemoveBuffByUUID(buff.ID.UUID())
 
-	g.DebugLog.Info("RemoveBuffFromPlayer", "player_id", player.ID.UUID(), "buff_type", buff.Type, "removed", result)
+	g.DebugLog.Info("RemoveBuffFromPlayer", "player_id", player.ID.UUID(), "buff_type", buff.Type, "buff_uuid", buff.ID.UUID(), "removed", result)
 	return result
 }
 

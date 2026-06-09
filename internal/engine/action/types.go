@@ -386,8 +386,11 @@ func (a *AddBuffAction) Execute(ctx *ActionContext) error {
 	duration := ctx.GetBuffDuration(a.BuffType)
 	a.duration = duration
 
-	// Check if player already has this buff type (duration extend)
-	if a.targetPlayer.HasBuff(a.BuffType) {
+	// Isolated buffs skip duration-extend: each instance gets full lifecycle
+	isIsolated := a.BuffType.IsIsolated()
+
+	// Check if player already has this buff type (duration extend for non-isolated)
+	if a.targetPlayer.HasBuff(a.BuffType) && !isIsolated {
 		// Duration extend: Player.AddBuff handles duration merge internally
 		// OnAddBuff should NOT be called (buff already subscribed on EventBus)
 		// PhasePostBuffApplied should NOT be published (not a new buff application)
@@ -1328,7 +1331,7 @@ func (a *AddItemAction) Source() string             { return a.SourceID }
 func (a *AddItemAction) Target() string             { return a.targetPlayer.ID.UUID() }
 func (a *AddItemAction) TargetPlayer() *core.Player { return a.targetPlayer }
 func (a *AddItemAction) PreTriggerPhase() constants.Phase  { return constants.PhaseAnyTime }
-func (a *AddItemAction) PostTriggerPhase() constants.Phase { return constants.PhaseAnyTime }
+func (a *AddItemAction) PostTriggerPhase() constants.Phase { return constants.PhasePostItemAdded }
 
 func (a *AddItemAction) Execute(ctx *ActionContext) error {
 	if a.targetPlayer == nil {
@@ -1340,6 +1343,11 @@ func (a *AddItemAction) Execute(ctx *ActionContext) error {
 
 	newItem := core.NewItem(a.ItemType)
 	ctx.OnAddItem(a.targetPlayer, newItem)
+
+	// Store added item info for PhasePostItemAdded handler matching
+	ctx.SetString("added_item_id", newItem.ID.UUID())
+	ctx.SetString("added_item_type", string(a.ItemType))
+
 	return nil
 }
 
@@ -1391,7 +1399,6 @@ func (a *RemoveItemAction) Execute(ctx *ActionContext) error {
 	if ctx.OnRemoveItem == nil {
 		return errors.NewActionExecutionError("remove_item", "", "OnRemoveItem callback is nil", nil)
 	}
-	// OnRemoveItem handles EventBus unsubscription and player.RemoveItem
 	ctx.OnRemoveItem(a.targetPlayer, a.ItemType)
 	return nil
 }

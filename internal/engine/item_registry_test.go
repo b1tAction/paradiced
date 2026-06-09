@@ -39,13 +39,13 @@ func TestAllItemsHaveHandlerConfig(t *testing.T) {
 func TestItemHandlerConfigFields(t *testing.T) {
 	tests := []struct {
 		itemType    constants.ItemType
-		phase       constants.Phase
+		phases      []constants.Phase
 		priority    int
 		needConfirm bool
 	}{
-		{constants.ItemTypeReverseClock, constants.PhaseItemUsed, 50, false},
-		{constants.ItemTypeAnyDoor, constants.PhaseItemUsed, 60, false},
-		{constants.ItemTypeDiceUpgrade, constants.PhaseItemUsed, 70, false},
+		{constants.ItemTypeReverseClock, []constants.Phase{constants.PhaseItemUsed}, 50, false},
+		{constants.ItemTypeAnyDoor, []constants.Phase{constants.PhaseItemUsed}, 60, false},
+		{constants.ItemTypeDiceUpgrade, []constants.Phase{constants.PhaseItemUsed}, 70, false},
 	}
 
 	for _, tt := range tests {
@@ -55,8 +55,8 @@ func TestItemHandlerConfigFields(t *testing.T) {
 			continue
 		}
 
-		if config.Phase != tt.phase {
-			t.Errorf("%s.Phase = %s, expected %s", tt.itemType, config.Phase, tt.phase)
+		if !config.HasPhase(tt.phases[0]) {
+			t.Errorf("%s.Phases does not contain %s", tt.itemType, tt.phases[0])
 		}
 
 		if config.Priority != tt.priority {
@@ -263,28 +263,28 @@ func TestGetItemTypesByCategory(t *testing.T) {
 // ========== Edge Case Tests: nil player/context ==========
 
 func TestItemHandlerWithNilContext(t *testing.T) {
-	// All item handlers should gracefully handle nil context
+	// All item handlers should gracefully handle nil context (skip passive items with nil config)
 	itemTypes := GetAllItemTypes()
 	for _, it := range itemTypes {
-		handler := GetItemHandlerConfig(it).Handler
-		if handler == nil {
+		config := GetItemHandlerConfig(it)
+		if config == nil || config.Handler == nil {
 			continue
 		}
 		// Should not panic with nil context
-		handler(constants.PhaseAnyTime, nil)
+		config.Handler(constants.PhaseAnyTime, nil)
 	}
 }
 
 func TestItemHandlerWithNilPlayer(t *testing.T) {
-	// All item handlers should gracefully handle nil player in context
+	// All item handlers should gracefully handle nil player in context (skip passive items with nil config)
 	itemTypes := GetAllItemTypes()
 	for _, it := range itemTypes {
-		handler := GetItemHandlerConfig(it).Handler
-		if handler == nil {
+		config := GetItemHandlerConfig(it)
+		if config == nil || config.Handler == nil {
 			continue
 		}
 		ctx := event.NewContext(nil) // nil player
-		handler(constants.PhaseAnyTime, ctx)
+		config.Handler(constants.PhaseAnyTime, ctx)
 		// Should not produce derived actions
 		if len(ctx.GetDerivedActions()) > 0 {
 			t.Errorf("ItemType %s should not produce actions with nil player", it)
@@ -765,8 +765,9 @@ func TestNamedBladeHandlerBehavior(t *testing.T) {
 	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
 	ctx.Set("action_context", actionCtx)
+	ctx.Set("item_id", "test-named-blade-uuid")
 
-	handler(constants.PhaseItemUsed, ctx)
+	handler(constants.PhasePostItemAdded, ctx)
 
 	derived := ctx.GetDerivedActions()
 	if len(derived) != 1 {
@@ -790,8 +791,9 @@ func TestSageProtectionItemHandlerBehavior(t *testing.T) {
 	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
 	ctx.Set("action_context", actionCtx)
+	ctx.Set("item_id", "test-sage-protection-uuid")
 
-	handler(constants.PhaseItemUsed, ctx)
+	handler(constants.PhasePostItemAdded, ctx)
 
 	derived := ctx.GetDerivedActions()
 	if len(derived) != 1 {

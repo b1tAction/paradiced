@@ -86,4 +86,6 @@ type ItemDefinition struct {
 	EnglishName string     `json:"english_name"`  // English identifier (snake_case)
 	Name        string     `json:"name"`          // Chinese display name
 	Desc        string     `json:"desc"`          // Description text
+	Triggerable bool       `json:"triggerable"`   // Whether player can actively use this item
+	Targetable  bool       `json:"targetable"`    // Whether item requires target player selection
 }

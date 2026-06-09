@@ -220,71 +220,99 @@ items:
     english_name: ReverseClock
     name: 反方向的钟
     desc: 给予指定玩家迷途Buff
+    triggerable: true
+    targetable: true
   any_door:
     evaluation: neutral
     english_name: AnyDoor
     name: 任意门
     desc: 前往指定玩家身边
+    triggerable: true
+    targetable: true
   dice_upgrade:
     evaluation: good
     english_name: DiceUpgrade
     name: 骰子升级卡
     desc: 将当前骰子升级为更高等级
+    triggerable: true
+    targetable: false
   magic_flute:
     evaluation: mild_bad
     english_name: MagicFlute
     name: 魔笛
     desc: 与某人共同获得沉沦Buff，共享恶性Action
+    triggerable: true
+    targetable: true
   cupid_arrow:
     evaluation: mild_good
     english_name: CupidArrow
     name: 丘比特之箭
     desc: 与某人共同获得永恒Buff，共享良性Action
+    triggerable: true
+    targetable: true
   crimson_blade:
     evaluation: mixed
     english_name: CrimsonBlade
     name: 猩红之刃
     desc: 损失一半血量，对目标造成等量伤害
+    triggerable: true
+    targetable: true
   wisdom_ring:
     evaluation: good
     english_name: WisdomRing
     name: 智慧玄戒
     desc: 获得神眷Buff
+    triggerable: true
+    targetable: false
   meditation_ring:
     evaluation: good
     english_name: MeditationRing
     name: 禅定玄戒
     desc: 获得甘霖Buff
+    triggerable: true
+    targetable: false
   discipline_ring:
     evaluation: good
     english_name: DisciplineRing
     name: 持戒玄戒
     desc: 获得金身Buff
+    triggerable: true
+    targetable: false
   foolish_ring:
     evaluation: mixed
     english_name: FoolishRing
     name: 痴愚煞戒
     desc: HP+1，LP-1
+    triggerable: true
+    targetable: false
   greedy_ring:
     evaluation: mixed
     english_name: GreedyRing
     name: 贪婪煞戒
     desc: LP+1，HP-1
+    triggerable: true
+    targetable: false
   wrath_ring:
     evaluation: mild_bad
     english_name: WrathRing
     name: 嗔恨煞戒
     desc: HP-1，获得嗔怒Buff
+    triggerable: true
+    targetable: false
   named_blade:
     evaluation: very_good
     english_name: NamedBlade
     name: 名刀司命
     desc: 抵挡一次致命伤害
+    triggerable: false
+    targetable: false
   sage_protection:
     evaluation: good
     english_name: SageProtection
     name: 贤者的庇护
     desc: 原地复活
+    triggerable: false
+    targetable: false
 
 # ========== Faction Definitions ==========
 

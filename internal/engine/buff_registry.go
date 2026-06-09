@@ -387,17 +387,17 @@ func registerAllBuffs() {
 		Handler:     handleWrathAmplify,
 	})
 
-	// Savior: block one fatal damage, then remove Savior buff
+	// Savior: block one fatal damage, then remove Savior buff + paired item via 亡语
 	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeSavior], &BuffHandlerConfig{
-		Phases:      []constants.Phase{constants.PhasePreDamage},
+		Phases:      []constants.Phase{constants.PhasePreDamage, constants.PhasePreBuffRemoved},
 		Priority:    999,
 		NeedConfirm: false,
 		Handler:     handleSaviorBlock,
 	})
 
-	// SageProtection: respawn in-place (death location) instead of checkpoint
+	// SageProtection: respawn in-place, remove buff + paired item via 亡语
 	GlobalBuffRegistry.RegisterBuff(defs.Buffs[constants.BuffTypeSageProtection], &BuffHandlerConfig{
-		Phases:      []constants.Phase{constants.PhasePreRespawn},
+		Phases:      []constants.Phase{constants.PhasePreRespawn, constants.PhasePreBuffRemoved},
 		Priority:    50,
 		NeedConfirm: false,
 		Handler:     handleSageProtectionRespawn,
@@ -1280,31 +1280,56 @@ func handleWrathAmplify(phase constants.Phase, ctx *event.Context) error {
 }
 
 // handleSaviorBlock blocks one fatal damage and removes Savior buff.
-// PhasePreDamage: if DamageAction would kill the player (HP - Amount <= 0),
-// block the action and remove Savior buff via derived RemoveBuffAction.
+// PhasePreDamage: block fatal damage, push RemoveBuffAction(Savior).
+// PhasePreBuffRemoved (亡语): remove paired item when buff is removed by any source.
 func handleSaviorBlock(phase constants.Phase, ctx *event.Context) error {
-	if phase != constants.PhasePreDamage {
-		return nil
-	}
 	if ctx == nil || ctx.Player == nil {
 		return nil
 	}
 
-	raw, ok := ctx.Get("current_action")
-	if !ok {
-		return nil
-	}
-	damageAction, ok := raw.(*engineaction.DamageAction)
-	if !ok || damageAction == nil {
-		return nil
-	}
+	switch phase {
+	case constants.PhasePreDamage:
+		raw, ok := ctx.Get("current_action")
+		if !ok {
+			return nil
+		}
+		damageAction, ok := raw.(*engineaction.DamageAction)
+		if !ok || damageAction == nil {
+			return nil
+		}
 
-	// Check if damage would be fatal (HP - Amount <= 0)
-	if ctx.Player.HP-damageAction.Amount <= 0 {
-		ctx.SetBool("action_blocked", true)
-		ctx.SetString("blocked_by", string(constants.SourceBuffSavior))
-		ctx.AddDerivedAction(engineaction.NewRemoveBuffAction(ctx.Player, constants.BuffTypeSavior, string(constants.SourceBuffSavior)))
-		logHandlerResult("Savior", ctx, "blocked_fatal_damage", "damage", damageAction.Amount, "player_hp", ctx.Player.HP)
+		// Check if damage would be fatal (HP - Amount <= 0)
+		if ctx.Player.HP-damageAction.Amount <= 0 {
+			ctx.SetBool("action_blocked", true)
+			ctx.SetString("blocked_by", string(constants.SourceBuffSavior))
+			ctx.AddDerivedAction(engineaction.NewRemoveBuffAction(ctx.Player, constants.BuffTypeSavior, string(constants.SourceBuffSavior)))
+			logHandlerResult("Savior", ctx, "blocked_fatal_damage", "damage", damageAction.Amount, "player_hp", ctx.Player.HP)
+		}
+
+	case constants.PhasePreBuffRemoved:
+		// 亡语: remove paired item when Savior buff is removed by any source
+		// source_buff_id matching: only process if this is about our specific instance
+		sourceBuffID, _ := ctx.GetString("source_buff_id")
+		removedBuffID, _ := ctx.GetString("removed_buff_id")
+		if removedBuffID != "" && sourceBuffID != "" && sourceBuffID != removedBuffID {
+			return nil // Not our instance's removal
+		}
+		if raw, ok := ctx.Get("removed_buff_type"); ok {
+			if constants.BuffType(raw.(string)) == constants.BuffTypeSavior {
+				saviorBuff := ctx.Player.GetBuffByUUID(removedBuffID)
+				if saviorBuff != nil {
+					sourceItemType := saviorBuff.Metadata.GetStringOrDefault("source_item_type", "")
+					if sourceItemType != "" {
+						ctx.AddDerivedAction(engineaction.NewRemoveItemAction(
+							ctx.Player,
+							constants.ParseItemType(sourceItemType),
+							string(constants.SourceBuffSavior)+"_paired_item",
+						))
+						logHandlerResult("Savior", ctx, "亡语_remove_paired_item", "source_item_type", sourceItemType)
+					}
+				}
+			}
+		}
 	}
 
 	return nil
@@ -1312,29 +1337,54 @@ func handleSaviorBlock(phase constants.Phase, ctx *event.Context) error {
 
 // handleSageProtectionRespawn modifies respawn position to player's current location
 // (death location instead of checkpoint) and removes SageProtection buff.
-// PhasePreRespawn: modify RespawnAction.CheckpointPos to ctx.Player.Position,
-// then remove SageProtection buff via derived RemoveBuffAction.
+// PhasePreRespawn: modify RespawnAction.CheckpointPos, push RemoveBuffAction.
+// PhasePreBuffRemoved (亡语): remove paired item when buff is removed by any source.
 func handleSageProtectionRespawn(phase constants.Phase, ctx *event.Context) error {
-	if phase != constants.PhasePreRespawn {
-		return nil
-	}
 	if ctx == nil || ctx.Player == nil {
 		return nil
 	}
 
-	raw, ok := ctx.Get("current_action")
-	if !ok {
-		return nil
-	}
-	respawnAction, ok := raw.(*engineaction.RespawnAction)
-	if !ok || respawnAction == nil {
-		return nil
-	}
+	switch phase {
+	case constants.PhasePreRespawn:
+		raw, ok := ctx.Get("current_action")
+		if !ok {
+			return nil
+		}
+		respawnAction, ok := raw.(*engineaction.RespawnAction)
+		if !ok || respawnAction == nil {
+			return nil
+		}
 
-	// Modify respawn position to player's current position (death location)
-	respawnAction.CheckpointPos = ctx.Player.Position
-	ctx.AddDerivedAction(engineaction.NewRemoveBuffAction(ctx.Player, constants.BuffTypeSageProtection, string(constants.SourceBuffSageProtection)))
-	logHandlerResult("SageProtection", ctx, "respawn_in_place", "position", ctx.Player.Position)
+		// Modify respawn position to player's current position (death location)
+		respawnAction.CheckpointPos = ctx.Player.Position
+		ctx.AddDerivedAction(engineaction.NewRemoveBuffAction(ctx.Player, constants.BuffTypeSageProtection, string(constants.SourceBuffSageProtection)))
+		logHandlerResult("SageProtection", ctx, "respawn_in_place", "position", ctx.Player.Position)
+
+	case constants.PhasePreBuffRemoved:
+		// 亡语: remove paired item when SageProtection buff is removed by any source
+		// source_buff_id matching: only process if this is about our specific instance
+		sourceBuffID, _ := ctx.GetString("source_buff_id")
+		removedBuffID, _ := ctx.GetString("removed_buff_id")
+		if removedBuffID != "" && sourceBuffID != "" && sourceBuffID != removedBuffID {
+			return nil // Not our instance's removal
+		}
+		if raw, ok := ctx.Get("removed_buff_type"); ok {
+			if constants.BuffType(raw.(string)) == constants.BuffTypeSageProtection {
+				sageBuff := ctx.Player.GetBuffByUUID(removedBuffID)
+				if sageBuff != nil {
+					sourceItemType := sageBuff.Metadata.GetStringOrDefault("source_item_type", "")
+					if sourceItemType != "" {
+						ctx.AddDerivedAction(engineaction.NewRemoveItemAction(
+							ctx.Player,
+							constants.ParseItemType(sourceItemType),
+							string(constants.SourceBuffSageProtection)+"_paired_item",
+						))
+						logHandlerResult("SageProtection", ctx, "亡语_remove_paired_item", "source_item_type", sourceItemType)
+					}
+				}
+			}
+		}
+	}
 
 	return nil
 }

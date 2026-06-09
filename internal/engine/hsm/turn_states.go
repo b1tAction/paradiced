@@ -400,6 +400,15 @@ func (s *MainActionState) onRollDiceInternal(ctx *StateContext, sourceID string)
 // OnUseItem handles item usage input.
 // After the item handler executes, the consumed item is removed via RemoveItemAction.
 func (s *MainActionState) OnUseItem(ctx *StateContext, itemID string) {
+	// Guard: reject passive (non-triggerable) items
+	item := ctx.Player.GetItemByUUID(itemID)
+	if item != nil {
+		itemDef := engine.GetItemDefinition(item.Type)
+		if itemDef != nil && !itemDef.Triggerable {
+			return // passive item, cannot be actively used
+		}
+	}
+
 	// Publish PhaseItemUsed to trigger item handler
 	player := ctx.Player
 	triggerCtx := event.NewContext(player)
@@ -458,7 +467,7 @@ func (s *MainActionState) OnUseItem(ctx *StateContext, itemID string) {
 
 	// Consume the item after handler execution (RemoveItemAction handles EventBus unsubscription)
 	itemUUID := id.MustParseItemID(itemID)
-	item := player.GetItem(itemUUID)
+	item = player.GetItem(itemUUID)
 	if item != nil {
 		removeAction := engineaction.NewRemoveItemAction(player, item.Type, string(constants.SourceItemConsumed))
 		if err := s.actionCtx.ExecuteAction(removeAction); err != nil {
@@ -901,6 +910,7 @@ func newActionContextWithPools(game *engine.Game, bus *event.EventBus, mapEngine
 		}
 		return 0
 	}
+	ctx.GetItemDefinition = engine.GetItemDefinition
 	return ctx
 }
 

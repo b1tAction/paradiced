@@ -50,6 +50,11 @@ type ActionContext struct {
 	// These handle EventBus subscription/unsubscription for Item add/remove.
 	OnAddItem    func(player *core.Player, item *core.Item)                     // Called after AddItemAction.Execute
 	OnRemoveItem func(player *core.Player, itemType constants.ItemType) *core.Item // Called by RemoveItemAction.Execute
+
+	// GetItemDefinition returns the ItemDefinition for a given ItemType.
+	// Injected by engine layer (ItemRegistry). Used by AddItemAction/RemoveItemAction to
+	// look up Triggerable/PairedBuff for passive item auto-buff and paired removal.
+	GetItemDefinition func(itemType constants.ItemType) *constants.ItemDefinition
 }
 
 // NewActionContext creates a new ActionContext with required components.
@@ -156,9 +161,14 @@ func (ctx *ActionContext) ExecuteAction(action Action) error {
 		triggerCtx.Set("current_action", action)
 		triggerCtx.Set("action_context", ctx)
 
-		// For RemoveBuffAction, set removed buff type for handler matching
+		// For RemoveBuffAction, set removed buff type AND instance ID for handler matching
 		if removeAction, ok := action.(*RemoveBuffAction); ok {
 			triggerCtx.Set("removed_buff_type", string(removeAction.BuffType))
+			// Find the specific buff instance so handlers can use GetBuffByUUID
+			removedBuff := action.TargetPlayer().GetBuff(removeAction.BuffType)
+			if removedBuff != nil {
+				triggerCtx.Set("removed_buff_id", removedBuff.ID.UUID())
+			}
 		}
 
 		// Publish to allow Buffs/Items to intercept/modify the action
@@ -214,6 +224,11 @@ func (ctx *ActionContext) ExecuteAction(action Action) error {
 			// For AddBuffAction, set applied buff type for handler matching
 			if addAction, ok := action.(*AddBuffAction); ok {
 				triggerCtx.Set("applied_buff_type", string(addAction.BuffType))
+			}
+
+			// For AddItemAction, set added item info for PhasePostItemAdded handler matching
+			if _, ok := action.(*AddItemAction); ok {
+				triggerCtx.Set("item_id", ctx.GetStringOrDefault("added_item_id", ""))
 			}
 
 			// Publish for buff entry effects, death effects, chain reactions
