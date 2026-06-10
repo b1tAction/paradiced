@@ -12,20 +12,23 @@ func TestLoadDefault(t *testing.T) {
 		t.Fatalf("LoadDefault failed: %v", err)
 	}
 
-	if config.Length != 20 {
-		t.Errorf("config.Length = %d, want 20", config.Length)
+	const expectedLength = 40
+	const expectedEndIndex = expectedLength - 1
+
+	if config.Length != expectedLength {
+		t.Errorf("config.Length = %d, want %d", config.Length, expectedLength)
 	}
 
 	if config.StartIndex != 0 {
 		t.Errorf("config.StartIndex = %d, want 0", config.StartIndex)
 	}
 
-	if config.EndIndex != 19 {
-		t.Errorf("config.EndIndex = %d, want 19", config.EndIndex)
+	if config.EndIndex != expectedEndIndex {
+		t.Errorf("config.EndIndex = %d, want %d", config.EndIndex, expectedEndIndex)
 	}
 
-	if len(config.Cells) != 20 {
-		t.Errorf("len(config.Cells) = %d, want 20", len(config.Cells))
+	if len(config.Cells) != expectedLength {
+		t.Errorf("len(config.Cells) = %d, want %d", len(config.Cells), expectedLength)
 	}
 }
 
@@ -37,16 +40,19 @@ func TestMapConfigBuildMapEngine(t *testing.T) {
 
 	engine := BuildMapEngineFromConfig(config)
 
-	if engine.Length != 20 {
-		t.Errorf("engine.Length = %d, want 20", engine.Length)
+	const expectedLength = 40
+	const expectedEndIndex = expectedLength - 1
+
+	if engine.Length != expectedLength {
+		t.Errorf("engine.Length = %d, want %d", engine.Length, expectedLength)
 	}
 
 	if engine.StartIndex != 0 {
 		t.Errorf("engine.StartIndex = %d, want 0", engine.StartIndex)
 	}
 
-	if engine.EndIndex != 19 {
-		t.Errorf("engine.EndIndex = %d, want 19", engine.EndIndex)
+	if engine.EndIndex != expectedEndIndex {
+		t.Errorf("engine.EndIndex = %d, want %d", engine.EndIndex, expectedEndIndex)
 	}
 
 	// Verify cell at index 0 (Checkpoint with Item draw)
@@ -97,13 +103,13 @@ func TestMapConfigBuildMapEngine(t *testing.T) {
 		t.Errorf("cell[7].EventID = %q, want \"herb\"", cell7.EventID)
 	}
 
-	// Verify cell at index 19 (Boss, no draw)
-	cell19 := engine.Cells[19]
-	if cell19.CellType != constants.CellTypeBoss {
-		t.Errorf("cell[19].CellType = %v, want %v", cell19.CellType, constants.CellTypeBoss)
+	// Verify final cell (Boss, no draw)
+	cellEnd := engine.Cells[expectedEndIndex]
+	if cellEnd.CellType != constants.CellTypeBoss {
+		t.Errorf("cell[%d].CellType = %v, want %v", expectedEndIndex, cellEnd.CellType, constants.CellTypeBoss)
 	}
-	if cell19.DrawType != constants.DrawTypeNone {
-		t.Errorf("cell[19].DrawType = %v, want %v", cell19.DrawType, constants.DrawTypeNone)
+	if cellEnd.DrawType != constants.DrawTypeNone {
+		t.Errorf("cell[%d].DrawType = %v, want %v", expectedEndIndex, cellEnd.DrawType, constants.DrawTypeNone)
 	}
 }
 
