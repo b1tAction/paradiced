@@ -210,7 +210,7 @@ func TestLoadDefinitionsFromYAML(t *testing.T) {
 	expectedItems := []constants.ItemType{
 		constants.ItemTypeReverseClock, constants.ItemTypeAnyDoor, constants.ItemTypeDiceUpgrade,
 		constants.ItemTypeMagicFlute, constants.ItemTypeCupidArrow, constants.ItemTypeCrimsonBlade,
-		constants.ItemTypeWisdomRing, constants.ItemTypeMeditationRing, constants.ItemTypeDisciplineRing,
+		constants.ItemTypeWishBead, constants.ItemTypeRainwaterVessel, constants.ItemTypeVajraSeal,
 		constants.ItemTypeFoolishRing, constants.ItemTypeGreedyRing, constants.ItemTypeWrathRing,
 		constants.ItemTypeNamedBlade, constants.ItemTypeSageProtection,
 	}

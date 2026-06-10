@@ -225,28 +225,28 @@ func registerAllItems() {
 		Handler:     handleCrimsonBlade,
 	})
 
-	// WisdomRing: Give Divine buff to self
-	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeWisdomRing], &ItemHandlerConfig{
+	// WishBead: Give Divine buff to self
+	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeWishBead], &ItemHandlerConfig{
 		Phases:      []constants.Phase{constants.PhaseItemUsed},
 		Priority:    50,
 		NeedConfirm: false,
-		Handler:     createGiveBuffHandler(constants.BuffTypeDivine, constants.SourceItemWisdomRingBuff),
+		Handler:     createGiveBuffHandler(constants.BuffTypeDivine, constants.SourceItemWishBeadBuff),
 	})
 
-	// MeditationRing: Give Rain buff to self
-	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeMeditationRing], &ItemHandlerConfig{
+	// RainwaterVessel: Give Rain buff to self
+	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeRainwaterVessel], &ItemHandlerConfig{
 		Phases:      []constants.Phase{constants.PhaseItemUsed},
 		Priority:    50,
 		NeedConfirm: false,
-		Handler:     createGiveBuffHandler(constants.BuffTypeRain, constants.SourceItemMeditationRingBuff),
+		Handler:     createGiveBuffHandler(constants.BuffTypeRain, constants.SourceItemRainwaterVesselBuff),
 	})
 
-	// DisciplineRing: Give Golden Body buff to self
-	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeDisciplineRing], &ItemHandlerConfig{
+	// VajraSeal: Give Golden Body buff to self
+	GlobalItemRegistry.RegisterItem(defs.Items[constants.ItemTypeVajraSeal], &ItemHandlerConfig{
 		Phases:      []constants.Phase{constants.PhaseItemUsed},
 		Priority:    50,
 		NeedConfirm: false,
-		Handler:     createGiveBuffHandler(constants.BuffTypeGoldenBody, constants.SourceItemDisciplineRingBuff),
+		Handler:     createGiveBuffHandler(constants.BuffTypeGoldenBody, constants.SourceItemVajraSealBuff),
 	})
 
 	// FoolishRing: HP+1, LP-1

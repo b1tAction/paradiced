@@ -257,24 +257,24 @@ items:
     desc: 损失一半血量，对目标造成等量伤害
     triggerable: true
     targetable: true
-  wisdom_ring:
+  wish_bead:
     evaluation: good
-    english_name: WisdomRing
-    name: 智慧玄戒
+    english_name: WishBead
+    name: 摩愿佛珠
     desc: 获得神眷Buff
     triggerable: true
     targetable: false
-  meditation_ring:
+  rainwater_vessel:
     evaluation: good
-    english_name: MeditationRing
-    name: 禅定玄戒
+    english_name: RainwaterVessel
+    name: 萍雨水盂
     desc: 获得甘霖Buff
     triggerable: true
     targetable: false
-  discipline_ring:
+  vajra_seal:
     evaluation: good
-    english_name: DisciplineRing
-    name: 持戒玄戒
+    english_name: VajraSeal
+    name: 金刚法印
     desc: 获得金身Buff
     triggerable: true
     targetable: false
