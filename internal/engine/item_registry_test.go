@@ -570,12 +570,12 @@ func TestCrimsonBladeZeroDamage(t *testing.T) {
 	}
 }
 
-func TestWisdomRingHandlerBehavior(t *testing.T) {
+func TestWishBeadHandlerBehavior(t *testing.T) {
 	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	game.AddPlayer(player)
 
-	handler := GetItemHandlerConfig(constants.ItemTypeWisdomRing).Handler
+	handler := GetItemHandlerConfig(constants.ItemTypeWishBead).Handler
 	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
 	ctx.Set("action_context", actionCtx)
@@ -593,17 +593,17 @@ func TestWisdomRingHandlerBehavior(t *testing.T) {
 	if addBuff.BuffType != constants.BuffTypeDivine {
 		t.Errorf("buff type = %s, expected divine", addBuff.BuffType)
 	}
-	if addBuff.Source() != string(constants.SourceItemWisdomRingBuff) {
-		t.Errorf("source = %s, expected %s", addBuff.Source(), string(constants.SourceItemWisdomRingBuff))
+	if addBuff.Source() != string(constants.SourceItemWishBeadBuff) {
+		t.Errorf("source = %s, expected %s", addBuff.Source(), string(constants.SourceItemWishBeadBuff))
 	}
 }
 
-func TestMeditationRingHandlerBehavior(t *testing.T) {
+func TestRainwaterVesselHandlerBehavior(t *testing.T) {
 	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	game.AddPlayer(player)
 
-	handler := GetItemHandlerConfig(constants.ItemTypeMeditationRing).Handler
+	handler := GetItemHandlerConfig(constants.ItemTypeRainwaterVessel).Handler
 	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
 	ctx.Set("action_context", actionCtx)
@@ -623,12 +623,12 @@ func TestMeditationRingHandlerBehavior(t *testing.T) {
 	}
 }
 
-func TestDisciplineRingHandlerBehavior(t *testing.T) {
+func TestVajraSealHandlerBehavior(t *testing.T) {
 	game := NewGame(id.NewGameID(), 0)
 	player := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
 	game.AddPlayer(player)
 
-	handler := GetItemHandlerConfig(constants.ItemTypeDisciplineRing).Handler
+	handler := GetItemHandlerConfig(constants.ItemTypeVajraSeal).Handler
 	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
 	ctx := event.NewContext(player)
 	ctx.Set("action_context", actionCtx)

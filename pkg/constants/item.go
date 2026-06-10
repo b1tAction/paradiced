@@ -15,9 +15,9 @@ const (
 	ItemTypeMagicFlute    ItemType = "magic_flute"    // 魔笛: give Sinking buff to self and target
 	ItemTypeCupidArrow    ItemType = "cupid_arrow"    // 丘比特之箭: give Eternal buff to self and target
 	ItemTypeCrimsonBlade  ItemType = "crimson_blade"  // 猩红之刃: sacrifice half HP, deal damage to target
-	ItemTypeWisdomRing    ItemType = "wisdom_ring"    // 智慧玄戒: give Divine buff
-	ItemTypeMeditationRing ItemType = "meditation_ring" // 禅定玄戒: give Rain buff
-	ItemTypeDisciplineRing ItemType = "discipline_ring" // 持戒玄戒: give Golden Body buff
+	ItemTypeWishBead    ItemType = "wish_bead"    // 摩愿佛珠: give Divine buff
+	ItemTypeRainwaterVessel ItemType = "rainwater_vessel" // 萍雨水盂: give Rain buff
+	ItemTypeVajraSeal ItemType = "vajra_seal" // 金刚法印: give Golden Body buff
 	ItemTypeFoolishRing   ItemType = "foolish_ring"   // 痴愚煞戒: HP+1, LP-1
 	ItemTypeGreedyRing    ItemType = "greedy_ring"    // 贪婪煞戒: LP+1, HP-1
 	ItemTypeWrathRing     ItemType = "wrath_ring"     // 嗔恨煞戒: HP-1, gain Wrath buff
@@ -30,7 +30,7 @@ func (it ItemType) IsValid() bool {
 	switch it {
 	case ItemTypeReverseClock, ItemTypeAnyDoor, ItemTypeDiceUpgrade,
 		ItemTypeMagicFlute, ItemTypeCupidArrow, ItemTypeCrimsonBlade,
-		ItemTypeWisdomRing, ItemTypeMeditationRing, ItemTypeDisciplineRing,
+		ItemTypeWishBead, ItemTypeRainwaterVessel, ItemTypeVajraSeal,
 		ItemTypeFoolishRing, ItemTypeGreedyRing, ItemTypeWrathRing,
 		ItemTypeNamedBlade, ItemTypeSageProtection:
 		return true
@@ -55,12 +55,12 @@ func ParseItemType(s string) ItemType {
 		return ItemTypeCupidArrow
 	case "crimson_blade":
 		return ItemTypeCrimsonBlade
-	case "wisdom_ring":
-		return ItemTypeWisdomRing
-	case "meditation_ring":
-		return ItemTypeMeditationRing
-	case "discipline_ring":
-		return ItemTypeDisciplineRing
+	case "wish_bead":
+		return ItemTypeWishBead
+	case "rainwater_vessel":
+		return ItemTypeRainwaterVessel
+	case "vajra_seal":
+		return ItemTypeVajraSeal
 	case "foolish_ring":
 		return ItemTypeFoolishRing
 	case "greedy_ring":
