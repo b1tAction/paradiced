@@ -213,7 +213,7 @@ export class DilemmaRaceRoom extends Room<GameState> {
     this.clearRoundTimer();
     this.state.round++;
     this.state.phase = 'choosing';
-    this.state.roundTimer = config.roundDuration / 1000;
+    this.state.roundTimer = Math.max(1, Math.ceil(config.roundDuration / 1000));
 
     // Reset choices for all players
     for (const [, player] of this.state.players) {
@@ -223,10 +223,14 @@ export class DilemmaRaceRoom extends Room<GameState> {
       }
     }
 
-    // Countdown timer
-    this.roundTimerRef = this.clock.setTimeout(() => {
-      this.resolveRound();
-    }, config.roundDuration);
+    // Keep the synchronized timer moving so clients do not appear frozen
+    // after a choice is submitted.
+    this.roundTimerRef = this.clock.setInterval(() => {
+      this.state.roundTimer = Math.max(0, this.state.roundTimer - 1);
+      if (this.state.roundTimer === 0) {
+        this.resolveRound();
+      }
+    }, 1_000);
   }
 
   // Resolve the current round
