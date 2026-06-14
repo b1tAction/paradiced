@@ -191,26 +191,26 @@ buffs:
     name: 金身
     desc: 接下来2回合受到的伤害减半
     duration: 2
-  wrath:
-    evaluation: mild_good
-    english_name: Wrath
-    name: 嗔怒
-    desc: 接下来2回合造成的伤害+1
-    duration: 2
-  savior:
-    evaluation: neutral
-    english_name: Savior
-    name: 庇护
-    desc: 抵挡一次致命伤害
-    duration: -1
-    hidden: true
-  sage_protection:
-    evaluation: neutral
-    english_name: SageProtection
-    name: 贤者的庇护
-    desc: 原地复活，不回到检查点
-    duration: -1
-    hidden: true
+  #wrath:
+  #  evaluation: mild_good
+  #  english_name: Wrath
+  #  name: 嗔怒
+  #  desc: 接下来2回合造成的伤害+1
+  #  duration: 2
+  #savior:
+  #  evaluation: neutral
+  #  english_name: Savior
+  #  name: 庇护
+  #  desc: 抵挡一次致命伤害
+  #  duration: -1
+  #  hidden: true
+  #sage_protection:
+  #  evaluation: neutral
+  #  english_name: SageProtection
+  #  name: 贤者的庇护
+  #  desc: 原地复活，不回到检查点
+  #  duration: -1
+  #  hidden: true
 
 # ========== Item Definitions ==========
 
@@ -278,41 +278,41 @@ items:
     desc: 获得金身Buff
     triggerable: true
     targetable: false
-  foolish_ring:
-    evaluation: mixed
-    english_name: FoolishRing
-    name: 痴愚煞戒
-    desc: HP+1，LP-1
-    triggerable: true
-    targetable: false
-  greedy_ring:
-    evaluation: mixed
-    english_name: GreedyRing
-    name: 贪婪煞戒
-    desc: LP+1，HP-1
-    triggerable: true
-    targetable: false
-  wrath_ring:
-    evaluation: mild_bad
-    english_name: WrathRing
-    name: 嗔恨煞戒
-    desc: HP-1，获得嗔怒Buff
-    triggerable: true
-    targetable: false
-  named_blade:
-    evaluation: very_good
-    english_name: NamedBlade
-    name: 名刀司命
-    desc: 抵挡一次致命伤害
-    triggerable: false
-    targetable: false
-  sage_protection:
-    evaluation: good
-    english_name: SageProtection
-    name: 贤者的庇护
-    desc: 原地复活
-    triggerable: false
-    targetable: false
+  #foolish_ring:
+  #  evaluation: mixed
+  #  english_name: FoolishRing
+  #  name: 痴愚煞戒
+  #  desc: HP+1，LP-1
+  #  triggerable: true
+  #  targetable: false
+  #greedy_ring:
+  #  evaluation: mixed
+  #  english_name: GreedyRing
+  #  name: 贪婪煞戒
+  #  desc: LP+1，HP-1
+  #  triggerable: true
+  #  targetable: false
+  #wrath_ring:
+  #  evaluation: mild_bad
+  #  english_name: WrathRing
+  #  name: 嗔恨煞戒
+  #  desc: HP-1，获得嗔怒Buff
+  #  triggerable: true
+  #  targetable: false
+  #named_blade:
+  #  evaluation: very_good
+  #  english_name: NamedBlade
+  #  name: 名刀司命
+  #  desc: 抵挡一次致命伤害
+  #  triggerable: false
+  #  targetable: false
+  #sage_protection:
+  #  evaluation: good
+  #  english_name: SageProtection
+  #  name: 贤者的庇护
+  #  desc: 原地复活
+  #  triggerable: false
+  #  targetable: false
 
 # ========== Faction Definitions ==========
 
