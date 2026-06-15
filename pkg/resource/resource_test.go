@@ -194,8 +194,7 @@ func TestLoadDefinitionsFromYAML(t *testing.T) {
 		constants.BuffTypeFire, constants.BuffTypeDeathMark,
 		constants.BuffTypeDominance, constants.BuffTypeRobLuck, constants.BuffTypeSuppress,
 		constants.BuffTypeSinking, constants.BuffTypeEternal, constants.BuffTypeFearless,
-		constants.BuffTypeGoldenBody, constants.BuffTypeWrath,
-		constants.BuffTypeSavior, constants.BuffTypeSageProtection,
+		constants.BuffTypeGoldenBody,
 	}
 	if len(defs.Buffs) != len(expectedBuffs) {
 		t.Errorf("len(defs.Buffs) = %d, want %d", len(defs.Buffs), len(expectedBuffs))
@@ -211,8 +210,6 @@ func TestLoadDefinitionsFromYAML(t *testing.T) {
 		constants.ItemTypeReverseClock, constants.ItemTypeAnyDoor, constants.ItemTypeDiceUpgrade,
 		constants.ItemTypeMagicFlute, constants.ItemTypeCupidArrow, constants.ItemTypeCrimsonBlade,
 		constants.ItemTypeWishBead, constants.ItemTypeRainwaterVessel, constants.ItemTypeVajraSeal,
-		constants.ItemTypeFoolishRing, constants.ItemTypeGreedyRing, constants.ItemTypeWrathRing,
-		constants.ItemTypeNamedBlade, constants.ItemTypeSageProtection,
 	}
 	if len(defs.Items) != len(expectedItems) {
 		t.Errorf("len(defs.Items) = %d, want %d", len(defs.Items), len(expectedItems))

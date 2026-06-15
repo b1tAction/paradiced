@@ -427,7 +427,7 @@ func TestBuildAvailableWithPassiveItem(t *testing.T) {
 	builder, game, hsmInstance := newTestBuilder()
 
 	player := newTestPlayer(constants.FactionQingLong)
-	// Passive item (triggerable=false) still appears in Available but with Triggerable=false
+	// Items without definitions (e.g., passive items not yet in YAML) are filtered out
 	item := core.NewItem(constants.ItemTypeNamedBlade)
 	player.AddItem(item)
 	game.AddPlayer(player)
@@ -436,11 +436,9 @@ func TestBuildAvailableWithPassiveItem(t *testing.T) {
 	builder.SetDiceTypeFromRng(rng.DiceTypeGold)
 	available := builder.BuildAvailable()
 
-	if len(available.Items) != 1 {
-		t.Errorf("BuildAvailable with passive item: len(Items) = %d, want 1", len(available.Items))
-	}
-	if available.Items[0].Triggerable != false {
-		t.Errorf("passive item Triggerable = %v, want false", available.Items[0].Triggerable)
+	// NamedBlade has no YAML definition yet, so it is filtered out
+	if len(available.Items) != 0 {
+		t.Errorf("BuildAvailable with undefined item: len(Items) = %d, want 0", len(available.Items))
 	}
 }
 
@@ -833,13 +831,13 @@ func TestBuildDefinitionsConfigCompleteness(t *testing.T) {
 	if len(defs.Events) != 14 {
 		t.Errorf("len(defs.Events) = %d, want 14", len(defs.Events))
 	}
-	// Verify all 21 buffs present
-	if len(defs.Buffs) != 21 {
-		t.Errorf("len(defs.Buffs) = %d, want 21", len(defs.Buffs))
+	// Verify all 18 buffs present
+	if len(defs.Buffs) != 18 {
+		t.Errorf("len(defs.Buffs) = %d, want 18", len(defs.Buffs))
 	}
-	// Verify all 14 items present
-	if len(defs.Items) != 14 {
-		t.Errorf("len(defs.Items) = %d, want 14", len(defs.Items))
+	// Verify all 9 items present
+	if len(defs.Items) != 9 {
+		t.Errorf("len(defs.Items) = %d, want 9", len(defs.Items))
 	}
 
 	// Verify all entries have required fields populated
