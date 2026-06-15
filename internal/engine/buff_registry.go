@@ -978,6 +978,18 @@ func resolveLinkedPlayer(actionCtx *engineaction.ActionContext, linkedPlayerUUID
 	return nil
 }
 
+const (
+	actionMarkerSinkingShared = "buff_sinking_shared"
+	actionMarkerEternalShared = "buff_eternal_shared"
+)
+
+func addMarkedDerivedAction(ctx *event.Context, actionCtx *engineaction.ActionContext, action engineaction.Action, marker string) {
+	if actionCtx != nil {
+		actionCtx.MarkAction(action, marker)
+	}
+	ctx.AddDerivedAction(action)
+}
+
 // handleSinkingShare shares negative actions/buffs with linked player.
 // PhasePreAction: share DamageAction and negative ModifyLPAction targeting Sinking holder with linked player.
 // PhasePreBuffApplied: share negative buffs (excluding Boss and Hidden) targeting Sinking holder with linked player.
@@ -987,10 +999,14 @@ func handleSinkingShare(phase constants.Phase, ctx *event.Context) error {
 	}
 
 	// Skip if this action was already shared by Sinking (prevents infinite loops)
+	var currentAction engineaction.Action
 	if raw, ok := ctx.Get("current_action"); ok {
 		action, ok := raw.(engineaction.Action)
 		if ok && action != nil && action.Source() == string(constants.SourceBuffSinking) {
 			return nil
+		}
+		if ok {
+			currentAction = action
 		}
 	}
 
@@ -1007,6 +1023,9 @@ func handleSinkingShare(phase constants.Phase, ctx *event.Context) error {
 	actionCtx, err := getActionCtxFromEventCtx(ctx)
 	if err != nil {
 		return err
+	}
+	if currentAction != nil && actionCtx.ActionHasMarker(currentAction, actionMarkerSinkingShared) {
+		return nil
 	}
 	linkedPlayer := resolveLinkedPlayer(actionCtx, linkedPlayerUUID)
 	if linkedPlayer == nil {
@@ -1030,14 +1049,16 @@ func handleSinkingShare(phase constants.Phase, ctx *event.Context) error {
 		case *engineaction.DamageAction:
 			// Share damage with linked player if targeting Sinking holder
 			if a.TargetPlayer() == ctx.Player {
-				ctx.AddDerivedAction(engineaction.NewDamageAction(linkedPlayer, a.Amount, source))
+				action := engineaction.NewDamageAction(linkedPlayer, a.Amount, source)
+				addMarkedDerivedAction(ctx, actionCtx, action, actionMarkerSinkingShared)
 				logHandlerResult("Sinking", ctx, "shared_damage", "amount", a.Amount, "linked_player", linkedPlayer.ID.UUID())
 			}
 
 		case *engineaction.ModifyLPAction:
 			// Share negative LP modification with linked player if targeting Sinking holder
 			if a.Amount < 0 && a.TargetPlayer() == ctx.Player {
-				ctx.AddDerivedAction(engineaction.NewModifyLPAction(linkedPlayer, a.Amount, source))
+				action := engineaction.NewModifyLPAction(linkedPlayer, a.Amount, source)
+				addMarkedDerivedAction(ctx, actionCtx, action, actionMarkerSinkingShared)
 				logHandlerResult("Sinking", ctx, "shared_negative_modify_lp", "amount", a.Amount, "linked_player", linkedPlayer.ID.UUID())
 			}
 		}
@@ -1047,7 +1068,8 @@ func handleSinkingShare(phase constants.Phase, ctx *event.Context) error {
 			buffType := constants.BuffType(raw.(string))
 			// Share negative buffs (excluding Boss and Hidden)
 			if buffType.IsNegative() && !buffType.IsBoss() && !buffType.IsHidden() {
-				ctx.AddDerivedAction(engineaction.NewAddBuffAction(linkedPlayer, buffType, source))
+				action := engineaction.NewAddBuffAction(linkedPlayer, buffType, source)
+				addMarkedDerivedAction(ctx, actionCtx, action, actionMarkerSinkingShared)
 				logHandlerResult("Sinking", ctx, "shared_buff", "buff_type", buffType, "linked_player", linkedPlayer.ID.UUID())
 			}
 		}
@@ -1065,10 +1087,14 @@ func handleEternalShare(phase constants.Phase, ctx *event.Context) error {
 	}
 
 	// Skip if this action was already shared by Eternal (prevents infinite loops)
+	var currentAction engineaction.Action
 	if raw, ok := ctx.Get("current_action"); ok {
 		action, ok := raw.(engineaction.Action)
 		if ok && action != nil && action.Source() == string(constants.SourceBuffEternal) {
 			return nil
+		}
+		if ok {
+			currentAction = action
 		}
 	}
 
@@ -1085,6 +1111,9 @@ func handleEternalShare(phase constants.Phase, ctx *event.Context) error {
 	actionCtx, err := getActionCtxFromEventCtx(ctx)
 	if err != nil {
 		return err
+	}
+	if currentAction != nil && actionCtx.ActionHasMarker(currentAction, actionMarkerEternalShared) {
+		return nil
 	}
 	linkedPlayer := resolveLinkedPlayer(actionCtx, linkedPlayerUUID)
 	if linkedPlayer == nil {
@@ -1108,19 +1137,22 @@ func handleEternalShare(phase constants.Phase, ctx *event.Context) error {
 		case *engineaction.HealAction:
 			// Share healing with linked player if targeting Eternal holder
 			if a.Amount > 0 && a.TargetPlayer() == ctx.Player {
-				ctx.AddDerivedAction(engineaction.NewHealAction(linkedPlayer, a.Amount, source))
+				action := engineaction.NewHealAction(linkedPlayer, a.Amount, source)
+				addMarkedDerivedAction(ctx, actionCtx, action, actionMarkerEternalShared)
 				logHandlerResult("Eternal", ctx, "shared_heal", "amount", a.Amount, "linked_player", linkedPlayer.ID.UUID())
 			}
 
 		case *engineaction.ModifyLPAction:
 			if a.Amount > 0 && a.TargetPlayer() == ctx.Player {
-				ctx.AddDerivedAction(engineaction.NewModifyLPAction(linkedPlayer, a.Amount, source))
+				action := engineaction.NewModifyLPAction(linkedPlayer, a.Amount, source)
+				addMarkedDerivedAction(ctx, actionCtx, action, actionMarkerEternalShared)
 				logHandlerResult("Eternal", ctx, "shared_positive_modify_lp", "amount", a.Amount, "linked_player", linkedPlayer.ID.UUID())
 			}
 
 		case *engineaction.AddItemAction:
 			if a.TargetPlayer() == ctx.Player {
-				ctx.AddDerivedAction(engineaction.NewAddItemAction(linkedPlayer, a.ItemType, source))
+				action := engineaction.NewAddItemAction(linkedPlayer, a.ItemType, source)
+				addMarkedDerivedAction(ctx, actionCtx, action, actionMarkerEternalShared)
 				logHandlerResult("Eternal", ctx, "shared_add_item", "item_type", a.ItemType, "linked_player", linkedPlayer.ID.UUID())
 			}
 		}
@@ -1130,7 +1162,8 @@ func handleEternalShare(phase constants.Phase, ctx *event.Context) error {
 			buffType := constants.BuffType(raw.(string))
 			// Share positive buffs (excluding Boss, Hidden, Faction)
 			if buffType.IsPositive() && !buffType.IsBoss() && !buffType.IsHidden() && !buffType.IsFaction() {
-				ctx.AddDerivedAction(engineaction.NewAddBuffAction(linkedPlayer, buffType, source))
+				action := engineaction.NewAddBuffAction(linkedPlayer, buffType, source)
+				addMarkedDerivedAction(ctx, actionCtx, action, actionMarkerEternalShared)
 				logHandlerResult("Eternal", ctx, "shared_buff", "buff_type", buffType, "linked_player", linkedPlayer.ID.UUID())
 			}
 		}

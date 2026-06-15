@@ -57,17 +57,17 @@ func TestBuffHandlerConfigPhases(t *testing.T) {
 		{constants.BuffTypePoison, constants.PhaseBeforeTurn, true, 30, false},
 		{constants.BuffTypeDeathMark, constants.PhasePreAction, true, 999, false},
 		{constants.BuffTypeThorns, constants.PhasePreDamage, true, 50, false},
-			// New buff handler configs
-			{constants.BuffTypeSinking, constants.PhasePreAction, true, 60, false},
-			{constants.BuffTypeSinking, constants.PhasePreBuffApplied, true, 60, false},
-			{constants.BuffTypeEternal, constants.PhasePreAction, true, 60, false},
-			{constants.BuffTypeEternal, constants.PhasePreBuffApplied, true, 60, false},
-			{constants.BuffTypeFearless, constants.PhasePreAction, true, 200, false},
-			{constants.BuffTypeFearless, constants.PhasePostBuffApplied, true, 200, false},
-			{constants.BuffTypeGoldenBody, constants.PhasePreDamage, true, 70, false},
-			{constants.BuffTypeWrath, constants.PhasePreAction, true, 60, false},
-			{constants.BuffTypeSavior, constants.PhasePreDamage, true, 999, false},
-			{constants.BuffTypeSageProtection, constants.PhasePreRespawn, true, 50, false},
+		// New buff handler configs
+		{constants.BuffTypeSinking, constants.PhasePreAction, true, 60, false},
+		{constants.BuffTypeSinking, constants.PhasePreBuffApplied, true, 60, false},
+		{constants.BuffTypeEternal, constants.PhasePreAction, true, 60, false},
+		{constants.BuffTypeEternal, constants.PhasePreBuffApplied, true, 60, false},
+		{constants.BuffTypeFearless, constants.PhasePreAction, true, 200, false},
+		{constants.BuffTypeFearless, constants.PhasePostBuffApplied, true, 200, false},
+		{constants.BuffTypeGoldenBody, constants.PhasePreDamage, true, 70, false},
+		{constants.BuffTypeWrath, constants.PhasePreAction, true, 60, false},
+		{constants.BuffTypeSavior, constants.PhasePreDamage, true, 999, false},
+		{constants.BuffTypeSageProtection, constants.PhasePreRespawn, true, 50, false},
 	}
 
 	for _, tt := range tests {
@@ -871,7 +871,7 @@ func TestThornsReflectDamageCalculation(t *testing.T) {
 	// Test reflect damage rounding: 30% with math.Round
 	// Thorns buff is on BossPlayer, ctx.Player = BossPlayer
 	tests := []struct {
-		damage        int
+		damage          int
 		expectedReflect int
 	}{
 		{1, 0},  // 1*0.3=0.3 → rounded=0 → no reflect
@@ -1037,9 +1037,9 @@ func TestHiddenImmuneIsBossBypass(t *testing.T) {
 		shouldBlock bool
 	}{
 		{constants.BuffTypeThorns, false},    // IsBoss → bypass Hidden
-		{constants.BuffTypeDeathMark, false},  // IsBoss → bypass Hidden
-		{constants.BuffTypeCurse, true},       // Negative → blocked by Hidden
-		{constants.BuffTypeDivine, false},     // Positive → bypass Hidden
+		{constants.BuffTypeDeathMark, false}, // IsBoss → bypass Hidden
+		{constants.BuffTypeCurse, true},      // Negative → blocked by Hidden
+		{constants.BuffTypeDivine, false},    // Positive → bypass Hidden
 	}
 
 	handler := GetBuffHandlerConfig(constants.BuffTypeHidden).Handler
@@ -1439,6 +1439,7 @@ func TestDominanceAmplifyBossDamageViaExecuteAction(t *testing.T) {
 		t.Errorf("Boss damage = %d, expected 10 (5 original + 5 Dominance amplified)", damageDealt)
 	}
 }
+
 // ========== Sinking Buff Handler Tests ==========
 
 func TestSinkingShareDamageAction(t *testing.T) {
@@ -1889,6 +1890,77 @@ func TestEternalNotShareNegativeActions(t *testing.T) {
 	}
 }
 
+func TestEternalRobLuckRedirectDoesNotLoopModifyLP(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	playerA := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), InitLP: 1, MaxLP: 100})
+	playerB := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID(), InitLP: 1, MaxLP: 100})
+	game.AddPlayer(playerA)
+	game.AddPlayer(playerB)
+
+	eternalA := core.NewBuff(constants.BuffTypeEternal, 2)
+	eternalA.Metadata.SetString("eternal_linked_player", playerB.ID.UUID())
+	game.ApplyBuffToPlayer(playerA, eternalA)
+
+	eternalB := core.NewBuff(constants.BuffTypeEternal, 2)
+	eternalB.Metadata.SetString("eternal_linked_player", playerA.ID.UUID())
+	game.ApplyBuffToPlayer(playerB, eternalB)
+
+	robLuckB := core.NewBuff(constants.BuffTypeRobLuck, 1)
+	robLuckB.Metadata.SetString("rob_luck_source_player", playerA.ID.UUID())
+	game.ApplyBuffToPlayer(playerB, robLuckB)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+
+	err := actionCtx.ExecuteAction(engineaction.NewModifyLPAction(playerA, 1, "test"))
+	if err != nil {
+		t.Fatalf("Eternal and RobLuck should not recursively exceed action queue depth: %v", err)
+	}
+	if playerA.LP != 3 {
+		t.Errorf("playerA LP = %d, expected 3 (original + redirected share)", playerA.LP)
+	}
+	if playerB.LP != 1 {
+		t.Errorf("playerB LP = %d, expected 1 (RobLuck redirects Eternal share)", playerB.LP)
+	}
+}
+
+func TestEternalRobLuckRedirectDoesNotLoopAddItem(t *testing.T) {
+	game := NewGame(id.NewGameID(), 0)
+	playerA := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	playerB := core.NewPlayer(core.PlayerConfig{ID: id.NewPlayerID()})
+	game.AddPlayer(playerA)
+	game.AddPlayer(playerB)
+
+	eternalA := core.NewBuff(constants.BuffTypeEternal, 2)
+	eternalA.Metadata.SetString("eternal_linked_player", playerB.ID.UUID())
+	game.ApplyBuffToPlayer(playerA, eternalA)
+
+	eternalB := core.NewBuff(constants.BuffTypeEternal, 2)
+	eternalB.Metadata.SetString("eternal_linked_player", playerA.ID.UUID())
+	game.ApplyBuffToPlayer(playerB, eternalB)
+
+	robLuckB := core.NewBuff(constants.BuffTypeRobLuck, 1)
+	robLuckB.Metadata.SetString("rob_luck_source_player", playerA.ID.UUID())
+	game.ApplyBuffToPlayer(playerB, robLuckB)
+
+	actionCtx := engineaction.NewActionContext(game, game.Bus, gamemap.NewMapEngine(20), game.Draw)
+	actionCtx.OnAddItem = func(p *core.Player, item *core.Item) {
+		if err := game.ApplyItemToPlayer(p, item); err != nil {
+			t.Fatalf("ApplyItemToPlayer error: %v", err)
+		}
+	}
+
+	err := actionCtx.ExecuteAction(engineaction.NewAddItemAction(playerA, constants.ItemTypeAnyDoor, "test"))
+	if err != nil {
+		t.Fatalf("Eternal and RobLuck should not recursively exceed action queue depth: %v", err)
+	}
+	if len(playerA.Inventory) != 2 {
+		t.Fatalf("playerA inventory len = %d, expected 2 (original + redirected share)", len(playerA.Inventory))
+	}
+	if len(playerB.Inventory) != 0 {
+		t.Fatalf("playerB inventory len = %d, expected 0 (RobLuck redirects Eternal share)", len(playerB.Inventory))
+	}
+}
+
 // ========== Fearless Buff Handler Tests ==========
 
 func TestFearlessBlockDamage(t *testing.T) {
@@ -2047,13 +2119,13 @@ func TestFearlessAllowRemoveBuffAction(t *testing.T) {
 
 func TestGoldenBodyReduceDamage(t *testing.T) {
 	tests := []struct {
-		damage    int
-		expected  int
+		damage   int
+		expected int
 	}{
-		{1, 1},  // floor(1/2)+1 = 0+1 = 1
-		{3, 2},  // floor(3/2)+1 = 1+1 = 2
-		{5, 3},  // floor(5/2)+1 = 2+1 = 3
-		{7, 4},  // floor(7/2)+1 = 3+1 = 4
+		{1, 1}, // floor(1/2)+1 = 0+1 = 1
+		{3, 2}, // floor(3/2)+1 = 1+1 = 2
+		{5, 3}, // floor(5/2)+1 = 2+1 = 3
+		{7, 4}, // floor(7/2)+1 = 3+1 = 4
 	}
 
 	game := NewGame(id.NewGameID(), 0)
@@ -2384,7 +2456,8 @@ func TestSageProtectionRespawnInPlace(t *testing.T) {
 	handler := GetBuffHandlerConfig(constants.BuffTypeSageProtection).Handler
 	handler(constants.PhasePreRespawn, ctx)
 
-	raw, _ := ctx.Get("current_action"); respawnAction := raw.(*engineaction.RespawnAction)
+	raw, _ := ctx.Get("current_action")
+	respawnAction := raw.(*engineaction.RespawnAction)
 	if respawnAction.CheckpointPos != 15 {
 		t.Errorf("CheckpointPos = %d, expected 15 (player's death position)", respawnAction.CheckpointPos)
 	}
@@ -2424,7 +2497,8 @@ func TestSageProtectionWrongPhase(t *testing.T) {
 	handler(constants.PhaseBeforeTurn, ctx)
 
 	// Should not modify RespawnAction on wrong phase
-	raw, _ := ctx.Get("current_action"); respawnAction := raw.(*engineaction.RespawnAction)
+	raw, _ := ctx.Get("current_action")
+	respawnAction := raw.(*engineaction.RespawnAction)
 	if respawnAction.CheckpointPos != 30 {
 		t.Errorf("CheckpointPos should not be modified on wrong phase, got %d", respawnAction.CheckpointPos)
 	}
@@ -3190,13 +3264,13 @@ func TestFearlessDoesNotBlockRemoveBuffAction(t *testing.T) {
 
 func TestGoldenBodyDamageFloorCalculation(t *testing.T) {
 	tests := []struct {
-		original  int
-		expected  int
+		original int
+		expected int
 	}{
-		{1, 1},   // floor(1/2)+1 = 0+1 = 1
-		{2, 2},   // floor(2/2)+1 = 1+1 = 2
-		{3, 2},   // floor(3/2)+1 = 1+1 = 2
-		{10, 6},  // floor(10/2)+1 = 5+1 = 6
+		{1, 1},    // floor(1/2)+1 = 0+1 = 1
+		{2, 2},    // floor(2/2)+1 = 1+1 = 2
+		{3, 2},    // floor(3/2)+1 = 1+1 = 2
+		{10, 6},   // floor(10/2)+1 = 5+1 = 6
 		{100, 51}, // floor(100/2)+1 = 50+1 = 51
 	}
 
