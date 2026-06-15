@@ -19,26 +19,30 @@ import (
 type ActionContext struct {
 	*util.Metadata // Embedded for extensible storage
 
-	Game          protocol.Game         // Game instance (interface to avoid circular dependency with engine)
-	EventBus      *event.EventBus       // EventBus for interception (nil if no interception)
-	MapEngine     *gamemap.MapEngine    // MapEngine for movement calculation (direct type)
-	DrawEngine    *rng.DrawEngine       // DrawEngine for random draws (events, buffs, items)
-	EventPool     []*rng.EvaluatedItem  // Event pool for DrawEventAction (all events)
-	ItemPool      []*rng.EvaluatedItem  // Item pool for DrawItemAction (all items)
-	BuffPool      []*rng.EvaluatedItem  // Buff pool for DrawBuffAction (drawable buffs)
-	ActionQueue   *Queue                // Queue for derived actions
+	Game        protocol.Game        // Game instance (interface to avoid circular dependency with engine)
+	EventBus    *event.EventBus      // EventBus for interception (nil if no interception)
+	MapEngine   *gamemap.MapEngine   // MapEngine for movement calculation (direct type)
+	DrawEngine  *rng.DrawEngine      // DrawEngine for random draws (events, buffs, items)
+	EventPool   []*rng.EvaluatedItem // Event pool for DrawEventAction (all events)
+	ItemPool    []*rng.EvaluatedItem // Item pool for DrawItemAction (all items)
+	BuffPool    []*rng.EvaluatedItem // Buff pool for DrawBuffAction (drawable buffs)
+	ActionQueue *Queue               // Queue for derived actions
 	// Probability weights for cell-based draws
-	ProbGood      float64               // Probability weight for Good pool
-	ProbNeutral   float64               // Probability weight for Neutral pool
-	ProbBad       float64               // Probability weight for Bad pool
+	ProbGood    float64 // Probability weight for Good pool
+	ProbNeutral float64 // Probability weight for Neutral pool
+	ProbBad     float64 // Probability weight for Bad pool
 
 	// processedCount tracks total actions processed in this context's lifecycle.
 	// Shared across all nested ProcessQueue calls to enforce depth limit.
 	processedCount int
 
+	// actionMarkers stores internal chain markers for actions in the current context.
+	// It is intentionally separate from Metadata because markers are runtime-only.
+	actionMarkers map[Action]map[string]bool
+
 	// Buff lifecycle callbacks - injected by HSM layer (engine.Game)
 	// These handle EventBus subscription/unsubscription for Buff add/remove.
-	OnAddBuff    func(player *core.Player, buff *core.Buff)    // Called after AddBuffAction.Execute
+	OnAddBuff    func(player *core.Player, buff *core.Buff)                        // Called after AddBuffAction.Execute
 	OnRemoveBuff func(player *core.Player, buffType constants.BuffType) *core.Buff // Called by RemoveBuffAction.Execute
 
 	// GetBuffDuration returns the default duration for a Buff type from BuffDefinition.
@@ -48,7 +52,7 @@ type ActionContext struct {
 
 	// Item lifecycle callbacks - injected by HSM layer (engine.Game)
 	// These handle EventBus subscription/unsubscription for Item add/remove.
-	OnAddItem    func(player *core.Player, item *core.Item)                     // Called after AddItemAction.Execute
+	OnAddItem    func(player *core.Player, item *core.Item)                        // Called after AddItemAction.Execute
 	OnRemoveItem func(player *core.Player, itemType constants.ItemType) *core.Item // Called by RemoveItemAction.Execute
 
 	// GetItemDefinition returns the ItemDefinition for a given ItemType.
@@ -88,6 +92,67 @@ func (ctx *ActionContext) SetCellDraw(probGood, probNeutral, probBad float64) *A
 // maxQueueProcessingDepth limits the number of actions processed in a single
 // ProcessQueue cycle to prevent infinite loops from recursive derived actions.
 const maxQueueProcessingDepth = 50
+
+func (ctx *ActionContext) ensureActionMarkers() map[Action]map[string]bool {
+	if ctx.actionMarkers == nil {
+		ctx.actionMarkers = make(map[Action]map[string]bool)
+	}
+	return ctx.actionMarkers
+}
+
+// MarkAction attaches an internal chain marker to an action.
+// Markers are not game-state metadata; they only prevent derived action loops.
+func (ctx *ActionContext) MarkAction(action Action, marker string) {
+	if ctx == nil || action == nil || marker == "" {
+		return
+	}
+
+	markers := ctx.ensureActionMarkers()
+	actionMarkers := markers[action]
+	if actionMarkers == nil {
+		actionMarkers = make(map[string]bool)
+		markers[action] = actionMarkers
+	}
+	actionMarkers[marker] = true
+}
+
+// ActionHasMarker reports whether an action carries an internal chain marker.
+func (ctx *ActionContext) ActionHasMarker(action Action, marker string) bool {
+	if ctx == nil || action == nil || marker == "" {
+		return false
+	}
+
+	if ctx.actionMarkers == nil {
+		return false
+	}
+	actionMarkers := ctx.actionMarkers[action]
+	return actionMarkers != nil && actionMarkers[marker]
+}
+
+// CopyActionMarkers preserves internal chain markers when handlers replace an
+// action with a derived action, such as RobLuck redirecting an Eternal share.
+func (ctx *ActionContext) CopyActionMarkers(from, to Action) {
+	if ctx == nil || from == nil || to == nil {
+		return
+	}
+
+	if ctx.actionMarkers == nil {
+		return
+	}
+	fromMarkers := ctx.actionMarkers[from]
+	if len(fromMarkers) == 0 {
+		return
+	}
+
+	toMarkers := ctx.actionMarkers[to]
+	if toMarkers == nil {
+		toMarkers = make(map[string]bool)
+		ctx.actionMarkers[to] = toMarkers
+	}
+	for marker := range fromMarkers {
+		toMarkers[marker] = true
+	}
+}
 
 // ExecuteAction executes an action with interception support.
 // Flow:
@@ -138,6 +203,7 @@ func (ctx *ActionContext) ExecuteAction(action Action) error {
 			// (Dominance adds amplified actions, RobLuck adds redirected actions)
 			for _, derived := range preCtx.GetDerivedActions() {
 				if execAction, ok := derived.(Action); ok {
+					ctx.CopyActionMarkers(action, execAction)
 					ctx.PushDerivedAction(execAction)
 				}
 			}
@@ -188,6 +254,7 @@ func (ctx *ActionContext) ExecuteAction(action Action) error {
 			// Action blocked, but still process any derived actions from the interceptor
 			for _, derived := range triggerCtx.GetDerivedActions() {
 				if execAction, ok := derived.(Action); ok {
+					ctx.CopyActionMarkers(action, execAction)
 					ctx.PushDerivedAction(execAction)
 				}
 			}
@@ -197,6 +264,7 @@ func (ctx *ActionContext) ExecuteAction(action Action) error {
 		// Step 2: Collect derived actions from PreTrigger handler
 		for _, derived := range triggerCtx.GetDerivedActions() {
 			if execAction, ok := derived.(Action); ok {
+				ctx.CopyActionMarkers(action, execAction)
 				ctx.PushDerivedAction(execAction)
 			}
 		}
@@ -242,6 +310,7 @@ func (ctx *ActionContext) ExecuteAction(action Action) error {
 			// Step 5: Collect derived actions from PostTrigger handler
 			for _, derived := range triggerCtx.GetDerivedActions() {
 				if execAction, ok := derived.(Action); ok {
+					ctx.CopyActionMarkers(action, execAction)
 					ctx.PushDerivedAction(execAction)
 				}
 			}
@@ -293,6 +362,7 @@ func (ctx *ActionContext) Clear() {
 	ctx.ActionQueue.Clear()
 	ctx.Metadata.Clear()
 	ctx.processedCount = 0
+	ctx.actionMarkers = nil
 }
 
 // GetGameLog returns the global game log (helper method).
