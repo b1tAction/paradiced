@@ -16,9 +16,9 @@ import (
 
 // MockSocketClient implements SocketClientAdapter for testing.
 type MockSocketClient struct {
-	msgChan    chan *nakama.SocketMessage
-	sendMu     sync.Mutex
-	sentMsgs   []struct {
+	msgChan  chan *nakama.SocketMessage
+	sendMu   sync.Mutex
+	sentMsgs []struct {
 		opCode int64
 		data   any
 	}
@@ -28,7 +28,7 @@ type MockSocketClient struct {
 // NewMockSocketClient creates a new mock socket client.
 func NewMockSocketClient() *MockSocketClient {
 	return &MockSocketClient{
-		msgChan:  make(chan *nakama.SocketMessage, 100),
+		msgChan: make(chan *nakama.SocketMessage, 100),
 		sentMsgs: make([]struct {
 			opCode int64
 			data   any
@@ -343,10 +343,10 @@ func TestHandleStateSyncWithBossPlayer(t *testing.T) {
 				Faction:  "zhu_que",
 			},
 			{
-				PlayerID:    "beeeeeef-beef-beef-beef-beeeeeeeeeef",
-				Faction:     "",
-				HP:          50,
-				IsBoss:      true,
+				PlayerID: "beeeeeef-beef-beef-beef-beeeeeeeeeef",
+				Faction:  "",
+				HP:       50,
+				IsBoss:   true,
 			},
 		},
 	}
@@ -478,8 +478,8 @@ func TestHandleDecisionRequest(t *testing.T) {
 
 	// Simulate DecisionRequest
 	decision := model.Decision{
-		ID:      "dec-001",
-		Prompt:  "选择一个选项",
+		ID:     "dec-001",
+		Prompt: "选择一个选项",
 		Options: []model.Option{
 			{ID: "opt-1", Label: "选项1"},
 			{ID: "opt-2", Label: "选项2"},
@@ -672,7 +672,6 @@ func TestHandleActionRejected(t *testing.T) {
 		t.Errorf("OpCode = %d, expected 100", last.OpCode)
 	}
 }
-
 
 func TestHandleUnknownOpCode(t *testing.T) {
 	mockSocket := NewMockSocketClient()
@@ -917,5 +916,197 @@ func TestHandleFullSyncRoundEndWait(t *testing.T) {
 	}
 	if sent[0].opCode != nakama.OpRoundReady {
 		t.Errorf("OpCode = %d, expected OpRoundReady (%d)", sent[0].opCode, nakama.OpRoundReady)
+	}
+}
+
+func TestHandleFullSyncWaitingForHostAsHostSendsStartGame(t *testing.T) {
+	mockSocket := NewMockSocketClient()
+	logger := nakama.NewLogger(false)
+	player := NewAutoPlayPlayerStandalone(mockSocket, "host-user", logger)
+
+	stateSync := model.StateSync{
+		GlobalState:     "WaitingForHost",
+		CurrentPlayerID: "host-user",
+		Players: []model.Player{
+			{PlayerID: "host-user", Faction: "qing_long"},
+			{PlayerID: "guest-user", Faction: "zhu_que"},
+		},
+	}
+
+	data, _ := json.Marshal(stateSync)
+	player.handleFullSync(context.Background(), data)
+
+	sent := mockSocket.GetSentMessages()
+	if len(sent) != 1 {
+		t.Fatalf("Sent messages count = %d, expected 1", len(sent))
+	}
+	if sent[0].opCode != nakama.OpStartGame {
+		t.Errorf("OpCode = %d, expected OpStartGame (%d)", sent[0].opCode, nakama.OpStartGame)
+	}
+}
+
+func TestHandleFullSyncWaitingForHostInfersHostFromFirstHumanPlayer(t *testing.T) {
+	mockSocket := NewMockSocketClient()
+	logger := nakama.NewLogger(false)
+	player := NewAutoPlayPlayerStandalone(mockSocket, "host-user", logger)
+
+	stateSync := model.StateSync{
+		GlobalState: "WaitingForHost",
+		Players: []model.Player{
+			{PlayerID: "host-user", Faction: "qing_long"},
+			{PlayerID: "guest-user", Faction: "zhu_que"},
+			{PlayerID: "boss-user", IsBoss: true},
+		},
+	}
+
+	data, _ := json.Marshal(stateSync)
+	player.handleFullSync(context.Background(), data)
+
+	sent := mockSocket.GetSentMessages()
+	if len(sent) != 1 {
+		t.Fatalf("Sent messages count = %d, expected 1", len(sent))
+	}
+	if sent[0].opCode != nakama.OpStartGame {
+		t.Errorf("OpCode = %d, expected OpStartGame (%d)", sent[0].opCode, nakama.OpStartGame)
+	}
+}
+
+func TestHandleFullSyncWaitingForHostSingleHumanDoesNotStart(t *testing.T) {
+	mockSocket := NewMockSocketClient()
+	logger := nakama.NewLogger(false)
+	player := NewAutoPlayPlayerStandalone(mockSocket, "host-user", logger)
+
+	stateSync := model.StateSync{
+		GlobalState: "WaitingForHost",
+		Players: []model.Player{
+			{PlayerID: "host-user", Faction: "qing_long"},
+			{PlayerID: "boss-user", IsBoss: true},
+		},
+	}
+
+	data, _ := json.Marshal(stateSync)
+	player.handleFullSync(context.Background(), data)
+
+	if sent := mockSocket.GetSentMessages(); len(sent) != 0 {
+		t.Errorf("Sent messages count = %d, expected 0", len(sent))
+	}
+}
+func TestHandleFullSyncWaitingForHostNonHostDoesNotStart(t *testing.T) {
+	mockSocket := NewMockSocketClient()
+	logger := nakama.NewLogger(false)
+	player := NewAutoPlayPlayerStandalone(mockSocket, "guest-user", logger)
+
+	stateSync := model.StateSync{
+		GlobalState:     "WaitingForHost",
+		CurrentPlayerID: "host-user",
+		Players: []model.Player{
+			{PlayerID: "host-user", Faction: "qing_long"},
+			{PlayerID: "guest-user", Faction: "zhu_que"},
+		},
+	}
+
+	data, _ := json.Marshal(stateSync)
+	player.handleFullSync(context.Background(), data)
+
+	if sent := mockSocket.GetSentMessages(); len(sent) != 0 {
+		t.Errorf("Sent messages count = %d, expected 0", len(sent))
+	}
+}
+
+// ========== Waiting Room Start Tests ==========
+
+func TestHandleWaitingSyncHostCanStartSendsStartGame(t *testing.T) {
+	mockSocket := NewMockSocketClient()
+	logger := nakama.NewLogger(false)
+	player := NewAutoPlayPlayerStandalone(mockSocket, "host-user", logger)
+
+	waiting := model.WaitingSync{
+		MatchID:     "match-001",
+		HostUserID:  "host-user",
+		PlayerCount: 2,
+		MinPlayers:  2,
+		MaxPlayers:  4,
+		CanStart:    true,
+	}
+
+	data, _ := json.Marshal(waiting)
+	player.handleWaitingSync(context.Background(), data)
+
+	sent := mockSocket.GetSentMessages()
+	if len(sent) != 1 {
+		t.Fatalf("Sent messages count = %d, expected 1", len(sent))
+	}
+	if sent[0].opCode != nakama.OpStartGame {
+		t.Errorf("OpCode = %d, expected OpStartGame (%d)", sent[0].opCode, nakama.OpStartGame)
+	}
+	if sent[0].data != nil {
+		t.Errorf("StartGame payload = %#v, expected nil", sent[0].data)
+	}
+}
+
+func TestHandleWaitingSyncNonHostDoesNotStart(t *testing.T) {
+	mockSocket := NewMockSocketClient()
+	logger := nakama.NewLogger(false)
+	player := NewAutoPlayPlayerStandalone(mockSocket, "guest-user", logger)
+
+	waiting := model.WaitingSync{
+		MatchID:     "match-001",
+		HostUserID:  "host-user",
+		PlayerCount: 2,
+		MinPlayers:  2,
+		MaxPlayers:  4,
+		CanStart:    true,
+	}
+
+	data, _ := json.Marshal(waiting)
+	player.handleWaitingSync(context.Background(), data)
+
+	if sent := mockSocket.GetSentMessages(); len(sent) != 0 {
+		t.Errorf("Sent messages count = %d, expected 0", len(sent))
+	}
+}
+
+func TestHandleWaitingSyncCannotStartDoesNotStart(t *testing.T) {
+	mockSocket := NewMockSocketClient()
+	logger := nakama.NewLogger(false)
+	player := NewAutoPlayPlayerStandalone(mockSocket, "host-user", logger)
+
+	waiting := model.WaitingSync{
+		MatchID:     "match-001",
+		HostUserID:  "host-user",
+		PlayerCount: 1,
+		MinPlayers:  2,
+		MaxPlayers:  4,
+		CanStart:    false,
+	}
+
+	data, _ := json.Marshal(waiting)
+	player.handleWaitingSync(context.Background(), data)
+
+	if sent := mockSocket.GetSentMessages(); len(sent) != 0 {
+		t.Errorf("Sent messages count = %d, expected 0", len(sent))
+	}
+}
+
+func TestHandleWaitingSyncSendsStartGameOnce(t *testing.T) {
+	mockSocket := NewMockSocketClient()
+	logger := nakama.NewLogger(false)
+	player := NewAutoPlayPlayerStandalone(mockSocket, "host-user", logger)
+
+	waiting := model.WaitingSync{
+		MatchID:     "match-001",
+		HostUserID:  "host-user",
+		PlayerCount: 2,
+		MinPlayers:  2,
+		MaxPlayers:  4,
+		CanStart:    true,
+	}
+
+	data, _ := json.Marshal(waiting)
+	player.handleWaitingSync(context.Background(), data)
+	player.handleWaitingSync(context.Background(), data)
+
+	if sent := mockSocket.GetSentMessages(); len(sent) != 1 {
+		t.Errorf("Sent messages count = %d, expected 1", len(sent))
 	}
 }

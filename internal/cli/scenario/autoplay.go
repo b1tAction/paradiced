@@ -299,6 +299,7 @@ type AutoPlayPlayer struct {
 	lastErr          error
 	rejections       int
 	lastRejection    *model.ActionRejected
+	startRequested   bool
 }
 
 // NewAutoPlayPlayer creates a new autoplay player.
@@ -383,6 +384,8 @@ func (p *AutoPlayPlayer) handleMessage(ctx context.Context, msg *nakama.SocketMe
 		p.handleGameOver(ctx, msg.Data)
 	case nakama.OpActionRejected:
 		p.handleActionRejected(ctx, msg.Data)
+	case nakama.OpWaitingSync:
+		p.handleWaitingSync(ctx, msg.Data)
 	case nakama.OpStartGameAck:
 		p.logger.Debug("Received StartGameAck (game start acknowledged)")
 	default:
@@ -573,7 +576,7 @@ func (p *AutoPlayPlayer) handleMiniGameStart(ctx context.Context, data []byte) {
 	case "count_seconds":
 		// count_seconds: elapsed close to 5.0, with deviation increasing by player index
 		gameData = map[string]interface{}{
-			"elapsed": 5.0 + float64(playerIndex) * 0.3,
+			"elapsed": 5.0 + float64(playerIndex)*0.3,
 		}
 	case "dice_race":
 		// dice_race: deterministic dice values, lower playerIndex → higher score
@@ -611,6 +614,45 @@ func (p *AutoPlayPlayer) handleMiniGameStart(ctx context.Context, data []byte) {
 	}
 
 	p.logger.Info("Submitted mini-game data", "game_type", submit.GameType, "player_index", playerIndex)
+}
+
+func (p *AutoPlayPlayer) requestStartGame(ctx context.Context, source string) {
+	p.mu.Lock()
+	if p.startRequested {
+		p.mu.Unlock()
+		return
+	}
+	p.startRequested = true
+	p.mu.Unlock()
+
+	p.logger.Info("Auto strategy: start game as host", "source", source)
+	if err := p.socket.SendMessage(ctx, nakama.OpStartGame, nil); err != nil {
+		p.logger.Error("Failed to send StartGame", "error", err)
+		p.mu.Lock()
+		p.lastErr = err
+		p.startRequested = false
+		p.mu.Unlock()
+	}
+}
+
+func (p *AutoPlayPlayer) handleWaitingSync(ctx context.Context, data []byte) {
+	var waiting model.WaitingSync
+	if err := json.Unmarshal(data, &waiting); err != nil {
+		p.logger.Error("Failed to parse WaitingSync", "error", err)
+		return
+	}
+
+	p.logger.Info("Received waiting sync",
+		"match_id", waiting.MatchID,
+		"host_user_id", waiting.HostUserID,
+		"player_count", waiting.PlayerCount,
+		"can_start", waiting.CanStart)
+
+	if !waiting.CanStart || waiting.HostUserID != p.userID {
+		return
+	}
+
+	p.requestStartGame(ctx, "waiting_sync")
 }
 
 func (p *AutoPlayPlayer) handleGameOver(ctx context.Context, data []byte) {
@@ -663,13 +705,37 @@ func (p *AutoPlayPlayer) handleFullSync(ctx context.Context, data []byte) {
 
 	p.mu.Lock()
 	p.globalState = stateSync.GlobalState
+	p.currentPlayerID = stateSync.CurrentPlayerID
+	hostPlayerID := ""
+	humanPlayers := 0
+	for _, player := range stateSync.Players {
+		if player.IsBoss {
+			continue
+		}
+		humanPlayers++
+		if hostPlayerID == "" {
+			hostPlayerID = player.PlayerID
+		}
+		if p.playerID == "" && player.PlayerID == p.userID {
+			p.playerID = player.PlayerID
+		}
+	}
+	myPlayerID := p.playerID
 	p.mu.Unlock()
 
 	p.logger.Info("Received full sync (reconnection)",
 		"global", stateSync.GlobalState,
 		"turn", stateSync.TurnState,
 		"round", stateSync.Round,
-		"players", len(stateSync.Players))
+		"current_player_id", stateSync.CurrentPlayerID,
+		"host_player_id", hostPlayerID,
+		"players", len(stateSync.Players),
+		"my_player_id", myPlayerID)
+
+	if stateSync.GlobalState == "WaitingForHost" && humanPlayers >= 2 && hostPlayerID == myPlayerID {
+		p.requestStartGame(ctx, "full_sync")
+		return
+	}
 
 	// When in RoundEndWait state, auto-send RoundReady signal (same as handleStateSync)
 	if stateSync.GlobalState == "RoundEndWait" {
